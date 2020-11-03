@@ -1,0 +1,55 @@
+Determining if the pthread_create exist failed with the following output:
+Change Dir: /home/hpjeon/hw/class/udemy_C++UnitTesting/section_4_27/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_45001/fast"
+/usr/bin/make -f CMakeFiles/cmTC_45001.dir/build.make CMakeFiles/cmTC_45001.dir/build
+make[1]: Entering directory '/home/hpjeon/hw/class/udemy_C++UnitTesting/section_4_27/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_45001.dir/CheckSymbolExists.cxx.o
+/usr/bin/c++     -o CMakeFiles/cmTC_45001.dir/CheckSymbolExists.cxx.o -c /home/hpjeon/hw/class/udemy_C++UnitTesting/section_4_27/build/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx
+Linking CXX executable cmTC_45001
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_45001.dir/link.txt --verbose=1
+/usr/bin/c++       -rdynamic CMakeFiles/cmTC_45001.dir/CheckSymbolExists.cxx.o  -o cmTC_45001 
+CMakeFiles/cmTC_45001.dir/CheckSymbolExists.cxx.o: In function `main':
+CheckSymbolExists.cxx:(.text+0x1b): undefined reference to `pthread_create'
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_45001.dir/build.make:97: recipe for target 'cmTC_45001' failed
+make[1]: *** [cmTC_45001] Error 1
+make[1]: Leaving directory '/home/hpjeon/hw/class/udemy_C++UnitTesting/section_4_27/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_45001/fast' failed
+make: *** [cmTC_45001/fast] Error 2
+
+File /home/hpjeon/hw/class/udemy_C++UnitTesting/section_4_27/build/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_create
+  return ((int*)(&pthread_create))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/hpjeon/hw/class/udemy_C++UnitTesting/section_4_27/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_80bde/fast"
+/usr/bin/make -f CMakeFiles/cmTC_80bde.dir/build.make CMakeFiles/cmTC_80bde.dir/build
+make[1]: Entering directory '/home/hpjeon/hw/class/udemy_C++UnitTesting/section_4_27/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_80bde.dir/CheckFunctionExists.cxx.o
+/usr/bin/c++    -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_80bde.dir/CheckFunctionExists.cxx.o -c /home/hpjeon/hw/class/udemy_C++UnitTesting/section_4_27/build/CMakeFiles/CheckLibraryExists/CheckFunctionExists.cxx
+Linking CXX executable cmTC_80bde
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_80bde.dir/link.txt --verbose=1
+/usr/bin/c++   -DCHECK_FUNCTION_EXISTS=pthread_create    -rdynamic CMakeFiles/cmTC_80bde.dir/CheckFunctionExists.cxx.o  -o cmTC_80bde -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_80bde.dir/build.make:97: recipe for target 'cmTC_80bde' failed
+make[1]: *** [cmTC_80bde] Error 1
+make[1]: Leaving directory '/home/hpjeon/hw/class/udemy_C++UnitTesting/section_4_27/build/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_80bde/fast' failed
+make: *** [cmTC_80bde/fast] Error 2
+
+

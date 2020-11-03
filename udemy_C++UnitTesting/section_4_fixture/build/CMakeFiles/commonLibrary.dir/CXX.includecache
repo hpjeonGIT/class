@@ -1,0 +1,16 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_4/LibraryCode.cpp
+LibraryCode.hpp
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_4/LibraryCode.hpp
+stdexcept
+-
+
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_4/LibraryCode.hpp
+
