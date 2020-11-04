@@ -1,0 +1,6 @@
+/home/hpjeon/hw/class/udemy_C++UnitTesting/GoogleTestProject_backup_mock_full/build/CMakeFiles/rebuild_cache.dir
+/home/hpjeon/hw/class/udemy_C++UnitTesting/GoogleTestProject_backup_mock_full/build/CMakeFiles/mainApp.dir
+/home/hpjeon/hw/class/udemy_C++UnitTesting/GoogleTestProject_backup_mock_full/build/CMakeFiles/databaseConnectionLibrary.dir
+/home/hpjeon/hw/class/udemy_C++UnitTesting/GoogleTestProject_backup_mock_full/build/CMakeFiles/edit_cache.dir
+/home/hpjeon/hw/class/udemy_C++UnitTesting/GoogleTestProject_backup_mock_full/build/CMakeFiles/testRunner.dir
+/home/hpjeon/hw/class/udemy_C++UnitTesting/GoogleTestProject_backup_mock_full/build/CMakeFiles/employeeManagerLibrary.dir

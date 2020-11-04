@@ -5,6 +5,9 @@
 - Using cmake + google test for TDD
 - Some features of c++14 like generator and tuple
 
+# Mocking
+- Mocking means that we fake methods of a class. Instead of connection to real DB, we may mock the method, pretending to connect and testing.
+
 # Questions
 - In section 24, static void SetUpTestCase() is used. As static data, account.deposit() is given in the constructor of class AccountTestFixture. Can the initialization be located in the inside of SetUpTestCase()?
 - In section 27, parametric tests are studied while more study is required regarding TestWithParam

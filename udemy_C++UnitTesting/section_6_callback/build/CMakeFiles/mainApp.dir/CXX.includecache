@@ -1,0 +1,44 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/Employee.hpp
+string
+-
+
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/EmployeeManager.hpp
+Employee.hpp
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/Employee.hpp
+IDatabaseConnection.hpp
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/IDatabaseConnection.hpp
+map
+-
+vector
+-
+string
+-
+
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/IDatabaseConnection.hpp
+string
+-
+vector
+-
+functional
+-
+Employee.hpp
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/Employee.hpp
+
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/main.cpp
+iostream
+-
+IDatabaseConnection.hpp
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/IDatabaseConnection.hpp
+Employee.hpp
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/Employee.hpp
+EmployeeManager.hpp
+/home/hpjeon/hw/class/udemy_C++UnitTesting/section_6_callback/EmployeeManager.hpp
+

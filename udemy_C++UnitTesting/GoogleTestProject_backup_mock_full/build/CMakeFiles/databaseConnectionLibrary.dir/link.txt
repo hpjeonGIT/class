@@ -1,0 +1,2 @@
+/usr/bin/ar qc libdatabaseConnectionLibrary.a  CMakeFiles/databaseConnectionLibrary.dir/IDatabaseConnection.cpp.o
+/usr/bin/ranlib libdatabaseConnectionLibrary.a

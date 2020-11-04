@@ -1,0 +1,2 @@
+/usr/bin/ar qc libemployeeManagerLibrary.a  CMakeFiles/employeeManagerLibrary.dir/EmployeeManager.cpp.o
+/usr/bin/ranlib libemployeeManagerLibrary.a
