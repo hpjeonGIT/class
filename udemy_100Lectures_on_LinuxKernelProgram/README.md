@@ -106,7 +106,7 @@ clean:
 
 ## Lecture 15
 - Running dmesg as background
-  - dmesg -w
+  - dmesg -w &
   - Can observe module print when loaded or unloaded in the CLI
 
 ## Lecture 16
@@ -139,3 +139,69 @@ clean:
 ## Lecture 27
 - Using init_module() and cleanup_module() instead of module_init() and module_exit()
 - Check module_init_exit.c
+
+## Lecture 28
+- Passing parameters: use module_param macro
+- sudo insmod ./arguments.ko loop_count=5 name="hpjeon"
+  - no space around `=` symbol
+```
+$ dmesg
+[55604.584438] test_arguments_init: In init
+[55604.584440] test_arguments_init: Loop Count:5
+[55604.584441] test_arguments_init: Hi hpjeon
+[55604.584442] test_arguments_init: Hi hpjeon
+[55604.584442] test_arguments_init: Hi hpjeon
+[55604.584443] test_arguments_init: Hi hpjeon
+[55604.584443] test_arguments_init: Hi hpjeon
+```
+- Check /sys/module/arguments/parameters/loop_count and /sys/module/arguments/parameters/name
+
+## Lecture 29
+- Parameter data type will be checked.
+
+## Lecture 30
+- modprobe reads /etc/modprobe.conf for parameters (not existing for Ubuntu)
+
+## Lecture 33
+- Passing array as input
+- sudo insmod ./parameter_array.ko  param_array=4,5,8
+
+## Lecture 35
+- symbol: name space for memory. Could be a variable or a function
+- Every kernel image has a symbol table
+  - sudo cat /boot/System.map-4.15.0-122-generic
+
+## Lecture 36
+- How to export a symbol
+  - When you define a new function in the module
+  - EXPORT_SYMBOL or EXPORT_SYMBOL_GPL
+
+## Lecture 37
+- /boot/System.map vs /proc/kallsyms
+  - /proc/kallsyms: contains symbols of dynamically loaded modules + built-in modules
+  - /boot/System.map: only built-in modules
+
+## Lecture 38
+- sudo insmod symbol_export.ko
+- sudo cat /boot/System.map-`uname -r` doesn't find print_jiffies
+- sudo cat /proc/kallsyms  finds print_jiffies
+
+## Lecture 39
+- Module stacking
+  - New modules use the symbols exported by old modules
+  - MSDOS file system relies on symbols from FAT module
+- Steps for practice
+  - sudo insmod ./module1.ko
+  - sudo cat /proc/kallsyms |grep myadd
+  - sudo insmod ./module2.ko
+  - sudo ln -s <absolute_path>/module1.ko /lib/modules/`uname -r`/kernel/drivers/misc/
+  - sudo ln -s <absolute_path>/module2.ko /lib/modules/`uname -r`/kernel/drivers/misc/
+  - sudo depmod -a
+    - Check /lib/modules/`uname -r`/modules.dep
+  - sudo rmmod module2.ko
+  - sudo rmmod module1.ko
+  - sudo modprobe module2 # this works now
+    - After adding dependency from modprobe, loading module2 will load module1 automatically
+
+## Lecture 40
+- 
