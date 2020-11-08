@@ -52,4 +52,69 @@
   - r
   - n # x5 repetition
   - p $eax # if n x4, 0 is printed as movb $20,%al is not executed yet
-  
+
+## Section 6.19
+- Directives
+  - .CODE: start of a code Segment
+  - .DATA: start of a data Segment
+  - .STACK: start of a stack Segment
+  - .END: end of a module
+  - .DD: allocates a double storage
+  - .DWORD: same as .DD
+- [label:] mnemonic [operands] [;comment]
+  - Ex) start : mov eax,10000h ; EAX=10000h
+
+## Section 6.20
+- Big Endian: offset by significant digits
+  - First digit to the first offset
+- Little Endian: opposite of Big Endian
+  - Last digit to the first offset
+
+## Section 6.21
+```
+.section .text
+.globl  _start
+_start:
+      nop
+      movl $0x12345678, %ebx
+      bswap %ebx
+      nop
+      nop
+```
+- as -gstabs -o endian.o endian.s
+- ld -o endian endian.o
+- gdb -q endian
+  - b *_start
+  - r
+  - n # x3
+  - info Registers
+```
+rbx            0x78563412	2018915346
+```
+  - ebx=> rbx register. 78 is stored in the first offset then 56 is on the second. 34 for third and 12 on the last offset.
+
+## Section 6.22
+- Call conventions
+- x86_32, 1st-6th arguments: ebc, ecx, edx, esi ,edi, epb
+- x86_64, 1st-6th arguments: rdi, rsi, rdx, rcx, r8, r9
+- x87 (FP), 1st-6th arguments: xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6
+
+## Section 6.23
+- GAS Directives
+  - .section data
+  - .section text
+  - .lcomm: local common section
+  - .bss: block start by symbol
+  - .globl: make label accessible by other files
+
+## Section 6.24
+- NASM Directives
+  - .section .data
+  - .section .text
+  - BITS
+  - SECTION/SEGMENT
+  - EXTERN
+  - COMMON
+  - GLOBAL
+  - STATIC
+  - EQU

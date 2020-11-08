@@ -203,5 +203,62 @@ $ dmesg
   - sudo modprobe module2 # this works now
     - After adding dependency from modprobe, loading module2 will load module1 automatically
 
-## Lecture 40
-- 
+## Lecture 43
+- When MODULE_LICENSE is missing, verification fails and loading is disabled
+
+## Lecture 44
+- Tainted kernel: not supported by community. Debugging functionality and API calls are limited.
+  - Using proprietary kernel module may taint kernel
+
+## Lecture 45
+- How to check the kernel is tainted or not
+  - Check dmseg
+  - Check /proc/sys/kernel/tainted. When larger than 0, tainted
+- Or download: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/plain/tools/debugging/kernel-chktaint
+
+## Lecture 46
+- When invalid license is used, module vericiation fails and kernel is tainted
+
+## Lecture 47
+- If non-GPL license tries to use EXPORT_SYMBOL_GPL, compilation will fail
+
+## Lecture 48
+- Finding version number: modinfo ./module1.ko
+  - Find vermagic
+
+## Lecture 49
+- Module metadata
+```
+MODULE_DESCRIPTION("Hello World");
+MODULE_AUTHOR("hpjeon");
+MODULE_LICENSE("GPL");
+MODULE_VERSION("1.1.1");
+```
+- Check through modinfo command
+  - vermagic: strings are checked for matching
+  - intree: When accecpted, in-tree. Initially out-of-tree
+  - srcversion: MD4 hash of the source code
+    - Can be used to check any patching or update
+  - retpoline: against Spectre bug
+
+## Lecture 50
+- MODULE_INFO macro
+  - MODULE_VERSION(), MODULE_AUTHOR(), MODULE_LICENSE() actually call MODULE_INF()
+
+## Lecture 51
+- objdump --section-headers ./hello.ko
+- objdump --section-headers --section=.modinfo --full-contents ./hello.ko
+```
+./hello.ko:     file format elf64-x86-64
+
+Sections:
+Idx Name          Size      VMA               LMA               File off  Algn
+  4 .modinfo      000000b4  0000000000000000  0000000000000000  000000f0  2**3
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+Contents of section .modinfo:
+ 0000 76657273 696f6e3d 312e312e 31006c69  version=1.1.1.li
+ 0010 63656e73 653d4750 4c006175 74686f72  cense=GPL.author
+ 0020 3d68706a 656f6e00 64657363 72697074  =hpjeon.descript
+ 0030 696f6e3d 48656c6c 6f20576f 726c6400  ion=Hello World.
+ 0040 73726376 65727369 6f6e3d38 46423246  srcversion=8FB2F
+```
