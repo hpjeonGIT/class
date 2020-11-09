@@ -262,3 +262,6 @@ Contents of section .modinfo:
  0030 696f6e3d 48656c6c 6f20576f 726c6400  ion=Hello World.
  0040 73726376 65727369 6f6e3d38 46423246  srcversion=8FB2F
 ```
+
+## Lecture 52
+-

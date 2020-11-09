@@ -118,3 +118,68 @@ rbx            0x78563412	2018915346
   - GLOBAL
   - STATIC
   - EQU
+
+## Section 6.25
+- Linux syscalls
+```
+section .data
+   msg db  "hello, world!"
+section .text
+   global _start
+_start:
+  mov rax, 1  ; calls sys_write function
+  mov rdi, 1  ; first argument, 1 for standard output
+  mov rsi, msg ; 2nd argument
+  mov rdx, 13  ; 3rd argument. count of bytes
+  syscall
+  mov rax, 60  ; calls sys_exit
+  mov rdi, 0
+  syscall
+```
+- a function size_t sys_write( unsigned int fd, const char * buf, size_t count)
+  - fd -> rdi, 0 for standard input/1 for standard output/2 for standard error
+  - buf -> rsi, points to a character array
+  - count -> rdx, specifies the number of bytes to written
+- Google linux syscall table for the lists
+
+## Section 6.26
+- Check gas/sys_call/hello.s
+- gcc -c hello.s -no-pie
+- ld -o a.out hello.o
+
+## Section 6.27
+- Types of operand types
+  - immediate: imm, imm8, imm16, imm32
+  - registers: reg8, reg16, reg32, reg, sreg
+  - memory: mem, mem8, mem16, mem32
+
+## Section 6.28
+- MOV instruction
+  - MOV destination, source
+```
+.data
+count WORD 1
+.code
+mov ecx, 0
+mov cx, count
+```
+  - MOVZX, mov with zero-extend
+```
+.data
+byteVal BYTE 10001111b
+.code
+movzx ax,byteVal ; AX=0000000010001111b
+```
+  - MOVSX, mov with sign-extend
+```
+.data
+byteVal BYTE 10001111b
+.code
+movsx ax,byteVal ; AX=1111111110001111b
+```
+
+## Section 6.30
+- Memory addressing modes
+  - Effective Address = BaseReg + IndexReg * ScaleFactor + Disp
+  - Ex) mov eax, [MyArray+esi*4]
+  - Ex) mov eax, [ebx+esi+12]
