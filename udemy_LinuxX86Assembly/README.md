@@ -147,13 +147,13 @@ _start:
 - gcc -c hello.s -no-pie
 - ld -o a.out hello.o
 
-## Section 6.27
+## Section 7.27
 - Types of operand types
   - immediate: imm, imm8, imm16, imm32
   - registers: reg8, reg16, reg32, reg, sreg
   - memory: mem, mem8, mem16, mem32
 
-## Section 6.28
+## Section 7.28
 - MOV instruction
   - MOV destination, source
 ```
@@ -178,8 +178,65 @@ byteVal BYTE 10001111b
 movsx ax,byteVal ; AX=1111111110001111b
 ```
 
-## Section 6.30
+## Section 7.30
 - Memory addressing modes
   - Effective Address = BaseReg + IndexReg * ScaleFactor + Disp
   - Ex) mov eax, [MyArray+esi*4]
   - Ex) mov eax, [ebx+esi+12]
+
+## Section 8.31
+- Arithmetic Instruction
+  - ADD, SUB, MUL, IMUL, DIV, IDIV, INC, DEC, IndexReg
+
+## Section 8.32
+- Increment/decrement: INC/DEC reg/mem
+```
+.data
+myWord WORD 1000h
+.code
+inc myWord ; myWord = 1001h
+mov bx, myWord
+dec bx ; bx = 1000h
+```
+
+## Section 8.33
+- ADD/SUB dest, source
+```
+.data
+var1 DWORD 3000h
+var2 DWORD 1000h
+.code
+mov eax, var1 ; eax = 3000h
+sub eax, var2 ; eax = 2000h
+```
+
+## Section 8.34
+- as -gstabs sub.o sub.s
+- ld -o sub sub.o
+- gdb -q sub
+  - b *_start
+  - run
+
+## Section 8.35
+- OFFSET
+- PTR
+- TYPE
+- LENGTHOF
+- SIZEOF
+- LABEL
+- ALIGN
+
+## Section 8.36
+- sal: Shift Arithmetic Left
+- gdb command:
+  - x : displays memory contents
+  - x/d: displays memory contents in decimal
+  - Ex) x/d &value1
+
+## Section 8.37
+- Index addressing in AT&T syntax
+- base_address(offset_address, index, size)
+```
+movl $2, %edi
+movl values(, %edi, 4), %eax
+```
