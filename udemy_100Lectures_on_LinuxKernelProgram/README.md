@@ -317,3 +317,76 @@ cat /proc/sys/kernel/printk
 
 ## Lecture 7.63
 - printk() will inject "\n" anyway
+
+## Lecture 7.64
+- print_hex_dump()
+
+## Lecture 7.65
+- print_hex_dump_bytes()
+
+## Lecture 7.66
+- Dynamic Debug
+  - CONFIG_DYNAMIC_DEBUG
+    - check /boot/config-`uname -r`
+  - dynamic_pr_debug()
+    - pr_debug() prints too many logging info.
+    - mount |grep debugfs
+      - debugfs is mounted
+
+## Lecture 9.73
+- Kernel panic : an error in the kernel code
+  - calls panic() function to dump debug info.
+  - /proc/sys/kernel/panic : After N seconds, will reboot
+- panic_test.c
+  - Will reboot the OS
+
+## Lecture 9.74
+- OOPS : similar to segfault in user space
+  - Processor status
+  - Contents of CPU registers
+  - Call trace
+- oops_test.c
+```
+[Fri Nov  6 10:00:50 2020] IP: test_oops_init+0x1c/0x30 [oops_test]
+[Fri Nov  6 10:00:50 2020] PGD 0 P4D 0
+[Fri Nov  6 10:00:50 2020] Oops: 0002 [#1] SMP PTI
+```
+
+## Lecture 9.76
+- BUG_ON(condition) : macro in Linux device drivers
+  - Same as `if (condition) BUG()`
+- BUG()
+  - prints the contents of the registers
+  - prints stack trace
+  - kill process
+- bug_test.c
+  - dmesg shows:
+```
+ kern  :crit  : [169315.139710] kernel BUG at /home/hpjeon/hw/class/udemy_100Lectures_on_LinuxKernelProgram/section_9/bug_test.c:7!
+```
+
+## Lecture 9.77
+- oops/BUG() module will not be able to be removed
+
+## Lecture 10.80
+- Counting the number of CPUs
+- cat /proc/cpuinfo
+- num_online_cpus() in online_cpus.c
+
+## Lecture 10.81
+- Linux kernel internally refers processes as tasks
+- List of processes is stored as the task list, which is a circular doubly linked list
+- /lib/modules/4.15.0-122-generic/build/include/linux/sched.h
+  - struct task_struct {}
+- State of a process
+  - R: Running or on a run-queue
+  - S: Sleeping/blocked. Can be runnable/awaken by a signal
+  - D: Similar to S but not waken-up by a signal
+  - T: Stopped
+  - I: Idling
+  - ps -el shows the states of processes
+
+## Lecture 10.82
+- Read task_struct of the corresponding process when a module needs info in the kernel
+- current.c
+  - Will print insmod when inserted. rmmod for removal.
