@@ -1,5 +1,7 @@
 # Class title
 - Learn Linux Kernel Programming by Linux Trainer
+- Interfacing kernel modules using insmod/rmmod using printk, init, exit
+- Actual kernel core programming is not addressed
 
 ## Lecture 1.2
 - Kernal module: loadable. Not requiring rebooting of the system
@@ -386,7 +388,51 @@ cat /proc/sys/kernel/printk
   - I: Idling
   - ps -el shows the states of processes
 
-## Lecture 10.82
+## Lecture 10.82-83
 - Read task_struct of the corresponding process when a module needs info in the kernel
 - current.c
   - Will print insmod when inserted. rmmod for removal.
+  - current macro from <asm/current.h>
+
+## Lecture 10.86
+- Process memory map
+- ps -ef # find id like 3637
+- cat /proc/3637/maps
+  - Those info are stored in struct mm_struct
+
+## Lecture 11.88
+- Kernel thread: Linux task running in kernel mode only
+- ps -ef resuls with []
+```
+root     18658     2  0 15:21 ?        00:00:00 [kworker/2:3]
+root     18659     2  0 15:21 ?        00:00:00 [kworker/0:1]
+hpjeon   18675  3652 20 15:21 pts/0    00:03:53 /usr/lib/firefox/firefox -privat
+hpjeon   18738 18675 33 15:21 pts/0    00:06:20 /usr/lib/firefox/firefox -conten
+```
+- ps 18658 and 18659 are kernel threads
+- Compared to user thread, kernel threads don't have address space. mm variable in task_struct {} is NULL
+
+## Lecture 11.89
+- kthread_create()/kthread_stop() in kthread.c
+
+## Lecture 11.93
+- If kthread_should_stop() is not used, process is killed when the module is removed
+
+## Lecture 11.94
+- If kthread_stop() is not used, oops happens when rmmod is tried. The module will not be removed
+
+## Lecture 12.97
+- LINUX_VERSION_CODE at /lib/modules/4.15.0-122-generic/build/include/generated/uapi/linux/version.h
+- /lib/modules/4.15.0-122-generic/build/Makefile
+```
+VERSION = 4
+PATCHLEVEL = 15
+SUBLEVEL = 18
+```
+- LINUX_VERSION_CODE = 65536 * VERSION + 256 * PATCHLEVEL + SUBLEVEL
+
+## Lecture 12.98
+- KERNEL_VERSION macro
+
+## Lecture 13.103
+- __init will make the kernel to remove init function after loading the module, saving memory

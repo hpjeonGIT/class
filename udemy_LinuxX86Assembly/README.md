@@ -240,3 +240,27 @@ sub eax, var2 ; eax = 2000h
 movl $2, %edi
 movl values(, %edi, 4), %eax
 ```
+
+## Section 8.38
+- JE : if equal
+- JZ : if zero
+- JNE : if not equal
+- JNZ : if not zero
+- JG : if the first operand is greater than second
+- JGE : if the first operand is greater or equal to second
+
+## Section 8.39
+- Conditional branching
+- JMP destination
+
+## Section 8.40
+- Logic instructions
+- AND destination, source
+- OR destination, source
+- CMP destination, source
+
+## Section 8.42
+- as -gstabs -o jump.o jump.s
+- ld -o jump jump.o
+- As ebx is greater than eax, tp1: is skipped and goes to greater:
+- In gdb, use `info register` to see the current value of registers such as rax, rbx, rcx, ...
