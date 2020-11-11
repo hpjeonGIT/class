@@ -436,3 +436,19 @@ SUBLEVEL = 18
 
 ## Lecture 13.103
 - __init will make the kernel to remove init function after loading the module, saving memory
+
+## Lecture 13.105
+- __exit is a macro from linux/init.h
+- built-in  module doesn't need exit function. When built-in, __exit will disregard the exit function
+- Good practice to have
+
+## Lecture 13.106
+- __initdata/__exitdata: when __init is used in the init function
+
+## Lecture 13.107
+- The list of built-in modules at /lib/modules/`uname -r`/modules.builtin
+
+## Lecture 13.109
+- Blacklisting modules : blacklist <modulename>
+  - /etc/modprobe.d/*.conf with blacklist keyword
+  - sudo update-initramfs -u # updating initial ram disk
