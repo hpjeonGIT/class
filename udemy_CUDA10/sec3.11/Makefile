@@ -1,4 +1,4 @@
-CUDAFLAGS ?= -g -G -lineinfo  -arch=sm_60
+CUDAFLAGS ?= -g -lineinfo  
 
 ALL = monochrome
 

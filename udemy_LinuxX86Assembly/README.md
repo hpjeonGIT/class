@@ -233,7 +233,7 @@ sub eax, var2 ; eax = 2000h
   - x/d: displays memory contents in decimal
   - Ex) x/d &value1
 
-## Section 8.37
+## Section 9.37
 - Index addressing in AT&T syntax
 - base_address(offset_address, index, size)
 ```
@@ -241,7 +241,7 @@ movl $2, %edi
 movl values(, %edi, 4), %eax
 ```
 
-## Section 8.38
+## Section 10.38
 - JE : if equal
 - JZ : if zero
 - JNE : if not equal
@@ -249,18 +249,80 @@ movl values(, %edi, 4), %eax
 - JG : if the first operand is greater than second
 - JGE : if the first operand is greater or equal to second
 
-## Section 8.39
+## Section 10.39
 - Conditional branching
 - JMP destination
 
-## Section 8.40
+## Section 10.40
 - Logic instructions
 - AND destination, source
 - OR destination, source
 - CMP destination, source
 
-## Section 8.42
+## Section 10.42
+- cd ConditionalJump
 - as -gstabs -o jump.o jump.s
 - ld -o jump jump.o
 - As ebx is greater than eax, tp1: is skipped and goes to greater:
 - In gdb, use `info register` to see the current value of registers such as rax, rbx, rcx, ...
+
+## Section 10.43
+- jmp _bottom will go to _bottom: section, without running the left-over in the _start: section
+- cd jmp
+- as -gstabs -o jmp.o jmp.s
+- ld -o jmp jmp.o
+
+## Section 10.44
+- CALL jump
+- jmp just go to _bottom: and no return to start. CALL will return to _start to continue the left-over (below of call _bottom)
+- gdb doesn't show the section of _bottom: while results are reflected in the register
+  - _bottom: section is executed as one line
+
+## Section 10.45
+- Instruction operands
+| Type    |   Example            | C/C++              |
+|---------|----------------------|--------------------|
+|Immediate| mov eax,42           | eax=42             |
+|         | imul ebx,11h         | ebx *=0x11         |
+|         | xor dl,55h           | dl ^=0x55          |
+|         | add esi,8            | esi += 8           |
+|---------|----------------------|--------------------|
+|Register | mov eax,ebx          | eax = ebx          |
+|         | inc ecx              | ecx +=1            |
+|         | add ebx,esi          | ebx +=esi          |
+|         | mul ebx              | ebx:eax = eax*ebx  |
+|---------|----------------------|--------------------|
+| Memory  | mov eax,[ebx]        | eax =*ebx          |
+|         | add eax,[val1]       | eax +=*val1        |
+|         | or ecx,[ebx+esi]     | ecx |= *(ebx+esi)  |
+|         | sub word ptr[edi],12 | *(short*) edi -=12 |
+
+
+## Section 11.46
+- Inline assembly with C/C++
+- Using __asm__() function in the C code
+- gcc -no-pie main.c
+
+## Section 11.47
+- Single% for operands. %% for registers.
+- Extended assembly
+  - a: eax, rax, ax, al
+  - b: ebx, rbx, bx, bl
+  - c: ecx, rcx, cx, cl
+  - __asm__("assembly code": "=a"(result): "d"(data1), "c"(data2))
+    - This means : edx = data1, ecx=data2, result=eax
+
+## Section 11.48
+- Inline assembly extended format with placeholders
+```
+__asm__("assembly code... using %1,%2,%0"
+      : "=r"(result)
+      : "r"(data1), "r"(data2));
+```
+  - %0 will represent reg for result
+  - %1 will represent reg for data1
+  - %2 will represent reg for data2
+
+## Section 11.49-51
+- Referencing placeholders
+- %1 => %[value1] as alternate placeholders

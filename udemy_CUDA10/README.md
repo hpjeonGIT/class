@@ -62,7 +62,7 @@ Thread 1 "array-add-bug" received signal CUDA_EXCEPTION_1, Lane Illegal Address.
 - cudaSuccess, cudaError_t
 - Helper functions - cudaGetErrorString(), cudaGetLastError()
 
-## 3.11
+### 3.11
 - Converting color ppm to grey
 ```
 ./monochrome flower.ppm out.ppm
@@ -70,6 +70,7 @@ kernel ran in 0 ms
 ```
 - Enabling profiling
   - make CUDAFLAGS=-lineinfo
+  - Or edit Makefile as `CUDAFLAGS ?= -g -lineinfo -arch=sm_60`
   - -lineinfo still optimizes while keeps the line number as well
   - nvvp monochrome ./flower.ppm out.ppm
     - When: Failed to load module "canberra-gtk-module"
@@ -82,4 +83,29 @@ kernel ran in 0 ms
       - sudo /usr/local/cuda-11.1/bin/nvvp  ./monochrome  flower.ppm  out.ppm
         - sudo might be necessary due to security issue
       - Analysis tab -> Switch to unguided analysis -> Analysis tab -> Application -> Compute Utilization -> Select Kernel from Results panel -> Now Analysis tab shows the available profiling results such as Kernel Performace Limiter, ..., Global Memory Access Pattern, Kernel Profile - PC Sampling
-![Snapshot of nvvp](https://github.com/hpjeonGIT/class/udemy_CUDA10/nvpp_snapshot.png)
+![Snapshot of nvvp](./nvpp_snapshot.png)
+
+### 3.12
+- Memory Hierarchy
+  -  Global memory -> L2 cache -> SM
+- For monochrome example
+  - Disable or comment out -G option (debug for GPU)
+  - Keep -lineinfo. This will still optimize
+- Checking produced instructions
+  - cuobjdump -sass monochrome | cut -c -80 |less
+```                  
+        /*00e8*/                   FFMA R7, R7, 0.1875, R0 ;                    
+        /*00f0*/                   STG.E [R4], R7 ;                             
+        /*00f8*/                   STG.E [R4+0x4], R7 ;                         
+
+        /*0108*/                   STG.E [R4+0x8], R7 ;                         
+        /*0110*/                   LDG.E R6, [R2+0xc] ;                         
+        /*0118*/                   STG.E [R4+0xc], R6 ;            
+```
+  - Dump CUDA instructions
+  - nvvp shows a message of inefficient alignment
+- For monochrome.cu with better performance, adjust ../util.h
+  - `struct pixel {` to `struct __align__(16) pixel{`
+  - Increases Device memory utilization from 65% to 85%
+- In nvpp
+  - Analysis tab -> 1. CUDA Application Analysis -> click Examine individual kernels -> 2. Performance-Critical Kernels -> click Perform Kernel Analysis -> 3. Compute, Bandwidth, or Latency Bound -> click Perform Memory Bandwidth analysis

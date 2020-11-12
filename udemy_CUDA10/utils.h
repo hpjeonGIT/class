@@ -15,7 +15,7 @@
   }
 
 /* A single pixel with floating-point channel values */
-struct pixel {
+struct __align__(16)  pixel {
   float red;
   float green;
   float blue;
