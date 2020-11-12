@@ -107,5 +107,51 @@ kernel ran in 0 ms
 - For monochrome.cu with better performance, adjust ../util.h
   - `struct pixel {` to `struct __align__(16) pixel{`
   - Increases Device memory utilization from 65% to 85%
+    - This may work up to 4 floats or 2 doublesa
 - In nvpp
   - Analysis tab -> 1. CUDA Application Analysis -> click Examine individual kernels -> 2. Performance-Critical Kernels -> click Perform Kernel Analysis -> 3. Compute, Bandwidth, or Latency Bound -> click Perform Memory Bandwidth analysis
+
+### 3.13
+- splotlights.cu
+- plain floating operation. No index or array in light_brightness()
+- Add -lineinfo to CUDAFLAGS in Makefile
+- sudo /usr/local/cuda-11.1/bin/nvvp  ./monochrome  flower.ppm  out.ppm
+- How to align warp memory for 2D memory map?
+  - Use cudaMallocPitch()
+  - pitch will be used for cudaMemcpy2D. This is copy b/w device and device
+
+### 3.14
+- Texture cache and constant cache
+- Built-in memory of each SM
+- Constant memory
+  - Read-only for Kernels
+  - cached on the SM
+  - Fast when all threads read the same address
+
+### 3.15
+- Instruction and Control Flow Optimizations
+- __function = lower digit functions
+- or use : make CUDAFLAGS=--use_fast_math will use lower digit but fast math functions
+
+### 4.16
+- Introduction to shared memory
+```
+__shared__ float tile[TILE_DIM][TILE_DIM + 1];
+...
+  tile[threadIdx.y][threadIdx.x] = source[source_index];
+...
+  cooperative_groups::thread_block block =
+      cooperative_groups::this_thread_block();
+  cooperative_groups::sync(block); # will wait all threads in the block to finish, aligning memory
+```
+- Bank Conflicts
+  - Banks of 32 elements
+  - Banks can broadcast to multiple threads
+  - Can retrieve one element at a time
+- transpose-shared is 3x faster than transpose
+
+### 4.17
+- Reduction
+
+### 4.18
+- Prefix sum
