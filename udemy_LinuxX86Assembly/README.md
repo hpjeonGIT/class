@@ -427,3 +427,18 @@ _load:
 - STD: Sets the Direction flag as 0, going backwards
 - REP: Repeat String operation
   - `rep movsb`
+
+## Section 12.59
+- Convert lower cases to upper cases
+- LODS: Loads a byte, word, or doubleword from the source operand into AL, AX, or EAX
+- STOSB:  copies the data from AL, AX, or EAX to the destination string
+
+## Section 12.60
+- String comparison
+- CMPSB: compares a byte value
+- CMPSW: compares 2 bytes or word
+- CMPSL: compares 4 bytes or longword
+- compare.s
+  - `Test` vs `Test` : p $ebx in gdb will print zero
+  - `Test` vs `Tess` : p $ebx in gdb will print one
+  - `Test` vs `Test1` : p $ebx in gdb will print zero

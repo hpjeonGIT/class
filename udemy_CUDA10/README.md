@@ -1,8 +1,8 @@
 ## Title Learning CUDA 10 Programming
 - Nathan Weston
 
-## Q
-- where is deviceQuery?
+## Review
+- Too much skipping. Not recommended.
 
 ## Section 2
 ### 2.6
@@ -156,3 +156,14 @@ __shared__ float tile[TILE_DIM][TILE_DIM + 1];
 ### 4.18
 - Prefix sum
 - workefficient scan algorithm from nvidia sample code
+
+### 6.24
+- Concurrency
+  - Multiple concurrent kernels
+  - Controlled by stream
+- Default stream runs sequentially
+- For concurrent Kernels
+  - Make multiple streams and run kernels concurrently
+
+### 6.25
+- cudaMemcpyAsync() for asynchronous copies
