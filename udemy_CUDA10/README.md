@@ -155,3 +155,4 @@ __shared__ float tile[TILE_DIM][TILE_DIM + 1];
 
 ### 4.18
 - Prefix sum
+- workefficient scan algorithm from nvidia sample code

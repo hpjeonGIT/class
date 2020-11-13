@@ -326,3 +326,104 @@ __asm__("assembly code... using %1,%2,%0"
 ## Section 11.49-51
 - Referencing placeholders
 - %1 => %[value1] as alternate placeholders
+
+## Section 11.52
+- Using memory location
+```
+__asm__(
+  "divb %2\n\t"
+  "movl %%eax, %0"
+  :"=m"(result)
+  :"a"(dividend),"m"(divisor)
+);
+```
+
+## Section 11.53
+- Using FPU
+  - f: any floating point reg
+  - t: top floating point reg
+  - u: second floating point reg
+```
+__asm__(
+  "fsincos"
+  :"=t"(cosine),"=u"(sine)
+  :"0"(radian)
+);
+```
+  - fsincos: computes sine/cosine of the source operand in register ST(0), which is a stack, then stores the sine in ST(0) and pushes cosine onto the top of FPU register stack. This is faster than executing FSIN and FCOS sequentially
+
+## Section 11.54
+- Jump in the Assembly
+```
+__asm__(
+  "cmp %1, %2\n\t"
+  "jge greater\n\t"
+  "movl %1, %0\n\t"
+  "jmp end\n"
+  "greater: \n\t"
+  "movl %2,%0\n"
+  "end:"
+  :"=r"(result)
+  :"r"(a), "r"(b)
+);
+```
+
+## Section 11.55
+- Assembly MACRO
+```
+#define GREATER(a,b,result) ({\
+  __asm__( \
+          "cmp %1, %2\n\t" \
+          "jge 0f\n\t" \
+          "movl %1,%0\n\t" \
+          "jmp 1f\n" \
+          "0: \n\t" \
+          "movl %2, %0\n\t" \
+          "1: " \
+          :"=r"(result) \
+          :"r"(a), "r"(b) \
+        ); \
+})
+...
+   GREATER(data1,data2,result);
+```
+
+## Section 12.56
+- Moving bytes of strings
+- movsb: moving a single byte
+- movsw: moving 2 bytes or 16 bits (word)
+- movsl: moving 4 bytes or longword (doubleword)
+```
+25	  movsw
+(gdb) x/s &output
+0x6000e8 <output>:	"T"
+(gdb) n
+26	  movsl
+(gdb) x/s &output
+0x6000e8 <output>:	"Thi"
+(gdb) n
+28	  movl $1, %eax
+(gdb) x/s &output
+0x6000e8 <output>:	"This is"
+```
+
+## Section 12.57
+- Moving entire strings
+```
+_load:
+  movsb
+  loop _load
+```
+- When entire bytes are moved, loop _load will exit by default (?)
+
+## Section 12.58
+- Load string with REP instruction
+- MOVS (copy mem to mem)
+- STOS (store AL/AX/EAX/RAX)
+- SCAS (scan string)
+- CMPS (compare string)
+- LODS (load string)
+- CLD: clears the direction flag as 0, and instructions work by incrementing the pointer to the data
+- STD: Sets the Direction flag as 0, going backwards
+- REP: Repeat String operation
+  - `rep movsb`
