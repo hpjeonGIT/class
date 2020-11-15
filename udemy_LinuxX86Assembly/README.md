@@ -1,6 +1,9 @@
 # Title
 - Linux x86 Assembly Language Programming from Ground Up
 
+# Review
+- No AVX, NO SSE coding example
+
 #Tools
 - sudo apt install nasm
 - sudo snap install atom --classic
@@ -446,6 +449,7 @@ _load:
 ## Section 12.61
 - Sentence comparison
 - int $0x80 doesn't RETURN. The sample code keeps running, passing equal: section even when two strings are different. How to exit in the middle?
+  - Add `jmp hr2` after int $0x80
 
 ## Section 12.62
 - Find a character in the string
@@ -458,6 +462,7 @@ _load:
 - .asciz/.string: zero terminates the string
 - .ascii: no zero terminate
 - gcc hello.s -no-pie; ./a.out
+- `xor %rdi,%rdi` sets 0000 in the first operand (initialization)
 
 ## Section 13.64
 - Calling C libraries using nasm
@@ -489,3 +494,70 @@ cmovl %rsi, %rax
 - nasm -felf64 fib.as
 - gcc -no-pie fib.o
 - ./a.out
+
+## Section 13.68
+- Reading command line arguments
+- In main(int argc, char** argv)
+  - argc = %rdi, argv= %rsi
+- gcc com.s -no-pie
+- ./a.out  1 2 3
+```
+1
+2
+3
+```
+- Arguments are treated as strings
+
+## Section 13.69
+- nasm -felf64 hello.asm
+- gcc -no-pie hello.o
+- ./a.out a1 a2 a3
+```
+a1
+a2
+a3
+```
+
+## Section 13.70
+- Power operation: x^y
+- Multiplication of x with y times
+- gcc power.s -no-pie
+- ./a.out 2 3
+```
+8
+```
+
+## Section 13.71
+- nasm version of 13.70
+- nasm -felf64 power.asm
+- gcc -no-pie power.o
+- ./a.out 3 3
+
+## Section 13.72
+- Mixing floating point registers with C
+- gcc sum.s main.c
+- ./a.out
+
+## Section 13.73
+- Recursive algorithm
+- gcc fact.s main.c ; ./a.out
+
+## Section 13.74
+- Using stack point register, scanning CLI arguments
+- nasm -felf64 add.asm
+- ld -o add add.o
+- ./add 1 2
+
+## Section 13.75
+- Bubble sorting algorithm
+- as -gstabs  -o bubble.o bubble.s
+- ld bubble.o
+- gdb ./a.out
+  - b *end
+  - run
+  - x/10d &values
+```  
+0x6000e6:	3	5	6	9
+0x6000f6:	10	12	13	45
+0x600106:	67	87
+```
