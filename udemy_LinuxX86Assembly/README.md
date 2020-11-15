@@ -442,3 +442,50 @@ _load:
   - `Test` vs `Test` : p $ebx in gdb will print zero
   - `Test` vs `Tess` : p $ebx in gdb will print one
   - `Test` vs `Test1` : p $ebx in gdb will print zero
+
+## Section 12.61
+- Sentence comparison
+- int $0x80 doesn't RETURN. The sample code keeps running, passing equal: section even when two strings are different. How to exit in the middle?
+
+## Section 12.62
+- Find a character in the string
+- SCASB: scan a byte
+- SCASW
+- SCASL
+
+## Section 13.63
+- Calling C libraries
+- .asciz/.string: zero terminates the string
+- .ascii: no zero terminate
+- gcc hello.s -no-pie; ./a.out
+
+## Section 13.64
+- Calling C libraries using nasm
+- nasm -felf64 hello.asm
+- gcc hello.o -no-pie
+- ./a.out
+
+## Section 13.65
+- Mixing C & Assembly
+```
+cmp   %rsi, %rax
+cmovl %rsi, %rax
+```
+  - if rax < rsi, then rax = rsi # at&t. nasm is opposite(?)
+- Ref: http://6.s081.scripts.mit.edu/sp18/x86-64-architecture-guide.html
+  - %rax: temp register, return value
+  - %rdi: 1st argument to function
+  - %rsi: 2nd argument to function
+  - %rdx: 3rd argument to function
+  - %rcx: 4th argument to function
+- cc -std=c99 max.c max.s ; ./a.out
+
+## Section 13.66
+- Fibonacci number (gas version)
+- gcc fib.s -no-pie; ./a.out
+
+## Section 13.67
+- Fibonacci number (nasm version)
+- nasm -felf64 fib.as
+- gcc -no-pie fib.o
+- ./a.out
