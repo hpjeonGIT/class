@@ -71,6 +71,105 @@ end
 - To see the methods of an object: "Hello".methods
   - Equivalent to dir("hello") in python
 
-## Section 12. Array and loops
+## Section 12. Array hash and loops
 - Arrays use []
   - `x = [1,3,7]`
+- Array hash
+  - `user = {'firstname'=> 'John',  'lastname'=>'Smith' }`
+  - `user = [ {'firstname'=> 'John',  'lastname'=>'Smith' }, { 'firstname'=>'Brad', 'lastname'=>'Trav'} ]`
+  - Corresponds to dictionary in Python
+- Loops
+  - `5.times do puts "Hello world" end`
+    - New line after Hello world
+  - `5.times { print("Hello world") }`
+    - No new line. Texts will be concatenated
+  - `3.upto(10) {puts "Hello world"}`
+    - 8 times repetitions
+  - `3.downto(1) {puts "Hello world"}`
+    - 3 times repetitions
+  - atoms = [ "Hyd", "Hel", "Li"]; atoms.each{ |x| puts x}
+```
+irb(main):003:0> while x < limit
+irb(main):004:1> puts x
+irb(main):005:1> x += 1
+irb(main):006:1> end
+```
+
+## Section 13. Objects and classes
+- Defining class components
+```
+irb(main):007:0> class Car
+irb(main):008:1> attr_accessor :make, :model, :color
+irb(main):009:1> end
+```
+  - car1 = Car.new # makes a new class object
+  - car1.make = 'Honda'
+- Defining class functions
+```
+irb(main):020:0> class Car
+irb(main):021:1> def drive
+irb(main):022:2> print 'Driving'
+irb(main):023:2> end
+irb(main):024:1> end
+```
+  - car1 = Car.new; car1.drive
+- Inheriting classes
+```
+irb(main):001:0> class Vehicle
+irb(main):002:1> attr_accessor :make, :color, :year
+irb(main):003:1> end
+=> nil
+irb(main):004:0> class Car < Vehicle
+irb(main):005:1> attr_accessor :fourwheel
+irb(main):006:1> end
+```
+
+## Section 17. Generating Controllers and Views
+- At myruby/, rails generate controller posts
+  - This will generate myruby/app/views/posts folder
+  - Edit myruby/app/controllers/posts_controller.rb
+```
+class PostsController < ApplicationController
+  def index
+
+  end
+end
+```  
+  - Provide myruby/app/views/posts/index.html.erb
+```
+<h1> Blog Posts </h1>
+<h3> Sample Post </h3>
+<p> This is a sample text for new Ruby app </p>
+<hr>
+<h3> Sample Post 2 </h3>
+<p> This is a 2nd sample text for new Ruby app </p>
+```
+  - Update app/config/routes.rb
+```
+Rails.application.routes.draw do
+  get 'home/index'
+    resources  :posts
+  root :to => 'home#index'
+end
+```
+  - Now load 127.0.0.1:3000/posts
+
+## Section 18. Action Controllers & Routes
+- At myruby folder, `rake routes`
+  - Shows Prefix, Verb, URI Pattern
+- Make app/views/posts/edit.html.erb, show.html.erb
+  - Provide html grammar within
+- In app/controllers/posts_controller.rb, provide functions of edit, show such as
+```
+class PostsController < ApplicationController
+  def index
+    @content_first = 'This is a content from posts_controller'
+    @content_second = 'This is a function from posts_controller'
+  end
+  def edit
+  end
+  def show
+  end
+```
+- Now load `127.0.0.1:3000/posts/edit`
+- In app/views/posts/index.html.erb, contents from app/controllers/posts_controller.rb can be used by injecting `<p><%=@content_first %> </p>`
