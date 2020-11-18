@@ -173,3 +173,5 @@ class PostsController < ApplicationController
 ```
 - Now load `127.0.0.1:3000/posts/edit`
 - In app/views/posts/index.html.erb, contents from app/controllers/posts_controller.rb can be used by injecting `<p><%=@content_first %> </p>`
+
+## Section 19. Database planning and model creation
