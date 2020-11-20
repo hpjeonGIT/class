@@ -1,0 +1,14 @@
+==15660== NVPROF is profiling process 15660, command: ./a.out
+==15660== Profiling application: ./a.out
+==15660== Profiling result:
+   Start  Duration            Grid Size      Block Size     Regs*    SSMem*    DSMem*      Size  Throughput  SrcMemType  DstMemType           Device   Context    Stream  Name
+253.87ms  169.15us                    -               -         -         -         -  256.00KB  1.4434GB/s    Pageable      Device  GeForce GT 1030         1         7  [CUDA memcpy HtoD]
+254.05ms  17.475us            (128 1 1)       (256 1 1)        10  4.0000KB        0B         -           -           -           -  GeForce GT 1030         1         7  sum_reduction(int*, int*) [114]
+254.07ms  2.7520us              (1 1 1)       (256 1 1)        10  4.0000KB        0B         -           -           -           -  GeForce GT 1030         1         7  sum_reduction(int*, int*) [115]
+254.07ms  152.63us                    -               -         -         -         -  256.00KB  1.5995GB/s      Device    Pageable  GeForce GT 1030         1         7  [CUDA memcpy DtoH]
+
+Regs: Number of registers used per CUDA thread. This number includes registers used internally by the CUDA driver and/or tools and can be more than what the compiler shows.
+SSMem: Static shared memory allocated per CUDA block.
+DSMem: Dynamic shared memory allocated per CUDA block.
+SrcMemType: The type of source memory accessed by memory operation/copy
+DstMemType: The type of destination memory accessed by memory operation/copy
