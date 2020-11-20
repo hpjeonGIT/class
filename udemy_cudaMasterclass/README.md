@@ -85,6 +85,7 @@ printf("Sum array CPU wall time = %4.6f\n",
 
 ## Assignment 2
 - In the assignment you have to implement array summation in GPU which can sum 3 arrays. You have to use error handling mechanisms, timing measuring mechanisms as well.Then you have to measure the execution time of you GPU implementations.
+
 | block_size | cpu  | gpu  | host->device | device->host |
 |------------|------|------|--------------|--------------|
 |64          |0.0168|0.0027|0.031         | 0.010        |
@@ -115,3 +116,153 @@ Device 0: GeForce GT 1030
 ```
 
 ## 19. Understanding the device better
+- In each block, warp scheduler and shared memory exist
+- A single thread block must match one SM (stream multiprocessor)
+
+## 20. Warps
+- Thread blocks are divided into smaller units called warps, which have 32 consecutive threads
+- CUDA execution model ref: https://stackoverflow.com/questions/10460742/how-do-cuda-blocks-warps-threads-map-onto-cuda-cores
+- GT1030 has 1024 threads per block as max
+  - This means 32 warps per block as max
+  - 3 SM with 2048 threads each
+    - Each SM has 128 CUDA cores
+    - There could be 6 blocks with 1024 threads each, implying 192 warps
+- Only 4 warps can run simultaneously
+- A single thread block -> partitioned over warps -> now those threads run with a single instruction (SIMT)
+  - Unit of warp allocation is multiples of 32. Could be waste if less than 32 threads are used
+
+## 21. Warp divergence
+- Within a single warp, some threads have different instruction than others, this is a warp divergence
+  - Significant penalty
+  - Any if statement may yield divergence
+  - Make conditional flow in units of warp size (=32)
+- How to calculate branch efficiency
+  - 100*((N. branches - N. divergent branches)/N. branches)
+```
+if (tid%2 !=0){
+  // do something
+} else {
+  // do another
+}
+```
+  - 100*(2-1)/2 = 50% branch efficiency
+- Comparison of conditional flow by warp id or not
+  - Use 3_warp_divergence.cu
+  - `sudo /usr/local/cuda-11.1/bin/nvprof --metrics branch_efficiency ./a.out`
+  - Default compilation will optimize the code and efficiency will be 100%
+  - Use -G as a debug mode, then the difference is found
+```
+$ nvcc -G 3_warp_divergence.cu
+$ sudo /usr/local/cuda-11.1/bin/nvprof --metrics branch_efficiency ./a.out
+
+-----------------------WARP DIVERGENCE EXAMPLE------------------------
+
+==20446== NVPROF is profiling process 20446, command: ./a.out
+==20446== Profiling application: ./a.out
+==20446== Profiling result:
+==20446== Metric result:
+Invocations                               Metric Name                        Metric Description         Min         Max         Avg
+Device "GeForce GT 1030 (0)"
+    Kernel: code_without_divergence(void)
+          1                         branch_efficiency                         Branch Efficiency     100.00%     100.00%     100.00%
+    Kernel: divergence_code(void)
+          1                         branch_efficiency                         Branch Efficiency      83.33%      83.33%      83.33%
+```
+
+## 23. Resources partitioning and latency hiding 2
+- nvidia-smi -a -q -d CLOCK
+```
+==============NVSMI LOG==============
+
+Timestamp                                 : Fri Nov 20 10:33:13 2020
+Driver Version                            : 455.45.01
+CUDA Version                              : 11.1
+
+Attached GPUs                             : 1
+GPU 00000000:01:00.0
+    Clocks
+        Graphics                          : 139 MHz
+        SM                                : 139 MHz
+        Memory                            : 405 MHz
+        Video                             : 544 MHz
+    Applications Clocks
+        Graphics                          : N/A
+        Memory                            : N/A
+    Default Applications Clocks
+        Graphics                          : N/A
+        Memory                            : N/A
+    Max Clocks
+        Graphics                          : 1911 MHz
+        SM                                : 1911 MHz
+        Memory                            : 3004 MHz
+        Video                             : 1708 MHz
+    Max Customer Boost Clocks
+        Graphics                          : N/A
+    SM Clock Samples
+        Duration                          : 42158.29 sec
+        Number of Samples                 : 100
+        Max                               : 1227 MHz
+        Min                               : 139 MHz
+        Avg                               : 657 MHz
+    Memory Clock Samples
+        Duration                          : 42158.29 sec
+        Number of Samples                 : 100
+        Max                               : 3004 MHz
+        Min                               : 405 MHz
+        Avg                               : 2468 MHz
+    Clock Policy
+        Auto Boost                        : N/A
+        Auto Boost Default                : N/A
+```
+
+## 24. Occupancy
+- The ratio of active warps to maximum number of warps per SM
+- Occupancy calculator - an excel sheet from CUDA development kit
+```
+$ nvcc -arch=sm_61 --ptxas-options=-v 6_occupancy_test.cu
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z14occupancy_testPi' for 'sm_61'
+ptxas info    : Function properties for _Z14occupancy_testPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 4 registers, 328 bytes cmem[0]
+```
+  - Use the number of registers into the excel sheet to calculate occupancy
+- Best practice
+  - Keep the number of threads per block as multiples of 32 (=warp size)
+  - Avoid small block sizes. Use 128 or 256 or larger threads per block
+  - Keep the number of blocks much larger than the number of SMs
+
+## 25. Profile driven optimization
+- nvcc -c common.cpp
+- nvcc -link common.o 7_sum_array.cu
+- Metrics to check
+  - sm_efficiency
+  - Achieved_occupancy
+  - Branch_efficiency
+  - Gld_efficiency
+  - Gld_throuput
+  - Dram_read_throughput
+  - Inst_per_warp
+  - Stall_sync
+```
+sudo  /usr/local/cuda-11.1/bin/nvprof --metrics gld_efficiency,sm_efficiency,achieved_occupancy ./a.out
+
+----------------------- SUM ARRAY EXAMPLE FOR NVPROF ------------------------
+
+Runing 1D grid
+Input size : 4194304
+Kernel is lauch with grid(32768,1,1) and block(128,1,1)
+==23940== NVPROF is profiling process 23940, command: ./a.out
+==23940== Some kernel(s) will be replayed on device 0 in order to collect all events/metrics.
+==23940== Replaying kernel "sum_arrays_1Dgrid_1Dblock(float*, float*, float*, int)" (1 of 3)..Replaying kernel "sum_arrays_1Dgrid_1Dblock(float*, float*, float*, int)" (done)
+Arrays are same al events
+==23940== Profiling application: ./a.out
+==23940== Profiling result:
+==23940== Metric result:
+Invocations                               Metric Name                        Metric Description         Min         Max         Avg
+Device "GeForce GT 1030 (0)"
+    Kernel: sum_arrays_1Dgrid_1Dblock(float*, float*, float*, int)
+          1                            gld_efficiency             Global Memory Load Efficiency     100.00%     100.00%     100.00%
+          1                             sm_efficiency                   Multiprocessor Activity      99.69%      99.69%      99.69%
+          1                        achieved_occupancy                        Achieved Occupancy    0.910413    0.910413    0.910413
+```
