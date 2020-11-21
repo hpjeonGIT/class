@@ -1,6 +1,7 @@
 ## CUDA Programming Masterclass with C++
 - By Kasun Liyanage
 - PPT slides are enclosed in each class
+- So far, the best Udemy class
 
 ## 5. Basic of CUDA program
 - Steps of CUDA apps
@@ -266,3 +267,181 @@ Device "GeForce GT 1030 (0)"
           1                             sm_efficiency                   Multiprocessor Activity      99.69%      99.69%      99.69%
           1                        achieved_occupancy                        Achieved Occupancy    0.910413    0.910413    0.910413
 ```
+
+## 26. Parallel reduction
+- cudaDeviceSynchronize(): Introduces a global sync in host code
+- __syncthreads(): sync within a block
+- Parallel reduction
+  - Let each thread sum its own data set
+  - When threads complete the local reduction, sum each thread result over iterations of entire threads
+```
+for (int offset=1; offset < blockDim.x; offset *=2) {
+  if (tid %(2*offset) == 0)
+    input[tid] += input[tid + offset];
+  __syncthreads();
+}
+```
+
+## 27. Parallel reduction reducing warp divergence
+- The code of section 26 idles a half of threads when the gpu sum starts
+- From:
+```	for (int offset = 1; offset <= blockDim.x/2; offset *= 2)	{
+		if (tid % (2 * offset) == 0)		{
+			input[gid] += input[gid + offset];		}
+		__syncthreads();	}
+```
+- To:
+```
+for (int offset = 1; offset <= blockDim.x /2 ; offset *= 2)	{
+		int index = 2 * offset * tid;
+		if (index < blockDim.x)		{
+			i_data[index] += i_data[index + offset];		}
+		__syncthreads();	}
+```
+  - This still wastes threads but index of the sum narrows to a warp
+- Using interleaved pairs
+```
+	for (int offset = blockDim.x/ 2; offset > 0; offset = offset/2)	{
+		if (tid < offset)		{
+			int_array[gid] += int_array[gid + offset];		}
+		__syncthreads();	}
+```
+
+## 28. Loop unrolling
+- Thread block unrolling
+```
+if ((index + 3 * blockDim.x) < size) {
+  int a1 = input[index];
+  int a2 = input[index + blockDim.x];
+  int a3 = input[index+ 2* blockDim.x];
+  int a4 = input[index+ 3 *blockDim.x];
+  input[index] = a1 + a2 + a3 + a4;
+}
+__syncthreads();
+```
+## 29. Warp unrolling
+```
+	if (tid < 32)
+	{
+		volatile int * vsmem = i_data;
+		vsmem[tid] += vsmem[tid + 32];
+		vsmem[tid] += vsmem[tid + 16];
+		vsmem[tid] += vsmem[tid + 8];
+		vsmem[tid] += vsmem[tid + 4];
+		vsmem[tid] += vsmem[tid + 2];
+		vsmem[tid] += vsmem[tid + 1];
+	}
+```  
+- volatile qualifier will disable optimization, preventing a register optimization
+  - Ref: https://stackoverflow.com/questions/49163482/cuda-reduction-warp-unrolling-school
+
+## 32. Dynamic parallelism
+- New GPU kernels from the existing GPU kernel
+- Can be recursive
+- nvcc -arch=sm_61 -rdc=true 14_dynamic_parallelism.cu
+  - An option -rdc=true is necessary to launch kernel from __device__ or __global__
+  - Parent kernel waits until the child kernel completes
+
+## 33. Reduction with dynamic parallelism
+- nvcc -rdc=true -link common.o reduc.cu
+- GPU version is 60x slower than CPU version. How to accelerate?
+
+## 35. CUDA memory model
+- gld_efficiency : global memory load efficiency
+- gld_throughput : global memory load throughput
+- gld_transactions : global memory load transactions
+- gld_transactions_per_request : how many memory transactions needed for one memory request
+```
+$ sudo /usr/local/cuda-11.1/bin/nvprof --metrics gld_efficiency,gld_throughput,gld_transactions,gld_transactions_per_request ./a.out
+Runing 1D grid
+Entered block size : 128
+Input size : 4194304
+Kernel is lauch with grid(32768,1,1) and block(128,1,1)
+==7649== NVPROF is profiling process 7649, command: ./a.out
+==7649== Some kernel(s) will be replayed on device 0 in order to collect all events/metrics.
+Replaying kernel "test_sum_array_for_memory(float*, float*, float*, int)" (done)
+==7649== Profiling application: ./a.out
+==7649== Profiling result:
+==7649== Metric result:
+Invocations                               Metric Name                        Metric Description         Min         Max         Avg
+Device "GeForce GT 1030 (0)"
+    Kernel: test_sum_array_for_memory(float*, float*, float*, int)
+          1                            gld_efficiency             Global Memory Load Efficiency     100.00%     100.00%     100.00%
+          1                            gld_throughput                    Global Load Throughput  26.542GB/s  26.542GB/s  26.542GB/s
+          1                          gld_transactions                  Global Load Transactions     4194306     4194306     4194306
+          1              gld_transactions_per_request      Global Load Transactions Per Request   16.000008   16.000008   16.000008
+```
+
+## 36. Different memory types in CUDA
+- Registers: fastest. Thread-private. Max 255 registers per thread
+  - In nvcc, using --ptxas-options=-v shows the number of registers
+  ```
+  __global__ void  register_usage_test(int * results, int size)  {
+  	int gid = blockDim.x * blockIdx.x + threadIdx.x;  
+  	int x1 = 3465;
+  	int x2 = 1768;
+  	int x3 = 453;
+  	int x4 = x1 + x2 + x3;
+  	if (gid < size)   	{
+  		results[gid] =  x4;  	}
+  }
+```
+- nvcc --ptxas-options=-v 2_register_usage.cu
+```
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z19register_usage_testPii' for 'sm_52'
+ptxas info    : Function properties for _Z19register_usage_testPii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 4 registers, 332 bytes cmem[0]
+```
+  - gid, x1,x2,x3,x4 are allocated and 5 registers may be expected but 4 registers are reported due to optimization
+  - If more registers are used than HW limit, it will spill over to local memory, resulting in performance penalty
+- Local Memory: local arrays with indices. High latency memory access
+- Shared memory: __shared__ L1 cache and shared memory uses the same on-chip memory
+
+## 37. Memory management and pinned memory
+- Pinned memory
+  - Host allocated host memory is pageable and GPU cannot access safely
+  - Pageable memory must be pinneed before copy
+  - cudaMallocHost() will pinn memory
+    - cudaFreeHost() to deallocate memory
+  - Instead of `float *h_a = (float *)malloc(nbytes);...;free(h_a);`,
+  ```
+	float *h_a;
+	cudaMallocHost((float **)&h_a, nbytes);
+  ...
+  cudaFreeHost(h_a);
+  ```
+- nvprof --print-gpu-trace ./a.out
+- Pageable:
+```
+  Start  Duration            Grid Size      Block Size     Regs*    SSMem*    DSMem*      Size  Throughput  SrcMemType  DstMemType           Device   Context    Stream  Name
+438.61ms  85.106ms                    -               -         -         -         -  128.00MB  1.4688GB/s    Pageable      Device  GeForce GT 1030         1         7  [CUDA memcpy HtoD]
+523.72ms  78.946ms                    -               -         -         -         -  128.00MB  1.5834GB/s      Device    Pageable  GeForce GT 1030         1         7  [CUDA memcpy DtoH]
+```
+- Pinned:
+```
+   Start  Duration            Grid Size      Block Size     Regs*    SSMem*    DSMem*      Size  Throughput  SrcMemType  DstMemType           Device   Context    Stream  Name
+373.13ms  84.588ms                    -               -         -         -         -  128.00MB  1.4777GB/s      Pinned      Device  GeForce GT 1030         1         7  [CUDA memcpy HtoD]
+457.76ms  78.664ms                    -               -         -         -         -  128.00MB  1.5890GB/s      Device      Pinned  GeForce GT 1030         1         7  [CUDA memcpy DtoH]
+```
+  - Pinned memory reduces 438ms to 373ms
+
+## 38. Zero copy memory
+- Pinned memory mapped into the device address space. Host and device have direct access
+- No explicit data transfer
+- cudaHostAlloc()/cudaFreeHost()
+  - cudaHostAllocDefault: same as pinned memory
+  - cudaHostAllocPortable: pinned memory and can be used by CUDA
+  - cudaHostAllocWriteCombined: written by host and read by device
+  - cudaHostAllocMapped: host memory mapped into device address space. The most common option
+  - cudaHostGetDevicePointer(): get the mapped device pointer
+    - Memory is allocated from host and the device pointer is necessary to launch the kernel
+- May result in low performance
+  - But may be useful for large memory requirement
+
+## 39. Unified memory
+- Let CPU/GPU access the same memory address or pointer
+- __device__ __managed__ int y;
+- cudaMallocManaged()
+- No malloc/free/copy function is required
