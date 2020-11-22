@@ -48,7 +48,11 @@ int main(int argc, char** argv){
    elapsed_seconds = end-start;
    cout << "Shuffled array - Elapsed time: " << elapsed_seconds.count() << "sec with sum="
         << local_sum <<endl;
-
+/*
+Vector size = 33554432
+Ordered array - Elapsed time: 0.164727sec with sum=2056144956
+Shuffled array - Elapsed time: 0.860852sec with sum=2056144956
+*/
 
   return 0;
 }

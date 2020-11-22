@@ -445,3 +445,62 @@ ptxas info    : Used 4 registers, 332 bytes cmem[0]
 - __device__ __managed__ int y;
 - cudaMallocManaged()
 - No malloc/free/copy function is required
+
+## 40. Global memory access patterns
+- Aligned memory access : First address is an even multiple of the cache granularity
+- Coalesced memory access : 32 threads in a warp access a continuous chunk of memory
+- Uncached memory (skipping L1 cache) may be fine-grained, and may be useful for mis-aligned or non-coalesced memory access
+- nvcc -Xptxas -dlcm=ca 6_misaligned_read.cu
+  - -dlcm=ca : default, enabling L1 available
+  - -dlcm=cg : L2 only
+- Mis-aligned test using given offset
+```
+int gid = blockIdx.x * blockDim.x + threadIdx.x;
+int k = gid + offset;
+if (k < size)
+  c[gid] = a[k]+ b[k];
+```
+  - sudo /usr/local/cuda-11.1/bin/nvprof --metrics gld_efficiency,gld_transactions ./a.out
+  - As offset size increases, gld_efficiency decreases from 100% to 80%
+  - Difference of using -dlcm=ca & -dlcm=cg is not clear. Same results.
+
+## 41. Global memory writes
+- Offset is applied into the c[] array, as writing index
+
+## 42. AOS vs SOA
+- AOS
+```
+struct abc
+{
+  float x;
+  float y;
+}
+struct abc myA[N];
+```
+- SOA
+```
+struct abc
+{
+  float x[N];
+  float y[N];
+}
+struct abc myA;
+```
+- sudo /usr/local/cuda-11.1/bin/nvprof --metrics gld_efficiency,gld_transactions ./a.out  
+```
+ Invocations                               Metric Name                        Metric Description         Min         Max         Avg
+Device "GeForce GT 1030 (0)"
+    Kernel: test_aos(testStruct*, testStruct*, int)
+          1                            gld_efficiency             Global Memory Load Efficiency      50.00%      50.00%      50.00%
+          1                          gld_transactions                  Global Load Transactions     4194306     4194306     4194306
+...
+Invocations                               Metric Name                        Metric Description         Min         Max         Avg
+Device "GeForce GT 1030 (0)"
+    Kernel: test_soa(structArray*, structArray*, int)
+          1                            gld_efficiency             Global Memory Load Efficiency     100.00%     100.00%     100.00%
+          1                          gld_transactions                  Global Load Transactions     4194306     4194306     4194306
+```
+  - SOA shows 100% gld efficiency while AOS shows 50%
+
+## 43. Matrix transpose
+- 
