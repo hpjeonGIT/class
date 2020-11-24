@@ -174,11 +174,9 @@ Device "GeForce GT 1030 (0)"
 - nvidia-smi -a -q -d CLOCK
 ```
 ==============NVSMI LOG==============
-
 Timestamp                                 : Fri Nov 20 10:33:13 2020
 Driver Version                            : 455.45.01
 CUDA Version                              : 11.1
-
 Attached GPUs                             : 1
 GPU 00000000:01:00.0
     Clocks
@@ -247,9 +245,7 @@ ptxas info    : Used 4 registers, 328 bytes cmem[0]
   - Stall_sync
 ```
 sudo  /usr/local/cuda-11.1/bin/nvprof --metrics gld_efficiency,sm_efficiency,achieved_occupancy ./a.out
-
 ----------------------- SUM ARRAY EXAMPLE FOR NVPROF ------------------------
-
 Runing 1D grid
 Input size : 4194304
 Kernel is lauch with grid(32768,1,1) and block(128,1,1)
@@ -503,4 +499,111 @@ Device "GeForce GT 1030 (0)"
   - SOA shows 100% gld efficiency while AOS shows 50%
 
 ## 43. Matrix transpose
-- 
+- sudo /usr/local/cuda-11.1/bin/nvprof --metrics  gld_efficiency,gst_efficiency  ./a.out
+  - copy_row() shows 100% while copy_column() yields 12.5%, which is non-coalesced
+- copy_row(): well-coalesced (not matrix transpose. Just copy)
+```
+$ sudo /usr/local/cuda-11.1/bin/nvprof --metrics  gld_efficiency,gst_efficiency  ./a.out
+    Kernel: copy_row(int*, int*, int, int)
+          1                            gld_efficiency             Global Memory Load Efficiency     100.00%     100.00%     100.00%
+          1                            gst_efficiency            Global Memory Store Efficiency     100.00%     100.00%     100.00%
+```
+- copy_column(): non-coalesced (not matrix transpose. Just copy). gld/gst_efficiency are 12.5%
+```      
+$ sudo /usr/local/cuda-11.1/bin/nvprof --metrics  gld_efficiency,gst_efficiency  ./a.out 1
+    Kernel: copy_column(int*, int*, int, int)
+          1                            gld_efficiency             Global Memory Load Efficiency      12.50%      12.50%      12.50%
+          1                            gst_efficiency            Global Memory Store Efficiency      12.50%      12.50%      12.50%
+```
+- read_row_write_column: reading is coalesced while write is not. gst_efficency is 12.5%
+```
+    Kernel: transpose_read_row_write_column(int*, int*, int, int)
+          1                            gld_efficiency             Global Memory Load Efficiency     100.00%     100.00%     100.00%
+          1                            gst_efficiency            Global Memory Store Efficiency      12.50%      12.50%      12.50%
+```
+- read_column_write_row: reading is non-coalesced while write is. gld_efficiency is 12.5%
+```
+    Kernel: transpose_read_column_write_row(int*, int*, int, int)
+          1                            gld_efficiency             Global Memory Load Efficiency      12.50%      12.50%      12.50%
+          1                            gst_efficiency            Global Memory Store Efficiency     100.00%     100.00%     100.00%
+```
+
+## 45. Matrix transpose with diagonal coordinate
+- Partition camping: memory requests are queued at some partitions while other partitions remain unused
+- Avoid partition camping using diagonal coordinate system
+
+## 47. Shared memory
+- Mis-aligned/non-coalesced memory access can have benefit from using shared memory
+- nvcc -link common.o --ptxas-options=-v 1_intro_smem.cu
+```
+nvcc -link common.o -arch=sm_61  --ptxas-options=-v 1_intro_smem.cu
+...
+ptxas info    : Used 6 registers, 340 bytes cmem[0]
+```
+- Shared memory bank conflicts : when multiple threads request the same memory address, the access is serialized, yielding bank conflicts
+  - May use cudaDeviceSetSharedMemConfig() as eight bytes for double-precision data
+  - Data might be distributed along banks to reduce serialization
+
+## 53. Synchronization in CUDA
+- __threadfence_block()
+- __threadfence()
+
+
+## 55. CUDA constant memory
+- Can be adjusted from the host
+- Must be initialized from the host
+- cudaMemcpyToSymbol()
+
+## 56. Matrix transpose with shared memory padding
+## 57. Warp shuffle instructions
+- Shuffling threads within the same warp
+
+## 60. CUDA streams
+- Launch multiple kernels, transferring memory b/w kernels by overlapping execution
+- CUDA stream: a sequence of commands that execute in order
+- Overlapping is the key to transfer memory within device
+- NULL stream: default stream that kernel launches and data transfers use
+  - Implicitly declared stream
+
+## 61. Asynchronous functions
+- cudaMemCpyAsync()
+  - Host pointers should be pinned memory
+  - Stream is assigned
+```
+cudaStream_t str;
+cudaStreamCreate(&str);
+cudaMemcpyAsync(d_in, h_in, byte_size, cudaMemcpyHostToDevice, str);
+cuda_func <<< grid, block ,0, str >>>(...);
+cudaMemcpyAsync(h_ref, d_out, byte_size, cudaMemcpyDeviceToHost, str);
+cudaStreamSynchronize(str);
+cudaStreamDestroy(str);
+```
+- 3_simple_cuda_stream_modified.cu produced different results than the lecture. Two kernel executions actually don't overlap
+
+## 62. How to use CUDA streams
+- Objective: overlap kernel executions so we can reduce the overhead of memory transfer
+  - Launch multiple kernels
+    - Concurrent kernel executions
+  - Perform asynchronous memory transfer
+- Default stream will execute kernel functions one by one
+  - No parallel execution
+- concurrent.cu
+  - std::cout not working in the device
+```
+cudaStream_t str1, str2, str3;
+cudaStreamCreate(&str1);
+cudaStreamCreate(&str2);
+cudaStreamCreate(&str3);
+simple_kernel <<< 1,1,0,str1 >>>();
+simple_kernel <<< 1,1,0,str2 >>>();
+simple_kernel <<< 1,1,0,str3 >>>();
+cudaStreamDestroy(str1);
+cudaStreamDestroy(str2);
+cudaStreamDestroy(str3);
+cudaDeviceSynchronize();
+cudaDeviceReset();
+```
+  - Kernels are overlapping
+
+## 63. Overlapping memory transfer and kernel execution
+- ? Kernels didn't overlap?
