@@ -607,3 +607,232 @@ cudaDeviceReset();
 
 ## 63. Overlapping memory transfer and kernel execution
 - ? Kernels didn't overlap?
+
+## 64
+- NULL stream can block non-null stream
+- Non-NULL streams
+  - blocking : can be blocked by NULL stream
+  - non-blocking : cannot be blocked by NULL stream
+- Streams created by cudaStreamCreate() are blocking streams
+1 For blocking streams only
+```
+gpuErrchk(cudaStreamCreate(&stm1));
+gpuErrchk(cudaStreamCreate(&stm2));
+gpuErrchk(cudaStreamCreate(&stm3));
+...
+blocking_nonblocking_test1 << <grid, block, 0, stm1 >> > ();
+blocking_nonblocking_test1 << <grid, block, 0, stm2 >> > ();
+blocking_nonblocking_test1 << <grid, block, 0, stm3 >> > ();
+```
+- Yields:
+```
+---test1
+---test1
+---test1
+```
+2 For blocking streams + default stream
+```
+gpuErrchk(cudaStreamCreate(&stm1));
+gpuErrchk(cudaStreamCreate(&stm2));
+gpuErrchk(cudaStreamCreate(&stm3));
+...
+blocking_nonblocking_test1 << <grid, block, 0, stm1 >> > ();
+blocking_nonblocking_test1 << <grid, block >> > ();
+blocking_nonblocking_test1 << <grid, block, 0, stm3 >> > ();
+```
+- Yields:
+```
+--------test1
+---test1
+-------------test1
+```
+  - Without stream option, the launched kernel becomes the default stream (2nd blocking_nonblocking_test1 <<< >>>)
+
+3 For one blocking stream + one nonblocking stream + default stream
+```
+gpuErrchk(cudaStreamCreate(&stm1));
+gpuErrchk(cudaStreamCreate(&stm2));
+gpuErrchk(cudaStreamCreateWithFlags(&stm3,cudaStreamNonBlocking));
+...
+blocking_nonblocking_test1 << <grid, block, 0, stm1 >> > ();
+blocking_nonblocking_test1 << <grid, block >> > ();
+blocking_nonblocking_test1 << <grid, block, 0, stm3 >> > ();
+```
+- Yields:
+```
+--------test1 (This is the default stream)
+---test1
+---test1
+```
+4 For nonblocking streams + default stream
+```
+gpuErrchk(cudaStreamCreateWithFlags(&stm1,cudaStreamNonBlocking));
+gpuErrchk(cudaStreamCreate(&stm2));
+gpuErrchk(cudaStreamCreateWithFlags(&stm3,cudaStreamNonBlocking));
+...
+blocking_nonblocking_test1 << <grid, block, 0, stm1 >> > ();
+blocking_nonblocking_test1 << <grid, block >> > ();
+blocking_nonblocking_test1 << <grid, block, 0, stm3 >> > ();
+```
+- Yields:
+```
+---test1 (This is the default stream)
+---test1
+---test1
+```
+
+## 65. Explicit/implicit synchronization
+- Explicit sync
+  - cudaDeviceSynchronize()
+  - cudaStreamSynchronize()
+  - cudaEventSynchronize()
+  - cudaStreamWaitEvent()
+- Implicit sync
+  - Page-locked host memory allocation
+  - Device memory allocation
+  - Device memory set
+  - Memory copy b/w two addresses to the same device memory
+  - Any CUDA command to the NULL stream
+  - Switch b/w L1 and shared memory configurations
+
+## 66. CUDA events
+- CUDA event : a marker in CUDA stream
+  - Can sync stream execution
+  - Can Monitor device progress
+  - Can measure the execution time of the kernel
+- cudaEventCreate()/cudaEventDestroy()
+- cudaEventRecord() will queue an event
+- cudaEventElapsedTime() will return the elapsed time in msec
+```
+cudaEvent_t start, end;
+cudaEventCreate(&start);
+cudaEventCreate(&end);
+cudaEventRecord(start);
+event_test << < grid,block >>> ();
+cudaEventRecord(end);
+cudaEventSynchronize(end);
+float time;
+cudaEventElapsedTime(&time, start, end);
+printf("Kernel execution time using events : %f \n",time);
+cudaEventDestroy(start);
+cudaEventDestroy(end);
+```
+
+## 67. Inter stream dependency
+- Events can be used to add inter-stream dependencies
+```
+cudaEvent_t event1;
+cudaEventCreateWithFlags(&event1, cudaEventDisableTiming);
+k1 << <grid, block, 0, stm1 >> > ();
+cudaEventRecord(event1, stm1);
+cudaStreamWaitEvent(stm3, event1, 0);
+k2 << <grid, block, 0, stm2 >> > ();
+k3 << <grid, block, 0, stm3 >> > ();
+```
+- Yields:
+```
+---k1()
+----k2()
+-------k3()
+```
+  - k3() is executed after k1() is completed
+
+## 68. Not all instructions are created equally
+- SAXPY
+  - MAD() in CUDA has less numerical accuracy
+
+## 69. Single vs Double FPE
+- Round_to_zero
+- Round_up
+- Round_down
+- Round_to_nearest
+- Coping double precision from device/host may be larger than 2x more than single precision
+
+## 70. Standard vs intrinsic functions
+- Standard functions can be used in host and device
+  - sqrt, pow, ... from math.h
+- Intrinsic functions can be used in device only
+  - Uses fewer instructions than the equivalent in standard functions
+  - Faster but less accurate than standard functions
+  - __powf() is less accurate than powf()
+- nvcc --ptx 3_standard_intrinsic.cu
+- Open 3_standard_intrinsic.ptx
+- Intrinsic function kernel
+```
+// .globl	_Z9intrinsicPf
+.visible .entry _Z9intrinsicPf(
+.param .u64 _Z9intrinsicPf_param_0
+)
+{
+.reg .f32 	%f<5>;
+.reg .b64 	%rd<3>;
+ld.param.u64 	%rd1, [_Z9intrinsicPf_param_0];
+cvta.to.global.u64 	%rd2, %rd1;
+ld.global.f32 	%f1, [%rd2];
+lg2.approx.f32 	%f2, %f1;
+add.f32 	%f3, %f2, %f2;
+ex2.approx.f32 	%f4, %f3;
+st.global.f32 	[%rd2], %f4;
+ret;
+}
+```
+  - Much shorter than standard function kernel and approx. instructions are found
+- Standard function kernel
+```
+// .globl	_Z8standardPf
+.visible .entry _Z8standardPf(
+.param .u64 _Z8standardPf_param_0
+)
+{
+.reg .pred 	%p<17>;
+.reg .f32 	%f<103>;
+.reg .b32 	%r<15>;
+.reg .b64 	%rd<3>;
+ld.param.u64 	%rd2, [_Z8standardPf_param_0];
+cvta.to.global.u64 	%rd1, %rd2;
+mov.f32 	%f14, 0f3F800000;
+cvt.rzi.f32.f32	%f15, %f14;
+add.f32 	%f16, %f15, %f15;
+...
+...
+...
+```
+  - Much longer and standard instructions
+- Singe precision of powf() comparison
+```
+Host calculated	        		66932852.000000  # powf() in the host
+Standard Device calculated	66932848.000000  # powf() in the device
+Intrinsic Device calculated	66932804.000000  # __powf() in the device
+```
+- Double precision of pow() in host and device. Intrinsic result used __powf() as there is no double-precision equivalent of __powf()
+```
+Host calculated		        	66932851.562500  # pow() in the host
+Standard Device calculated	66932851.562500  # pow() in the device
+Intrinsic Device calculated	66932804.000000  # __powf() in the device
+```
+
+## 72. Scan algorithm
+- Prefix sum (or called `scan`)
+  - Cumulative sum in computer science
+```
+y0 = x0
+y1 = x0 + x1
+y2 = x0 + x1 + x2
+...
+```
+- MPI : MPI_Scan(), MPI_Exscan()
+- C++ : std::inclusive_scan(), std::exclusive_scan()
+
+## 73. Simple parallel scan
+- CPU scan : N-1
+- Naive scan: NlogN - (N-1)
+
+## 74. Balanced tree model
+- Reduction + down sweep (exclusive scan) phases
+- Workload: 2*(N-1)
+
+## 75. Efficient inclusive scan
+- Reduction + down sweep (inclusive scan) phases
+- Workload: 2*(N-1)
+
+## 76. Parallel scan for large data
