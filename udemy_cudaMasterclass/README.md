@@ -371,7 +371,7 @@ Device "GeForce GT 1030 (0)"
 ## 36. Different memory types in CUDA
 - Registers: fastest. Thread-private. Max 255 registers per thread
   - In nvcc, using --ptxas-options=-v shows the number of registers
-  ```
+```
   __global__ void  register_usage_test(int * results, int size)  {
   	int gid = blockDim.x * blockIdx.x + threadIdx.x;  
   	int x1 = 3465;
