@@ -380,4 +380,257 @@ UNION ALL
 - EXCEPT ALL: Removes rows from the 2nd query
 - Q: ALL is useful? Does duplicated row exist?
 
-##
+## 91. Subquery
+- Ex) Find the more expensive items than all products in the Toys department
+  - 1) Query the MAX price in the Toys department
+  - 2) Query name and price using the criterion
+```
+SELECT name, price
+FROM products
+WHERE price > (
+  SELECT MAX(price) FROM products WHERE department = 'Toys'
+  );
+```
+
+## 93. Subqueries in SELECT
+- Subquery in SELECT MUST return a single column data
+```
+SELECT name, price, (SELECT price FROM products WHERE id=3)
+FROM products
+WHERE price >867;
+```
+- Yields:
+```
+name	                    price	price
+Practical Fresh Shirt	    10	  10
+Incredible Granite Mouse	10	  10
+```
+  - First price column data is wrong. This is due to the confusion of the sql engine in pg-sql.com. To fix, use AS for sql engine not to be confused
+```
+SELECT name, price, (SELECT price FROM products WHERE id=3) AS new_tag
+FROM products
+WHERE price >867;
+```
+- Now yields:
+```
+name	                    price	new_tag
+Practical Fresh Shirt	    876	  10
+Incredible Granite Mouse	989	  10
+```
+
+## 96. Subqueries in FROM
+- Must use alias (AS keyword)
+- May return multiple columns
+
+## 100. Exercise
+- Find the maximum average price of products by departments
+```
+SELECT MAX(avg_price) AS max_avg_price
+FROM ( SELECT AVG(price) AS avg_price
+      FROM products GROUP BY department
+      ) AS P;
+```
+
+## 102. Subqueries with WHERE
+```
+SELECT id
+FROM orders
+WHERE product_id IN (
+  SELECT id FROM products WHERE price /weight > 50
+);
+```
+- Is equivalent to:
+```
+SELECT orders.id
+FROM orders
+JOIN products ON orders.product_id = products.id
+AND products.price/products.weight > 50;
+```
+
+## 107. Operator with ALL
+- > ALL, < ALL, >= ALL, <= ALL, = ALL, <> ALL
+  - RHS would be column data
+```
+SELECT name, department, price
+FROM products
+WHERE price > (
+  SELECT MAX(price)
+  FROM products
+  WHERE department='Industrial'
+);
+```
+- Is equivalent to:
+```
+SELECT name, department, price
+FROM products
+WHERE price > ALL (
+  SELECT price
+  FROM products
+  WHERE department='Industrial'
+);
+```
+
+## 108. Operator with SOME
+- > SOME, < SOME, >= SOME, <= SOME, = SOME, <> SOME
+  - RHS would be column data
+  - Needs that one data must meet condition at least
+
+## 111. Correlated subqueries
+-  Find maximum price item in each department
+  - Loop over each department
+```
+SELECT name, department, price
+FROM products AS p1
+WHERE p1.price =  (
+  SELECT MAX(price)
+  FROM products as p2
+  WHERE p1.department = p2.department
+  );  
+```
+
+## 112. Subqueries in SELECT
+```
+SELECT
+(SELECT max(price) FROM phones) AS max_price,
+(SELECT min(price) FROM phones) AS min_price,  
+(SELECT avg(price) FROM phones) AS avg_price ;
+....
+max_price	min_price	avg_price
+991	      1	        498.7300000000000000
+```
+- Without FROM in the main SELECT, single values are queried and printed
+
+## 113. SELECT DISTINCT
+- Queries unique values using `DISTINCT`
+- `SELECT DISTINCT department FROM products;` : queries the unique values in the department column
+- `SELECT COUNT(DISTINCT department) FROM products;` : queries the number of unique departments
+- `SELECT DISTINCT department, name FROM products;` : queries the unique cases of department and name. Same value might be repeated but same combination is excluded
+
+## 119. GREATEST()
+- `SELECT GREATEST(30,10,20);`
+  - `SELECT MAX(30,10,20);` doesn't work
+```
+SELECT name, weight, GREATEST(30, 2* weight)
+FROM products;
+```
+- 3rd column will be the larger value of 30 or 2*weight
+
+## 120. LEAST()
+```
+SELECT name, weight, LEAST(400, 0.5*price)
+FROM products;
+```
+- 3rd column will be the smaller one of 400 or price/2
+
+## 121. CASE()
+```
+SELECT
+name,
+price,
+CASE
+ WHEN price > 600 THEN 'high'
+ WHEN price > 300 THEN 'medium'
+ ELSE 'cheap'
+END
+FROM products;
+```
+- If the condition of CASE-END is not met, NULL will be printed
+
+## PosgreSQL + pgadmin for Ubuntu
+- https://www.tecmint.com/install-postgresql-and-pgadmin-in-ubuntu/
+- https://medium.com/coding-blocks/creating-user-database-and-adding-access-on-postgresql-8bfcd2f4a91e
+- sudo apt install postgresql postgresql-contrib libpq-dev -y
+- sudo apt install pgadmin3
+- sudo pg_isready
+```
+sudo -u postgres psql
+postgres=# create database mydb;
+postgres=# create user myuser with encrypted password 'mypass';
+postgres=# alter user myuser createdb;
+postgres=# grant all privileges on database mydb to myuser;
+```
+- Open pgadmin3
+  - Host is localhost
+  - Port 5432
+- Ref: https://alvinalexander.com/blog/post/postgresql/log-in-postgresql-database/
+- To login: `psql -d mydb -U myuser -h localhost`
+
+## 126. Data type
+- smallint, integer, bigint      # int with 16,32, 64 bit
+- smallserial, serial, bigserial # unsigned int
+- decimal, numeric, real, double precision, float
+
+## 127. Best practice for the data type
+- Id column of tables => serial
+- Non-floating number => integer
+- Bank balance, scientific calculations => numeric
+- When round-off error can be tolerated => double precision
+
+## 128. More on number
+- `SELECT (2.0);` # psql will store as numeric
+- `SELECT (2.0::INTEGER);` # enforce as integer
+- `SELECT(1.99999::REAL - 1.99998::REAL);` yields 1.00136e-5
+- `SELECT(1.99999::DECIMAL - 1.99998::DECIMAL);` yields 0.00001
+- `SELECT(1.99999::NUMERIC - 1.99998::NUMERIC);` yields 0.00001
+
+## 129. Character types
+- CHAR(5): Static storage. Spaces are padded if not filled
+- VARCHAR: stores a string of any length
+- TEXT: stores a string of any length
+- VARCHAR(50): Stores up to 50 characters, removing extra characters
+- No performance differences on using TEXT or VARCHAR or VARCHAR(#)
+  - Finite size might be given to VARCHAR() for certain data check or to avoid memory abuse
+
+## 130. Boolean types
+- TRUE:  true,  'yes', 'on',  1, 't', 'y'
+- FALSE: false, 'no',  'off', 0, 'f', 'n'
+- NULL: null # NULL is BOOLEAN TYPE as well
+
+## 131. DATE
+```
+SELECT ('1890-11-22'::DATE);
+SELECT ('1890 NOV 22'::DATE);
+SELECT ('1:33 PM'::TIME);
+SELECT ('1:33 PM EST'::TIME WITH TIME ZONE);
+SELECT ('NOV-22-2002 1:33 PM EST'::TIMESTAMP WITH TIME ZONE);
+```
+
+## 132. INTERVAL
+- Duration of time such as day, minute, sec
+- `SELECT('1 D 20H 30 M 4 S'::INTERVAL);`
+- `SELECT('1 D 20H 30 M 4 S'::INTERVAL) - ('1 D 39 S'::INTERVAL);`
+  - Yields `20:29:25`
+- `SELECT('NOV-20-2020 1:23 AM EST':: TIMESTAMP WITH TIME ZONE)
+- ('4D 1sec'::INTERVAL);`
+  - Yields `2020-11-16 01:22:59-05`
+
+## 135. NULL Constraint
+- When data is missing
+- When a table is created, use NOT NULL:
+```
+CREATE TABLE products(
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(50),
+  price INTEGER NOT NULL
+);
+```
+- Aftger a table is created, use SET NOT NULL:
+```
+ALTER TABLE products
+ALTER COLUMN price
+SET NOT NULL;
+```
+- Renaming the name of column:
+```
+ALTER TABLE products
+RENAME COLUMN deparment TO department;
+```
+
+## 136. Applying NULL constraint
+- Converting NULL value into a finite number (=9999)
+```
+UPDATE products
+SET price = 9999
+WHERE price IS NULL;
+```
+  - `WHERE price = NULL` will not work
