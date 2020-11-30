@@ -614,7 +614,7 @@ CREATE TABLE products(
   price INTEGER NOT NULL
 );
 ```
-- Aftger a table is created, use SET NOT NULL:
+- If the table already exists, use SET NOT NULL:
 ```
 ALTER TABLE products
 ALTER COLUMN price
@@ -634,3 +634,93 @@ SET price = 9999
 WHERE price IS NULL;
 ```
   - `WHERE price = NULL` will not work
+
+## 137. Default column value
+- When a table is created, use DEFAULT:
+```
+CREATE TABLE products(
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(50),
+  price INTEGER DEFAULT 999
+);
+```
+- If the table already exists, use SET DEFAULT:
+```
+ALTER TABLE products
+ALTER COLUMN price
+SET DEFAULT 999;
+```
+
+## 138. Unique constraint
+- Avoid duplicated column values
+- When a table is created, use UNIQUE:
+```
+CREATE TABLE products(
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(50) UNIQUE,
+  price INTEGER
+);
+```
+- If the table already exists, use ADD UNIQUE():
+```
+ALTER TABLE products
+ADD UNIQUE(name);
+```
+
+## 139. Applying unique constraints to multiple columns
+- How to remove an existing constraint
+  - Find the name of constraint from the GUI of pgadmin3
+```
+ALTER TABLE products
+DROP CONSTRAINT products_name_key;
+```
+- Applying unique constraints to multiple columns
+```
+ALTER TABLE products
+ADD UNIQUE(name, department);
+```
+  - Partial matching is allowed. Only when all of them match, an error is produced
+
+## 140. Using CHECK
+- Avoiding negative number
+  - When a table is created, use CHECK():
+```
+CREATE TABLE products(
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(50),
+  price INTEGER CHECK (price > 0)
+);
+```
+  - If the table already exists, use ADD CHECK():
+```
+ALTER TABLE products
+ADD CHECK(price > 0);
+```
+- When only selected words are allowed: `mycolor VARCHAR(20) CHECK (mycolor in ('red','green','red'))`
+
+## 141. Order constraints
+- Ex) Delivery date must be after creation date
+```
+CREATE TABLE orders (
+id SERIAL PRIMARY KEY,
+name VARCHAR(50) NOT NULL,
+created_at TIMESTAMP NOT NULL,
+est_delivery TIMESTAMP NOT NULL,
+CHECK (created_at < est_delivery)
+);
+```
+
+## 143. A complicated schema
+- Schema designer: drawsql.app, dbdiagram.io, sqldbm.com, ...
+
+## 149. A sample bad schema
+- How to keep the track of WHO liked WHAT?
+
+## 150. Designing a LIKE system
+- 3 TABLES of users, posts, and likes
+  - Add a unique constraint with UNIQUE(user_id, post_id) in the likes TABLE
+
+## 151. Modification for reaction system
+- Adding one more column of type such as like, love, care, funny, sad, ...
+
+## 152. Enabling LIKE and COMMENTS simultaneously
