@@ -724,3 +724,105 @@ CHECK (created_at < est_delivery)
 - Adding one more column of type such as like, love, care, funny, sad, ...
 
 ## 152. Enabling LIKE and COMMENTS simultaneously
+- How to make a foreign key for comment and post
+  - One column for row id and another column for comment or post ?  
+- Polymorphic association
+  - Foreign key to refer rows in any of several related tables
+  - May refer different tables by the value of the multiple columns
+    - Foreign keys must point rows in the assigned table, not multiple tables
+    - This guarantees data consistency - when a row in the corresponding able is deleted, the reference foreign key is updated
+  - This will violate the rule of relational database design
+  - Not recommended but might be used in Ruby on Rails
+  - May use SUPERTABLE approach instead
+
+## 153. Alternative of polymorphic association
+- Provides separate columns for each different referred table
+  - A column for comment_id and another column for post_id
+- `SELECT COALESCE((4)::BOOLEAN::INTEGER,0);`
+- `(4)::BOOLEAN::INTEGER,0`
+  - This will convert number 4 into BOOLEAN then INTEGER, implying 1
+
+## 154. The simplest approach
+- Provides separate tables for comment history/post history
+- May use UNION
+
+## 161. Designing of a hashtag system
+- Hashtags are used in posts, comments, and users (In instagram)
+- Hashtag query or search is limited for posts only
+  - We may not build tables of hashtag_comments nor - hashtag_users
+
+## 162. Tables for hash tags
+- Hashtag table
+
+|id  |title | post_id|
+|----|------|--------|
+|1   | bird |  3     |
+|2   | fun  |  5     |
+|3   | fun  |  2     |
+|4   | bird |  7     |
+
+- This could be waste of memory
+  - Repetition of same title
+  - Title is string data
+
+- Provide separate tables for hashtags and the link
+
+|id  |title |
+|----|------|
+|1   | bird |
+|2   | fun  |
+
+|id  | hashtag_id | post_id|
+|----|------------|--------|
+|1   | 1          |  3     |
+|2   | 2          |  5     |
+|3   | 2          |  2     |
+|4   | 1          |  7     |
+
+- Repetition is managed through integer index
+
+## 165. Number of followers or posts
+- We don't build separate tables for those data
+- They are `derived data`, and can be queried using existing tables
+
+## 168. Exercising a DB for instagram
+- Creating a table for users
+- NOT NULL vs DEFAULT
+  - NOT NULL : a value must be provided (an empty string is an input)
+  - DEFAULT : When no value is INSERTED, default value is inserted
+  - NOT NULL + DEFAULT : when a value is required but optional
+- When one of phone or email item is required
+  - `CHECK (COALESCE(phone, email) IS NOT NULL)`
+  - At least, one of phone or email should not be NULL
+```
+CREATE  TABLE users (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	username VARCHAR(30) NOT NULL,
+	bio      VARCHAR(400) NOT NULL DEFAULT '',
+	avatar   VARCHAR(200),
+	phone    VARCHAR(25),
+	email    VARCHAR(40),
+	password VARCHAR(50),
+	status   VARCHAR(15)		
+	CHECK(COALESCE(phone, email) IS NOT NULL)
+);
+```
+
+## 169. Table of posts
+- Make user_id as a foreign key column
+  - Make sure the post is deleted when the user_id is removed
+  - Use `ON DELETE CASCADE`
+```
+CREATE  TABLE posts (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	url      VARCHAR(200) NOT NULL,
+	caption  VARCHAR(240),
+	lat REAL CHECK(lat IS NULL OR (lat >= -90  AND lat <= 90 )),
+	lng REAL CHECK(lng IS NULL OR (lng >= -180 AND lng <= 180)),
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE
+);
+```
