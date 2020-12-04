@@ -555,6 +555,22 @@ postgres=# grant all privileges on database mydb to myuser;
 - Ref: https://alvinalexander.com/blog/post/postgresql/log-in-postgresql-database/
 - To login: `psql -d mydb -U myuser -h localhost`
 
+- PostgreSQL 12 for Ubuntu 18
+  - https://computingforgeeks.com/install-postgresql-12-on-ubuntu/
+  - wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+  - echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" |sudo tee  /etc/apt/sources.list.d/pgdg.list
+  - sudo apt update
+  - sudo apt -y install postgresql-12 postgresql-client-12 pgadmin4
+  - systemctl status postgresql.service
+  - systemctl is-enabled postgresql
+  - Reboot
+  - pgadmin4 # may take a couple of minutes
+    - ~~Edit /etc/postgresql/12/main/pg_hba.conf and `host ...  md5` as `host ... `, removing md5~~
+    - local login using myuser, postgres, and os ID didn't work. psql through `-h localhost` worked OK.
+    - sudo service postgresql restart
+  - Servers -> right mouse button -> Create new server -> General:Name = localhost -> Connection:Host = localhost
+    - Used posgres has the user
+
 ## 126. Data type
 - smallint, integer, bigint      # int with 16,32, 64 bit
 - smallserial, serial, bigserial # unsigned int
@@ -800,7 +816,7 @@ CREATE  TABLE users (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 	username VARCHAR(30) NOT NULL,
-	bio      VARCHAR(400) NOT NULL DEFAULT '',
+	bio      VARCHAR(400) DEFAULT '',
 	avatar   VARCHAR(200),
 	phone    VARCHAR(25),
 	email    VARCHAR(40),
@@ -826,3 +842,198 @@ CREATE  TABLE posts (
 	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE
 );
 ```
+
+## 170. Table of comments
+```
+CREATE  TABLE comments (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	contents VARCHAR(240) NOT NULL,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE
+);
+```
+
+## 171. Table of likes
+- How to enforce if post_id or comment_id is valid
+```
+CHECK (
+		COALESCE((post_id)::BOOLEAN::INTEGER, 0) +
+		COALESCE((comment_id)::BOOLEAN::INTEGER,0) = 1
+)
+```
+ - COALESCE(null,0) produces 0
+```
+CREATE  TABLE likes (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	post_id    INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+	comment_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+	CHECK (
+		COALESCE((post_id)::BOOLEAN::INTEGER, 0) +
+		COALESCE((comment_id)::BOOLEAN::INTEGER,0) = 1
+	)
+
+);
+```
+
+## 172. Table of photos and captions
+- Enforces a photo_tag is made by a unique combination of user and post
+  - UNIQUE(user_id, post_id)
+```
+CREATE  TABLE photo_tags (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+	x INTEGER NOT NULL,
+	y INTEGER NOT NULL,
+	UNIQUE(user_id, post_id)				
+);
+CREATE  TABLE caption_tags (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+	UNIQUE(user_id, post_id)				
+);
+```
+
+## 173. Tables of hashtags
+```
+CREATE  TABLE hashtags (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	title VARCHAR(20) NOT NULL UNIQUE
+);
+CREATE  TABLE hashtags_posts (
+	id SERIAL PRIMARY KEY,
+	hashtag_id INTEGER NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
+	post_id    INTEGER NOT NULL REFERENCES posts(id)    ON DELETE CASCADE,
+	UNIQUE(hashtag_id, post_id)
+);
+CREATE  TABLE followers (
+	id SERIAL PRIMARY KEY,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	leader_id   INTEGER NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+	follower_id INTEGER NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+	UNIQUE (leader_id, follower_id)
+);
+```
+
+## 175. Loading external SQL file
+- In pdamdin3, right mouse button on instagram database
+  - Restore -> select ig.sql
+  - In the Restore option, enable `Type Of Objects - Only data`, `Dont'save - Owner`, `Queries - Single transaction`, `Disable - Trigger`
+  - /usr/bin/pg_restore --host localhost --port 5432 --username "myuser" --dbname "instagram" --no-password  --data-only --disable-triggers --single-transaction --verbose "/home/hpjeon/Downloads/ig.sql"
+- Error message: Unsupported version (1.14) in file header
+  - Install newer version of psql and pgadmin4
+- Using pgadmin4
+  - Took 10.35 sec
+- Removing NOT NULL constraint from the produced table
+```
+ALTER TABLE users
+ALTER COLUMN bio
+DROP NOT NULL;
+```
+
+## 178-182. Some practices
+- Find max 3 IDs from user table
+```
+SELECT *
+FROM users
+ORDER BY ID DESC
+LIMIT 3;
+```
+- Find username and captions of all posts by user ID=200
+```
+SELECT username, caption, posts.user_id, users.id
+FROM posts
+JOIN users ON posts.user_id = users.id
+WHERE users.id = 200
+LIMIT 10;
+```
+  - What if `JOIN users ON posts.user_id=200` without WHERE constraint?
+    - What is missing?
+- Show each username and the number of likes made by them
+```
+SELECT users.username, COUNT(*)
+FROM likes
+JOIN users ON users.id = likes.user_id
+GROUP BY users.username
+LIMIT 10;
+```
+
+## 183. Performance of Postgres
+- How data are stored
+- How index is handled
+- How query is analyzed
+
+## 184. How PosgreSQL stores the data in the disk
+- From SQL `SHOW data_directory;`
+- Find folders at  /var/lib/postgresql/10/main/base
+```
+SELECT oid, datname
+FROM pg_database;
+```
+  - This command shows the id of each database
+  - Find raw data inside of the folder from matching id
+```
+SELECT * FROM pg_class;
+```  
+  - This command shows the mapping of a table to an actual actual file (heap)
+
+## 185. Heaps, blocks and tuples
+- A heap is composed of many blocks or pages
+  - Each block is 8kbytes
+- A block or page is composed of many tuples or items
+- A tuple or an item or a row holds all the information for on record stored in a table
+
+## 186. Block data layout
+
+## 187. Heap file layout
+- postgresql.org/docs/current/storage-page-layout.html
+- Header layout: pd_lsn, pd_checksum, pd_flags, pd_lower, pd_upper, pd_special, pd_pagesize_version, pd_prune_xid
+- Item ID, size of item
+- Actual data
+
+## 188. Full table scan - how a query scan a table
+- For a query like `SELECT * FROM users WHERE username = 'Riann';`
+- SQL will read entire data into the memory to search
+  - Will search every line
+- Full Table Scan
+  - From heap file to memory
+  - Very expensive
+
+## 189. How to avoid Full Table Scan
+- Book-keeping the location of 'Riann'
+  - **Let's make an Index**
+  - Tells which block/row is for 'Riann'
+  - Avoids to load entire data
+
+## 190. How an index works
+- When query is searched, extracts username and block location/row only
+  - Not entire data
+- Then sorts by some order
+- Builds TREE data structures
+  - Adds helpers to the root node
+    - Provides a criterion which branch might be taken
+  - Visits the corresponding leaf node, finding the blockrecord
+
+## 191. Creating an index
+- `CREATE INDEX ON users(username);`
+- In pdadmin4, Tables->users->indexes is found
+- To delete index, `DROP INDEX users_username_idx;`
+
+## 192. Benchmarking queries
+- Use `EXPLAIN ANALYZE`
+```
+EXPLAIN ANALYZE SELECT *
+FROM users
+WHERE username = 'Emil30';
+```
+  - Prints execution time - around 0.04ms
+- After DROP INDEX, it took 0.96ms
