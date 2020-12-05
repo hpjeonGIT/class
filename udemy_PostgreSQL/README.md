@@ -1018,10 +1018,10 @@ SELECT * FROM pg_class;
 - When query is searched, extracts username and block location/row only
   - Not entire data
 - Then sorts by some order
-- Builds TREE data structures
+- Builds TREE data structures (B-Tree, Hash, GiST, ...)
   - Adds helpers to the root node
     - Provides a criterion which branch might be taken
-  - Visits the corresponding leaf node, finding the blockrecord
+  - Visits the corresponding leaf node, finding the block record
 
 ## 191. Creating an index
 - `CREATE INDEX ON users(username);`
@@ -1037,3 +1037,135 @@ WHERE username = 'Emil30';
 ```
   - Prints execution time - around 0.04ms
 - After DROP INDEX, it took 0.96ms
+
+## 193. Downsides of indices
+- Size of tables
+```
+SELECT pg_size_pretty(pg_relation_size('users'));
+SELECT pg_size_pretty(pg_relation_size('users_username_idx'));
+```
+- `users` table consumes 880 kb while `users_username_idx` uses 184 kb
+- Downsides of indexing
+  - Can consume large disk space
+  - Will slow down insert/update/delete as the index has to be updated
+  - Index might not be used
+
+## 194. Types of index
+- B-Tree : General purpose
+- Hash : speeds up simple equality checks
+- GiST : Geometry, full-text search
+  - ~~`CREATE INDEX username ON users USING GIST`~~
+- SP-GiST : clustered data like dates
+- GIN : For columns containing arrays or JSON
+  - ~~`CREATE INDEX name on table USING GIN`~~
+- BRIN : specialized for very large datasets
+- Using them is not addressed in this class
+
+## 195. Automatically generated indices
+- PostgreSQL automatically creates indices for primary key and columns of unique constraints
+  - They are NOT shown in Tables -> table_name -> indexes in pgadmin4
+- For index table, `relkind = 'i'`
+- `pg_class` shows all of objects in PostgreSQL
+```
+SELECT relname, relkind
+FROM pg_class
+WHERE relkind = 'i';
+```
+  - This command shows all objects of indexes
+  - `users_pkey` is the index of primary key in users table, and automatically generated
+
+## 196. Behind the scenes of indexes
+```
+CREATE EXTENSION pageinspect;
+```
+- Allows the access to the contents of the database at low level
+```
+SELECT *
+FROM bt_metap('users_username_idx');
+```
+- root is found as 3
+```
+SELECT *
+FROM bt_page_items('users_username_idx',3);
+```
+- Shows the B-TREE structures
+```
+SHOW data_directory;
+```
+- Shows the path where actual data are stored
+
+## 197. Good query vs bad query using index
+- SQL query -> parser -> rewrite -> planner -> execute
+- Planner
+  - Decides which data to be searched or fetched
+  - Finds the most efficient strategy
+
+## 198. EXPLAIN and EXPLAIN ANALYZE
+- In planner, they are for benchmarking + evaluating queries, not for user in real data fetching
+  - Find the most efficient strategy
+- `EXPLAIN`: builds a query plan and display info about it
+  - Just explain. No execution
+- `EXPLAIN ANALYZE` : builds a query plan, run it, and info about it
+  - In addition to the explain, run the script and shows the execution time
+- pgadmin has a menu button for EXPLAIN and EXPLAIN ANALYZE
+  - Profiling options can be added
+![Snapshot of pgadmin](./explain_analyze.png)
+- Sample results of EXPLAIN ANALYZE
+```
+EXPLAIN ANALYZE SELECT username, contents
+FROM users
+JOIN comments ON comments.user_id = users.id
+WHERE username = 'Alyson14';
+#####
+Hash Join  (cost=8.31..1756.11 rows=11 width=81) (actual time=0.150..11.893 rows=7 loops=1)
+  Hash Cond: (comments.user_id = users.id)
+  ->  Seq Scan on comments  (cost=0.00..1589.10 rows=60410 width=72) (actual time=0.007..5.640 rows=60410 loops=1)
+  ->  Hash  (cost=8.30..8.30 rows=1 width=17) (actual time=0.040..0.040 rows=1 loops=1)
+        Buckets: 1024  Batches: 1  Memory Usage: 9kB
+        ->  Index Scan using users_username_idx on users  (cost=0.28..8.30 rows=1 width=17) (actual time=0.029..0.037 rows=1 loops=1)
+              Index Cond: ((username)::text = 'Alyson14'::text)
+```
+  - Index Scan -> Hash -> Hash Join <- Seq Scan
+  - For `(cost=8.31..1756.11 rows=11 width=81)`
+    - Computing cost might be 17561.11 (8.31 is the startup time) 11 rows might be produced. 81 bytes per each row might be consumed
+  - For `(actual time=0.150..11.893 rows=7 loops=1)`
+    - Actual computing cost is 11.893 (0.150 is the startup time). 7 rows were produced
+- Following query shows the size of each column in users table
+```
+SELECT *
+FROM pg_stats
+WHERE tablename = 'users';
+```
+![Snapshot of pgadmin](./pg_stats.png)
+
+## 200-202. Understanding Cost
+- How the planner decides which strategy is the most efficient?
+  - Cost estimation
+  - postgresql.org/docs/current/runtime-config-query.html
+    - random_page_cost, seq_page_cost, cpu_tuple_cost, cpu_index_tuple_cost, cpu_operator_cost, ...
+    - seq_page_cost is defined as 1.0 as the basic reference
+    - Users may customize those values to tune the performance
+- Typical cost = (# pages read sequentially) * seq_page_cost + (# pages read a random) * random_page_cost + (# rows scanned) * cpu_tuple_cost + (# index entries scanned) * cpu_index_tuple_cost + (# times function/operator evaluated) * cpu_operator_cost
+  - Or simplified version: Cost = (# pages read sequentially) * seq_page_cost + (# rows scanned) * cpu_tuple_cost
+  - Actual cost estimation is more complicated
+
+## 205. Sample exercise
+- Create index for likes table
+```
+CREATE INDEX likes_created_at_idx ON likes(created_at);
+```
+- Following query uses index
+```
+EXPLAIN SELECT *
+FROM likes
+WHERE created_at < '2013-01-01';
+```
+- Following query just uses sequential scan, not using index
+```
+EXPLAIN SELECT *
+FROM likes
+WHERE created_at > '2013-01-01';
+```
+  - Why ?
+  - Random access through index becomes very expensive for very lagre data
+  - Cost was estimated and compared
