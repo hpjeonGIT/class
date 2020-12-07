@@ -1109,7 +1109,7 @@ SHOW data_directory;
   - In addition to the explain, run the script and shows the execution time
 - pgadmin has a menu button for EXPLAIN and EXPLAIN ANALYZE
   - Profiling options can be added
-![Snapshot of pgadmin](./explain_analyze.png)
+![Snapshot of pgadmin](./explain_analzye.png)
 - Sample results of EXPLAIN ANALYZE
 ```
 EXPLAIN ANALYZE SELECT username, contents
@@ -1167,5 +1167,169 @@ FROM likes
 WHERE created_at > '2013-01-01';
 ```
   - Why ?
-  - Random access through index becomes very expensive for very lagre data
+  - Random access through index becomes very expensive for very large data
   - Cost was estimated and compared
+
+## 206-207. Sample UNION query
+- Show the username of users who were tagged in a caption or photo before Jan 07 2010. Also show the date they were tagged
+```
+EXPLAIN ANALYZE SELECT users.username, tags.created_at
+FROM users
+JOIN (
+SELECT user_id, created_at FROM caption_tags
+UNION ALL
+SELECT user_id, created_at FROM photo_tags
+) AS tags ON tags.user_id = users.id
+WHERE tags.created_at < '2010-01-07';
+```
+
+## 208. Common Table Expression (CTE)
+-
+```
+WITH tags AS (
+	SELECT user_id, created_at FROM caption_tags
+	UNION ALL
+	SELECT user_id, created_at FROM photo_tags
+)
+SELECT users.username, tags.created_at
+FROM users
+JOIN tags AS tags ON tags.user_id = users.id
+WHERE tags.created_at < '2010-01-07';
+```
+- Define with a `WITH` before the main query
+  - Simple form is used to make a query easy to read
+  - Recursive form is used to express complex query
+- Simple form of CTE doesn't change the cost or planner
+
+## 209-210. Recursive CTE
+- Useful for tree or graph-style data structure
+- Must use a UNION keyword
+- Use existing templates or examples - very difficult to understand
+```
+WITH RECURSIVE countdown(val) AS (
+	SELECT 3 AS val
+	UNION
+	SELECT val - 1 FROM countdown WHERE val > 1
+)
+SELECT *
+FROM countdown;
+```
+  - Produces a column of 3, 2, 1
+
+## 212-213. A sample recursive CTE
+```
+WITH RECURSIVE suggestions(leader_id, follower_id, depth) AS (
+	SELECT leader_id, follower_id, 1 AS depth
+	FROM followers
+	WHERE follower_id=1000
+	UNION
+	SELECT followers.leader_id, followers.follower_id, depth+1
+	FROM followers
+	JOIN suggestions ON suggestions.leader_id = followers.follower_id
+	WHERE depth <3
+)
+SELECT DISTINCT users.id, users.username
+FROM suggestions
+JOIN users ON users.id = suggestions.leader_id
+WHERE depth > 1
+LIMIT 30;
+```
+
+## 214. A same query
+- Show the most popular users - the users who were tagged the most (caption_tags, photo_tags)
+```
+SELECT username, COUNT(*)
+FROM users
+JOIN(
+	SELECT user_id FROM caption_tags
+	UNION ALL
+	SELECT user_id FROM photo_tags
+) AS merge ON merge.user_id = users.id
+GROUP BY users.username
+ORDER BY COUNT(*) DESC
+LIMIT 10;
+```
+- We may not want to use UNION many times for merge tables. How to merge existing tables?
+
+## 215. Merging tables
+- We do not want to delete existing tables
+- Let's create a VIEW
+
+## 216. Creating a View
+```
+CREATE VIEW tags AS (
+	SELECT id, created_at, user_id, post_id, 'photo_tag' AS type FROM photo_tags
+	UNION ALL
+	SELECT id, created_at, user_id, post_id, 'caption_tag' AS type FROM caption_tags
+);
+SELECT username, COUNT(*)
+FROM users
+JOIN tags ON tags.user_id = users.id
+GROUP BY users.username
+ORDER BY COUNT(*) DESC
+LIMIT 10;
+```
+
+## 217. A sample VIEW
+- A VIEW for 10 the most recent post
+```
+CREATE VIEW recent_post AS (
+	SELECT *
+	FROM posts
+	ORDER BY created_at DESC
+	LIMIT 10
+);
+```
+
+## 218. Deleting and changing VIEWs
+- CREATE OR REPLACE
+```
+CREATE OR REPLACE VIEW recent_post AS (
+	SELECT *
+	FROM posts
+	ORDER BY created_at DESC
+	LIMIT 15
+);
+```
+- DROP for deleting views
+```
+DROP VIEW recent_post;
+```
+
+## 219. Materialized VIEWs
+- VIEW is a kind of macro, and is executed every time when a query sees the VIEW
+  - Ref: https://dba.stackexchange.com/questions/7242/does-sql-server-calculate-views-every-time-when-someone-query-the-views
+- Materialized VIEW: executed only at specific times, and can be referenced
+
+## 220-223. A sample query using LEFT JOIN
+- For each week, show the number of likes that posts and comments received. Use created_at of the post and comment tables, not when the like was received
+```
+SELECT
+	date_trunc('week', COALESCE(posts.created_at, comments.created_at)) AS week,
+	COUNT(posts.id) AS num_likes_for_posts,
+	COUNT(comments.id) AS num_likes_for_comments
+FROM likes
+LEFT JOIN posts ON posts.id = likes.post_id
+LEFT JOIN comments ON comments.id = likes.comment_id
+GROUP BY week
+ORDER BY week;
+```
+- This takes 1.7 sec
+```
+CREATE MATERIALIZED VIEW weekly_likes AS (
+	SELECT
+		date_trunc('week', COALESCE(posts.created_at, comments.created_at)) AS week,
+		COUNT(posts.id) AS num_likes_for_posts,
+		COUNT(comments.id) AS num_likes_for_comments
+	FROM likes
+	LEFT JOIN posts ON posts.id = likes.post_id
+	LEFT JOIN comments ON comments.id = likes.comment_id
+	GROUP BY week
+	ORDER BY week
+) WITH DATA;
+```
+- Now `SELECT * FROM weekly_likes;` takes 0.1msec
+- When data is modified, weekly_likes VIEW doesn't update automatically
+- `REFRESH MATERIALIZED VIEW weekly_likes;` will update the materialized VIEW
+
+## 224. Transactions
