@@ -545,7 +545,7 @@ FROM products;
 ```
 sudo -u postgres psql
 postgres=# create database mydb;
-postgres=# create user myuser with encrypted password 'mypass';
+postgres=# create user myuser with encrypted password 'XXXX';
 postgres=# alter user myuser createdb;
 postgres=# grant all privileges on database mydb to myuser;
 ```
@@ -1184,7 +1184,7 @@ WHERE tags.created_at < '2010-01-07';
 ```
 
 ## 208. Common Table Expression (CTE)
--
+- Intermediate query results that can be used other main query statement
 ```
 WITH tags AS (
 	SELECT user_id, created_at FROM caption_tags
@@ -1333,3 +1333,535 @@ CREATE MATERIALIZED VIEW weekly_likes AS (
 - `REFRESH MATERIALIZED VIEW weekly_likes;` will update the materialized VIEW
 
 ## 224. Transactions
+- How to make sure the entire multiple operations are done completely or when broken, how to roll back
+- BEGIN, COMMIT, ROLLBACK
+
+## 225-226. A sample transaction
+```
+CREATE TABLE accounts(
+id SERIAL PRIMARY KEY,
+name VARCHAR(20) NOT NULL,
+balance INTEGER NOT NULL
+);
+INSERT INTO accounts (name, balance)
+VALUES
+('Gia',100),
+('Alyson',100);
+```
+- `BEGIN;` starts a transaction
+- `COMMIT`: merges changes to the main data pool
+- `ROLLBACK`: cancels the change
+- Bad commands will put the transaction in an aborted state. ROLLBACK must be executed
+- With connection 1)
+```
+BEGIN;
+UPDATE accounts
+SET balance = balance - 50
+WHERE name = 'Alyson';
+UPDATE accounts
+SET balance = balance + 50
+WHERE name = 'Gia';
+COMMIT;
+```
+- With connection 2)
+  - Balance change is not found until COMMIT is made from connection 1)
+
+## 228. Manual ROLLBACK
+```
+BEGIN;
+SELECT * FROM nonexisting_table;
+```
+- SQL will crash. Any new query will not be executed
+```
+ROLLBACK;
+```
+- After ROLLBACK, an appropriate query will work
+
+## 229-230. Schema migration
+- Request: column name of 'contents' as 'body'
+- `ALTER TABLE comments RENAME COLUMN contents TO body;`
+  - Will break existing API or queries
+- Changes of DB and API must be made in the same time
+- Or Need to tie the structure of the database into the code
+  - Not from PGAdmin
+  - Needs schema Migration File: C, Python, Java, ...
+- Migration File
+  - Up: Apply or change the DB structure
+  - Down: Undo Up or revert
+- Ex) 1
+  - Up: CREATE TABLE comments ( id SERIAL PRIMARY KEY, created_at ....);
+  - Down: DROP TABLE comments;
+- Ex) 2
+  - Up: ALTER TABLE comments RENAME COLUMN contents TO body;
+  - Down: ALTER TABLE comments
+   RENAME COLUMN body TO contents;
+
+## 232. Migration libraries
+- Python: alembic, yoyo-migration
+- Java: flywaydb
+- Javascript: node-pg-migrate, sequelize, db-migrate
+- Recommendation: instead of automatic SQL query from the library, write your own SQL manually
+
+## 234-237. A sample node js project
+- `mkdir ig`
+- `cd ig`
+- `npm init -y`
+- `npm install node-pg-migrate pg`
+- Edit package.json
+```
+{
+  "name": "ig",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "migrate": "node-pg-migrate"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-pg-migrate": "^5.9.0",
+    "pg": "^8.5.1"
+  }
+}
+```
+- `npm run migrate create table comments`
+- Edit migrations/*_table-comments.js
+```
+/* eslint-disable camelcase */
+exports.shorthands = undefined;
+exports.up = pgm => {
+  pgm.sql(`
+    CREATE TABLE comments(
+      id SERIAL PRIMARY KEY,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      contents VARCHAR(240) NOT NULL
+    );
+    `);
+};
+exports.down = pgm => {
+  pgm.sql(`
+    DROP TABLE comments;
+    `)
+};
+```
+- `DATABASE_URL=postgres://postgres:__passwd__@localhost:5432/socialnetwork npm run migrate up`
+  - pgadmin can find the table comments is produced
+- `DATABASE_URL=postgres://postgres:__passwd__@localhost:5432/socialnetwork npm run migrate down`
+  - Now the table comments is gone
+- `npm run migrate create rename contents to body`
+- Edit the newly produced json
+```
+/* eslint-disable camelcase */
+exports.shorthands = undefined;
+exports.up = pgm => {
+  pgm.sql(`
+    ALTER TABLE comments
+    RENAME COLUMN contents TO body;
+    `)
+};
+exports.down = pgm => {
+  pgm.sql(`
+  ALTER TABLE comments
+  RENAME COLUMN body TO contents;
+  `)
+};
+```
+- `DATABASE_URL=postgres://postgres:__passwd__@localhost:5432/socialnetwork npm run migrate up`
+  - As there are two json files, 1) it will create a table and 2) will ALTER the table
+```
+### MIGRATION 1607647512791_table-comments (UP) ###
+    CREATE TABLE comments(
+      id SERIAL PRIMARY KEY,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      contents VARCHAR(240) NOT NULL
+    );
+    ;
+INSERT INTO "public"."pgmigrations" (name, run_on) VALUES ('1607647512791_table-comments', NOW());
+### MIGRATION 1607648312077_rename-contents-to-body (UP) ###
+   ALTER TABLE comments
+    RENAME COLUMN contents TO body;
+    ;
+INSERT INTO "public"."pgmigrations" (name, run_on) VALUES ('1607648312077_rename-contents-to-body', NOW());
+```
+- `DATABASE_URL=postgres://postgres:__passwd__@localhost:5432/socialnetwork npm run migrate down`
+  - Will revert those steps
+```
+### MIGRATION 1607648312077_rename-contents-to-body (DOWN) ###
+  ALTER TABLE comments
+  RENAME COLUMN body TO contents;
+  ;
+DELETE FROM "public"."pgmigrations" WHERE name='1607648312077_rename-contents-to-body';
+Migrations complete!
+```
+
+## 238-239. Schema and data migrations
+- Moving latitude and longitudinal columns into a single column of location
+  - Schema migration: adding a new column/removing old columns
+  - Data migration: merging two data into a single data type
+    - What if there are millions of data?
+  - Running  migration in a transaction might be recommended
+    - Newly added rows might not be processed from such a transaction: potential data loss
+- May split schema migration and data migration
+
+## 240. Proper migrations of schema and data
+- Add column loc
+- Let API fill data of lat/lng/loc
+- Copy lat/lng to loc
+- Update API to write loc only
+- Drop columns of lat/lng
+- Can avoid any data loss
+
+## 241. npm command to create tables
+- `npm run migrate create add posts table`
+- Edit js file at migration folder
+```
+/* eslint-disable camelcase */
+exports.shorthands = undefined;
+exports.up = pgm => {
+  pgm.sql(`
+    CREATE TABLE posts (
+      id SERIAL PRIMARY KEY,
+      url VARCHAR(300),
+      lat NUMERIC,
+      lng NUMERIC
+    );
+    `);
+};
+exports.down = pgm => {
+  pg.sql(`
+    DROP TABLE posts;
+    `);
+};
+```
+
+## 242. Web server using express
+- `npm install express pg`
+- Make index.js
+```
+const express = require('express');
+const pg = require('pg');
+const pool = new pg.Pool({
+  host: 'localhost',
+  port: 5432,
+  database: 'socialnetwork',
+  user: 'postgres',
+  password: 'XXXXXX'
+  });
+//pool.query('SELECT 1+1;').then((res) => console.log(res));
+const app = express();
+app.use(express.urlencoded({ extended:true }));
+
+app.get('/posts', async(req,res) => { const {rows } = await pool.query(`
+  SELECT * FROM posts;
+  `);
+  res.send(`
+    <table>
+    <thead>
+    <tr>
+    <th>id</th>
+    <th>lng</th>
+    <th>lat</th>
+    </tr>
+    </thead>
+    <tbody>
+    ${rows.map(row => {
+      return `
+        <tr>
+        <td>${row.id} </td>
+        <td>${row.lng} </td>
+        <td>${row.lat} </td>
+        </tr>
+      `;
+    }). join('')}
+    </tbody>
+    </table>
+    <form method="POST">
+     <h3> Create Post </h3>
+     <div>
+        <label> Lng</label>
+        <input name = "lng"/>
+      </div>
+      <div>
+        <label> Lat</label>
+        <input name = "lat"/>
+      </div>
+      <button type = "submit">Create</button>
+      </form>
+    `);
+});
+app.post('/posts', async(req,res) => {
+  const { lng, lat } = req.body;
+  await pool.query(
+    'INSERT INTO posts (lat, lng) VALUES ($1, $2);',
+    [lat, lng]
+  );
+  res.redirect('/posts')
+});
+app.listen(3005, () => {
+  console.log('Listening on port 3005');
+})
+```
+- `node index.js` will start web server
+- Open http://localhost:3005/posts in the web browser
+- `npm run migrate create add loc to posts`
+- Edit migration file
+```
+/* eslint-disable camelcase */
+exports.shorthands = undefined;
+exports.up = pgm => {
+  pgm.sql(`
+    ALTER TABLE posts
+    ADD COLUMN loc POINT;
+    `);
+};
+exports.down = pgm => {
+  pgm.sql(`
+    ALTER TABLE posts
+    DROP COLUMN loc;
+    `);
+};
+```
+- `DATABASE_URL=postgres://postgres:__passwd__@localhost:5432/socialnetwork npm run migrate up`
+  - Now loc column is added
+
+## 245. Writing data to the existing/new columns
+- Modify:
+```
+app.post('/posts', async(req,res) => {
+  const { lng, lat } = req.body;
+  await pool.query(
+    'INSERT INTO posts (lat, lng) VALUES ($1, $2);',
+    [lat, lng]
+  );
+  res.redirect('/posts')
+});
+```
+- To:
+```
+app.post('/posts', async(req,res) => {
+  const { lng, lat } = req.body;
+  await pool.query(
+    'INSERT INTO posts (lat, lng, loc) VALUES ($1, $2, $3);',
+    [lat, lng, `(${lng}, ${lat})`]
+  );
+  res.redirect('/posts')
+});
+```
+- Restart index.js and add new data. Now loc column is updated
+
+## 246. Copying data to the loc column
+- DO NOT update at once - may overload the server
+- Split data and run batch jobs many times, updating data piece by piece
+- Transaction Locks
+  - During the transaction, handled data are locked
+  - Any transaction accessing the locked data will be queued
+  - Pending queue will be executed the locked transaction is committed or rolled-back
+
+## 247. Updating values of loc column
+- mkdir -p migrations/data
+- Edit 01-lng-lat-to-loc.js
+```
+const pg = require('pg');
+const pool = new pg.Pool({
+  host: 'localhost',
+  port: 5432,
+  database: 'socialnetwork',
+  user: 'postgres',
+  password: 'XXXXXXXXXXX'
+  });
+pool.query(`
+  UPDATE posts
+  SET loc = POINT(lng, lat)
+  WHERE loc IS NULL;
+`)
+.then(() =>{
+  console.log('Update Complete');
+  pool.end();
+})
+.catch((err) => console.error(error.message));
+```
+- `node 01-lng-lat-to-loc.js` will update the server
+
+## 251. New project using Node API
+- Javascript API to interact with socialnetwork table
+
+## 252. Initial setup
+- `mkdir api; cd api`
+- `npm install dedent express jest node-pg-migrate nodemon pg pg-format supertest node-pg-migrate`
+
+## 253. One fast migration
+- `npm init -y`
+- Edit package.json
+```
+{
+  "name": "social-repo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "migrate": "node-pg-migrate",
+    "start": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+```
+ - `npm run migrate create add users table`
+ - Now edit migrations/XXX-add-users-table.js
+ ```
+ /* eslint-disable camelcase */
+ exports.shorthands = undefined;
+ exports.up = pgm => {
+   pgm.sql(`
+     CREATE TABLE users(
+       id SERIAL PRIMARY KEY,
+       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+       bio VARCHAR(400),
+       username VARCHAR(30) NOT NULL
+     );`);
+ };
+ exports.down = pgm => {
+   pgm.sql(`
+     DROP TABLE users;
+     `);
+ };
+```
+- Drop socialnetwork database from pgadmin4 and create it again
+  - If a transaction is not handled appropriately, the pg_locks is applied and the db cannot be dropped.
+  - Couldn't drop a database from pgadmin4
+  - `sudo -u postgres psql; DROP DATABASE socialnetwork` has dropped the table
+- `DATABASE_URL=postgres://postgres:__passwd__@localhost:5432/socialnetwork npm run migrate up`
+  - pgadmin will show that users table is produced
+
+## 254. Building the users router
+- Make src/app.js
+```
+const express = require('express');
+const usersRouter = require('./routes/users');
+module.exports = () => {
+  const app = express();
+  app.use(express.json());
+  app.use(usersRouter);
+  return app;
+};
+```
+- Make src/routes/users.js
+```
+const express = require('express');
+const router = express.Router();
+router.get('/users', async(req, res) => {});
+router.get('users/:id', async(req, res) => {});
+router.post('/users', async(req,res) => {});
+router.post('/users/:id', async(req,res) => {});
+router.delete('/users/:id', async(req,res) => {});
+module.exports = router;
+```
+
+## 255. Understanding Connection Pools
+- A pool internally maintains several different clients that can be re-used
+- Make src/pool.js
+```
+const pg = require('pg');
+class Pool {
+  _pool = null;
+  connect(options) {
+    this._pool = new pg.Pool(options)
+    return this._pool.query('SELECT 1+1;');
+    // enforces a client is made when first connection is made
+  }
+}
+module.exports = new Pool();
+```
+
+## 256. Validating connection credentials
+- Make index.js
+```
+const app = require('./src/app.js');
+const pool = require('./src/pool.js');
+pool.connect({
+  host: 'localhost',
+  port: 5432,
+  database: 'socialnetwork',
+  user: 'postgres',
+  password: 'XXXXXXXXX'
+});
+app().listen(3005, () =>{
+  console.log('Listening on port 3005');
+});
+```
+
+## 257. Query and close
+- Add following functions to pool.js
+```
+close() {
+  return this._pool.end();
+}
+query(sql) {
+  return this._pool.query(sql); // this has security issue!!!
+}
+```
+
+## 259. Creating a repository
+- Make src/repos/user-repo.js
+```
+const pool = require('../pool');
+class UserRepo {
+  static async find() {
+    const result = await pool.query('SELECT * FROM users;');
+    return result.rows;
+  }
+  static async findById() {  }
+  static async insert() {  }
+  static async update() {  }
+  static async delete() {  }
+}
+module.exports = UserRepo
+```
+- Update users.js accordingly
+```
+const express = require('express');
+const UserRepo = require('../repos/user-repo');
+const router = express.Router();
+router.get('/users', async(req, res) => {
+  const users = await UsersRepo.find();
+  res.send(users);
+});
+router.get('users/:id', async(req, res) => {});
+router.post('/users', async(req,res) => {});
+router.post('/users/:id', async(req,res) => {});
+router.delete('/users/:id', async(req,res) => {});
+module.exports = router;
+```
+
+## 260
+- `npm install nodemon`
+- `npm run start`
+- postman or REST client of MS code
+- camel casing of Javascript vs different style: created_at vs createdAt
+
+## 262
+- Converted created_at key into createdAt
+
+## 264. SQL Injection Exploits
+- `SELECT * FROM users WHERE id= ${id};` from API
+- If the request sends `http://localhost:3005/users/1;DROP TABLE users;`, the table will be dropped
+  - `${id}` is handled a string
+
+## 265. Prepared statements for SQL Injection
+- How to sanitize user-provided values
+  - Provide appropriate API
+  - Let Postgres sanitize
+- PREPARE statement may map the data type for arguments
+
+## 266. Preventing SQL Injection
+- From: `SELECT * FROM users WHERE id= ${id};`
+- To: `SELECT * FROM users WHERE id= $1` using API. Deliver arguments using appropriate mapping
+  - Let only integer data type be mapped, not the entire string
+
+## 274. Adding disconnection after tests
