@@ -1865,3 +1865,33 @@ module.exports = router;
   - Let only integer data type be mapped, not the entire string
 
 ## 274. Adding disconnection after tests
+
+## 278. Isolation with schemas
+- Avoid conflict from parallel testings
+- Produce a dedicated database for each test
+- Or
+- Use a different schema for each test
+
+## 279. Create new schema
+```
+CREATE SCHEMA test;
+CREATE TABLE test.users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR
+);
+```
+
+## 280. Controlling schema access with search paths
+- `SHOW search_path;` shows the current search path
+- `SET search_path TO test, public;` changes the default schema to test
+- To revert, `SET search_path TO "$user", public;`
+
+## 283. Strategy for isolation
+- Generate a random string per test
+- Using the random name, generate a schema
+
+## 284. Escaping identifier
+- To avoid SQL injection, parametrization might be used but PostgreSQL may not allow it
+- Potential security issue at `CREATE SCHEMA ${roleName} AUTHORIZATION ${roleName};`
+- May want `CREATE SCHEMA $1 AUTHORIZATION $2, [${roleName}, ${roleName}]` but this doesn't work
+- `CREATE ROLE %I WITH AUTHORIZATION %I, roleName, roleName` may work

@@ -1,4 +1,7 @@
 # Learn Ruby on Rails from Scratch
+- ? Screen capture uses too high resolution. Hard to read what the lecturer does
+- Not organized well. Hard to understand what the lecture wants to deliver
+- Not recommended
 
 ## Section 4. Install Ruby on Ubuntu
 - Ignore lecture and use followings:
@@ -175,3 +178,58 @@ class PostsController < ApplicationController
 - In app/views/posts/index.html.erb, contents from app/controllers/posts_controller.rb can be used by injecting `<p><%=@content_first %> </p>`
 
 ## Section 19. Database planning and model creation
+- sudo gem install pg # install postgresql gem module
+- Update config/database.yml for postgresql
+  - Ref: https://gist.github.com/jwo/4512764
+- rails g model post title:string body:text category_id:integer author_id:integer
+- rake db:migrate
+
+### start from scratch again
+- rails new myrubyblog --database=postgresql --webpack=react
+  - Will install gems. Supply sudo passwd when requested
+- rails g model post title:string body:text category_id:integer author_id:integer
+- rake db:migrate
+
+
+ sudo -u postgres psql
+[sudo] password for hpjeon:
+psql (12.5 (Ubuntu 12.5-1.pgdg18.04+1), server 10.15 (Ubuntu 10.15-1.pgdg18.04+1))
+Type "help" for help.
+```
+sudo -u postgres psql
+postgres=# \du  # list of users
+postgres=# ALTER ROLE postgres
+postgres-# WITH PASSWORD 'XXXXX';
+## make sure ; is added. After update, "ALTER ROLE" must be prompted in CLI
+postgres-# \q
+```
+- To login from CLI, psql -U postgres -h localhost
+  - This will ask passwd
+ export DATABASE_URL="postgres://postgres:XXXXXX@localhost/myrubyblog"
+hpjeon@hakune:~/TEMP/myrubyblog$ !ra
+
+## digital ocean.com
+- Ref: https://www.digitalocean.com/community/tutorials/how-to-use-postgresql-with-your-ruby-on-rails-application-on-ubuntu-18-04
+- Create ROR application with postgresql
+```
+rails new utau -d=postgresql
+cd utau
+```
+- Edit config/database.yml and below default:, add username and passwd
+```
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  host: localhost
+  pool: 5
+  username: postgres
+  password: XXXXX
+  port: 5432
+```
+- rails db:create
+  - From pgadmin4, confirm that utau_development and utau_test databases are created
+- rails server --binding=localhost
+  - From web-browser, enter `localhost:3000`
+
+## medium.com class
+https://medium.com/@frouster/ruby-on-rails-postgresql-f1b037924bdf
