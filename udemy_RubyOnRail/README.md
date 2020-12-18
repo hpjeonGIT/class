@@ -232,4 +232,4 @@ default: &default
   - From web-browser, enter `localhost:3000`
 
 ## medium.com class
-https://medium.com/@frouster/ruby-on-rails-postgresql-f1b037924bdf
+- https://medium.com/@frouster/ruby-on-rails-postgresql-f1b037924bdf
