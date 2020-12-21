@@ -20,3 +20,4 @@
 - sudo apt-get install xclip
 - xclip -selection clipboard < ~/.ssh/id_ed25519.pub
 - Login to github -> settings -> add ssh-key
+- Still git push orign main works as it used to work. SSH key is not working?
