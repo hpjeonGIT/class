@@ -42,8 +42,11 @@
 - Pricing
   - On-demand
   - Savings plans
+    - Commits a consistent amount of compute usage
     - Up to 72% discount
+    - 1 or 3 years
   - Reserved instances
+    - On-demand
     - 1 or 3 years
   - Spot instances
     - Ideal for flexible workload which can withstand interruption
@@ -106,7 +109,7 @@
 - AWS management console: basic web interface
 - AWS CLI: efficient for automation
 - SDK: C++, Java, .NET, ...
-- AWS Elastic Beanstalk: builds environment for customer. Helps to build infractructure
+- AWS Elastic Beanstalk: builds environment for customer. Helps to build infractructure. Users upload applications and Elastic Beanstalk automatically handles the deployment details of provisioning, load balancing, auto-scaling, and health monitoring
 - AWS CloudFormation: using templates, builds infrastructure for customers
 
 ## Subnet and network access control
@@ -299,6 +302,119 @@
   - Amazon agent
   - Security assessment service
 - Amazon GuardDuty
+  - Threat detection service
+  - Monitors malicious activity and unauthorized behavior
+  - ML anomaly detection tool
+
+## Monitoring AWS environment
+- CloudWatch
+  - Monitoring AWS infrastructure, applications, and services
+  - Dashboard is available
+  - Coupled with SNS and can send warning/message
+- CloudTrail
+  - Tracks user activities and API requests throughout AWS infrastructure
+  - Every request gets logged in the CloudTrail engine
+  - Secure logs
+  - Events are typically updated within 15min
+- Trusted Advisor
+  - Inspects your AWS environment and provides recommendation
+  - Best practice in terms of :
+    - Cost optimization: eliminate used and idle resource
+    - Performance: checks your service limits, and monitors overutilized instances
+    - Security: closes gaps, enables security features, examine permissions
+    - Fault tolerance: increase availability using auto-scaling, health checks, multi AZ, backup
+    - Service limits: Using snapshot, checks the service usage more than 80% of the service limits
+  - Green check for no problems
+  - Orange triangle for recommended investigations
+  - Red circle for recommended actions
+
+## Pricing
+- AWS Free Tier
+  - Always free, no expiration
+    - 1 M invocation and 3.2 million seconds of compute per month in Lambda
+    - 25GB per month in DynamoDB
+  - 12 months free
+    - For new AWS customer
+    - S3 for 5GB
+  - Trials
+    - Inspector offers a 90 day free trial
+    - 750 free hours over a 30day with Lightsail
+- AWS Pricing Calculator
+  - Estimate costs based on use cases
+- Billing dashboard
+  - Monitors the usage, analyzes and controls the costs
+- Consolidated billing
+  - AWS Organization as shown above
+  - Can combine usage across accounts to receive volume pricing discounts
+- AWS Budgets
+  - When cost/usage exceeds the criterion, message is sent
+- AWS Cost Explorer
+  - Visualizes and manages AWS cost and usage over time
+- AWS Support plans
+  - Basic support
+    - No extra cost
+    - 24/7 customer service
+    - Documentation
+    - Whitepapers
+    - Support forums
+    - AWS Trusted Advisors
+    - AWS Personal Health Dashboard
+  - Developer support
+    += Basic support
+    - Email access for 24 hours response time and 12 hours for system down
+    - 7 Core checks of Trusted Advisor
+  - Business support
+    += Developer support
+    - Direct Phone access
+    - Full checks of Trusted Advisor
+  - Enterprise support
+    += Business support
+    - 15 min SLA support
+    - Technical Account Manager
+    - Full checks of Trusted Advisor
+- AWS Marketplace
+  - A digital catalog that includes thousands of SW listings from independent SW vendors
+  - One-click deployment
+  - Flexible payment plan
+
+## Migration to AWS
+- Six core perspectives
+  - Business: Move from a IT/business separated model to an integrated IT strategy
+  - People: helps HR to prepare cloud adoption by updating staffs and skills
+  - Governance: Update he staff skills and organization process
+  - Platform: helps IT to describe the structure and design of cloud architectures
+  - Security: helps IT to transform the organization's security culture
+  - Operations: Recovering IT workloads to meet the requirements of business stakeholders
+- AWS Cloud Adoption Framework (CAF)
+  - Action Plan
+- Migration strategies
+  - Rehosting: moving applications without change, from local to cloud
+  - Replatforming: cloud optimization of applications
+  - Refactoring: change how an application is architected and eveloped using cloud-native features
+  - Repurchasing: replaces an existing application with a cloud-based version
+  - Retaining: keeping applications in the legacy environment
+  - Retiring: removal of applications
+- AWS Snow Family
+  - A collection of PHYSICAL devices to migrate exabytes of data in/out of AWS
+  - Snowcone: a device of 2CPU/4GB mem/8TB storage
+  - Snowball: a device of  80TB HDD + 40vCPU or 42TB + 52vCPU
+  - Snowmobile: 100PB per Snowmobile, a shipping container
+- Innovation with AWS
+
+## Well Architected Framework
+- Five pillars of the Well-Architected Framework
+  - Operational Excellence: run workload efficiently and gain insights
+  - Security: protects information
+  - Reliability: focuses on the ability of a workload to consistently and correctly perform its intended functions
+  - Performance efficiency: using computing resources efficiently to MEET SYSTEM REQUIREMENTS and maintain that efficiency
+  - Cost optimization: Run systems and deliver business value at the lowest price point
+- Benefits of the AWS cloud
+  - Trade upfront expense
+  - Benefit from massive economies of scale
+  - Stop guessing capacity
+  - Increase speed and agility
+  - Stop spending money for data centers
+  - Go global in minutes
 
 ## Quiz
 - How does the scale of cloud computing help you to save costs?
@@ -309,3 +425,25 @@
   - Ensuring that no single Amazon EC2 instance has to carry the full workload on its own
 - The best description of AWS account's default network access control list
   - It is stateless and allows all inbound and outbound traffic
+- Which support plan includes all AWS Trusted Advisor checks at the lowest cost?
+  - Business
+- Which perspective of the AWS CAF helps you to design, implement, and optimize your AWS infrastructure based on your business goals and perspectives?
+  - Platform perspective
+- Which migration strategy involves moving to a different product?
+  - Repurchasing
+- Which perspective of AWS CAF helps you to structure the selection and implementation of permissions?
+  - Security Perspective
+- Which pillar of AWS well-Architected Framework focuses on the ability of a workload to consitently and correctly perform its intended functions?
+  - Reliability
+- Which pillar of AWS WAF includes the ability to run workloads efficiently and gain insights into their operations?
+  - Operational Excellence
+- Which service enables you to consolidate and manage multipel AWS accounts from a central location?
+  - AWS organization
+- Which VPC component controls inbound/outbound traffic for EC2 instances?
+  - Security Group
+- Which service enables you to build the workflows that are reuired for human review of machine learning predictions?
+  - Amazon Augmented AI
+- Which statement best describes an Availability zone?
+  - A fully isolated portion of the AWS global infrastructure
+- Which statement best describes a Region?
+  - A separate geographical location with multiple locations that are isolated from each other
