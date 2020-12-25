@@ -115,3 +115,22 @@ host: localhost
   - Generates app/models/portfolio.rb, app/controllers/portfolios_controller.rb, app/views/portfolios, ...
 - `rails db:migrate`
   - Check db/schema.rb is updated
+
+## 55-56. Deep Dive: Rails Generators and customization
+- rails new GeneratorApp -T --database=postgresql
+- cd GeneratorApp
+  - Edit config/database.yml for username and password
+- rails db:create
+- rails g scaffold Post title:string body:text
+- rails db:migrate
+- Make a new folder at lib/templates/erb/scaffold/index.html.erb
+
+## 58. Seeds file
+- db/seeds.rb
+
+### When following message appears:
+```
+FATAL: Listen error: unable to monitor directories for changes.
+Visit https://github.com/guard/listen/wiki/Increasing-the-amount-of-inotify-watchers for info on how to fix this.
+```
+- Multiple ruby instances are existing. Terminate them

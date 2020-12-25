@@ -1,0 +1,311 @@
+## AWS Cloud practitioner essentials
+
+- Undifferentiated heavy lifting IT
+  - Let you do your own work, not administrating infrastructure
+- Deployment models for cloud computing
+  - Cloud-based deployment
+  - On-premises deployment
+  - Hybrid deployment
+
+- Benefits of cloud computing
+  - Trade upfront expense for variable expense
+  - Stop spending money to run and maintain data centers
+  - Stop guessing capacity
+  - Benefit from massive economies of scale
+  - Increase speed and agility
+  - Go global in minutes
+
+- Cloud computing models
+  - Infrastructure as a Service (Iaas)
+    - Common deployment for accessing network,  computing, and data storage
+    - AWS EC2, GCE, ...
+  - Platform as a Service (PaaS)
+    - Provides the platform (SW/HW) for developers
+    - AWS Elastic Beanstalk, Heroku, Azure, Github
+  - Software as a Service (Saas)
+    - Google Apps, Dropbox
+
+## EC2 instance
+- Multitenancy: sharing underlying hw resource b/w instances
+- Compute as a Service (CaaS)
+- How EC2 works
+  - Launch
+  - Connect
+  - Use
+- Instance types
+  - General purpose
+  - Compute optimized
+  - Memory optimized
+  - Accelerated computing
+  - Storage optimized
+    - Distributed file systems, data warehousing, high frequency online transaction processing (OLTP)
+- Pricing
+  - On-demand
+  - Savings plans
+    - Up to 72% discount
+  - Reserved instances
+    - 1 or 3 years
+  - Spot instances
+    - Ideal for flexible workload which can withstand interruption
+    - Amazon may claim resources with 2 min notice
+    - Up to 90% discount
+  - Dedicated hosts
+    - No multi-tenancy
+- Scalability
+  - Scaling up: adding more powers to the computer
+  - Scaling out:
+  - Amazon EC2 autoscaling
+- Directing traffic with Elastic Load Balancing (ELB)
+  - Front end -> ELB -> Back end
+- Messaging and queuing
+  - Convert tightly coupled architecture into loosely coupled one
+  - Convert monolithic applications into microservices
+  - Simple Queue Service (SQS)
+    - Messages are queued
+  - Simple Notification Service (SNS)
+    - A channel for messages to all subscribers
+
+## Serverless instances
+- AWS Lambda
+  - Trigger runs Lambda function
+  - Less than 15 min run
+  - For web-service
+  - Event driven
+
+## Container orchestration service
+- Elastic Container Services (ECS)
+  - Supports Docker containers
+- Elastic Kubernetes Service (EKS)
+- AWS Fargate: serverless compute engine for containers. Works on both of ECS and EKS
+
+## Global infrastructure and reliability
+- Choosing business region
+  - Compliance requirement
+  - Proximity
+  - Feature availability
+  - Price
+- Availability zone
+  - A single data center or group of data centers within a Region
+- Edge locations
+  - Regions are geographically isolated areas
+  - Regions contain Availability Zones (more than 2)
+  - Edge locations run Amazon CloudFront
+    - Cached copy of CDN (Amazon CloudFront) for faster delivery
+- Amazon CloudFront
+  - Services for pictures, audio, video, ...
+  - Content Delivery Network
+- AWS outposts
+  - Isolated platform located locally in the customer location or on-premises data center
+
+## Amazon Virtual Private Cloud (VPC)
+- Allows private network within AWS. Has its own subnets
+- Virtual Private Gateway: allows certain network or VPN only
+- AWS Direct Connect : dedicated fiber connection from private datacenter to AWS
+
+## How to interact with AWS services
+- AWS management console: basic web interface
+- AWS CLI: efficient for automation
+- SDK: C++, Java, .NET, ...
+- AWS Elastic Beanstalk: builds environment for customer. Helps to build infractructure
+- AWS CloudFormation: using templates, builds infrastructure for customers
+
+## Subnet and network access control
+- Networking hardening
+  - Packet -> Network Access Control List (ACL) -> Subnet
+    - ACL may not block exit packet as well
+    - ACL is stateless, implying that it doesn't store data
+    - By default, it allows all of inbound/outbound traffic
+  - Security Group may block incoming packet but ignores exiting packet
+    - Security Group is stateful, implying that backing storage is required
+    - By default, it blocks all inbound traffic
+    - By default, it allows all outbound traffic
+  - Overhead by ACL and Security Group is very low
+- Application security
+- User identity
+- Authentication and authorization
+- Distributed denial of service prevention
+- Data integrity
+- Encryption
+- Sample case study
+  - A company launching online photo storage applications
+  - Public subnet: Support the customer-facing website
+  - Private subnet: isolate databases containing customers' personal info
+  - Virtual Private Gateway: Create a VPN connection b/w the VPC and the internal corporate network
+  - AWS Direct Connect: Establish a dedicated connection b/w the on-premise data center and the VPC
+
+## Amazon Route 53
+- DNS service
+- Routing policy
+  - Latency based routing
+  - Geolocation DNS
+  - Geoproximity routing
+  - Weighted round robin
+
+## Storage and database
+- Do not store important data in the disk of EC2 instances
+  - Will be removed when the instance is released
+  - Ideal for scratch data
+- Elastic Block Store (EBS)
+  - Provides consistent storage for EC2 instances
+  - EBS Snpashots are available for backup
+  - Criteria
+    - Size
+    - Type
+    - Configuration
+  - SSD or HDD
+  - Block storage
+    - Slight change will update the changed block only
+- Simple Storage Service (S3)
+  - Store data as objects
+  - Store objects in buckets
+  - Up to 5TB of a single object
+  - Stored in a minimum three Availability Zones
+  - Write once/read many
+  - Object storage
+    - Slight change to a file will rewrite the entire object data
+  - Cannot be mounted in ec2 instances. Needs special command/API to copy data from instances
+- S3 Standard Infrequent Access (Standard-IA)
+  - Lower storage price but higher retrieval price
+- S3 One Zone-Infrequent Access (One Zone-IA)
+  - Cheaper than S3 Standard IA. Recommended for easily reproducible data
+- S3 Intelligent Tiering
+  - By access to objects within 30 days, moving b/w S3 <-> S3 Standard IA is automated
+- S3 Glacier
+  - Lost cost data archiving
+  - Can be retrieved within a few min to a few hours
+- S3 Glacier Deep Archive
+  - The lowest cost object storage
+  - Retrieve may take 12 hours
+- Use cases
+  - Millions of photos from web users
+    - Web-enabled
+    - Regionally distributed
+    - S3 is recommended
+  - 80 GB video edition
+    - Advantage of block storage - update the changed block only
+    - EBS is recommended
+- Elastic File System (EFS)
+  - Multiple instances can access the data in EFS simultaneously
+  - EBS can connect to the multiple EC2 instances but those instances must be in the same Availability Zone
+  - EFS is Regional resource across multiple Availability Zones
+  - Automatic scaling
+  - On-premise servers can access EFS through Direct Connect
+- Relational Database Service (RDS)
+  - Lift-and-shift migration
+  - Automatic patching
+  - Backups
+  - Redundancy
+  - Failover
+  - Disaster Recovery
+- Amazon Aurora
+  - 1/10th cost of commercial database
+  - Data replication
+  - Up to 15 read replicas
+  - Continuous backup
+- DynamoDB (similar to MongoDB)
+  - Non-relational databases/NoSQL databases
+  - A serverless database
+    - No provision/patch/managing servers
+  - Key-value database
+  - Massively scalable
+  - For millions of users
+- Use cases
+  - Sales department
+    - Complex REJOINING is required
+    - RDS
+  - Employee contact list
+    - No complex schema
+    - DynamoDB
+- Redshift (similiar to Hadoop)
+  - Data warehousing service
+  - Bigdata BI solution
+- Database Migration Service (DMS)
+  - Source database remains fully functional during the migration
+  - Homogeneous migration
+    - MySQL->MySQL, MS-SQL->SQL server, ...
+  - Heterogeneous migration
+    - Schema conversion is necessary
+  - Development and test database migrations
+    - Enables developers to test applications without affecting production users
+  - Database consolidation
+    - Combining multiple databases into a single
+  - Continuous database replication
+- Choosing the right database
+  - Additional services
+  - DocumentDB: document database with MongoDB compatibility
+  - Neptune: graph database service. SNS, supply chain, ...
+  - Quantum Ledger Database (QLDB): can review the complete history of all changes in the data
+  - Managed Blockchain
+  - ElasticCache: provides caching layer
+  - DynamoDB Accelerator (DAX): in-memory cache for DynamoDB
+
+## Stateless vs Stateful
+- https://www.redhat.com/en/topics/cloud-native-apps/stateful-vs-stateless
+- Stateless
+  - No stored knowledge of past transactions
+  - When interrupted, start a new one
+  - A single request and a response like a vending machine
+- Stateful
+  - Can be returned to again and again
+  - Current transaction may be affected by what happened before
+  - When interrupted, the context and history are stored
+
+## Security in AWS
+- Shared Responsibility
+  - Users and AWS
+  - Users: O/S, Application, Data
+  - AWS: Physical, Network, Hypervisor
+- AWS account root user
+- Multi-Factor Authorization (MFA)
+- AWS Identiy and Access Management (IAM)
+  - Root user -> Create the first IAM user and give it permission to create other users -> Login as the first IAM user and create other users
+  - Default IAM user: no permission as default. Let each person have individual IAM user account
+  - IAM policy: Use least privilege principle
+  - IAM groups: group control over policy/grant/access
+  - IAM roles: gains temporary access to permissions. Not for long-term
+- AWS Organizations
+  - A central location to manage multiple AWS accounts
+  - Consolidated billing
+  - Hierarchical groupings of accounts for policy/regulation/grant/billing
+  - Service Control Policies (SCPs)
+    - No permission is granted by SCPs
+    - Can be applied to 1) an individual member account (root user) and 2) an organization unit (OU)
+- AWS Artifact
+  - On-demand access to AWS security and compliance reports and select online agreements
+    - AWS Artifact Agreements
+    - AWS Artifact Reports
+- Customer Compliance Center
+- Denial-of-service attacks
+  - DDOS
+    - UDP FLOOD
+      - Sets massive response from a service to the target
+      - Security Group can filter only allowed protocols
+    - HTTP level attacks
+      - Uses zombie PCs to overload the services
+    - SLOWLORIS attack
+      - Takes entire packet preventing regular service
+      - Elastic load balancer will distribute the requests
+- AWS Shield with AWS WAF
+  - Protects DDoS attacks
+  - AWS Shield Standard
+    - No cost
+  - AWS Shield Advanced
+    - Paid service and provides detailed attack diagnosis and the ability to detect and mitigate attacks
+- AWS Key Management Service (KMS)
+  - Cretes cryptographic keys
+- AWS Inspector
+  - Examines the deviation from the best-practice
+  - Network configuration reachability piece
+  - Amazon agent
+  - Security assessment service
+- Amazon GuardDuty
+
+## Quiz
+- How does the scale of cloud computing help you to save costs?
+  - The aggregated cloud usage from a large number of customers results in lower pay-as-you-go prices
+- What would be the best Amazon EC2 instance for batch processing workload?
+  - Compute optimized
+- An example of Elastic Load Balancing
+  - Ensuring that no single Amazon EC2 instance has to carry the full workload on its own
+- The best description of AWS account's default network access control list
+  - It is stateless and allows all inbound and outbound traffic
