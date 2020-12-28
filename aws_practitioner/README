@@ -80,6 +80,10 @@
   - Supports Docker containers
 - Elastic Kubernetes Service (EKS)
 - AWS Fargate: serverless compute engine for containers. Works on both of ECS and EKS
+  - Container service
+  - Pay only for CPU and memory time used
+  - No provision/patching for each server
+  - Application or Network Load Balancing available
 
 ## Global infrastructure and reliability
 - Choosing business region
@@ -110,7 +114,7 @@
 - AWS CLI: efficient for automation
 - SDK: C++, Java, .NET, ...
 - AWS Elastic Beanstalk: builds environment for customer. Helps to build infractructure. Users upload applications and Elastic Beanstalk automatically handles the deployment details of provisioning, load balancing, auto-scaling, and health monitoring
-- AWS CloudFormation: using templates, builds infrastructure for customers
+- AWS CloudFormation: using templates (json files), builds infrastructure for customers
 
 ## Subnet and network access control
 - Networking hardening
@@ -306,11 +310,13 @@
   - Monitors malicious activity and unauthorized behavior
   - ML anomaly detection tool
 
+
 ## Monitoring AWS environment
 - CloudWatch
   - Monitoring AWS infrastructure, applications, and services
   - Dashboard is available
   - Coupled with SNS and can send warning/message
+  - Has logs for Lambda
 - CloudTrail
   - Tracks user activities and API requests throughout AWS infrastructure
   - Every request gets logged in the CloudTrail engine
@@ -447,3 +453,171 @@
   - A fully isolated portion of the AWS global infrastructure
 - Which statement best describes a Region?
   - A separate geographical location with multiple locations that are isolated from each other
+
+!!!!!!!
+
+## Exam Readiness: AWS Certified Solutions Architect - Associate
+
+### How to design resilient architectures
+1. Choose reliable/resilient storage
+2. How to design decoupling mechanism using AWS
+  - When one component fails, other components are not affected
+3. How to design a multi-tier architecture
+4. How to design high availability and/or fault tolerant solutions
+- EC2 instance store
+  - Fixed capacity.
+  - Ephemeral volumes
+- Elastic Block Store
+  - Encryption/snapshots available
+  - Independent lifecyle than EC2 instance
+  - Can be attached to EC2 instance
+  - HDD is good for sequential access than SSD
+  - SSD is good for random access
+  - Q: A database on EC2 instace - needs backup feature with block storage. What storage would be the lowest cost option for the backup data? A: EBS Cold HDD
+- Elastic File System (EFS)
+  - Shared storage
+  - Elastic capacity
+  - Supports NFS
+  - Only for Linux
+- S3
+ - Object storage
+ - Consistency model - older object might be loaded just after updating the object as they are distributed
+ - Glacier
+   - Vaults and archives
+   - Expedited, standard, bulk
+ - Decoupling
+   - Email service
+     - Tightly coupled system: Web server -> Email service -> Email server
+     - Decoupled system: Web server -> SQS -> Email service -> Email server
+   - Logging service
+     - Coupled: Web Server -> Logging service -> DynamoDB
+     - Decoupled: Web Server -> SQS -> distributed Logging service (scale up or scale down using Elastic Load Balancer)-> DynamoDB
+- High Availability
+  - Everything fails all time
+- CloudFormation
+  - Using JSON, VPC creation is automated
+  - Templates are not region specific
+  - Amazon Machine Image (AMI) is not recommended to modify
+  - AMI IDs are different across Regions
+  - Users supply parameters
+- RTO vs RPO
+  - Recovery Time Objective (RTO): max time application can be down without causing damage
+  - Recovery Point Objective (RPO): Loss tolerance. How much time/data is lost
+
+
+## Design Performant Architectures
+1 Choose performant storage and databases
+2 Apply caching to improve performance
+3 Design solutions for elasticity and scalability
+- Moving web-related files into S3 increases the web performance
+- S3 buckets
+  - Create a bucket in one of the AWS Regions
+    - A bucket is coupled with a Region
+  - Upload any number of objects to the bucket
+  - Pricing model
+    - By GB per month, transfer out of region, put, copy, post, list, and get requests
+    - Transfer in to S3, transfer out from S3 to CloudFront or the same Region is free
+- Storage for databases
+  - RDS
+    - When SQL is necesssary
+    - No more than a single worker node/shard
+    - May not work with massive read/write rates (150K write/sec)
+      - Use DynamoDB for such cases
+    - Not for sharding
+      - Use DynamoDB for such cases
+    - For better performance, select a better performing instance
+      - No distributed database instances
+      - Read Replicas might be helpful for read only
+    - Read Replicas
+      - Can be replicated across different AZs
+- Caching
+  - CloudFront edge location for S3
+  - ElastiCache for RDS, DynamoDB, MongoDB
+    - Memcached vs Redis
+    - Memcached by multi-threading
+    - Redis is a dictionary service
+- Enabling Auto scaling of EC2 instances
+  - AutoScaling, Elastic Load Balancer, CloudWatch
+  - AutoScaling enforces a minimum number of running EC2 instances
+- CloudWatch
+  - CPU, Network, queue size
+  - Cannot monitor memory usage
+
+## Specify Secure Applications and Architectures
+1 Determine how to secure application iters
+2 Determine how to secure data
+3 Define the networking infrastructure for a single VPC application
+- Principle of least privilege
+  - Persons (or process) can perform all activities they need to perform, and no more
+- AWS IAM
+  - Central manager of users and user permissions
+  - Create users, groups, roles and policies
+  - Define permissions to control which AWS resources users can access
+  - Integrates MS Active Directory and AWS Directory Service using SAML identity federation
+  - IAM users
+  - Roles: Temporary identities used by EC2 instances, Lambdas, and external users
+  - Federation: users with Active Directory identities or other corporate credentials have role assigned in IAM
+  - Web Identity Federation: users with web identities from Amazon or other open ID provider have role assigned using Security Token Service (STS)
+- Virtual Private Cloud (VPC)
+  - Security
+  - Routing
+  - Network isolation
+  - Management
+  - Bastion hosts
+  - Security Groups vs. Network ACL (Access Control List)
+    - Explicit allow only vs Explicit Allow or Deny
+      - By default, disallows all inbound/allows outbound vs allows all inbound/outbound
+    - ENI or network interface vs subnet
+    - Stateful vs stateless
+    - can exist across many AZ but not Regions
+  - VPC connections
+    - Internet gateway: Connect to the internet
+    - Virtual private gateway: Connect to VPN
+    - AWS Direct Connect: Dedicated pipe
+    - VPC peering: Connec to other VPCs
+    - NAT gateways: Allow internet traffic from private subnets
+
+## Design Cost-optimized Architectures
+1. Determine how to design cost-optimized storage
+2. Determine how to design cost-optimized compute
+- S3-IA is more expensive than S3 for file retrieval
+- EFS is not available for public access
+
+## Define Operationally-excellent Architectures
+- Prepare
+- Operate
+- Evolve
+
+## Questions
+- Your web service has a performance SLA to respond to 99% of requests in < 1 sec. Under normal and heavy operations, distributed requests over four instances meets performance requirements. What archiecture ensures COST EFFICIENT HIGH AVAILABILITY of your service if an availability zone becomes unreachable?
+  - Four servers across two AZ (8 servers across two AS are TOO many)
+- Your web service has a performance SLA to respond to 99% of requests in < 1 sec. Under normal and heavy operations, distributed requests over four instances meets performance requirements. What archiecture ensures COST EFFICIENT FAULT-TOLERANT OPERATION of your service if an availability zone becomes unreachable?
+  - Eight servers across two AZ (4 servers across two AS doesn't meet fault-tolerance)
+  - Fault-tolerance is higher requirement than high availability
+- How can I access the print statements from Lambda?
+  - CloudWatch Logs
+- You're running an EC2 instance with snapshots EBS everyday. When crashed, it takes 10min to recover. What is RTO and RPO?
+  - RTO is 10 min while RPO is 1 day
+- Your AWS account admin left your company today. Which actions are necessary today?
+  - Change password and add MFA to the root user
+  - Rotate keys and change passwords for IAM users
+  - Delete the administrator's IAM user
+- You're running a web server in a subnet in your VPC. When tried to connect using HTTP, it timed out. How to fix the problem?
+  - Check that the VPC contains an internet Gateway and the subnet route table is routing 0.0.0.0/0 to the internet Gateway
+  - Check security group allows inbound access on port 80
+  - Check network ACL allows inbound access on port 80
+- Which actions can be controlled with IAM policies?
+  - Configuring a VPC security group
+  - Creating an Oracle RDS database
+  - Creating an Amazon S3 bucket
+- Good candidates to store in a cache?
+  - Session state
+  - Shopping cart
+  - Product Catalog
+  - Bank account balance must be renewed all the time, not cached
+- What is the template that Auto Scaling uses to launch a fully configured instance automatically?
+  - Launch configuration: includes AMI ID, instance type, key pair, and userdata
+- An application runs optimally on 9 EC2 instances, and must have at least 6 running instances to maintain minimally acceptable performance for a short period. Which is the most cost-efficient auto scaling group configuration?
+  - 9 instances across 3 AZs is better than 12 instances across 2 AZs
+- A web application running on EC2 instances yielded 404 errors. How to track those errors?
+  - Use CloudWatch logs to get the web server logs from EC2 instances

@@ -127,6 +127,104 @@ host: localhost
 
 ## 58. Seeds file
 - db/seeds.rb
+```
+10.times do |blog|
+  Blog.create!(
+    title: "My Blog Post #{blog}",
+    body: "some random texts here"
+  )
+end
+5.times do |skill|
+  Skill.create!(
+    title:"Rails #{skill}",
+    percent_utilized:15
+  )
+end
+9.times do |portfolio_item|
+  Portfolio.create!(
+    title: "Portfolio title: #{portfolio_item}",
+    subtitle:"My great service",
+    body: "Some random texts",
+    main_image: "http://placehold.it/500x300",
+    thumb_image: "http://placehold.it/350x200"
+  )
+end
+puts "5 skills added"
+puts "10 blogs added"
+```
+- rails db:setup
+  - Redoing from scratch
+  - Don't do this in the production environment
+## 59. Index.html from scratch
+- Add `def index` into `app/controllers/portfolios_controller.rb`
+```
+class PortfoliosController < ApplicationController
+  def index
+    @portfolio_items = Portfolio.all
+  end
+end
+```
+- `app/views/portfolios` folder is produced as empty. Add index.html.erb as a regular html
+```
+<h1> Porfolio items </h1>
+<% @portfolio_items.each do |portfolio_item| %>
+<p><%= portfolio_item.title %></p>
+<p><%= portfolio_item.subtitle %></p>
+<p><%= portfolio_item.body %></p>
+<%= image_tag portfolio_item.thumb_image %>
+<% end %>
+```
+
+## 60. New functionality from scratch
+- Add `def new` into `app/controllers/portfolios_controller.rb`
+```
+class PortfoliosController < ApplicationController
+  def index
+    @portfolio_items = Portfolio.all
+  end
+  def new
+    @portfolio_item = Portfolio.new
+  end
+end
+```
+  - Note that `@portfolio_item` as new.html.erb uses the variable of `@portfolio_item` (not items)
+- Add a new file of `app/views/portfolios/new.html.erb`
+```
+<h1> Create a new Portfolio Item </h1>
+<%= form_for(@portfolio_item) do |f| %>
+  <div id="field">
+    <%= f.label :title %>
+    <%= f.text_field :title %>
+  </div>
+  <div id="field">
+    <%= f.label :subtitle %>
+    <%= f.text_field :subtitle %>
+  </div>
+  <div id="field">
+    <%= f.label :body %>
+    <%= f.text_field :body %>
+  </div>
+  <div class="actions">
+    <%= f.submit %>
+  </div>
+<% end %>
+```
+- Now add create function to the controller
+```
+def create
+    @portfolio_item = Portfolio.new(params.require(:portfolio).permit(:title, :subtitle,:body))
+    respond_to do |format|
+      if @portfolio_item.save
+        format.html { redirect_to portfolios_path, notice: 'Your portfolio item is now live' }
+        format.json { render :show, status: :created, location: @portfolio_item }
+      else
+        format.html { render :new }
+        format.json { render json: @portfolio_item.errors, status: :unprocessable_entity }
+      end
+    end
+  end
+  ```
+  - From `http://localhost:3000/portfolios/new`, now you can create new portfolio but it will yield an error message as the thumb image from index.html.erb is missing. So updated index.html.erb with `<%= image_tag portfolio_item.thumb_image unless portfolio_item.thumb_image.nil?%>`, checking if the condition of an image is nil or not
 
 ### When following message appears:
 ```
