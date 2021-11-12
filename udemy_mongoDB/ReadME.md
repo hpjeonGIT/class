@@ -23,9 +23,6 @@ bye
 
 10. Time to Get Started
 ```
-> showdbs
-uncaught exception: ReferenceError: showdbs is not defined :
-@(shell):1:1
 > show dbs
 admin   0.000GB
 config  0.000GB
@@ -441,3 +438,160 @@ db.createCollection('posts', {
 { "ok" : 1 }
 ```
 
+71. Insert()
+- Instead of insert(), use insertOne() or insertMany()
+
+72. Ordered insert()
+- `> db.hobbies.insertMany([{_id: "sports", name: "Sports"}, {_id: "cooking", name: "Cooking"}, {_id: "cars", name: "Cars"}])`: works OK
+- `> db.hobbies.insertMany([{_id: "yoga", name: "Yoga"}, {_id: "cooking", name: "Cooking"}, {_id: "cars", name: "Cars"}])`: breaks as duplicated `_id` found. But `yoga` is still added to collections as the failure happens at 2nd document, canceling the left-over
+- `db.hobbies.insertMany([{_id: "yoga", name: "Yoga"}, {_id: "cooking", name: "Cooking"}, {_id: "hiking", name: "Hiking"}], {ordered: false})`
+    - By using `{ordered: false}`, failed documents are ignored but working elements are added into collections
+    - Default status of `ordered` is true
+- Even though insertMany() may fail, accepted documents are not rolled-back regardless of ordered or unordered
+
+73. writeConcern
+- `{w: 1, j: undefined, wtimeout:200}`: w for write and j for journal. May set timeout
+- Ex) `> db.persons.insertOne({name: "Chris", age:41}, {writeConcern: {w:1, j: true, wtimeout:100}})`
+
+75. Assignment2
+```
+use companyData
+db.companies.insertOne({_id: "glass", name: "Glass inc", budget: 100})
+db.companies.insertMany([{_id: "glass", name: "fiber inc", budget: 333}, {_id: "ceram", name: "Ceramic Inc", budget: 200} ], {ordered:false})
+db.companies.insertOne({name: "brick company", budget:4444}, {writeConcern: {w:1 , j : true }} )
+db.companies.insertOne({name: "shoes company", budget:55}, {writeConcern: {w:1 , j : false }} )
+```
+
+76. Importing data
+- `mongoimport mydata.json -d dbase_name -c collexn_name --jsonArray --drop`
+    - `--drop` will drop the database if it exists already
+
+80. Methods, filters, and operators
+- Regarding `db.myCollection.find( { age: 32} )`
+    - current database: db
+    - access this collection: mycollection
+    - method: find()
+    - filter: `{ age: 32}`
+        - field(key) : age
+        - value: 32
+- Regarding `db.myCollection.find( { age:  {$gt : 30 }} )`
+    - current database: db
+    - access this collection: mycollection
+    - method: find()
+    - range filter: `{ age:  {$gt : 30 }}`
+        - operator: `$gt`
+
+85. Querying embedded fields and arrays
+```
+	"rating" : {
+		"average" : 8.1
+	},
+```
+- use double quotation: `db.shows.find({"rating.average": {$gt: 8}})`
+```
+	"genres" : [
+		"Comedy",
+		"Family"
+	],
+```
+- `db.shows.find({genres: [ "Comedy" ]}).pretty()`
+
+86. `$in` vs `$nin`
+- `db.shows.find({ runtime: {$in: [42,30] }}).pretty()`
+	- Find runtime of 42 or 30. Not range of 30-42
+- `$nin` is `not $in`
+
+87. `$or` vs `$nor`
+```
+> db.shows.find({$or: [{"rating.average": {$lt:5} }, {"rating.average": {$gt: 9.3} } ]}).count()
+4
+```
+
+88. `$and`
+```
+> db.shows.find({$and: [{"rating.average": {$gt:9} }, {genres: "Drama"}] }).count()
+3
+> db.shows.find({"rating.average": {$gt:9} , genres: "Drama"}).count()
+3
+```
+- Two queries in a single `{}`
+- `db.shows.find({"rating.average": {$gt:9}} , {genres: "Drama"})` gives a wrong result (only the first query)
+	- However, if same field/key is used, second field will overwrite the first query
+```
+> db.shows.find({genres: "Drama", genres: "Horror"}).count()
+23
+> db.shows.find({genres: "Horror"}).count()
+23
+```	
+- To find two matching values of the same field, we need `$and`
+```
+> db.shows.find({$and: [{genres: "Drama"}, {genres: "Horror"}]}).count()
+17
+```
+
+90. Element operator
+```
+> db.users.insertMany([ {name: "Max", hobbies:[ {title: "sports", frequency:3 }, {title: "cooking", frequency: 6}], phone: 0132456789}, {name: "Manuel", hobbies: [ {title: "Cars"}, {freqeency: 7}], phone : "945672381", age: 30 } ])
+> db.users.find({age: {$exists: true}}).count()
+1
+> db.users.insertOne( {name: "Anna", hobbies: {title: "yoga", frequency:3 }, phone: "753159", age:null})
+> db.users.find({age: {$exists: true}}).count()
+2
+## <- null is still recognized as existing
+> db.users.find({age: {$exists: true, $ne: null}}).count()
+1
+## <- user one more query to check null
+```
+
+91. `$type`
+```
+> db.users.find({phone: {$type: "string"}}).count()
+3
+> db.users.find({phone: {$type: "double"}}).count()
+2
+> db.users.find({phone: {$type: ["string", "double"]}}).count()
+5
+```
+
+92. `$regex`
+```
+> db.shows.find({summary: {$regex: /musical/}}).count()
+2
+```
+
+93. `$expr`
+```
+> db.sales.insertMany([{volume:100, target:120}, {volume:89,targe:80}, {volume:200, target:177}])
+> db.sales.find({$expr: {$gt: ["$volume", "$target"]}})
+## find documents where volume > target
+{ "_id" : ObjectId("618eb30ef02d1be5657376af"), "volume" : 89, "targe" : 80 }
+{ "_id" : ObjectId("618eb30ef02d1be5657376b0"), "volume" : 200, "target" : 177 }
+> db.sales.find({$expr: {$gt: [ {$cond:  {if:  {$gte: ["$volume", 190] }, then: {$subtract: ["$volume", 10]}, else: "$volume"  } }, "$target"  ]}}).pretty()
+## find documents where 1) when volume >190 (volume -10) or 2) volume must be larger than target
+{
+	"_id" : ObjectId("618eb30ef02d1be5657376af"),
+	"volume" : 89,
+	"targe" : 80
+}
+{
+	"_id" : ObjectId("618eb30ef02d1be5657376b0"),
+	"volume" : 200,
+	"target" : 177
+}
+
+```
+- Q: what if target field doesn't exist?
+
+Assignment 3.
+- Import boxoffice.json
+- Search all movies that have a rating higher than 9.2 and a runtime lower than 100 min
+- Search all movies that have a genre of "drama" or "action"
+- Search all movies where visitors exceeded expectedVisitors
+```
+> db.boxoff.find({$and: [{"meta.rating": {$gt: 9.2}}, {"meta.runtime": {$lt: 100}}]}).count()
+1
+> db.boxoff.find({$or: [{genre: "drama"}, {genre: "action"}]}).count()
+3
+> db.boxoff.find({$expr: {$gt: ["visitors", "expectedVisitors"]}}).count()
+3
+```
