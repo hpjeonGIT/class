@@ -593,5 +593,181 @@ Assignment 3.
 > db.boxoff.find({$or: [{genre: "drama"}, {genre: "action"}]}).count()
 3
 > db.boxoff.find({$expr: {$gt: ["visitors", "expectedVisitors"]}}).count()
-3
+3 
+## -> this is wrong
+> db.boxoff.find({$expr: {$gt: ["$visitors", "$expectedVisitors"]}}).count()
+1
+```
+- For expression, **add `$` to the  field/key name**
+
+95. Querying array size with `$size`
+```
+> db.users.find({hobbies: {$size: 2}})
+```
+- Exact match only. Larger or less is not supported yet
+
+96. Querying arrays with `$all`
+- `> db.boxoff.find({genre: ["action", "thriller"]})` will find `"action", "thriller"`, not `"thriller", "action"`
+	- Exact match only
+- Using `all` will search document containing items regardless of the order or more elements
+	- `> db.boxoff.find({genre: {$all: ["action", "thriller"]}})`
+
+97. Querying arrays with `$elemMatch`
+```
+> db.users.insertMany([ {name:"Anna", hobbies: [ {title: "Sports", frequency:3}, {title :"Yoga", frequency:6} ]}, {name:"David", hobbies: [{title: "Sports", frequency:2}, {title:"Yoga", frequency: 5}] }])
+> db.users.find({$and: [{"hobbies.title": "Sports"}, {"hobbies.frequency": {$gte: 5}}]})
+{ "_id" : ObjectId("61925c27f02d1be5657376b8"), "name" : "David", "hobbies" : [ { "title" : "Sports", "frequency" : 2 }, { "title" : "Yoga", "frequency" : 5 } ] }
+## -> This will find David as well using frequency of Yoga, not Sports
+> db.users.find({hobbies: {$elemMatch: {title: "Yoga", frequency:{$gte: 6}}}})
+{ "_id" : ObjectId("61925ccbf02d1be5657376b9"), "name" : "Anna", "hobbies" : [ { "title" : "Sports", "frequency" : 3 }, { "title" : "Yoga", "frequency" : 6 } ] 
+## -> Using $elemMatch, field/key name is limited within the nested document
+```
+
+Assignment 4
+- Import attached data into boxOffice database
+- Find all movies with exactly two genres
+- Find all movies which aired in 2018
+- Find all movies having ratings greater than 8 but lower than 10
+```
+> db.movie.find({genre: {$size:2}})
+> db.movie.find({"meta.aired": {$eq: 2018}})
+> db.movie.find({$and: [{"ratings": {$gt:8}}, {"ratings": {$lt:10}}]})
+## from the solution:
+> db.movie.find({ratings: {$elemMatch: {$gt: 8, $lt:10}}})
+```
+
+99. Cursors
+```
+> const cursor = db.shows.find()
+> cursor.hasNext()
+true
+```
+100. Sorting
+```
+> db.shows.find().sort({"rating.average":1, runtime:-1}).pretty()
+```
+
+101. Skipping and limiting
+- .skip(10)
+- .limit(10)
+```
+> db.dataSimple.find().skip(100).limit(5)
+{ "_id" : ObjectId("61926a0ff02d1be565737722"), "id" : 100, "rating" : 5 }
+{ "_id" : ObjectId("61926a0ff02d1be565737723"), "id" : 101, "rating" : 3 }
+{ "_id" : ObjectId("61926a0ff02d1be565737724"), "id" : 102, "rating" : 4 }
+{ "_id" : ObjectId("61926a0ff02d1be565737725"), "id" : 103, "rating" : 6 }
+{ "_id" : ObjectId("61926a0ff02d1be565737726"), "id" : 104, "rating" : 10 }
+> 
+```
+
+102. Projection
+- 1 to show while 0 to hide
+```
+> db.shows.find({} , {name:1, type:1, _id:0})
+{ "name" : "Under the Dome", "type" : "Scripted" }
+{ "name" : "Person of Interest", "type" : "Scripted" }
+```
+
+103. Projection in array
+
+104. `$slice`
+```
+> db.shows.find({}, {genres: 1,  name:1}).limit(2).pretty()
+{
+	"_id" : ObjectId("618e7ee2509a74d40d7771e7"),
+	"name" : "Under the Dome",
+	"genres" : [
+		"Drama",
+		"Science-Fiction",
+		"Thriller"
+	]
+}
+{
+	"_id" : ObjectId("618e7ee2509a74d40d7771e8"),
+	"name" : "Person of Interest",
+	"genres" : [
+		"Drama",
+		"Action",
+		"Crime"
+	]
+}
+> db.shows.find({}, {genres: {$slice:[1,2]}, name:1}).limit(2).pretty()
+{
+	"_id" : ObjectId("618e7ee2509a74d40d7771e7"),
+	"name" : "Under the Dome",
+	"genres" : [
+		"Science-Fiction",
+		"Thriller"
+	]
+}
+{
+	"_id" : ObjectId("618e7ee2509a74d40d7771e8"),
+	"name" : "Person of Interest",
+	"genres" : [
+		"Action",
+		"Crime"
+	]
+}
+```
+- Showing 1-2 elements only, hiding 0th element
+
+107. `updateOne()`, `updateMany()`, and `$set`
+```
+> db.users.insertOne({name:"Chris", hobbies: ["Sports", "Cooking", "Hiking"]})
+> db.users.updateOne({_id:ObjectId("61926f1bf02d1be565737aa6")}, {$set: {hobbies: [{title:"Sports", frequency:5}, {title: "Cooking", frequency:3}, {title:"Hiking", frequency:1}]}})
+```
+- Using `$set` adds elements (not removing existing fields)
+```
+> db.users.updateMany({"hobbies.title":"Sports"}, {$set: {isSporty: true}})
+```
+- Adds the field of `isSporty`
+
+108. Multiple-fields with `$set`
+```
+> db.users.updateMany({"hobbies.title":"Sports"}, {$set: {isSporty: true, isCooky: false}})
+```
+
+109. Increment or decrement values
+```
+> db.users.updateMany({_id:ObjectId("618e88d4f02d1be5657376ac")}, {$inc: {age:100}})
+> db.users.updateOne({_id:ObjectId("618e88d4f02d1be5657376ac")}, {$inc: {age:100}, $set: {hasHouse: false } })
+```
+- There is no `$dec` for decrement. Use negative number with `$inc`
+
+110. `$min`, `$max`, `$mul`
+```
+> db.users.find({_id:ObjectId("618e88d4f02d1be5657376ac")})
+{ "_id" : ObjectId("618e88d4f02d1be5657376ac"), "name" : "Manuel", "hobbies" : [ { "title" : "Cars" }, { "freqeency" : 7 } ], "age" : 130, "phone" : "945672381", "hasHouse" : false }
+> db.users.updateOne({_id:ObjectId("618e88d4f02d1be5657376ac")}, {$min: {age:38}})
+## -> update age as min(current value, 38). Updated from 130->38
+{ "acknowledged" : true, "matchedCount" : 1, "modifiedCount" : 1 }
+> db.users.find({_id:ObjectId("618e88d4f02d1be5657376ac")})
+{ "_id" : ObjectId("618e88d4f02d1be5657376ac"), "name" : "Manuel", "hobbies" : [ { "title" : "Cars" }, { "freqeency" : 7 } ], "age" : 38, "phone" : "945672381", "hasHouse" : false }
+> db.users.updateOne({_id:ObjectId("618e88d4f02d1be5657376ac")}, {$min: {age:40}})
+## -> update age as min(current value, 40). 38 is maintained.
+{ "acknowledged" : true, "matchedCount" : 1, "modifiedCount" : 0 }
+> db.users.find({_id:ObjectId("618e88d4f02d1be5657376ac")})
+{ "_id" : ObjectId("618e88d4f02d1be5657376ac"), "name" : "Manuel", "hobbies" : [ { "title" : "Cars" }, { "freqeency" : 7 } ], "age" : 38, "phone" : "945672381", "hasHouse" : false }
+> db.users.updateOne({_id:ObjectId("618e88d4f02d1be5657376ac")}, {$max: {age:48}})
+## -> age as max(current value, 48)
+{ "acknowledged" : true, "matchedCount" : 1, "modifiedCount" : 1 }
+> db.users.updateOne({_id:ObjectId("618e88d4f02d1be5657376ac")}, {$mul: {age:1.1}})
+## -> age = age*1.1
+{ "acknowledged" : true, "matchedCount" : 1, "modifiedCount" : 1 }
+> db.users.find({_id:ObjectId("618e88d4f02d1be5657376ac")}).pretty()
+{
+	"_id" : ObjectId("618e88d4f02d1be5657376ac"),
+	"name" : "Manuel",
+	"hobbies" : [
+		{
+			"title" : "Cars"
+		},
+		{
+			"freqeency" : 7
+		}
+	],
+	"age" : 52.800000000000004,
+	"phone" : "945672381",
+	"hasHouse" : false
+}
 ```
