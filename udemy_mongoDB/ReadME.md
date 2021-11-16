@@ -771,3 +771,126 @@ true
 	"hasHouse" : false
 }
 ```
+
+111. Removing fields
+- Use `$unset` to remove field 
+```
+> db.companies.find()
+{ "_id" : "glass", "name" : "Glass inc", "budget" : 100 }
+{ "_id" : "ceram", "name" : "Ceramic Inc", "budget" : 200 }
+{ "_id" : ObjectId("618d8b49cef57a0b0c0e3efc"), "name" : "brick company", "budget" : 4444 }
+{ "_id" : ObjectId("618d8b4bcef57a0b0c0e3efd"), "name" : "shoes company", "budget" : 55 }
+> db.companies.updateMany({}, {$unset: {budget:""}})
+{ "acknowledged" : true, "matchedCount" : 4, "modifiedCount" : 4 }
+> db.companies.find()
+{ "_id" : "glass", "name" : "Glass inc" }
+{ "_id" : "ceram", "name" : "Ceramic Inc" }
+{ "_id" : ObjectId("618d8b49cef57a0b0c0e3efc"), "name" : "brick company" }
+{ "_id" : ObjectId("618d8b4bcef57a0b0c0e3efd"), "name" : "shoes company" }
+```
+
+112. Renaming fields
+```
+> db.companies.updateMany({}, {$rename: {name: "Name"}})
+```
+
+113. `upsert` in updateOne/Many()
+```
+> db.users.updateOne({name: "Maria"}, {$set: {age:29, hobbies: [{title: "organic", frequency:3}, {title: "yoga", frequency:5}]}})
+{ "acknowledged" : true, "matchedCount" : 0, "modifiedCount" : 0 }
+## updateOne() is not effective as "Maria" doesn't exist
+> db.users.updateOne({name: "Maria"}, {$set: {age:29, hobbies: [{title: "organic", frequency:3}, {title: "yoga", frequency:5}]}}, {upsert: true})
+{
+	"acknowledged" : true,
+	"matchedCount" : 0,
+	"modifiedCount" : 0,
+	"upsertedId" : ObjectId("6193be6af72795f8ecd822d2")
+}
+## using upsert true, new data is added if request one doesn't exist
+```
+
+Assignment 5
+- Create a new collection sports and upsert two new documents with fields of title, requiresTeam
+- Update all document which do require a team by adding a new field with the minimum amount of players
+- Update all documents that require a team by increasing the number of required players by 10
+```
+> db.sports.insertMany([{title:"baseball", requiresTeam: true}, {title:"tennis", requiresTeam: true}]
+> db.sports.insertOne({title:"workout", requiresTeam: false})
+> db.sports.updateOne({title:"soccer"}, {$set: {requiresTeam: true}}, {upsert:true}) 
+> db.sports.updateMany({"requiresTeam":true}, {$set: {minimumPlayers:10}})
+{ "acknowledged" : true, "matchedCount" : 2, "modifiedCount" : 2 }
+> db.sports.updateMany({"requiresTeam":true}, {$inc: {minimumPlayers:10}})
+{ "acknowledged" : true, "matchedCount" : 2, "modifiedCount" : 2 }
+```
+- Solution from the lecture
+```
+db.sports.updateMany({}, {$set: {title: "Football", requiredTeam: true}}, {upsert: true})
+## -> This will corrupt existing sports collection. Drop it beforehand
+db.sports.updateMany({title: "Soccer"}, {$set: {requiredTeam: true}}, {upsert: true})
+
+```
+
+114. Updating array elements
+- Use `$elemMatch` to find exact documents
+- Use `.$.` as a place-holder to locate the matched element from the query
+	- This place-holder works for only the **first element only**. For all elements, use `.$[].`
+	- All of `hobbies` must be array. If non-array `hobbies` exist, this will not work
+```
+> db.users.find({hobbies: {$elemMatch: {title: "Sports", frequency: {$gte:5}}}})
+> db.users.updateMany({hobbies: {$elemMatch: {title: "Sports", frequency: {$gte:5}}}}, {$set: {"hobbies.$.highFrequency":true }}) 
+{ "acknowledged" : true, "matchedCount" : 1, "modifiedCount" : 1 }
+> db.users.find({hobbies: {$elemMatch: {title: "Sports", frequency: {$gte:5}}}}).pretty()
+{
+	"_id" : ObjectId("61926f1bf02d1be565737aa6"),
+	"name" : "Chris",
+	"hobbies" : [
+		{
+			"title" : "Sports",
+			"frequency" : 5,
+			"highFrequency" : true
+		},
+		{
+			"title" : "Cooking",
+			"frequency" : 3
+		},
+		{
+			"title" : "Hiking",
+			"frequency" : 1
+		}
+	],
+	"isSporty" : true
+}
+```
+
+115. Updating all array elements
+```
+> db.users.updateMany({"hobbies.frequency": {$gt:2}}, {$set: {"hobbies.$[].goodFrequency": true}})
+```
+
+116. arrayFilters
+```
+> db.users.updateMany({"hobbies.frequency": {$gt:2}}, {$set: {"hobbies.$[el].betterFrequency": true}}, {arrayFilters: [{"el.frequency": {$gt:3 }}] })
+```
+
+117. Adding element to array
+- Use `$push`
+```
+> db.users.updateOne({name:"Maria"}, {$push: {hobbies: {title: "Sports", frequency:2 }}})
+```
+
+118. Removing elements from array
+- Use `$pull` or `$pop`
+```
+> db.users.updateOne({name:"Maria"}, {$pull: {hobbies: {title: "organic"} }})
+## -> removes matching element in the array
+> db.users.updateOne({name:"Maria"}, {$pop: {hobbies:1}})
+## -> removes the last element in the array
+> db.users.updateOne({name:"Maria"}, {$pop: {hobbies:-1}})
+## -> removes the first element in the array
+```
+
+123. `deleteOne()` vs `deleteMany()`
+
+124. indexes
+- Field/values are extracted and ordered to provide indexes
+- Watchout the overhead
