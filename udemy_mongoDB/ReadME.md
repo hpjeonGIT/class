@@ -894,3 +894,438 @@ db.sports.updateMany({title: "Soccer"}, {$set: {requiredTeam: true}}, {upsert: t
 124. indexes
 - Field/values are extracted and ordered to provide indexes
 - Watchout the overhead
+
+128. Creating index field and performance comparison
+- The attached persons.json is 5MB. Do not load from gedit.
+- `mongoimport persons.json -d contactData -c contacts --jsonArray`
+```
+> db.contacts.explain().find({"dob.age": {$gt: 60}})
+{
+	"explainVersion" : "1",
+	"queryPlanner" : {
+		"namespace" : "contactData.contacts",
+		"indexFilterSet" : false,
+		"parsedQuery" : {
+			"dob.age" : {
+				"$gt" : 60
+			}
+		},
+		"queryHash" : "FC9E47D2",
+		"planCacheKey" : "A5FF588D",
+		"maxIndexedOrSolutionsReached" : false,
+		"maxIndexedAndSolutionsReached" : false,
+		"maxScansToExplodeReached" : false,
+		"winningPlan" : {
+			"stage" : "COLLSCAN",  ### <---- Compare this with IXSCAN below
+			"filter" : {
+				"dob.age" : {
+					"$gt" : 60
+				}
+			},
+			"direction" : "forward"
+		},
+		"rejectedPlans" : [ ]
+	},
+	"command" : {
+		"find" : "contacts",
+		"filter" : {
+			"dob.age" : {
+				"$gt" : 60
+			}
+		},
+		"$db" : "contactData"
+	},
+	"serverInfo" : {
+		"host" : "hakune",
+		"port" : 27017,
+		"version" : "5.0.3",
+		"gitVersion" : "657fea5a61a74d7a79df7aff8e4bcf0bc742b748"
+	},
+	"serverParameters" : {
+		"internalQueryFacetBufferSizeBytes" : 104857600,
+		"internalQueryFacetMaxOutputDocSizeBytes" : 104857600,
+		"internalLookupStageIntermediateDocumentMaxSizeBytes" : 104857600,
+		"internalDocumentSourceGroupMaxMemoryBytes" : 104857600,
+		"internalQueryMaxBlockingSortMemoryUsageBytes" : 104857600,
+		"internalQueryProhibitBlockingMergeOnMongoS" : 0,
+		"internalQueryMaxAddToSetBytes" : 104857600,
+		"internalDocumentSourceSetWindowFieldsMaxMemoryBytes" : 104857600
+	},
+	"ok" : 1
+}
+```
+- Shows how mongoDB performed and its strategy for query
+```
+> db.contacts.createIndex({"dob.age":1})
+> db.contacts.explain("executionStats").find({"dob.age": {$gt: 60}})
+...
+		"winningPlan" : {
+			"stage" : "FETCH",
+			"inputStage" : {
+				"stage" : "IXSCAN",
+				"keyPattern" : {
+...
+```
+- From v3.4, executionStats is not printed. Use the argument of executionStats
+
+130. Index Restriction
+- Removing index
+```
+> db.contacts.dropIndex({"dob.age":1})
+{ "nIndexesWas" : 2, "ok" : 1 }
+```
+- When a query searches full or majority of records, COLLSCAN will be faster than IXSCAN
+	- IXSCAN will be faster than COLLSCAN when searching window is much smaller than entire records
+
+131. Compound index
+- 
+```
+> db.contacts.createIndex({"dob.age":1, gender:1 })
+```
+
+132. Using indexes for sorting
+```
+> db.contacts.find({"dob.age":35}).sort({gender:1}).count()
+```
+- index has already sorted and can exploit the current ordering
+- MongoDB has 32MB cache for sorting operation and may time-out for large collections without index
+
+133. The default index
+- Find existing indexes
+```
+> db.contacts.getIndexes()
+[
+	{
+		"v" : 2,
+		"key" : {
+			"_id" : 1
+		},
+		"name" : "_id_"
+	},
+	{
+		"v" : 2,
+		"key" : {
+			"dob.age" : 1,
+			"gender" : 1
+		},
+		"name" : "dob.age_1_gender_1"
+	}
+]
+```
+
+134. Unique index
+```
+ > db.contacts.createIndex({email:1}, {unique: true})
+{
+	"ok" : 0,
+	"errmsg" : "Index build failed: 6dd34ef1-8d3a-4462-813b-5125831dfba4: Collection contactData.contacts ( 9b844c0d-3404-4d6c-b276-1f5f286c25c8 ) :: caused by :: E11000 duplicate key error collection: contactData.contacts index: email_1 dup key: { email: \"abigail.clark@example.com\" }",
+	"code" : 11000,
+	"codeName" : "DuplicateKey",
+	"keyPattern" : {
+		"email" : 1
+	},
+	"keyValue" : {
+		"email" : "abigail.clark@example.com"
+	}
+}
+```
+- When uniqueness fails, it will report
+
+135. Partial filters
+```
+> db.contacts.createIndex({"dob.age":1}, {partialFilterExpression: {gender: "male"}})
+{
+	"numIndexesBefore" : 2,
+	"numIndexesAfter" : 3,
+	"createdCollectionAutomatically" : false,
+	"ok" : 1
+}
+```
+- Creates indexes of dob.age with male only
+- If a query searches females as well, COLLSCAN is used instead of IXSCAN as the query is outside of the index scope
+```
+> db.contacts.explain().find({"dob.age":{$gt:35}})
+...
+		"winningPlan" : {
+			"stage" : "COLLSCAN",
+...
+> db.contacts.explain().find({"dob.age":{$gt:35}, gender:"male"})
+...
+			"inputStage" : {
+				"stage" : "IXSCAN",
+...
+```
+
+136. Applying the partial index
+- When a unique index exist, if second new document doesn't have field required by the index, the insert will fail
+	- The first inserted document doesn't have the field is accepted as it is unique
+- When a unique index is defined, one document without the required field is allowed as it is unique
+
+137. Time-To-Live (TTL) index
+- For self-cleaning session
+```
+> db.sessions.insertOne({data: "abcdef", createdAt: new Date()})
+## make a new collection
+> db.sessions.createIndex({createdAt:1},{expireAfterSeconds: 10})
+## create an index with expireAfterSeconds
+> db.sessions.insertOne({data: "abcdef", createdAt: new Date()})
+## add one more document
+> db.sessions.find().pretty()
+{
+	"_id" : ObjectId("6195582cd4a65a4981fd9db6"),
+	"data" : "abcdef",
+	"createdAt" : ISODate("2021-11-17T19:29:48.266Z")
+}
+{
+	"_id" : ObjectId("61955852d4a65a4981fd9db7"),
+	"data" : "abcdef",
+	"createdAt" : ISODate("2021-11-17T19:30:26.432Z")
+}
+## two documents are found
+> db.sessions.find().pretty()
+> 
+## 10 seconds later, no data is found
+```
+- Based on the date found in the field, which is queried from createIndex(), after given seconds in expireAfterSeconds, collections are removed
+- Ref: https://docs.mongodb.com/manual/tutorial/expire-data/
+- Using `"expiredAt": new Date('July 22, 2023 14:00:00')` and `createindex({"expiredAt":1}, {expireAfterSeconds:0})`, the collection can be enforced to be removed at July 22, 2023 14:00:00
+
+138. Efficient queries
+- Use .explain()
+- Check:
+	- Milliseconds Process time
+	- Num of Keys examined
+	- Num of Documents examined
+	- Num of Documents returned -> this should be similar to Num Doc examined
+
+139. Covered queries
+- A query that can be satisfied entirely using an index, not examining any documents
+
+140. How mongoDB determines Winning/Rejected plans
+- Watchout index caching
+```
+> db.customers.insertMany([ {name:"Max", age: 29, salary: 3000},{name: "Manu", ange:30, salary:4000}] )
+> db.customers.createIndex({name:1})
+> db.customers.createIndex({age:1 , name:1}) ## compound index
+> db.customers.explain("executionStats").find({name:"Max", age: 30})
+...
+		"winningPlan" : {
+			"stage" : "FETCH",
+			"inputStage" : {
+				"stage" : "IXSCAN",
+				"keyPattern" : {
+					"age" : 1,
+					"name" : 1
+				},
+				"indexName" : "age_1_name_1",
+...
+		"rejectedPlans" : [
+			{
+				"stage" : "FETCH",
+				"filter" : {
+					"age" : {
+						"$eq" : 30
+					}
+				},
+				"inputStage" : {
+					"stage" : "IXSCAN",
+					"keyPattern" : {
+						"name" : 1
+					},
+					"indexName" : "name_1",
+> db.customers.explain("allPlansExecution").find({name:"Max", age: 30})
+...
+		"allPlansExecution" : [
+			{
+...
+					"inputStage" : {
+						"stage" : "IXSCAN",
+...
+						},
+						"indexName" : "age_1_name_1",
+...
+					"inputStage" : {
+						"stage" : "IXSCAN",
+...
+						},
+						"indexName" : "name_1",
+```
+
+141. Using multi-key indexes
+```
+> db.contacts.insertOne({name:"Max", hobbies: ["Cooking", "Sports"], addresses: [{street: "Main Street"}, {street: "Second Street"}]})
+> db.contacts.explain("executionStats").find({hobbies: "Sports"})
+...
+			"inputStage" : {
+				"stage" : "IXSCAN",  ##-> as expected
+...
+				"indexName" : "hobbies_1",
+				"isMultiKey" : true,
+				"multiKeyPaths" : {
+					"hobbies" : [
+						"hobbies"
+...
+> db.contacts.createIndex({addresses:1})
+> db.contacts.explain("executionStats").find({"addresses.street": "Main Street"})
+...
+		"executionStages" : {
+			"stage" : "COLLSCAN",  ##-> why? As nested document
+			"filter" : {
+				"addresses.street" : {
+					"$eq" : "Main Street"
+				}
+			},
+			"nReturned" : 1,
+			"executionTimeMillisEstimate" : 0,
+...
+> db.contacts.explain("executionStats").find({"addresses": {street: "Main Street"}})
+...
+			"inputStage" : {
+				"stage" : "IXSCAN", ##-> Now IXSCAN
+...
+> db.contacts.createIndex({"addresses.street":1}) ##-> or create index over nested field
+> db.contacts.explain("executionStats").find({"addresses.street":"Main Street"})
+...
+			"inputStage" : {
+				"stage" : "IXSCAN", ##-> as expected
+```
+
+142. Text indexes
+```
+> db.products.insertMany([{title:"A Book", description:"This is an awesome book about a young artist!"},{title: "Red T-shirt", description:"This T-shirt is red and it's pretty awesome!"}])
+> db.products.createIndex({description:1 }) ##-> This will not work
+> db.products.dropIndex({description:1 })
+> db.products.createIndex({description:"text" }) ## -> very expensive but faster than regex
+> db.products.find({$text: {$search: "red book"}}) ##-> red book is not a single word to search and finds documents containing red or book
+{ "_id" : ObjectId("61967515d4a65a4981fd9dbb"), "title" : "A Book", "description" : "This is an awesome book about a young artist!" }
+{ "_id" : ObjectId("61967515d4a65a4981fd9dbc"), "title" : "Red T-shirt", "description" : "This T-shirt is red and it's pretty awesome!" }
+> db.products.find({$text: {$search: "\"red book\""}}) ##-> as a single word
+```
+
+143. Score in text search
+- Using `$meta` for matching score
+```
+> db.products.find({$text: {$search: "awesome t-shirt"}}, {score: {$meta: "textScore"}}).pretty()
+{
+	"_id" : ObjectId("61967515d4a65a4981fd9dbb"),
+	"title" : "A Book",
+	"description" : "This is an awesome book about a young artist!",
+	"score" : 0.625
+}
+{
+	"_id" : ObjectId("61967515d4a65a4981fd9dbc"),
+	"title" : "Red T-shirt",
+	"description" : "This T-shirt is red and it's pretty awesome!",
+	"score" : 1.7999999999999998
+}
+```
+
+144. Text index with exclude words
+- Use `-` as the starting character
+```
+> db.products.find({$text: {$search: "awesome t-shirt"}})
+{ "_id" : ObjectId("61967515d4a65a4981fd9dbb"), "title" : "A Book", "description" : "This is an awesome book about a young artist!" }
+{ "_id" : ObjectId("61967515d4a65a4981fd9dbc"), "title" : "Red T-shirt", "description" : "This T-shirt is red and it's pretty awesome!" }
+> db.products.find({$text: {$search: "awesome -t-shirt"}})
+{ "_id" : ObjectId("61967515d4a65a4981fd9dbb"), "title" : "A Book", "description" : "This is an awesome book about a young artist!" }
+``` 
+
+145. Language setting
+- Assigning different weights using `weights` for score calculation
+- case-sensitivity can be controlled using `$caseSensitive`
+```
+> db.products.createIndex({title: "text", description: "text"},{default_language:"german"})
+> db.products.createIndex({title: "text", description: "text"},{default_language:"english", weights:{title :1 , description:10}})
+{
+	"numIndexesBefore" : 1,
+	"numIndexesAfter" : 2,
+	"createdCollectionAutomatically" : false,
+	"ok" : 1
+}
+> db.products.find({$text: {$search: "red", $language: "english", $caseSensitive: true}}, {score: {$meta:"textScore"}} ).pretty()
+{
+	"_id" : ObjectId("61967515d4a65a4981fd9dbc"),
+	"title" : "Red T-shirt",
+	"description" : "This T-shirt is red and it's pretty awesome!",
+	"score" : 6.666666666666667
+}
+```
+
+147. Building indexes
+- Foreground: using default createIndex(). The Collection is locked when the index is created. 
+- Background: Slower but collection is accessible.
+	- `db.ratings.createIndex({ag:1}, {background:true})`
+	- For production database
+
+150-159. Playing with GeoJSON
+- Use `$near`
+```
+> use awsomeplaces
+> db.places.insertOne({name:"California Academy of Sciences", location: {type:"Point", coordinates:[-122.47, 37.767] } })
+
+```
+153. Adding a Geospatial index
+```
+> db.places.find({location: {$near :{$geometry: {type: "Point", coordinates: [-122.471, 37.77]} } } }) ##-> fails
+Error: error: {
+	"ok" : 0,
+	"errmsg" : "error processing query: ns=awsomeplaces.placesTree: GEONEAR  field=location maxdist=1.79769e+308 isNearSphere=0\nSort: {}\nProj: {}\n planner returned error :: caused by :: unable to find index for $geoNear query",
+	"code" : 291,
+	"codeName" : "NoQueryExecutionPlans"
+}
+> db.places.createIndex({location: "2dsphere"})
+{
+	"numIndexesBefore" : 1,
+	"numIndexesAfter" : 2,
+	"createdCollectionAutomatically" : false,
+	"ok" : 1
+}
+> db.places.find({location: {$near :{$geometry: {type: "Point", coordinates: [-122.471, 37.77]} } } }) ##-> Now works
+{ "_id" : ObjectId("6196a38dd4a65a4981fd9dbd"), "name" : "California Academy of Sciences", "location" : { "type" : "Point", "coordinates" : [ -122.47, 37.767 ] } }
+> db.places.find({location: {$near :{$geometry: {type: "Point", coordinates: [-122.471, 37.77]}, $maxDistance:500} } }).pretty() ##-> using $maxDistance
+{
+	"_id" : ObjectId("6196a38dd4a65a4981fd9dbd"),
+	"name" : "California Academy of Sciences",
+	"location" : {
+		"type" : "Point",
+		"coordinates" : [
+			-122.47,
+			37.767
+		]
+	}
+}
+```
+
+155. Finding places inside of ROI
+```
+> const p1 = [-122.4547, 37.77473]
+> const p2 = [-122.45303, 37.76641]
+> const p3 = [-122.51026, 37.76411]
+> const p4 = [-122.51088, 37.77131]
+> db.places.find({location: {$geoWithin: {$geometry: {type:"Polygon", coordinates: [[p1, p2, p3, p4, p1]] } } } })
+{ "_id" : ObjectId("6196a68dd4a65a4981fd9dbe"), "name" : "Conservatory of Flowers", "location" : { "type" : "Point", "coordinates" : [ -122.461, 37.77 ] } }
+{ "_id" : ObjectId("6196a6a4d4a65a4981fd9dbf"), "name" : "Golden Gate Tennis Park", "location" : { "type" : "Point", "coordinates" : [ -122.45937, 37.7705 ] } }
+{ "_id" : ObjectId("6196a38dd4a65a4981fd9dbd"), "name" : "California Academy of Sciences", "location" : { "type" : "Point", "coordinates" : [ -122.47, 37.767 ] } }
+```
+
+Assignment 6
+- Pick 3 points on google maps and store them in a colleciton
+- Pick a point and find the nearest points within a min and max distance
+- Pick an area and see which points it contains
+- Store one area in a different collection
+```
+> db.places.insertOne({name:"point1", location: {type:"Point", coordinates:[123.456, 35.1234] } })
+> db.places.insertOne({name:"point2", location: {type:"Point", coordinates:[123.456, 35.12345] } })
+> db.places.insertOne({name:"point23", location: {type:"Point", coordinates:[123.456, 35.123456] } })
+> db.places.find({location: {$near :{$geometry: {type: "Point", coordinates: [123.456,35.124]}, $maxDistance:100} } })
+{ "_id" : ObjectId("6196ad14d4a65a4981fd9dc3"), "name" : "point23", "location" : { "type" : "Point", "coordinates" : [ 123.456, 35.123456 ] } }
+{ "_id" : ObjectId("6196ad0dd4a65a4981fd9dc2"), "name" : "point2", "location" : { "type" : "Point", "coordinates" : [ 123.456, 35.12345 ] } }
+{ "_id" : ObjectId("6196ad03d4a65a4981fd9dc1"), "name" : "point1", "location" : { "type" : "Point", "coordinates" : [ 123.456, 35.1234 ] } }
+> const s1 = [123.45, 35.1]
+> const s2 = [123.45, 35.2]
+> const s3 = [123.46, 35.2]
+> const s4 = [123.46, 35.1]
+> db.places.find({location: {$geoWithin: {$geometry: {type:"Polygon", coordinates: [[s1,s2,s3,s4,s1]] } } } })
+> db.areas.insertOne({name:"my test area", area: {type: "Polygon", coordinates:[[ s1,s2,s3,s4,s1]] }})
+> db.areas.find({area: {$geoIntersects: {$geometry: {type: "Point", coordinates:[ 123.45,35.11]}}}})
+```
