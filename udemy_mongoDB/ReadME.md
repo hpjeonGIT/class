@@ -1327,5 +1327,315 @@ Assignment 6
 > const s4 = [123.46, 35.1]
 > db.places.find({location: {$geoWithin: {$geometry: {type:"Polygon", coordinates: [[s1,s2,s3,s4,s1]] } } } })
 > db.areas.insertOne({name:"my test area", area: {type: "Polygon", coordinates:[[ s1,s2,s3,s4,s1]] }})
+> db.areas.createIndex({area: "2dsphere"})
 > db.areas.find({area: {$geoIntersects: {$geometry: {type: "Point", coordinates:[ 123.45,35.11]}}}})
+```
+
+161. Aggregation framework
+- Retrieving data in a customized form
+
+163. Aggregation Pipeline Stages
+- `db.persons.aggregate([ { $match: {gender: "female"} } ])` returns a cursor
+
+164. Group stage
+```
+> db.persons.aggregate([ { $match: {gender: "female"} }, { $group: { _id: { state: "$location.state" }, totalPersons: { $sum: 1 } } } ]).pretty()
+{ "_id" : { "state" : "são paulo" }, "totalPersons" : 11 }
+{ "_id" : { "state" : "northland" }, "totalPersons" : 8 }
+{ "_id" : { "state" : "central finland" }, "totalPersons" : 11 }
+```
+
+165. Advanced group stage
+```
+> db.persons.aggregate([ 
+	{ $match: {gender: "female"} }, 
+	{ $group: 
+		{ _id: { state: "$location.state" }, 
+			totalPersons: { $sum: 1 } 
+		} 
+	}, 
+	{$sort: {totalPersons: -1}	} 
+	]).pretty()
+{ "_id" : { "state" : "midtjylland" }, "totalPersons" : 33 }
+{ "_id" : { "state" : "nordjylland" }, "totalPersons" : 27 }
+```
+
+Assignment 7
+- Build a pipe line find older than 50 then find avg> db.persons.
+```
+db.persons.aggregate([ 
+	{ $match: {"dob.age": {$gt:50} } },
+	{ $group: {
+		_id: {gender:"$gender"}, 
+		numPersons: {$sum:1 }, 
+		avgAge: {$avg: "$dob.age"} 
+		}
+	}
+])
+db.persons.aggregate([ 
+	{ $match: {"dob.age": {$gt:50} } },
+	{ $group: {
+		_id: 'senior', 
+		numPersons: {$sum:1 }, 
+		avgAge: {$avg: "$dob.age"} 
+		}
+	}
+])
+```
+
+166. `$project`
+```
+db.persons.aggregate([
+	{$project: {_id:0, gender:1 , fullName: {$concat: ["$name.first"," ", "$name.last"] } } }
+])
+db.persons.aggregate([
+	{$project: {_id:0, gender:1 , fullName: {$concat: [
+		{$toUpper: "$name.first"}," ", {$toUpper: "$name.last"} ] } } }
+])
+```
+
+171. `$group` vs `$project`
+- `$group`: multiple documents into one
+	- Sum, count, average, builds array
+- `$project`: one document to one
+	- includes/exludes fields. Transforms.
+
+172. Pushing elements
+```
+> db.friends.aggregate([ { $group: { _id: {age :"$age"}, allHobbies: {$push: "$hobbies" } }} ])
+{ "_id" : { "age" : 29 }, "allHobbies" : [ [ "Sports", "Cooking" ], [ "Cooking", "Skiing" ] ] }
+{ "_id" : { "age" : 30 }, "allHobbies" : [ [ "Eating", "Data Analytics" ] ] }
+```
+- Pushed as it is (array). We need to extract elements first not to have array of array.
+
+173. `$unwind`
+- Flattens array elements to repeat documents with a single element
+```
+> db.friends.aggregate([ {$unwind: "$hobbies"}, { $group: { _id: {age :"$age"}, allHobbies: {$push: "$hobbies" } }} ])
+{ "_id" : { "age" : 29 }, "allHobbies" : [ "Sports", "Cooking", "Cooking", "Skiing" ] }
+{ "_id" : { "age" : 30 }, "allHobbies" : [ "Eating", "Data Analytics" ] }
+```
+- Now a single array is found but still redundant elements are found
+
+174. Eliminating duplicate values
+```
+> db.friends.aggregate([ {$unwind: "$hobbies"}, { $group: { _id: {age :"$age"}, allHobbies: {$addToSet: "$hobbies" } }} ])
+{ "_id" : { "age" : 29 }, "allHobbies" : [ "Cooking", "Skiing", "Sports" ] }
+{ "_id" : { "age" : 30 }, "allHobbies" : [ "Eating", "Data Analytics" ] }
+```
+- Use `$addToSet` instead of `$push`
+
+177. `$filter`
+```
+> db.friends.aggregate([ {$project: {_id:0, scores: { $filter: { input: "$examScores", as: "sc", cond: {$gt: ["$$sc.score", 60] } }}}}])
+{ "scores" : [ { "difficulty" : 6, "score" : 62.1 }, { "difficulty" : 3, "score" : 88.5 } ] }
+{ "scores" : [ { "difficulty" : 2, "score" : 74.3 } ] }
+{ "scores" : [ { "difficulty" : 3, "score" : 75.1 }, { "difficulty" : 6, "score" : 61.5 } ] }
+```
+- Use `$$` to convert(?)> db.persons.find({"dob.age": {$lt: 30 }}).count()
+868
+ from string to number (? not clear)
+
+179. `$bucket` for histogram
+```
+> db.persons.aggregate([
+... {
+... $bucket: {
+...   groupBy: "$dob.age",
+...   boundaries: [18, 30, 40, 50, 60, 120],
+...   output: { numPersons: {$sum:1}, averageAge: {$avg: "$dob.age"}
+...   }
+... }
+... }
+... ]).pretty()
+{ "_id" : 18, "numPersons" : 868, "averageAge" : 25.101382488479263 }
+{ "_id" : 30, "numPersons" : 910, "averageAge" : 34.51758241758242 }
+{ "_id" : 40, "numPersons" : 918, "averageAge" : 44.42265795206972 }
+{ "_id" : 50, "numPersons" : 976, "averageAge" : 54.533811475409834 }
+{ "_id" : 60, "numPersons" : 1328, "averageAge" : 66.55798192771084 }
+> db.persons.find({"dob.age": {$lt: 30 }}).count()
+868
+> db.persons.aggregate([ { $bucketAuto: {   groupBy: "$dob.age",  buckets: 5, output: { numPersons: {$sum:1}, averageAge: {$avg: "$dob.age"} }}}]).pretty()
+{
+	"_id" : {
+		"min" : 21,
+		"max" : 32
+	},
+	"numPersons" : 1042,
+	"averageAge" : 25.99616122840691
+}
+...
+{
+	"_id" : {
+		"min" : 65,
+		"max" : 74
+	},
+	"numPersons" : 851,
+	"averageAge" : 69.11515863689776
+}
+```
+
+## Section 12 is highly disoriented
+
+187. Number types
+- Integer: int32, -2.147B~2.147B
+- Longs: int64
+- Doubles: float64
+- High Precision Doubles: float128
+- Javascript from shell will handle all numbers as Doubles
+	- Python API will store as integer for `1` and float for `1.0`
+
+191. Int64
+```
+> db.numTest.insertOne({val: NumberInt("12345678901")})
+> db.numTest.findOne()
+{ "_id" : ObjectId("619bae98d4a65a4981fd9dc8"), "val" : -539222987 }
+> db.numTest.insertOne({val: NumberLong("1234567890123456789")})
+```
+- Overflow/underflow for Int32
+- When using Number**(), use "" to override (?) the translation from javascript shell
+	- ex) NumberInt("123"), NumberDecimal("0.123")
+
+197. Security
+- Authentication & authorization
+- Transport Encryption
+- Encrption at Rest
+- Auditing
+
+199. Roles
+- Administrator: configure database but not necessarily insert/fetch data
+- Developer: CRUDs data
+- Data scientst: fetchs data. No ndeed of CRUD
+
+200. Creating & editing users
+- createUser()/updateUser()
+	- Configures roles/privileges
+- `mongod --auth`
+	- Now user/passwd is required to CRUD
+```
+$ mongo
+> show dbs
+> show colections
+uncaught exception: Error: don't know how to show [colections] :
+> use admin
+switched to db admin
+> db.createUser({user:"myuser", pwd:"mypas", roles:["userAdminAnyDatabase"]})
+Successfully added user: { "user" : "myuser", "roles" : [ "userAdminAnyDatabase" ] }
+> show dbs
+> db.auth('myuser','mypas')
+1
+> show dbs
+admin          0.000GB
+analytics      0.003GB
+```
+
+201. Built-In Roles
+- Database User: read, readWrite
+- Database Admin: dbAdmin, userAdmin, dbOwner
+- All Database Roles: readAnyDatabase, readWriteAnyDatabase, userAdminAnyDatabase, dbAdminAnyDatabase
+- Cluster Admin: clusterManager, clusterMonitor, hostManager, clusterAdmin
+
+202. Assigning Roles, Users, and Database
+```
+> use shop
+switched to db shop
+> db.createUser({user:'appdev', pwd:'dev', roles: ["readWrite"]})
+Successfully added user: { "user" : "appdev", "roles" : [ "readWrite" ] }
+> exit
+bye
+$ mongo -u appdev -p dev --authenticationDatabase shop
+> show dbs
+shop  0.000GB
+```
+
+203. Updating Roles to other database
+```
+> db.logout()
+{ "ok" : 1 }
+> use admin
+switched to db admin
+> db.auth('myuser','mypas')
+1
+> use shop
+switched to db shop
+> db.updateUser("appdev", {roles: ["readWrite", {role: "readWrite", db:"blog"}]})
+> db.getUser("appdev")
+{
+	"_id" : "shop.appdev",
+	"userId" : UUID("ea3aa3b2-3a50-4c19-8e81-f9c36a5c36e0"),
+	"user" : "appdev",
+	"db" : "shop",
+	"roles" : [
+		{
+			"role" : "readWrite",
+			"db" : "blog"
+		},
+		{
+			"role" : "readWrite",
+			"db" : "shop"
+		}
+	],
+	"mechanisms" : [
+		"SCRAM-SHA-1",
+		"SCRAM-SHA-256"
+	]
+}
+```
+- To update user account, you must 1) log-in to db admin 2) switch to the corresponding db (shop here)
+```
+> use shop
+switched to db shop
+> db.logout()
+{ "ok" : 1 }
+> use admin
+switched to db admin
+> db.logout()
+{
+	"ok" : 0,
+	"errmsg" : "command logout requires authentication",
+	"code" : 13,
+	"codeName" : "Unauthorized"
+}
+> use shop
+switched to db shop
+> db.auth('appdev', 'dev')
+1
+> show dbs
+blog  0.000GB
+shop  0.000GB
+```
+- logout() from admin is necessary to auto() into shop
+
+Assignment 8.
+- Create DatabaseAdmin
+- Create User Admin
+- Create developer who can read/write data in Customers and Sales database
+```
+> use admin
+>  db.auth('myuser','mypas')
+1
+> use many
+switched to db many
+> db.createUser({user:'adminMany', pwd:'passMany', roles:["dbAdmin"]})
+Successfully added user: { "user" : "adminMany", "roles" : [ "dbAdmin" ] }
+> use admin
+switched to db admin
+> db.createUser({user:'adminUser', pwd:'passUser', roles:["userAdmin"]})
+Successfully added user: { "user" : "adminUser", "roles" : [ "userAdmin" ] }
+> use admin
+switched to db admin
+> db.createUser({user:'devperson', pwd:'pasdev', roles: [{role:"readWrite", db:"Customers"},{role:"readWrite", db:"Sales"}]})
+Successfully added user: {
+	"user" : "devperson",
+	"roles" : [
+		{
+			"role" : "readWrite",
+			"db" : "Customers"
+		},
+		{
+			"role" : "readWrite",
+			"db" : "Sales"
+		}
+	]
+}
 ```
