@@ -88,3 +88,65 @@ task3Element.addEventListener('click', assign2_1);
 assign2_3('hello world', " in the ", " weekend");
 ```
 
+36. Converting data type
+- parseInt() or parseFloat()
+
+
+39. functions
+```
+function createAndWriteOutput(operator, resultBefore, calcNumber) {
+    const calcDescription = `${resultBefore} ${operator} ${calcNumber}`
+    outputResult(currentResult, calcDescription);
+}
+function multiply() {
+    const enteredNumber = getUserNumberInput();
+    const initialResult = currentResult;
+    currentResult = currentResult * enteredNumber;
+    createAndWriteOutput('*', initialResult, enteredNumber)
+}
+```
+- Passing `*` or `+` into function arguments
+
+40. Comments
+- Use `//` or a block of `/* ... */`
+
+42. Data types
+- Numbers: 2, -1.234
+- Strings: 'HI', "Hi", `Hi`
+- Booleans: true/false
+- Objects: JSON
+- Arrays: [1, 2, 3]
+
+43. Arrays
+```
+let logEntries = [];
+...
+    logEntries.push(enteredNumber);
+    console.log(logEntries);
+```
+- `console.log()` can be viewed from `Inspect element->Console`
+- Each element in arrays can be accessed like `logEntries[0]`
+    - If the element value doesn't exist, `undefined` is printed
+
+48. Undefined, null, and NaN
+- Undefined: default value of uninitialized variables
+    - No manual assignment as Undefined
+    - It works but bad-practice
+- null: shouldn't be default value
+    - Can be used for reset or clear of a variable
+- NaN: still stays at memory and can be checked
+    - `typeof NaN` yields `number`
+
+50. defer and sync
+- `Inspect element->Performance->Record` then load a page. Then click stop record
+![Snapshot of nvvp](./snapshot_performance.png)
+```
+    <script src="assets/scripts/app.js" defer></script>
+    <script src="assets/scripts/hw.js" defer></script>
+```
+- Using defer, loading those js files (locally or remotely) is done in parallel with loading the html file
+```
+    <script src="assets/scripts/app.js" async></script>
+    <script src="assets/scripts/hw.js" async></script>
+```
+- Using async will load/execute those files independently, and may cause race conditions
