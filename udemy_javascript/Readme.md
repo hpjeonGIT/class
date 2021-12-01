@@ -139,7 +139,7 @@ let logEntries = [];
 
 50. defer and sync
 - `Inspect element->Performance->Record` then load a page. Then click stop record
-![Snapshot of nvvp](./snapshot_performance.png)
+![Snapshot of performance profiling](./snapshot_performance.png)
 ```
     <script src="assets/scripts/app.js" defer></script>
     <script src="assets/scripts/hw.js" defer></script>
@@ -150,3 +150,138 @@ let logEntries = [];
     <script src="assets/scripts/hw.js" async></script>
 ```
 - Using async will load/execute those files independently, and may cause race conditions
+
+62. MDN
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript
+
+65. Debugging javascript
+- Read error messages
+- Use console.log()
+- Use Chrome debugging tools
+- Use IDE debugging tools
+
+68. Debugging with Chrome
+- Inspect element -> Sources, find source file and click line numbers to add break points
+![Snapshot of debugging in chrome](./debugging_chrome.png)
+- Check Call Stack and local variables
+
+75. Comparisons
+- `==` checks value only while `===` checks data type. `===` is more favored for strict check
+```
+> 2 == 2
+> true
+> 2 === 2
+> true
+> 2 == "2" // NOTE !!!
+> true
+> 2 === "2" // NOTE !!!
+> ​false
+> 2 != "2"
+> false
+> 2 !== "2"
+> true￼
+```
+￼
+​78. Comparing Objects and Arrays
+- Equality of objects or array may not work
+```
+> xyz = {name: 'Max'}
+> abc = {name: 'Max'}
+> abc === xyz // NOTE !!!
+> false
+> abc.name === xyz.name
+> true
+> arr = [1,2,3]
+> brr = [1,2,3]
+> arr == brr // NOTE !!!
+> false
+> crr = arr 
+> arr === crr // But if a variable is copied from existing array/object, equality works
+> true
+```
+￼
+81. Truthy vs Falsy
+- Truthy: when a value can be converted to true
+- Falsy: when a value is a candidate of false
+    - '', null, undefined, NaN, 0, 0.0, 0.
+- ​Non-empty string is converted to true : `if (txt) {}`
+    - '' is false
+- 0 is converted to false
+    - 0.0 or 0. as well
+- Empty array ([]) or object ({}) is true
+- null, undefined, NaN are false
+
+90. Validating user input
+- Use prompt() to read a user input
+![Prompt in Chrome](./prompt_chrome.png)
+```
+const enteredValue = prompt('Maximum life for you and the monster','100');
+chosenMaxLife = parseInt(enteredValue);
+if (isNaN(chosenMaxLife) || chosenMaxLife <= 0) {
+    chosenMaxLife = 100;
+}
+```
+
+93. Ternary operator
+- `const userName = isLogin ? 'Max':null;`
+- May need parenthesis when another conditional check is made
+```
+> 'Max' === isLogin ? 'Max':null
+> null
+> 'Max' === (isLogin ? 'Max':null);
+> true
+```
+- The lecture shows that ternary operator works OK with === but Opera runs === prior to ternary operator
+
+95. Boolean tricks
+- Double bang: `!!`
+    - negate 2x: `!!1`=> true, `!!''`=> false
+    - Can convert truthy/falsy value to true/false
+        - `boolVal = !!mytxt` => true when non-empty string. When empty, false
+- Assigning a default value using OR
+    - ` const name = usrInput || 'DefaultName'`
+    - If usrInput is an empty string or undefined, it is falsy and `DefaultName` will be assigned
+- OR operation: 
+    - Ref: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Logical_OR
+    - `expr1 || expr2`
+    - If expr1 can be converted to true, returns expr1; else, returns expr2. 
+```
+> isLogin = true
+> isLogin || 'Max' // NOTE - true is resulted
+> true
+> 'Max' || isLogin // NOTE- 'Max' is resulted
+> 'Max'
+> wasLogin = false
+> wasLogin || 'Max'
+> 'Max'
+> 'Max' || wasLogin
+> 'Max'
+```
+- AND operation:
+    - `expr1 && expr2`
+    - If expr1 can be converted to true, returns expr2; else, returns expr1. 
+```
+> isLogin && 'Max'  // NOTE - 'Max' is resulted
+> 'Max'
+> 'Max' && isLogin  // NOTE - true is resulted
+> true
+> wasLogin && 'Max'
+> false
+> 'Max' && wasLogin
+> false
+> '' && 'Max' // NOTE - '' is resulted. Not true or false.
+> ''
+> 'Max' && '' // NOTE - '' is resulted. Not true or false.
+''
+```
+
+97. switch-case
+- It uses === for comparison (type of data is checked)
+- break is necessary - unless, below cases will be executed
+
+98. For loops
+- for loop: `for (let i=0;i<3;i++) {}`
+- for-of loop: `for(const el of array) {}`
+    - `for(const el in array) {}` works as well
+- for-in loop: `for(const key in obj) {}`
+- while loop: `while(isTrue) {}`
