@@ -282,6 +282,143 @@ if (isNaN(chosenMaxLife) || chosenMaxLife <= 0) {
 98. For loops
 - for loop: `for (let i=0;i<3;i++) {}`
 - for-of loop: `for(const el of array) {}`
-    - `for(const el in array) {}` works as well
+    - Make sure to use `of`, not `in`
+    - `in` will return the index, not value
+```
+> for (const el of ['a','b','c']) {console.log(el)}
+a
+b
+c
+> for (const el in ['a','b','c']) {console.log(el)} // Note that it returns index, not value of 'a','b','c'
+0
+1
+2
+```
 - for-in loop: `for(const key in obj) {}`
 - while loop: `while(isTrue) {}`
+
+104. Continue
+- break: exits the loop
+- continue: returns to the next iterator
+
+105. Labeled statement with break
+- Using the label of the loop, break can control which loop it may exit
+```
+> for (i of ['a','b','c']) {
+    console.log('Outer',i);
+    for (j in [1, 2, 3]) {
+        if (j==2) {
+            break;
+        }
+        console.log('Inner',j);
+    }
+}
+Outer a
+Inner 0
+Inner 1
+Outer b
+Inner 0
+Inner 1
+Outer c
+Inner 0
+Inner 1
+> OuterLoop: for (i of ['a','b','c']) {
+    console.log('Outer',i);
+    InnerLoop: for (j in [1, 2, 3]) {
+        if (j==2) {
+            break OuterLoop;
+        }
+        console.log('Inner',j);
+    }
+}
+Outer a
+Inner 0
+Inner 1
+```
+
+107. Throwing an error message
+```
+> throw { message: 'help!'}
+Uncaught 
+{message: 'help!'}
+```
+
+108. try-catch
+- For the errors beyond the control by the developer
+    - user input typo, network outage, ...
+- try {}: the code which may throw an error
+- catch {}: error handling and fallback logic
+- finally: optional but can be used to cleanup work in both cases of success or fail
+```
+> function myftn() { throw { message: 'crashed!'}}
+> try {
+    myftn();
+} catch (error) {
+    console.log(error);
+    throw error;
+} finally {
+    console.log('testing try-catch-finally');
+}
+> {message: 'crashed!'}
+> testing try-catch-finally
+```
+
+112. ES5 vs ES6+
+- ES: ECMA Script
+- ES5: only var. No support of let and const
+
+113. var vs let vs const
+- var: creates a variable over function & global scope
+    - Don't use var in ES6+ as a good practice
+- let: creates a variable over a block scope
+- const: creates a constant over a block scope
+
+114. Hoisting
+- Similar to functions, the location of var variables may not matter as JS will read the entire script and loads var variables into memory
+
+115. Strict mode and writing a good code
+- `'use strict';` or `"use strict";`
+    - Applies strict rules of JS
+    - Only in the single JS file
+- Do not initialize a new variable without let. It may confuse other folks to find the location of the initial declaration of the variable
+
+117. Inside the Javascript engine
+- Long term memory like function defintion on heap
+- Function calls, short-lived data, and communication on stack
+    - Found from Debugging -> Call Stack
+
+119. Primitive vs Reference values
+- Primitive
+    - strings, numbers, booleans, null, undefined, symbol
+    - Copies by values for copy operation
+    - Stored on stack
+    - Array as well? The lecture shows an array is reference but Opera shows it behaves as primitive
+- Reference
+    - all other objects which are expensive to create
+    - Stored on heap
+    - Copies the address of the variable in the memory for copy operation
+    - In order to have copying value, use `...`
+    - This is why `===` of two same objects doesn't work as it compares the address
+        - `const array` or `const object` implies the constant address
+        - push() still works as the address is constant
+        - new assignment will fail as the address will change
+```
+> let a1 = { age: 30};
+> let b1 = a1;
+> let c1 = {...a1} // now copy values, not address
+> a1.height = 5.09
+5.09
+> b1
+{age: 30, height: 5.09} // copy by reference. Updated automatically
+> c1
+{age: 30} // copy by value. No change
+> const aobj = {age:30};
+> aobj.height = 6.01  // push or adding new key works OK for const obj
+> aobj = {age:30, height:6.01} // new assignment fails as it changes the address
+VM1899:1 Uncaught TypeError: Assignment to constant variable.
+    at <anonymous>:1:6
+```
+
+120. Garbage collection
+- Management of heap memory
+- Checks periodically for unused memory (no reference)
