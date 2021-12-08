@@ -422,3 +422,216 @@ VM1899:1 Uncaught TypeError: Assignment to constant variable.
 120. Garbage collection
 - Management of heap memory
 - Checks periodically for unused memory (no reference)
+
+126. Functions vs methods
+- Method: function as a value of key in an object
+```
+> const v1 = { name: 'Max', greet: function greet() { console.log('Hello'); } };
+> v1.greet()
+VM2076:1 Hello
+```
+- `v1.greet` will return the function definition
+- The function name may be different than the key name
+
+127. Functions are stored as objects
+- Arguments, returns, ... are stored as key/value pairs
+```
+> dir(v1.greet)
+...
+arguments: null
+caller: null
+length: 0
+name: "greet"
+prototype: {constructor: ƒ}
+...
+```
+
+128. Function expressions:
+- Anonymous function: `const myftn = function() {...}`
+    - Doesn't need a function name
+129. Function declaration vs expressions
+- Function declaration (function statement)
+    - `function myFnxn(a,b) { return a*b; }`
+    - JS will be able to use this function regardless of the location
+        - Hoisted to top
+- Function expression
+    - `const myFnxn = function(a,b) {return a*b;}`
+    - Can use anonymous function
+    - Order matters
+    - Scope matters
+
+130. Anonymous function
+- When a function is not used often
+```
+> console.log(function() { return 3;})
+> VM808:1 ƒ () { return 3;}
+> console.log(function() { return 3;}()) // () is required after function definition
+> VM817:1 3
+```
+- A function name is NOT required but the name can be **USEFUL** for debugging
+
+133. Arrow function
+- For anonymous function only
+- Syntatic sugar (shorter coding but performance is same)
+```
+> const myfx = function(a,b) {return a+b;}
+> const myfz = (a,b)=> a+b;
+> myfx(3,4) === myfz(3,4)
+true
+```
+
+136. Default arguments
+- Any argument may have the default value. Order doesn't matter
+    - But good practice will put the default argument in the last
+
+137. Rest parameters
+- Handles undeterminated amount of arguments into an array
+    - Use `...vname`
+```
+> function mysum(...inputs) { 
+    let sum=0;  
+    for (const el of inputs) { 
+        sum += el;
+    }  
+    return sum; 
+    }
+undefined
+> mysum(1,2,3)
+6
+> mysum(1,2,3, -6, -8)
+-8
+```
+- Or default variable `arguments` works but it is not recommended to use
+
+139. Callback functions
+- A function pointer or function handler is sent through the argument and executed from the function
+```
+const myf01 = (resultHandler, a,b) => { let sum = a+b; resultHandler(sum); }
+# myf01() has arguments of resultHandler, which is a callback function, and a & b which are parameters
+# myf01() callsback resultHandler() for you - even you didn't ask to run resultHandler()
+const showR = (some_txt) => { alert(some_txt); }
+#
+myf01(showR, 12, 23)
+```
+
+Assignment 4
+- `function sayHello(name) { console.log('Hi ' + name) ; }` => `const sayH = (name) => { console.log('Hi ' + name) ; }`
+```inputcheck2(()=>{console.log('no data')})
+> const inputcheck2 = (nodataHandler, ...vlist) => { if (vlist.length == 0) {nodataHandler();}; for (el of vlist) { console.log(el) } }
+> const showR = () => {console.log('no data found')}
+> inputcheck2(showR, 3,2,1)
+3
+2
+1
+> inputcheck2(showR)
+no data found
+>inputcheck2(()=>{console.log('no data')})
+no data
+```
+
+140. bind() in the function pointer/function handler
+- Can pre-configure a function's arguments
+```
+> const inputcheck3 = (resultHandler, ...vlist) => { resultHandler(...vlist) }
+> const showEl2 = (messageStatus, ...vlist) => { console.log("message status = ", messageStatus); for (const el of vlist) { console.log(el) } }
+> inputcheck3(showEl2.bind(this, "testing message"), 'a', 'b', 123, 456, 3.14)
+message status =  testing message
+a
+b
+123
+456
+3.14
+> inputcheck3(showEl2, 'a', 'b', 123, 456, 3.14)
+message status =  a
+b
+123
+456
+3.14
+```
+- `functionHandler.bind(this, XXX)` will deliver XXX as the first argument
+​
+146. DOM
+- Document Object Model
+- Tools can parse HTML
+- Javascript is a hosted language
+- The browser as the host environment exposes the DOM API to JS code automatically
+
+149. Nodes & Elements
+- Ref: https://stackoverflow.com/questions/9979172/difference-between-node-object-and-element-object
+- Node: objects that make up DOM
+    - There are 12 different nodes
+    - DOCUMENT_NODE: document or document.body which would be a built-in DOM element
+    - HTML tag like <input> or <p>
+    - TEXT_NODE
+    - ELEMENT_NODE: an object of nodeType=1. HTML tags
+    - ATTRIBUTE_NODES
+- document.getElementById() will return one node and it is guaranteed to be an element
+- document.getElementsByClassName() will return the list of nodes
+
+150. Selecting elements in DOM
+- For `<p id="description"> Hi there </p>`
+- `const p1 = document.querySelector('p')` works
+- `const p2 = document.querySelector('#description')` works
+- querySelector() runs through CSS selector, which may not fit HTML5 yet
+    - This returns the first node only. To get NodeList, use querySelectorAll()
+
+153. Attributes vs Properties
+- Attributes: data from HTML code using element tags
+- Properties: data of object using dot(.) notation
+```
+> const input = document.querySelector('input')
+> input.value
+'default text'
+> input.value = 'new text'
+> const input2 = document.querySelector('input')
+> input2.value
+'new text'
+```
+- input.setAttribute('value', ...) vs input.value
+- setAttribute will automatically create a node if it doesn't exist
+```
+> input.value
+'new text'
+> input.setAttribute('value', 'hello world')
+## this will change the attributes, 'value', in the loaded HTML
+## check through Inspect element->Elements tab
+> input.value
+'new text'
+## Property of input is still the old value
+```
+![Change by setAttribute()](./attribute_change.png)
+
+Assignment 5.
+- Change the color of background as black and text as white, using 2 different methods
+- Change the document title using the title element, as "Assignment-solved!", using querySelector() 1) on document and 2) on the property of the document
+- Change h1 element on this page and change the text to "Assignment-solved!"
+```
+> const t1 = document.getElementById('task-1')
+> t1.style.backgroundColor="black"
+> t1.style.color="white"
+> const t1_1 = document.querySelector('#task-1')
+> t1_1.style.backgroundColor='orange'
+#
+> const tt = document.querySelector('title')
+> tt.innerText = 'Assignment-solved!' # or use tt.textContent
+> document.title
+'Assignment-solved!'
+> document.title = 'as given'
+#
+> const h1 = document.querySelector('h1')
+> h1.innerText = 'Assignment solved'
+```
+- Q: How to access from <head> to <title>? 
+    - Changing attributes is limited within <...>. <title> is outside of <head>
+```￼
+​<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Assignment - DOM Querying & Manipulation</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+```
