@@ -90,7 +90,7 @@ assign2_3('hello world', " in the ", " weekend");
 
 36. Converting data type
 - parseInt() or parseFloat()
-
+- Or `+strVar` will return number
 
 39. functions
 ```
@@ -621,8 +621,9 @@ Assignment 5.
 > const h1 = document.querySelector('h1')
 > h1.innerText = 'Assignment solved'
 ```
-- Q: How to access from <head> to <title>? 
-    - Changing attributes is limited within <...>. <title> is outside of <head>
+- Q: How to access from `<head>` to `<title>`? 
+    - Changing attributes is limited within `<...>`. `<title>` is outside of `<head>`
+- A: need to access the child node
 ```￼
 ​<!DOCTYPE html>
 <html lang="en">
@@ -634,4 +635,371 @@ Assignment 5.
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+```
+
+155. Traversing DOM
+- Child: direct child node/element
+- Decendant: direct or indirect child node/element
+- Parent: direct parent node/element
+- Ancestor: direct or indirect parent node/element
+- For index.html:
+```
+    <ul>
+      <li>Item 1</li>
+      <li class="list-item">Item 2</li>
+      <li class="list-item">Item 3</li>
+    </ul>
+```
+    - ul is unordered-list, showing bullets
+    - li is ordered-list, showing numbers
+- Finding the element of the above ul: `const ul = document.querySelector('ul')`
+- `ul.children` will retun the children elements
+- `ul.childNodes` will return the children nodes, including elements and texts
+    - The first text node is the white space between <ul> and <li> in the first line
+- `ul.firstChild` will retun the first child node
+- `ul.firstElementChild` will retun the first child element
+- Similar usage for lastChild and lastElementChild
+
+157. Accessing parent node/element
+- Only element can be a parent? 
+- One exception for parentNode is for the entire document
+```
+> const li1 = document.querySelector('li')
+>  li1.parentElement # li1.parentNode yields the same result
+<ul>​…​</ul>​
+> li1.closest('body') # finds the closest item in the ancestor. If it doesn't exist, returns null
+<body>​…​</body>​
+```
+
+158. Selecting Sibling elements
+```
+> const ul0 = document.querySelector('ul')
+> l1 = ul0.firstElementChild
+> l2 = l1.nextSibling
+#text
+> l2.previousElementSibling
+<li>​…​</li>​::marker​"Item 1"</li>​
+> l1.nextElementSibling
+<li class=​"list-item">​…​</li>​
+```
+- nextElementSibling is faster than querySelector()
+
+162. Adding Elements 
+```
+> const ul = document.querySelector('ul')
+> ul.innerHTML
+'\n      <li>Item 1</li>\n      <li class="list-item">Item 2</li>\n      <li class="list-item">Item 3 (Changed!)</li>\n    '
+> ul.innerHTML += '<li> Item 4 </li>' # this might not be a good practice as the browser will load the entire page again
+```
+- Instead of updating innerHTML, we may use insertAdjacentHTML()
+    - Depends on UI/UX, the response to user input may use this method (input is valid or not)
+
+163. Creating Elements
+- `document.createElement()`: must be from document!
+```
+> const ul = document.querySelector('ul')
+> const newLi = document.createElement('li')
+> newLi
+<li>​</li>​
+> ul.appendChild(newLi)
+<li>​…​</li>​
+> newLi.textContent = 'Item appended'
+```
+
+164. Inserting Elements
+- Continued from 163
+```
+> ul.prepend(newLi) # newLi will be re-locatd into the first item, not copied. newLi is reference not copy
+> ul.lastElementChild.before(newLi) # will move to the second-last position
+```
+- Per method, some browsers may not support. Check MDN for more acceptable methods for the same function
+
+165. Cloning DOM nodes
+- `newLi.cloneNode(true)`: deep-copy containing decendants
+- `newLi.cloneNode(false)`: shallow-copy. No child/no decendants
+- When the argument is missing, false is applied
+
+167. Removing Elements
+- `newLi.remove()`
+    - Will not work at IE11
+- `newLi.parentElement.removeChild(newLi)`
+    - Would work at IE11 as well
+
+171.
+- `const addMovieModal = document.getElementById('add-modal')` is better than `const addMovieModal = document.querySelector('#add-modal')` in terms of performance
+    - `const addMovieModal = document.body.children[1]` is not recommended as it will not work if the HTML structure changes
+- Finding class:
+    - Instead of `addMovieModal.className = '...'`, `addMovieModal.classList.toggle('visible')` is recommended
+
+184. Array-like object
+- Objects that have a length property and use indexes to access items
+    - Not really Array
+    - Ex) NodeList, String
+
+185. Creating arrays
+```
+const arra1 = [123, 456];          // [123, 456]
+const arra2 = new Array(123, 456); // [123, 456]
+const arra3 = new Array(5);        // creates an empty array of 5 elements
+const arra4 = Array.of(123, 456);  // [123, 456]
+const arra5 = Array.of(5);         // [5]
+const arra6 = Array.from('Hi')     // ['H', 'i']. Can be used for NodeList
+```
+
+187. Adding & removing elements
+- push(): adds an element in the end
+- pop(); Removes the last element
+- unshift(): adds an element in the beginning
+    - Slower than push()
+- shift(): Removes the first element in the array
+    - Arguments are not used
+    - Slower than pop()
+- Assignment with an index larger than the current length will create empty elements between    
+```
+> a = ['a','b']
+> arra[5] = ['z']
+> arra
+['a', 'b', empty × 3, Array(1)]
+```
+
+188. splice()
+- Inserts an element in the middle of an array
+- splice(index_of_start, amount_to_delete, new_element1, new_element2, ...)
+
+189. slice()
+- Does not change the given array
+- Returns a new array as requested
+```
+> const arr = ['a','b','c','d']
+> brr = arr.slice(0,2) # from 0 to (2-1)th element
+['a', 'b']
+```
+- To make a clone, may use .slice(), without indexes
+    - `const arr02 = arr01` makes a reference copy
+
+191. indexOf() vs lastIndexOf()
+```
+> ['a','a', 'b','b', 'c', 'c'].indexOf('a') # finds the index of the first finding
+0
+> ['a','a', 'b','b', 'c', 'c'].lastIndexOf('a') # finds the index of the last finding
+1
+```
+- When not found, `-1` will be returned
+- When an element is an object like { field: value}, this doesn't work
+
+192. find() and findIndex() for Array
+- Introduces a function to find elements
+    - Can be used to query objects
+- Grammar: `find((element, index, array) => {...})`
+    - Or `find(function(element, index, array) {...})`
+- For callback function: `find(callbackFn, thisArg)`
+```
+> [ {f01:0.12}, {f02:3.14}].findIndex((el)=>{return el.f01 === 0.12} )
+0
+```
+
+193. How to find if an element is included or not
+- Find an index of the value then check if the return is `-1` or not
+
+194. forEach() in Array
+- Can loop over the elements of an array
+- Same grammar of find()
+```
+> let taxList = [];
+> [120, 320, 150].forEach((el,idx,arr)=> {taxList.push({index:idx, taxAmount: el*0.075}) })
+> taxList
+(3) [{…}, {…}, {…}]
+0: {index: 0, taxAmount: 9}
+1: {index: 1, taxAmount: 24}
+2: {index: 2, taxAmount: 11.25}
+length: 3
+[[Prototype]]: Array(0)
+```
+
+195. map()
+- Maps every element in an array with the given function and returns a new array
+```
+> [120,320,150].map((el,idx,arr)=> { return {index:idx, taxAmount: el*0.075}})
+(3) [{…}, {…}, {…}]
+0: {index: 0, taxAmount: 9}
+1: {index: 1, taxAmount: 24}
+2: {index: 2, taxAmount: 11.25}
+length: 3
+[[Prototype]]: Array(0)
+```
+
+196. sort()
+```
+> [120,320,1150].sort()
+(3) 
+[1150, 120, 320]
+```
+- As it sorts as characters, **1150 is ordered earlier than 320**
+- The lecturer didn't explain why returning 1,0,-1 yielded the ordering
+    - The trick that the lecturer usesdis to use compareFunction(a,b): https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort
+- To sort numerics, use compareFn as necessary
+```
+> [120,320,1150].sort((a,b) => {a-b} )
+[120, 320, 1150]
+> [120,320,1150].sort((a,b) => {b-a} ) # inversing the b/a still yields the same result
+[120, 320, 1150]
+> [1,2,456,32].sort((a,b) => {console.log(a); console.log(b); })
+2
+1
+456
+2
+32
+456
+```
+
+197. filter()
+```
+> [1,2,456,32].filter((el,idx,arr)=>{ return el > 1.5})
+(3) [2, 456, 32]
+```
+
+198. Arrow functions
+- The above example can be reduced more
+```
+> [1,2,456,32].filter(function(el,idx,arr) { return el > 1.5} )
+(3) [2, 456, 32]
+> [1,2,456,32].filter((el,idx,arr)=>{ return el > 1.5})
+(3) [2, 456, 32]
+> [1,2,456,32].filter(el => el > 1.5) ## MUCH SHORTER
+(3) [2, 456, 32]
+```
+
+199. reduce()
+- Grammar: `[...].reduce((prevVal, curVal, idx, arr)=> {...}, initial_prevVal)`
+    - As index increases, prevVal is the returned value from the previous call of the function
+```
+> [1,2,456,32].reduce((pVal, cVal, idx, arr) => {console.log(pVal,cVal); return pVal+cVal; },0)
+0 1
+1 2
+3 456
+459 32
+491
+```
+
+201. String <-> Array
+```
+> 'hello;world;cooking'.split(';')
+(3) ['hello', 'world', 'cooking']
+> ['Max','Name','Array'].join(' ')
+'Max Name Array'
+```
+
+202. Spread Operator: `...`
+```
+> console.log(arr)
+(3) ['cooking', 'reading', 'coding']
+> console.log(...arr)
+cooking reading coding
+```
+- Spread operator litterally spreads the element of an array
+- If the element is number/string, regular copy will be made
+- If the element is an object {...}, reference copy will be made
+```
+> const tArr = [ {name:'Max', age:30}, {name:'Manuel', age:50}];
+> const cArr = [...tArr];
+> tArr[0].age=22
+> cArr
+0: {name: 'Max', age: 22} ## changing tArr element changes the element of cArr as the element is an object
+1: {name: 'Manuel', age: 50}
+```
+- Still slice() will produce the same reference copy
+- To make a deep copy, run forEach() or map() over the structure of objects and copy the element/component along the object structure
+
+203. Destructring array
+```
+> const [ firstName, lastName, ...etc] = [ 'Max', 'Schwarz', 'Address', 'age']
+> firstName
+'Max'
+>etc
+(2) ['Address', 'age']
+```
+
+204. Sets and Maps
+- Array: iterable, duplicates are allowed, order is guaids.has(123)
+trueranteed. Zero based index
+- Set: iterable, duplicates are NOT allowed, order is NOT guaranteed. No index.
+- Map: key-value. iterable, duplicate keys are not allowed. Order is guaranteed
+
+205. Working with Sets
+```
+> const ids = new Set([32, 123, 22]);
+> ids
+Set(3) {32, 123, 22}
+ids[0]
+undefined
+> ids.has(123)
+true
+```
+- entries() will return (value, value) as it matches to the method of map data
+    - Use values() instead
+
+206. Working with Maps
+```
+>￼const name1 = { name: 'Max'}
+> const mp1 = new Map([ [name1, 'Schwartz'], [ 'details', {Address: 123, age: 55}]]);
+> mp1
+Map(2) {{…} => 'Schwartz', 'details' => {…}}
+[[Entries]]
+0: {Object => "Schwartz"}
+key: {name: 'Max'}
+value: "Schwartz"
+1: {"details" => Object}
+key: "details"
+value: {Address: 123, age: 55}
+size: 2
+> for (const [k,v] of mp1.entries()){ console.log(k,v)}
+{name: 'Max'}
+ 'Schwartz'
+details 
+{Address: 123, age: 55}
+```
+
+​207. Maps vs Objects
+- Objects: strings, numbers, and symbols for keys. For small/medium sized sets of data. 
+- Maps: any value or object for keys. Better performance for large quantities of data. Better performance for adding/removing data often.
+​
+208. WeakSet()
+- Only objects
+- Not iterable
+- Limited methods than Set()
+- if there is no reference, the element object will be garbage-collected
+
+Assignment 6 
+- Create an array containing numbers and perform 3 operations. 1) Filter numbers greater than 5. 2) map every number into a some property 3) reduce the array into a single number by multiplying all components
+```
+> let as01 = [1,7, 5, 2];
+> as01.filter(p=>p>5)
+> as01.map((el,idx,arr) => {return  {num: el} })
+> as01.map((p)=> ({num:p})) ## or use () instead of return
+> as01.reduce((pv,cv,idx,arr)=> {return pv*cv},1)
+70
+```
+- Write a function that find the largest number in the list argument. Supply multiple arguments from the above assignment
+- Tweak the above function to return [min, max]. Then destructure the function return value and store them in separate storage
+- Create a list where makes sure no duplicate values
+```
+> function findM(args)  { 
+    x0 = args[0]; 
+    for (const el of args) { 
+        if (x0 < el) {
+            x0 = el;
+        } 
+    }; 
+    return x0;
+}    
+> findM([...as01])
+7
+> function findM2(args)  { xmax = args[0]; xmin = args[0]; for (const el of args) { if (xmax < el) {xmax = el}; if (xmin > el) {xmin = el}; }; return [xmin,xmax];}
+> [xmin, xmax] = findM2(as01)
+[1, 7]
+> const arr = ['cooking', 'reading', 'coding', 'cooking'];
+> const sarr = new Set(arr);
+> const brr = Array.from(sarr)
+> brr
+['cooking', 'reading', 'coding']
 ```
