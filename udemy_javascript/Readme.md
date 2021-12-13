@@ -655,7 +655,7 @@ Assignment 5.
 - Finding the element of the above ul: `const ul = document.querySelector('ul')`
 - `ul.children` will retun the children elements
 - `ul.childNodes` will return the children nodes, including elements and texts
-    - The first text node is the white space between <ul> and <li> in the first line
+    - The first text node is the white space between `<ul>` and `<li>` in the first line
 - `ul.firstChild` will retun the first child node
 - `ul.firstElementChild` will retun the first child element
 - Similar usage for lastChild and lastElementChild
@@ -1002,4 +1002,134 @@ Assignment 6
 > const brr = Array.from(sarr)
 > brr
 ['cooking', 'reading', 'coding']
+```
+
+213. Objects
+- Primitive values: numbers, strings, booleans, null, undefined, symbol
+- Reference values (=Objects): everything else. Array, {...}, DOM nodes, and other built-in objects
+
+216. Adding, modifying & deleting properties
+- Non-existing value will be printed as undefined
+- Do not assign undefined as value for best-practice
+    - When undefined is detected, the implication would be straight-forward
+```
+> let person = { name: 'Max', age: 30, greet: function() { console.log('hello world');} };
+> person.alert = function() { alert('printing now')}; ## adding a new element
+> delete person.age ## deleting an existing element
+```
+
+217. Special key names and []
+- Use quotation marks in the key place
+```
+> let abc = { 'first name': 'Max'}
+> abc['mid name'] = 'W'
+> abc
+{first name: 'Max', mid name: 'W'}
+```
+
+218. Property type
+- Positive number is recognized as a string. No negative number
+- Number keys are sorted automatically
+```
+> let abc = { 'first name': 'Max', 1.5: true}
+> abc[1.5]
+true
+> abc['1.5']
+true
+> let abc = { 'second name': 'W', 'first name': 'Max', 213: false, 15: true}
+> abc
+15: true
+213: false
+first name: "Max"
+second name: "W"
+```
+
+219. Dynamic access to the property
+- Use [] to inject a variable into object key
+- Introduces a user-input as a key name
+- For value, use as it is. Using [] will be translated as an array
+```
+> abc
+{15: true, 213: false, second name: 'W', first name: 'Max'}
+> const keyName = 'second name'  ## new variable
+> abc.keyName   ## NOT working
+undefined
+> abc[keyName]  ## Works OK now
+'W'
+> let abc = { [keyName]: true}  ## use [] to inject variable assignment to objects
+> abc
+{second name: true}
+> const valName = true
+> let abc = { [keyName]: [valName] }  ## This will produce an array
+> abc
+second name: [true]
+> let abc = { [keyName]: valName }   ## Works as expected
+> abc
+{second name: true}
+```
+​- Extracting key and its value to text: using `${}`
+```
+> people = {info: {age: 30, name: 'Max'} };
+> let text = ''
+> for (const key in people.info) { text = `${key}: ${people.info[key]}`;}
+> text
+'name: Max'
+```
+
+226 Object.assign()
+- Copying value, not reference
+```
+> p2
+{username: 'Max'}
+> const px = Object.assign({age:33}, p2)
+> p2.username = 'Max_Sw'
+> p2
+{username: 'Max_Sw'}
+> px
+{age: 33, username: 'Max'}  ## still has the value of the previous p2
+```
+
+227. Object destructuring
+```
+> let {age, ...etc} = px;
+> etc
+{username: 'Max'}
+> age
+33
+```
+
+228. If a property exists or not
+```
+> const p1 = { age: 33, name: 'Max', method: ()=> {console.log('hello')} }
+> 'age' in p1
+true
+```
+
+229. this
+- Uses an object property within an object
+```
+> const p1 = { age: 33, name: 'Max', method: function() { console.log(this.age)}  }
+> p1.method()
+33
+```
+- Arrow function ()=>{} doesn't work
+    - Or use a module `const p1 = { age: 33, name: 'Max', method() { console.log(this.age)}  }`
+
+230. call(), apply(), and bind()
+- Ref: https://stackoverflow.com/questions/15455009/javascript-call-apply-vs-bind
+- call(): invokes function immediately. call(thisValue, [...])
+- apply(): same as call() but uses an array for arguments. apply(thisValue, arg1, arg2, ...)
+- bind(): can be used to define a function for later usage
+- The first argument corresponds to `this`. If `this` is not required, use null
+```
+> const p1 = { age: 33, name: 'Max', method() { console.log(this.age)}  }
+> p1.method()
+33
+> p1.method.call({age:52}) # replaces this with {age:52}
+52
+>p1.method.apply({age:52})
+52
+> const newFnc = p1.method.bind({age:44})
+> newFnc()
+44
 ```
