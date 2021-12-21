@@ -1107,18 +1107,30 @@ true
 
 229. this
 - Uses an object property within an object
+- Provides an access to whatever called the method
 ```
 > const p1 = { age: 33, name: 'Max', method: function() { console.log(this.age)}  }
 > p1.method()
 33
+>    const person = {
+        name: 'Max',
+        greet() {
+            console.log(this); // ???
+            console.log(this.name);
+        }
+    };
+> const admin = { age: 30 };
+> admin.greet = person.greet;
+> admin.greet(); ## Now this is the admin object; admin.name doesn't exist and undefined is printed
+{age: 30, greet: ƒ}
 ```
 - Arrow function ()=>{} doesn't work
     - Or use a module `const p1 = { age: 33, name: 'Max', method() { console.log(this.age)}  }`
 
 230. call(), apply(), and bind()
 - Ref: https://stackoverflow.com/questions/15455009/javascript-call-apply-vs-bind
-- call(): invokes function immediately. call(thisValue, [...])
-- apply(): same as call() but uses an array for arguments. apply(thisValue, arg1, arg2, ...)
+- call(): invokes function immediately. call(thisValue, arg1, arg2, ...)
+- apply(): same as call() but uses an array for arguments. apply(thisValue, [...])
 - bind(): can be used to define a function for later usage
 - The first argument corresponds to `this`. If `this` is not required, use null
 ```
@@ -1133,3 +1145,740 @@ true
 > newFnc()
 44
 ```
+234. `this` and arrow functions
+- Using `this` inside of methods in `this`
+    - For arrow functions, `this` is from the definition of the context
+        - Ref: https://humanwhocodes.com/blog/2013/09/10/understanding-ecmascript-6-arrow-functions/
+        - Lexical this binding – The value of this inside of the function is  determined by where the arrow function is defined not where it is used.
+    - For regular function definition, `this` is from the calling context
+```
+> const p1 = {age: [33,44], name:['Max','Manuel'], 
+    method() { 
+        this.age.forEach((p,idx)=> {console.log(p + this.name[idx])})
+        } 
+    }
+> p1.method() ## this is coupled with the function definition
+33Max
+44Manuel
+> const p1 = {age: [33,44], name:['Max','Manuel'], 
+    method() { 
+        this.age.forEach(
+            function(p,idx) {console.log(this)})
+        } 
+    }
+> p1.method() ## prints the regular this definition in the console
+Window {0: global, 1: global, 2: Window, window: Window, self: Window, document: document, name: '', location: Location, …}
+Window {0: global, 1: global, 2: Window, window: Window, self: Window, document: document, name: '', location: Location, …}
+> this ## this from javascript console
+Window {0: global, 1: global, 2: Window, window: Window, self: Window, document: document, name: '', location: Location, …}
+```
+
+236. Getters & Setters
+- Apply try & catch or whatever to do sanity check for setter value
+```
+> const p1 = {age:33, set title(val) { this._title = val;}, get title() { return this._title} }
+> p1.title = 'hello world' ## setter: note that () is not used
+'hello world'
+>p1.title                 ## getter: may pre-define _title with default value
+'hello world'
+```
+
+242. class
+- Convention: start the name with Capital letters
+```
+> class Product{ title = 'Default'; info = {age:33, name:'Max'} }
+> const a1 = new Product()
+> a1.title
+'Default'
+> a1.info.age
+33
+```
+
+243. Constructor
+```
+> class Product{ 
+    title = 'Default';  
+    price; 
+    constructor(title,price) {
+        this.title = title; this.price=price; 
+    }  
+}
+> const a1 = new Product('hello W', 450)
+> a1.price
+450
+```
+
+249. Static methods and properties
+- No instance required
+- Can be used as a proxy
+
+250. Classes vs Object literals
+- Literals in javascript: constant values that can be assigned to the variables
+    - Quick & easy to create. No overhead
+- Classes: when we re-create same type of objects over and over again
+
+253. Inheritance
+- Only one base class
+- `super()` will call the constructor of the base class. Must be called befor `this` is used in the derived classes
+
+258. Private properties
+- Accessible only inside of the class
+- Use `#` prefix for member data or functions (not supported in Chrome yet)
+
+259. Pseudo-private
+- `_` prefix may be used as a convention for private (not actual rule)
+```
+class product  {
+    _internalId = 'abc012';
+};
+```
+
+Assignment 7
+- Create a Course class containing title, length, price. Then instantiate 2 objects
+- Add 2 methods 1) printing length/price value 2) summary of title, length, and price
+- Create derived classes: PracticalClass with numOfExcercises, TheoreticalClass with publish() method
+- Use getters and setters to ensure that the price property can only be set to a positive value and is returned with `$` as prefix
+- Use private fields to harden the getter/setter above
+```
+class Course { 
+    _title; _length; #price; 
+    set price(val) {
+        if (val > 0) {
+            this.#price = val
+        } else {
+            console.log('invalid price')
+        } 
+    };  
+    get price() { 
+        return '$'+this.#price 
+    }; 
+    constructor(title='default title', length=1, price=1000) {
+        this._title=title; this._length = length; this.#price = price; 
+    };  
+    lengthPprice() {
+        console.log(this._length/this.#price)
+    }; 
+    summary() {
+        console.log('title='+this._title + ' length='+this._length + ' price=$' + this.#price)} 
+}
+class PracticalClass extends Course {
+    _numOfExcercises;
+    #price;
+    constructor(title='default title', length=1, price=1000, numOfExcercises=1) {
+        super(title, length, price);
+        this._title=title; this._length = length; this.#price = price; 
+        this._numOfExercises = numOfExcercises;
+    }
+}
+```
+- Private data are NOT inherited
+
+260. instanceof
+```
+> const p1 = new Product()
+> p1 instanceof Product
+true
+```
+- This works for base Class as well
+
+261. Empty object
+```
+> const obj = new Object(); ## would be slower. Not recommended
+> const obj2 = {}           ## simple literal. Recommended
+> obj
+{}
+> obj2
+{}
+```
+
+262. Object description
+```
+> Object.getOwnPropertyDescriptors(p1)
+{_internalId: {…}}
+_internalId: {value: 'abc012', writable: true, enumerable: true, configurable: true}
+[[Prototype]]: Object
+> Object.defineProperty(p1, '_internalId', {writable: false}) ## we may lock
+> Object.getOwnPropertyDescriptors(p1)
+_internalId: {value: 'abc012', writable: false, enumerable: true, configurable: true} ## now writable is false
+```
+
+266. Constructor function vs Class
+- Class: since ES6
+    - Must be called with new
+    - Methods are not enumerable
+    - strict mode by default
+- Constructor function: available in ES5. regular function but would be used with new to create objects
+    - Might be called with new
+    - All properties and methods are enumerable
+    - Not in strict mode
+- Factory function: regular function but returns an object. Don't use new with this
+- Ref: https://stackoverflow.com/questions/8698726/constructor-function-vs-factory-functions
+- `new`: creates an object and return it in the behind of the scene
+
+268. Prototypes
+- `class` is a **sytactic sugar** of prototypical inheritance
+- Every object in javascript has the prototype
+- Prototype objects == Fallback objects
+- Prototype chain
+    - p.some_method() -> exit? Yes then execute. No then p.__proto__.some_method() -> No then p.__proto__.__proto__.some_method() ... up to Object.prototype
+```
+> const p1 = new product()
+> console.log(p1)
+VM871:1 
+product {_internalId: 'abc012'}
+> console.log(p1.__proto__)
+VM906:1 
+{constructor: ƒ}
+constructor: class product
+> console.log(p1.__proto__.__proto__)
+VM945:1 
+{constructor: ƒ, __defineGetter__: ƒ, __defineSetter__: ƒ, hasOwnProperty: ƒ, __lookupGetter__: ƒ, …}```
+```
+- Regarding `someObj.__proto__` vs `SomeFunction.prototype`, `__proto__` points at the prototype object of someObj, prototype at the prototype object that will be assigned as prototype to objects created based on someFunction
+
+305. Events
+- Browser: addEventListener()
+- NodeJS: on()
+
+
+325. Pure functions and side-effects
+- pure functions: same input, same results. No randomness
+- impure functions: has randomness. Results cannot be predicted
+- side effects: may update global/local variables/objects
+
+328. Closures
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures: A closure is the combination of a function bundled together (enclosed) with references to its surrounding state (the lexical environment). In other words, a closure gives you access to an outer function’s scope from an inner function. In JavaScript, closures are created every time a function is created, at function creation time.
+- https://blog.bitsrc.io/a-beginners-guide-to-closures-in-javascript-97d372284dda: A closure is a function that has access to its outer function scope even after the outer function has returned.
+- Every JS function is a closure
+- Lexical environment (lexical scope or static scope): accessibility of the variables, functions, and objects based on their physical location in the source code
+```
+> let multiplier = 1.1;
+> function createTaxCalculator(tax) { 
+    function calculateTax(amount) {  
+        return amount * tax * multiplier; 
+    } 
+    return calculateTax; 
+}
+> const c1 = createTaxCalculator(0.1) ## c1 object stores tax as 0.1
+> const c2 = createTaxCalculator(0.2) ## c1 object stores tax as 0.2
+> c1(100); ## computes amount(=100)* 0.1 * multiplier
+11
+> c2(100); ## computes amount(=100)* 0.2 * multiplier
+22
+> multiplier = 1.5
+1.5
+> c1(100)  ## Note that initial value of multiplier is NOT stored
+15
+> c2(100)
+30
+```
+- Closure remembers the inner variable when it is created
+
+329. Closures in Practice
+- Sample code by the lecturer is NOT a good example of closure
+
+331. IIFE
+- Immediately Invoked Function Expression
+```
+(function f1() {
+    console.log('hello');
+    }
+)()
+```
+- Executes when declared
+- One time usage
+- Not recommended for modern JS
+
+337. Numbers
+- No integer type
+- Numbers are stored as 64bit floating points
+```
+> Number.MAX_SAFE_INTEGER
+9007199254740991
+> Number.MIN_SAFE_INTEGER
+-9007199254740991
+> Number.MAX_VALUE
+1.7976931348623157e+308
+```
+
+338. Floating points
+```
+> 0.2 + 0.4 === 0.6
+false
+> (0.2 + 0.4).toFixed(2) == 0.6 ## toFixed() returns a string
+true
+> (5).toString(2) ## conversion to binary
+'101'
+```
+
+339. BigInt
+- Add `n` as post-fix
+- No floating point
+- 
+```
+> 123456789123456789 ## truncated due to max int number
+123456789123456780
+> 123456789123456789n  ## yields same number
+123456789123456789n
+> 10n - 4n  ## works OK
+6n
+> 10n - 4   ## crashes
+Uncaught TypeError: Cannot mix BigInt and other types, use explicit conversions
+> parseInt(10n) - 4 ## converting a BigInt into a regular int
+6
+> 10n - BigInt(4)  ## converting a regular int into a BigInt
+6n
+> 10n/3n  ## division produces a BigInt with truncation
+3n
+```
+
+340. Number and Math
+```
+> Number.isFinite(123)
+true
+> Number.isFinite(Infinity)
+false
+```
+
+343. Tagged Templates
+- Reading template literal when calls a function
+```
+> function f1(string, arg1, arg2) { 
+    console.log(string, arg1, arg2)
+    return 'hello with ' +  arg1 + ' and ' + arg2 
+}
+> const t1 = 'apple'
+> const t2 = 'banana'
+> f1`I am sending ${t1} and ${t2}`
+(3) ['I am sending ', ' and ', '', raw: Array(3)] 'apple' 'banana'
+'hello with apple and banana'
+```
+- The entire string in the template literal is sent as a string array
+
+344. Regular expression
+```
+> const regx = /^\S+@\S+\.\S+$/
+> regx.test('abc@xyz.com')
+true
+```
+
+345. More on regex
+- `(h|H)`: h or H
+- `.ello`: hello or Aello but ello fails
+
+349. Sync code
+- Sequential execution of the code
+
+350. Async code
+- callback is necessary to figure out if the process is completed
+- Javscript is single-threaded but offloads longer-tasking tasks to the browser, which uses multiple threads
+    - Node.js is single-threaded as well
+
+351. Event loop
+- Runs always
+- Responsible for executing the code, collecting and processing events, and executing queued sub-tasks
+
+353. setTimeout()
+```
+> function f1() { console.log('hello');}
+> setTimeout(f1, 5000)
+29
+hello  ## hello is prited after 5000ms
+```
+
+354. Promises
+- Callback hell: https://www.bmc.com/blogs/callback-hell/
+    - a phenomenon that afflicts a JavaScript developer when he tries to execute multiple asynchronous operations one after the other. By nesting callbacks in such a way, we easily end up with error-prone, hard to read, and hard to maintain code
+    - To prevent:
+        - Avoid deeply nesting callbacks
+        - Avoid anonymous functions. Give a specific name
+        - Modularize
+        - Handle every single error
+    - Best practice
+        - Use Promises
+        - Use Async-Await
+        - Coroutine of Promise + Generator
+- Promises
+    - Ref: https://www.geeksforgeeks.org/javascript-promises/
+    - Benefits
+        - Improves code readability
+        - Better handling of async operations
+        - Better flow of control definition in async logic
+        - Better Error handling
+    - Four states
+        - fulfilled: when succeded
+        - rejected: when failed
+        - pending: not fullfilled or rejected yet
+        - settled: fullfilled or rejected
+    - methods
+        - then(): takes up to two arguments, as callbacks for the resolved case and the rejected case. Returns a newly generated promise object. Can be chained. May omit 2nd argument (reject) until the final .catch()
+        - catch(): Appends a rejection handler. Errors from previous .then() blocks will reach this catch(). .then() blocks after .catch() block is not affected
+        - finally(): Appends a handler to the promise, and returns a new promise that is resolved when the original promise is resolved. The handler is called when the promise settled (fulfilled or rejected)
+- Regular callback - after 5sec, f1() is called-back
+```
+function f1(value) {console.log(value)}
+setTimeout(()=>{f1('hello callback')}, 5000)
+```
+- Using promise
+```
+let state = 'pending'
+function f1(value) {console.log(value); state = 'resolved'}
+function f2(value) {console.log(value); state = 'rejected'}
+function f3() {console.log('state='+state);}
+let prom = new Promise((res, rej)=>{
+    setTimeout(()=>{res('hello promise')}, 5000);
+    });
+prom.then(f1,f2).finally(f3)
+console.log(state)
+```
+    - f1() is injected as a resolver and f2() for rejector
+    - In the prom, res() function handler is executed 5000ms later
+    - f3() is injected as a callback for finally()
+        - if `.finally(console.log(state))` is used, `pending` will be printed as console.log() is executed immediately. To defer, a function pointer or handler must be used
+```
+let state = 'pending'
+function f1(value) {console.log(value); state = 'resolved'}
+function f2(value) {console.log(value); state = 'rejected'}
+function f3() {console.log('state='+state);}
+let prom = new Promise((res, rej)=>{
+    x = Math.random();
+    console.log('x=',x);
+    if (x > 0.5) {
+        setTimeout(()=>{res('hello promise')}, 5000);
+    } else { rej('something happened'); }
+    });
+prom.then(f1,f2).finally(f3)
+console.log(state)
+```
+    - Depending on x, resolver is executed 5000ms later or rejector is executed immediately. finally() shows the final state
+
+358. async/await
+- Instead of .then/.catch block, we can write async code like sync style
+```
+let state = 'pending'
+function f1(value) {console.log(value); state = 'resolved'}
+function f2(value) {console.log(value); state = 'rejected'}
+function f3() {console.log('state='+state);}
+async function f4() { // IIFE style
+    try{
+        await setTimeout(()=>{f1('hello promise')}, 5000);
+    } catch (error){
+        f2(error)
+    } finally {
+        ()=> {f3()}
+        // instead of function pointer above, if f3() is used, then f3() is executed immediately not awaiting for f1()
+    }
+}
+f4()
+```
+
+361. Promise.all(), Promise.race()
+- Promise.race(): only the fastest one matters regardless of fulfill or reject
+- Promise.all():
+```
+let pr1 = new Promise((res, rej)=>{
+    setTimeout(()=>{res('hello pr1')}, 5000);
+    });
+let pr2 = new Promise((res, rej)=>{
+    setTimeout(()=>{res('hello pr2')}, 2000);
+    });
+let pr3 = new Promise((res, rej)=>{
+    x = Math.random();
+    console.log('x=',x)
+    if (x > 0.3) {
+        setTimeout(()=>{res('hello pr3')}, 2000);
+    } else { rej('error in pr3');}
+    });
+//Promise.all([pr1, pr2]).then(v=>{console.log(v)},w=>{console.log(w)})
+Promise.all([pr1, pr3]).then(v=>{console.log(v)},w=>{console.log(w)})
+```
+    - If x>0.3, hello pr3
+    - Unless, errro in pr3 immediately
+```
+Promise.all([pr1, pr3]).then(v=>{console.log(v)},w=>{console.log(w)})
+```
+    - When x> 0.3, ['hello pr1', 'hello pr3']
+    - Unless, error in pr3 immediately
+
+398. Module
+- Ref: https://javascript.info/modules-intro
+    - Module works via http only
+
+469. Symbols
+- Primitive values
+- guaranteed to be unique
+- can be used as hidden object properties
+
+471. Iterator
+- Have a `next()` in the method which retunrs an objet. Make sure that it returns an object with two properies `{value: return_value, done: true or false}`
+```
+> let testobj = {
+    ncount: 0,
+    varry: ['Max', 'Manu', 'Lisa'],
+    next: function() {
+        if (this.ncount < this.varry.length){
+            let rv = {value: this.varry[this.ncount], done: false}
+            this.ncount ++;
+            return rv;
+        }
+        return {value: 'done', done: true}
+    }
+}
+> testobj.next()
+{value: 'Max', done: false}
+> testobj.next()
+{value: 'Manu', done: false}
+> testobj.next()
+{value: 'Lisa', done: false}
+> testobj.next()
+{value: 'done', done: true}
+> testobj.next()
+{value: 'done', done: true}
+```
+
+472. Generator
+- syntax: `function*`
+- Builds an object like iterator but automatically
+```
+> let testobj = {
+    ncount: 0,
+    varry: ['Max', 'Manu', 'Lisa'],
+    genmethod: function* genfunction() {
+        while (this.ncount < this.varry.length){ // while is necessary. if() will not continue to generate
+            yield this.varry[this.ncount];
+            this.ncount ++;
+        }
+    }
+}
+> const it1 = testobj.genmethod();
+> it1.next()  ## note that next() is from generator, not the code
+{value: 'Max', done: false} # literal {} is made automatically, not from the code
+> it1.next()
+{value: 'Manu', done: false}
+> it1.next()
+{value: 'Lisa', done: false}
+> it1.next()
+{value: undefined, done: true}
+> let testobj2 = {
+    ncount: 0,
+    varry: ['Max', 'Manu', 'Lisa'],
+    [Symbol.iterator]: function* () { // USING Symbol.iterator
+        while (this.ncount < this.varry.length){ // while is necessary. if() will not continue to generate
+            yield this.varry[this.ncount];
+            this.ncount ++;
+        }
+    }
+}
+> for (const el of testobj2) { // Loop over the object itself is yielded
+    console.log(el);
+}
+Max
+Manu
+Lisa
+```
+
+474. Reflect API
+- A built-in object that provides methods for interceptable JavaScript operations. Methods are same as those of proxy handlers
+- Object API already has similar methods
+    - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Reflect/Comparing_Reflect_and_Object_methods
+    - But better error messages from Reflect
+```
+> const c1 = { title:'Text', name:'Max'}
+> c1.title
+'Text'
+> Reflect.deleteProperty(c1,'title')
+true
+> c1
+{name: 'Max'}
+```
+
+475. Proxy API
+- For meta programming
+- Create traps (handler function) for object operation then use it to step in and execute the code
+- Create a handler function first, then call it as the second argument
+```
+> const c1 = { title:'Text', name:'Max'}
+> const cTrap = { 
+    get(target,prop,receiv) { 
+        //console.log(prop); 
+        return target[prop] || 'Not Found';
+    }
+}
+> const pC1 = new Proxy(c1, cTrap);
+> console.log(pC1.title, pC1.name, pC1.age) ## age is not a property of c1
+Text Max Not Found
+```
+- When a property doesn't exist, instead of undefiled, customized return can be made as shown above
+
+476. set() in trap
+```
+const c1 = { title:'Text', name:'Max'}
+const cTrap = { 
+    get(target,prop,receiv) { 
+        return target[prop] || 'Not Found';
+    },
+    set(target,prop,receiv) {
+        target[prop] = receiv;
+    }
+}
+const pC1 = new Proxy(c1, cTrap);
+pC1.age = 34;
+console.log(pC1.title, pC1.name, pC1.age);
+Text Max 34
+```
+
+481. Node.js
+```
+$ node
+Welcome to Node.js v12.22.8.
+Type ".help" for more information.
+> console.log('hello')
+hello
+undefined
+> 
+```
+
+482. Modules in Node.js
+- `require()` for Node.js
+- `import` or `export` for browsers
+```
+const fs = require('fs');
+fs.writeFile('sample.txt','username=Max', err=>{ console.log(err)});
+```
+
+483. Building a web server
+```
+const http = require('http');
+const server = http.createServer((request,response) => {
+    response.setHeader('Content-Type', 'text/html');
+    response.write('hello there!');
+    response.end();
+});
+server.listen(3000);
+```
+- `node test.js` then find local host (http://localhost:3000)from a browser
+![header_in_opera](./header_in_opera.png)
+
+485. Express.js
+- A framework for Node.js
+- `sudo npm install express`
+
+487. Basic of Express.js
+```
+const express = require('express');
+const app = express()
+app.use((req,res,next)=>{
+    res.setHeader('Content-type','text/html');
+    next();
+} );
+app.use((req,res,next)=>{
+    res.send('<h1>Hello world!</h1>');
+} );
+app.listen(3000);
+```
+
+488. Body parser with Express.js
+- `sudo npm install body-parser --save`
+```
+const express = require('express');
+const bodyParser = require('body-parser');
+const app = express()
+app.use(bodyParser.urlencoded({extended: false}));
+app.use((req,res,next)=>{
+    res.setHeader('Content-type','text/html');
+    next();
+} );
+app.use((req,res,next)=>{    
+    const userName = req.body.username || 'Unknown User';
+    res.send(`<h1>Hello ${userName}</h1><form method="POST" action="/"><input name="username" type="text"><button type="submit">Send</button></form>`);
+} );
+app.listen(3000);
+```
+
+489. Dynamic content using template engine ejs
+- `sudo npm install --save ejs`
+- index.ejs : not regular JS but with ejs grammar
+```
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NodeJS demo</title>
+</head>
+<body>
+    <h1> Hello ! <%=user %> </h1>
+    <form method="POST" action="/">
+        <input name="username" type="text" />
+        <button type="submit">Send</button>
+    </form>
+</body>
+</html>
+```
+- server.js
+```
+const express = require('express');
+const bodyParser = require('body-parser');
+const app = express();
+app.set('view engine','ejs')
+app.set('views','myViews');
+app.use(bodyParser.urlencoded({extended: false}));
+app.use((req,res,next)=>{
+    res.setHeader('Content-type','text/html');
+    next();
+} );
+app.use((req,res,next)=>{    
+    const userName = req.body.username || 'Unknown User';
+    res.render('index',{   // this part is dynamically managed
+        user: userName
+    });
+} );
+app.listen(3000);
+```
+
+492. CORS (Cross Origin Resource Sharing)
+- By default, only request to same origin (domain) are allowed
+```
+res.setHeader('Access-Control-Allow-Origin','*');
+res.setHeader('Access-Control-Allow-Methods','POST, GET, OPTIONS');
+res.setHeader('Access-Control-Allow-Headers','Content-Type');
+```
+
+500. Security hole
+- Your code
+    - can be read by anyone
+    - API_KEY might be shared as the service provider may limit IPs
+- XSS: Cross site scripting attacks
+- CSRF: Cross site request forgery
+- CORS: Cross-Origin Resource Sharing
+
+501. XSS
+- Malicious JS code gets injected & executed through browser input
+- Ex) unchecked user content
+    - Instead of innerHtml, use textContent so any injected text will not be executed
+    - Sanitize html part
+
+503. CSRF
+- Access to untrusted site
+- May use the stored cookie
+- Not JS specific but server-side attack method
+
+515. Performance
+- Startup time
+    - How soon we see something on the screen?
+    - How soon a user can interact with the page?
+- Runtime performance
+    - any freeze or lag in the application?
+    - is animation smooth?
+    - any memory leak? or more lag over time?
+
+517. Measuring performance
+- `performance.now()` in JS
+- Browser DevTools
+- webpagetest.com
+
+521. Code coverage
+- Inspect element -> Sources -> Coverage
+![code_coverage](./code_coverage.png)
+- May remove unloaded code to accelerate page loading
