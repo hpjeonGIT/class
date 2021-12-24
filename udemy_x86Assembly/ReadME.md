@@ -43,6 +43,7 @@ main:
 ```
 - gas: as - ex3.o ex3.s; ld ex3.o ; gdb ./a.out; b _start; run ; nexti ; p $eax
 	- Ref: https://cs.lmu.edu/~ray/notes/gasexamples/
+	- https://www.recurse.com/blog/7-understanding-c-by-learning-assembly
 ```
 .global _start
 .text
@@ -398,4 +399,347 @@ $3 = -9
 $4 = 67
 ```
 
+30. Memory address
+- Effective address = BaseReg + IndexReg * ScaleFactor + Disp
+```
+Disp:                           mov eax, [MyVal]
+BaseReg:                        mov eax, [ebx]
+BaseReg + IndexReg + Disp:      mov eax, [ebx+esi+12]
+BaseReg + IndexReg * SF + Disp: mov eax, [ebx+esi*4+20]
+```
 
+35. Summing Array elements
+- MASM code:
+```
+.386
+.model flat
+.data
+intArray DWORD 10000h,20000h,30000h,40000h;
+.code
+start proc
+     mov edi,OFFSET intArray
+	 mov ecx, LENGTHOF intArray
+	 mov eax,0
+LP:
+	add eax,[edi]
+	add edi,TYPE intArray
+	loop LP
+    ret
+start	endp
+end		start
+```
+- GAS conversion:
+```
+# https://www.tutorialspoint.com/assembly_programming/assembly_arrays.htm
+.global _start
+.data
+intArray: 
+    .long 0x10000, 0x20000, 0x30000, 0x40000
+    arrsize = . - intArray
+    arrlen = (. - intArray)/4 # long is 4 bytes
+.text
+_start:
+    movl $arrlen, %edi
+	movl $0, %eax
+    movl $0, %ebx
+    movl $intArray, %ecx
+LP:
+    add (%ecx, 4, %ebx), %eax
+    inc %ebx
+    dec %edi
+    jnz LP
+
+_end:
+	mov $60, %eax # below is to exit(0)
+	xor %edi, %edi # instead of rdi, edi works ok?
+	syscall
+```
+- Ref: https://www.youtube.com/watch?v=oq7_jOu1Owc
+- 0x10000 + 0x20000 + 0x30000 + 0x40000 = 65536 + 131072 + 196608 + 262144 = 655360
+- gdb confirms 
+```
+(gdb) p $eax
+$6 = 655360
+```
+- Q: is .long 4bytes? Not 8bytes?
+
+43. Coding: Computing the sum of an array
+``` C++
+#include <iostream>
+extern "C" int AdderGAS(int64_t a, int64_t b, int64_t c);
+
+int main() {
+	std::cout << AdderGAS(11,22,33) << std::endl;
+}
+
+int AdderCpp (int a, int b, int c) {
+	return a+b+c;
+}
+```
+``` AS
+.global AdderGAS
+.data
+.text
+AdderGAS:
+	push %rbp
+	mov %rsp, %rbp 
+	mov %rdi, %rax
+	add %rsi, %rax
+	add %rdx, %rax
+	pop %rbp
+	ret
+_end:
+	mov $60, %eax # below is to exit(0)
+	xor %edi, %edi # instead of rdi, edi works ok?
+	syscall    
+```
+- ref: https://zims-en.kiwix.campusafrica.gos.orange.com/wikibooks_en_all_maxi/A/X86_Assembly/GAS_Syntax
+- ref: https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
+- ref: http://6.s081.scripts.mit.edu/sp18/x86-64-architecture-guide.html
+```
+%rcx	used to pass 4th argument to functions
+%rdx	used to pass 3rd argument to functions
+%rsi	used to pass 2nd argument to functions
+%rdi	used to pass 1st argument to functions
+```
+- Command:
+```
+$ as -g -o sum.o sum.s
+$ g++ -c sum_.cpp
+$ g++ -o a.out sum_.o sum.o
+$ ./a.out
+66
+```
+
+44. Coding: computing signed muliplication and division
+```Cpp
+#include <iostream>
+extern "C" int IntegerMulDiv(int64_t a, int64_t b, int64_t * prod, 
+	int64_t * quo, int64_t *rem);
+int main()
+{
+
+	int a = -21, b = 9;
+	int prod = 0, quo = 0, rem = 0;
+	int rv;
+
+    rv = IntegerMulDiv(a, b, &prod, &quo, &rem);
+
+	printf("Input a : %4d b:	%4d\n", a, b);
+	printf("Output rv: %4d  prod:   %4d    quo: %4d   rem:  %4d\n", rv, pro
+d, quo, rem);
+
+	return 0;
+		 
+}
+```
+``` ASM
+.386
+.model flat,c
+.code
+
+;Return : 0 Error (Division by zero)
+;		: 1 Success
+;
+;Computation *prod = a*b
+;			 *quo = a/b
+;			 *rem = a %b
+
+IntegerMulDiv proc
+				
+			 push ebp
+			 mov ebp,esp
+			 push ebx
+
+			 xor eax,eax
+
+			 mov ecx,[ebp+8]		;ecx ='a'
+			 mov edx,[ebp+12]		;edx ='b'
+
+			 or edx, edx
+			 jz InvalidDivisor
+
+			 imul edx,ecx   ;edx = 'a'*'b'
+
+			 mov ebx,[ebp+16]  ; ebx ='prod'
+			 mov [ebx],edx
+
+			 mov eax,ecx			;eax ='a'
+			 cdq					;edx:eax contains dividend
+
+			idiv dword ptr[ebp+12]
+
+			mov ebx,[ebp+20]
+			mov [ebx],eax
+			mov ebx,[ebp+24]
+			mov [ebx],edx
+			mov eax,1
+
+	InvalidDivisor:
+			pop ebx
+			pop ebp
+			ret
+IntegerMulDiv  endp
+			end
+
+```
+
+58. Conversion b/w F to C
+- conv_.cpp
+```
+#include <iostream>
+extern "C" double FtoC(double deg_f);
+extern "C" double CtoF(double deg_c);
+int main() {
+	double ct = 30;
+	double ft = 86;
+	std::cout << "F to C: " << ft << "->" << FtoC(ft) << std::endl;
+	std::cout << "C to F: " << ct << "->" << CtoF(ct) << std::endl;
+}
+```
+- MASM
+```
+.model flat,c
+.const
+r8_SfFtoC real8 0.55555556
+r8_SfCtoF real8 1.8
+i4_32     dword 32
+.code
+FtoC  proc
+	push ebp
+	mov ebp,esp
+	fld [r8_SfFtoC]
+	fld real8 ptr[ebp+8]
+	fild [i4_32]
+	fsubp
+	fmulp
+	pop ebp
+	ret
+FtoC  endp
+;
+CtoF proc
+	push ebp
+	mov ebp,esp
+	fld real8 ptr[ebp+8]
+	fmul [r8_SfCtoF]
+	fiadd [i4_32]
+	pop ebp
+	ret
+CtoF endp
+```
+- GAS conversion
+```
+.global FtoC 
+.global CtoF
+.data
+    CMULT: .double 0.55555556 # C = (F -32) * 0.555556
+    FMULT: .double 1.8
+    BIAS : .double   32
+.text
+FtoC: 
+    push %rbp
+	mov %rsp, %rbp
+    movsd %xmm0, -0x8(%rbp)
+    fldl -0x8(%rbp)
+    fldl BIAS
+    fsubrp %st, %st(1)
+    fldl CMULT
+    fmulp %st, %st(1)
+    fstpl -0x10(%rbp)
+    movsd -0x10(%rbp),%xmm0
+    pop %rbp
+	retq
+CtoF:       # F = 1.8*C + 32
+    push %rbp
+	mov %rsp, %rbp
+    movsd %xmm0, -0x8(%rbp)
+    fldl -0x8(%rbp)
+    fldl FMULT
+    fmulp %st, %st(1)
+    fldl BIAS
+    faddp %st, %st(1)
+    fstpl -0x10(%rbp)
+    movsd -0x10(%rbp),%xmm0
+    pop %rbp
+	retq
+_end:
+	mov $60, %eax # below is to exit(0)
+	xor %edi, %edi # instead of rdi, edi works ok?
+	syscall
+```
+- Command:
+```
+$ as -o conv.o  conv.s
+$ g++ -c conv_.cpp
+$ g++ -no-pie -o a.out conv.o conv_.o
+$ ./a.out 
+F to C: 86->30
+C to F: 30->22
+```
+- Discussion
+	- For FPE, float/double arguments are handled through `%xmm`
+	- To find GAS reference, write a simple C function and disassemble it
+
+###  Extracting C++ function to objdump
+```
+double FtoC(double x) { 
+	return (x - 32) * 0.5555556;
+}
+```
+- Save as sample.cpp and disassemble as:
+```
+$ g++ -c -mfpmath=387  sampe.cpp 
+$ objdump -d sampe.o
+sampe.o:     file format elf64-x86-64
+Disassembly of section .text:
+0000000000000000 <_Z4FtoCd>:
+   0:	55                   	push   %rbp
+   1:	48 89 e5             	mov    %rsp,%rbp
+   4:	f2 0f 11 45 f8       	movsd  %xmm0,-0x8(%rbp)
+   9:	dd 45 f8             	fldl   -0x8(%rbp)
+   c:	dd 05 00 00 00 00    	fldl   0x0(%rip)        # 12 <_Z4FtoCd+0x12>
+  12:	de e9                	fsubrp %st,%st(1)
+  14:	dd 05 00 00 00 00    	fldl   0x0(%rip)        # 1a <_Z4FtoCd+0x1a>
+  1a:	de c9                	fmulp  %st,%st(1)
+  1c:	dd 5d f0             	fstpl  -0x10(%rbp)
+  1f:	f2 0f 10 45 f0       	movsd  -0x10(%rbp),%xmm0
+  24:	5d                   	pop    %rbp
+  25:	c3                   	retq   
+```
+- To read .rodata section, use -D option
+- Ref: http://www.sig9.com/articles/att-syntax
+	- https://github.com/Demkeys/x86_64AssemblyATTGASExamples/blob/master/MyProjects/EncryptAndDecryptFile/decryptprog.s
+- Error message:
+```
+g++ -o a.out conv.o conv_.o
+/usr/bin/ld: conv.o: relocation R_X86_64_32S against `.data' can not be used when making a PIE object; recompile with -fPIC
+/usr/bin/ld: final link failed: Nonrepresentable section on output
+collect2: error: ld returned 1 exit status
+```
+- Solution: use lea instead of mov. Ref: https://stackoverflow.com/questions/49434489/relocation-r-x86-64-32-against-data-can-not-be-used-when-making-a-shared-obje
+- or use -no-pie when link using g++
+
+## gdb command
+```
+(gdb) b FtoC
+Breakpoint 1 at 0x400894
+(gdb) run
+Starting program: /home/hpjeon/hw/class/udemy_X86Assembly/a.out 
+F to C
+Breakpoint 1, 0x0000000000400894 in FtoC ()
+(gdb) nexti
+0x000000000040089b in FtoC ()
+(gdb) display/i $pc
+1: x/i $pc
+=> 0x40089b <FtoC+11>:	fldl   0x0(%rip)        # 0x4008a1 <FtoC+17>
+(gdb) p $rbp
+$1 = (void *) 0x7fffffffd560
+(gdb) x &BIAS
+0x601060:	0x00000000
+(gdb) x &FMULT
+0x601058:	0xcccccccd
+```
+
+## ETC
+- Ref: https://stackoverflow.com/questions/15786404/fld-instruction-x64-bit
+	- for the float/double, arguments of functions are passed in XMM0, ...
