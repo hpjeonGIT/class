@@ -1232,3 +1232,48 @@ $ objdump -d fvec.o
 	- Using `!DIR$ IVDEP` doesn't yield packed double instruction (?)
 	- The source code has distinct loop size (=16) and the code can vectorize it. If unknown number is given, it cannot vectorize
 	- If array size is 7, g++ produces 1 of packed double (using ymm) and 3 of single double instructions (using xmm)
+- For variable size of array
+```
+subroutine loop_test(n, x,y,z)
+integer::n,i,j,k,m,l
+real*8:: x(16),y(16),z(16), pi
+pi = 3.1415
+m = n/4
+l = mod(n,4)
+k = 0
+do j=1,m
+    !$omp simd
+    do i=1,4
+        k = k + 1
+        z(k) = pi*x(k) + y(k)
+    end do
+end do
+!$omp simd
+do i=1,l
+  k = k + 1
+  z(i) = pi*x(i) + y(i)
+end do
+return
+end subroutine
+```
+- The assembly shows that it uses `vmulpd %ymm2,%ymm0,%ymm0`
+- For the C, similar strategy:
+```
+void loop_test(int n, double x[], double y[], double z[]) {
+    double pi = 3.1415;
+    int m = n / 4;
+    int l = n % 4;
+    int k = 0;
+    for (int j=0;j<m;j++) {
+        #pragma omp simd
+        for (int i=0;i<4; i++) {
+            z[k] = pi*x[i] + y[i];
+            k++;
+        }
+    }
+    for (int i=0;i<l;i++) {
+        z[k] = pi*x[k] + y[k];
+        k++;
+    }
+}
+```
