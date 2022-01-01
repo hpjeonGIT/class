@@ -255,3 +255,98 @@ let gzip = zlib.createGzip();
 let compressed = fs.createWriteStream(__dirname + '/write3.txt.gz'); // need to use gunzip, not unzip
 readable.pipe(gzip).pipe(compressed);
 ```
+
+58. http_parser
+- github.com/joyent/http-parser
+- Written in C
+
+59. Web server
+```js
+let http = require('http');
+http.createServer((req, res) => {
+    res.writeHead(200,{'Content-Type':'text/plain'});
+    res.end('Hello world\n');
+}).listen(1337,'127.0.0.1');
+```
+- Debug and find objects in res. Compare the header info with headers in Opera (Inspect Element->Network->All->localhost->Headers)
+![compare_header](./compare_header.png)
+
+60. Loading HTML file
+```js
+let http = require('http');
+let fs = require('fs');
+http.createServer((req, res) => {
+    res.writeHead(200,{'Content-Type':'text/html'}); // note that the type is text/html, not text/plain
+    let myHtml = fs.readFileSync(__dirname + '/index.html');
+    res.end(myHtml);
+}).listen(1337,'127.0.0.1');
+```
+- Editing the JS file will need the restart of node execution
+    - JS code is converted into machine code when node is executed
+- External htmls can be edited and might be reloaded from a browser
+
+61. Using stream to load HTML
+```js
+let http = require('http');
+let fs = require('fs');
+http.createServer((req, res) => {
+    res.writeHead(200,{'Content-Type':'text/html'});
+    fs.createReadStream(__dirname + '/index.html').pipe(res);
+}).listen(1337,'127.0.0.1');
+```
+- Use stream as much as possible
+
+64. Routing
+- Connecting http requests to content
+- use `req.url` to find the requested path
+```js
+let http = require('http');
+let fs = require('fs');
+http.createServer(function(req, res) {
+    if (req.url === '/') {
+        fs.createReadStream(__dirname + '/index.htm').pipe(res);
+    }
+    else if (req.url === '/api') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        var obj = {
+            firstname: 'John',
+            lastname: 'Doe'
+        };
+        res.end(JSON.stringify(obj));
+    }
+    else { // otherwise, 404 error is sent
+        res.writeHead(404);
+        res.end();
+    }
+}).listen(1337, '127.0.0.1');
+```
+- Q: how node.js handle many http requests even though it is a single thread?
+    - Ref: https://stackoverflow.com/questions/34855352/how-in-general-does-node-js-handle-10-000-concurrent-requests
+
+73. Express
+- JS framework
+- `sudo npm install express`
+```js
+let express = require('express');
+let app = express();
+let port = process.env.PORT || 3000 // when export PORT=XXX is done
+app.get('/', (req,res)=>{
+    res.send('<html><head></head><body><h1>Hello W!!!</h1></body></html>')
+});
+app.get('/api', (req,res)=>{
+    res.json({fName:'John', lName: 'Doe'});
+});
+app.listen(port);
+```
+- Content type is handled by Express
+
+77. Query string
+- Stored in `req.query` object
+
+78. RESTful API
+- REST: Representational State Transfer
+- Ref: https://stackify.com/soap-vs-rest/
+
+85. MEAN stack
+- MongoDB, Express, AngularJS, NodeJS
+- MongoDB, Express, ReactJS, NodeJS for MERN stack
