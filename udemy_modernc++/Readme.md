@@ -66,6 +66,50 @@ int main(){
 ```
 
 
+
+
+## Section 4: classes and objects
+
+49. Copy constructor - part I
+- Creates copy of the object's state in another object
+- Compiler may provide one automatically if there no copy constructor
+    - This could be problematic if a class has pointer member data
+- Default copy constructor will do shallow copy
+    - Use `delete` to disable copy-constructor
+    - If the code uses copy constructor, the compiler will produce error message, preventing the use of copy constructor
+    - `default` means that copy constructor will use what the compiler provides
+- Regarding initialization of objects using ()
+```
+Myclass x;
+...
+Myclass z(x); <-- This will try to shallow copy
+```
+```
+class Myclass {
+    ...
+    Myclass(const &Myclass) = delete;
+    ...
+}
+- If pointer or deep-copy is necessary, provide copy-constructor manually
+- If any function returns a class object, it is returned as a value (not reference). Then this will activate copy constructor of that class
+
+50. Copy constructor - part II
+- Operator `=` will do the shallow copy as well
+    - This is an **assignment operator**
+```
+Myclass x;
+...
+Myclass z;
+z = x; <--------  shallow copy will be done
+```
+- **Rule of 3**
+    - All of followings must be defined if a user implements any of them
+    - Destructor: `~Integer()`
+    - Copy constructor: `Integer(const Integer & obj)`
+    - Copy assignment operator: `Integer& operator= (A obj)`
+- When a copy constructor is implemented, the argument must use address, not value, as it will recursively call another constructor
+    - `Integer(const Integer & obj) {...}`
+
 53. L-value, R-value, & Rvalue references 
 - L-value
     - Has a name
@@ -141,10 +185,235 @@ int main(){
     - copy assignment operator: may need to allocate new memory
     - move constructor: may need to move the resource
     - move assignment operator: may need to move the resource
+```Cpp
+class Integer {
+...    
+Integer(); //default constructor
+Integer(int value); // parameterized constructor
+Integer(const Integer &obj); // copy constructor
+Integer(Integer &&obj); // move constructor
+Integer & operator=(const Integer &obj); // copy assignment
+Integer & operator=(Integer && obj); // move assignment
+```
+- Sample code:
+```cpp
+#include <iostream>
+class Integer{
+private:
+    int x;
+public:
+    Integer() {	x = 0;std::cout << "default constructor\n";}
+    ~Integer() {std::cout << "default destructor\n";}
+    Integer(int value) { x = value; std::cout << "param constructor\n";}
+    Integer(const Integer &obj) {x = obj.x; std::cout << "copy constructor \n";}
+    //Integer(const Integer &obj) = default;
+    Integer(Integer &&obj) {x = obj.x; std::cout << "move constructor \n";}
+    Integer &operator=(const Integer &obj) {x = obj.x;
+	std::cout << "copy assign operator\n";}
+    Integer &operator=(Integer && obj) {x = obj.x;
+	std::cout << "move assign operator\n";}
+    int GetValue() {return x;}
+    void SetValue(int value) { x = value;}
+};
+
+Integer Add(const int a, const int b) {
+    return Integer(a+b); // this calls param constructor
+}
+int main() {
+    Integer i1(123), i2(i1), i3;
+    // i1(123) calls param constructor
+    // i2(i1) calls copy constructor
+    // i3 calls default constructor    
+    i3 = i1; // this calls copy assign operator
+    Integer i4 {i1}; // this calls copy constructor
+    i3 = Add(1,2); //When Add() returns, it calls move assign operator
+    Integer i5(std::move(i3)); // default/move constructors are called
+    return 0;
+}
+```
+    - If copy constructors are commented out, the compile will fail
+        - Rule of 5
+    - The above constructors are same as `Integer(const Integer &obj) = default;` as there is no pointer member data
 - Rule of 0
     - If a class doesn't have ownership semantics, do not provide any of Rule of 5
     - Compiler will decide
         - User defined function may conflict
+- Custom copy constructor will delete the default move constructor and operator
+    - ? 
+    - To use move constructor/operator, the custom move constructor/operator must be made
+- parameterized constructor CANNOT use default/delete
+
+57. Copy elision
+- `intClass a = 3` can be recognized as `intClass a = intClass(3)`
+    - This will call move constructor
+    - Intermediate constructor will not be used
+    - **Return value optimization**
+
+58. std::move
+- std::move(x): a syntactic sugar of `static_cast<Myclass&&>(x)`
+
+## Section 6: Operator Overloading
+
+60. Operator overloading - part I
+- Custom implementation for primitive operators
+- Allows usage of user-defined objects in mathematical expressions
+- Overloaded as functions but provides a convenient notation
+- Implemented as member or global functions
+- Usage: `<ret> operator <#> (<arguments>)`
+    - `Integer &operator=(const Integer &obj) {}`
+- Number of arguments
+    - For global functions, same no. of arguments as the operands is required
+    - For member functions,
+        - Binary operator will require only one explicit argument
+        - Unary operator will not require any argument
+- Operator overloading is a **syntatic sugar** of functions
+- postfix operator needs `int` argument type
+    - Ref: https://docs.microsoft.com/en-us/cpp/cpp/increment-and-decrement-operator-overloading-cpp?view=msvc-170
+    - `Integer &operator++();` : prefix increment like ++obj
+    - `Integer operator++(int);` : postfix increment like obj++
+        - postfix increment requires a temporary object and this is why prefix increment is more efficient
+        - Ref: https://stackoverflow.com/questions/24901/is-there-a-performance-difference-between-i-and-i-in-c
+
+61. Operator overloading - part II
+- For `a=a`, address checking mechanism is necessary for `operator=`
+
+62. Operator overloading - part III
+- standard-out: `std::cout << a;`
+```cpp
+std::ostream & operator << (std::ostream &out, const Integer &a) {
+    out << a.GetValue();
+    return out;
+}
+```
+- standard-in: `std::cin >> a;`
+```cpp
+std::istream & operator >> (std::istream &inp, Integer &a) {
+    int x;
+    inp >> x;
+    a.SetValue(x);
+    return inp
+}
+- Function call operator: `a();`
+```cpp
+void operator()() { ... }
+```
+
+63. Operator overloading - part IV
+- Use `friend` to access member data (?)
+
+64. Operator overloading - part V
+- Overloading `->` and `*`
+- May add a class with destructor
+    - Allows automatic memory deallocation when out-of scope
+    - This is how **smart pointer** works
+
+65. Operator overloading - part VI
+
+66. Operator overloading - part VII
+
+67. Type conversion - part I
+- C-style casting is not recommended : `(float) a`
+    - Type check is not done
+- `static_cast<float> (a)`
+- `reinterpret_cast` might be done b/w different types (int->char)
+- `const_cast` ?
+
+68. Type conversion - part II
+- Compiler may convert initialization parameter implicitly
+    - `Integer i1 = 3;`
+    - To avoid such implicit conversion, use `explicit` keyword for the parameterized constructor
+        - `explicit Integer(int value) { ... }`
+
+69. Type conversion - part III
+- Type conversion operator
+    - `operator <type> ()`
+        - `operator int() { return x; }`
+    - No argument/No return type
+    - Now `int x = i6;` is allowed
+- To avoid implicit conversion, may use `explicit` keyword
+    - `explicit operator int() { return x; }`
+    - Now `int x = static_cast<int>(i6);` is allowed
+
+70. Initialization vs. assignment & member initialization list
+- Initialization list (calls parameterized constructor) is preferred than assignment as assignment has more function calls (default constructor + assignment operator)
+
+71. Raw pointers
+- Q: factory function?
+- Some good practice
+```cpp
+Integer *p = new Integer{value};
+...
+delete p; // deallocate memory
+p = nulltpr; // clean the addres it is pointing
+```
+- Raw pointer work OK but smart pointer is recommended as it will prevent memory leak
+
+72. std::unique_ptr
+- Cannot be copied
+- To send the unique pointer as an argument, use std::move
+```cpp
+void fnc1(std::unique_ptr<Integer> p) {...}
+...
+    fnc1(std::move(p));// after func1(p), p is deallocated
+```
+    - After fnc1(), p will be deallocated. To use again, reset()
+- If the function argument is used as reference, the pointer still holds the memory after function
+```cpp
+void fnc2(std::unique_ptr<Integer> &p) {...}
+...
+    fnc2(p);// after func2(p), p is still allocated
+    std::cout << p->GetValue() << std::endl;
+```
+- Unique pointer member function: release(), reset(), swap(), get(), ...
+- Adding GetPointer() function as a member function
+```cpp
+class Integer{
+...
+    Integer *GetPointer() {return this;}
+};
+int main() {
+    Integer *i1 = new Integer{123};
+    std::shared_ptr<Integer> p{i1->GetPointer()};
+    std::cout << p->GetValue() << std::endl;
+    return 0;
+}
+```
+
+73. Sharing Pointers
+- When multipe pointers share a pointer from a different class
+- Need to deallocate one by one in the end
+
+74. Sharing std::unique_ptr
+
+75. std::shared_ptr
+- Increments as it is shared again
+```cpp
+class Employee{
+    std::shared_ptr<Integer> m_pInteger{};
+public:
+    void SetInteger(std::shared_ptr<Integer> &i1) {
+        m_pInteger = i1;
+    }
+    const std::shared_ptr<Integer>& GetInteger() const {
+        return m_pInteger;
+    }
+};
+int main() {
+    std::shared_ptr<Integer> p{GetPointer(3)};
+    p->SetValue(123); std::cout << p.use_count() << std::endl; //-> will be 1
+    std::shared_ptr<Employee> e1 {new Employee{}};
+    e1->SetInteger(p); std::cout << p.use_count() << std::endl; //-> will be 2
+    std::shared_ptr<Employee> e2 {new Employee{}};
+    e2->SetInteger(p); std::cout << p.use_count() << std::endl; //-> will be 3
+    return 0;
+}
+```
+
+76. Weak ownership
+- 
+
+
+
 
 
 182. Concurrency basics
