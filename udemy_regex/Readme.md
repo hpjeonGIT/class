@@ -183,3 +183,14 @@
 07-31-1922
 5-5-2013
 ```
+
+## Some sample
+- For txt like `some constraints { ... \n ACTION_LABEL 'MyAction' { ...] \n`, to find out `MyAction` from Python regex:
+```py
+import re
+...
+txt = "some constraints { ... \n ACTION_LABEL 'MyAction' { ...] \n"
+m = re.findall(r".*(ACTION_LABEL)\s*\'(.+?)\'",txt)
+if len(m) > 0:
+    print(m[0][1])
+```
