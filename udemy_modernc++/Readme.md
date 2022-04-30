@@ -1,6 +1,66 @@
 ## Complete Modern C++ (C++11/14/17)
 - Instructor: Umar Lone
 
+21. Assignment
+- Implement following functions using pointer arguments only
+```cpp
+#include <iostream>
+int Add(int *a, int *b) {
+  return *a+*b;
+}
+void AddVal(int *a, int *b, int *result) {
+  *result = *a+*b;
+}
+void Swap(int *a, int *b) {
+  int c;
+  c = *a;
+  *a = *b;
+  *b = c; 
+  // int *c; this is not working
+  // c = a;
+  // a = b;
+  // b = c;
+}
+void Factorial(int *a, int *result) {
+  if (*a > 1) {
+    int *c = new int {*a - 1};
+    Factorial(c,result);
+    *result *= *a;
+    delete(c);
+  } else {
+    *result = 1;
+  }
+}
+int main() {
+  int a {10}, b{22};
+  std::cout << Add(&a, &b) << std::endl;
+  int c {};
+  AddVal(&a,&b,&c);
+  std::cout << c << std::endl;
+  Swap(&a,&b);
+  std::cout << a << " " << b << std::endl;
+  a = 4;
+  Factorial(&a,&c);
+  std::cout << c << std::endl;
+  //  
+  int *x = new int {10};
+  int *y = new int {22};
+  std::cout << Add(x,y) << std::endl;
+  int *z = new int{};
+  AddVal(x,y,z);
+  std::cout << *z << std::endl;
+  Swap(x,y);
+  std::cout << *x << " " << *y << std::endl;
+  *x = 4;
+  Factorial(x,z);
+  std::cout << *z << std::endl;
+  delete(x);
+  delete(y);
+  delete(z);
+  return 0;
+}
+```
+
 33. Inline functions
 - Replacement of MACRO in C++11 (?)
 - Injects inline function to the code, instead of calling the function
@@ -65,9 +125,6 @@ int main(){
 }
 ```
 
-
-
-
 ## Section 4: classes and objects
 
 49. Copy constructor - part I
@@ -111,6 +168,8 @@ z = x; <--------  shallow copy will be done
     - Copy assignment operator: `Integer& operator= (A obj)`
 - When a copy constructor is implemented, the argument must use address, not value, as it will recursively call another constructor
     - `Integer(const Integer & obj) {...}`
+
+## Section 5: Move Semantics
 
 53. L-value, R-value, & Rvalue references 
 - L-value
@@ -338,6 +397,8 @@ void operator()() { ... }
 
 70. Initialization vs. assignment & member initialization list
 - Initialization list (calls parameterized constructor) is preferred than assignment as assignment has more function calls (default constructor + assignment operator)
+
+## Section 7: Memory Management - Part II
 
 71. Raw pointers
 - Q: factory function?
@@ -1436,6 +1497,9 @@ find_max<double>(3, 1.1f);
   - Or provides an algorithm optimally for a specific type
   - Explicitly specialized functions must be defined in a .cpp file
 ```cpp
+// Explicit instantiation
+template char find_max(char a, char b);
+// Explicit specialization
 template<> const char* find_max(const char* a, const char* b) {
   return strcmp(a,b) > 0 ? a : b;
 }
@@ -1591,15 +1655,661 @@ int main() {
 ```
 
 141. Class Templates
+```cpp
+#include <iostream>
+template<typename T, int S>
+class Stack {
+  T m_Buffer[S];  
+  int m_Top {-1};
+public:
+  void Push(const T &elem) {
+    m_Buffer[++m_Top] = elem;
+  }
+  void Pop();
+  void Print() {
+    for(size_t i=0;i<=m_Top;++i) {
+      std::cout << m_Buffer[i] << std::endl;
+    }
+  }
+};
+template<typename T, int S>
+void Stack<T,S>::Pop() {
+  --m_Top;
+}
+int main() {
+  Stack<float,10> s1;
+  s1.Push(3.f);
+  s1.Push(1.f);
+  s1.Print();
+}
+```
+- When instantiate a class object, we need <> after the class name with appropriate argument
+- When member functions are defined outside of class definiiton, needs `template<>` keyword
 
+142. Class Template explicit Specialization - Part I
+- Handling `char *` for string
 
+143. Class Template explicit Specialization - Part II
+- Handling `std::vector<>` for PrettyPrint
 
+144. Assignment V
+- PrettyPrint for vector of vector
+```cpp
+#include <iostream>
+#include <vector>
+template<typename T>
+class PrettyPrinter {
+	T *m_pData;
+public:
+	PrettyPrinter(T *data) :m_pData(data) {	}
+	void Print() {		std::cout << "{" << *m_pData << "}" << std::endl;	}
+	T * GetData() {		return m_pData;	}
+};
+//Explicit specialization of a member function should appear outside the class
+template<>
+void PrettyPrinter<std::vector<int>>::Print() {
+	std::cout << "{";
+	for (const auto &x : *m_pData) {
+		std::cout << x;
+	}
+	std::cout << "}" << std::endl;
+}
+template<>
+void PrettyPrinter<std::vector<std::vector<int>>>::Print() {
+	std::cout << "{";
+	for (const auto &x : *m_pData) {
+    std::cout << "{";
+		for (const auto &el : x ) {
+      std::cout << el;
+    }
+    std::cout << "}";
+	}
+	std::cout << "}" << std::endl;
+}
+int main() {
+	std::vector<int> v{ 1,2,3,4,5 };
+	PrettyPrinter<std::vector<int>> pv(&v);
+	pv.Print();
+  std::vector<std::vector<int>> v2{ {1,2,3},{4,5,6}};
+  PrettyPrinter<std::vector<std::vector<int>>> pv2(&v2);
+  pv2.Print();	
+	return 0;
+}
+```
 
+145. Class Template Partial Specialization
+- Allows the specialization of partial arguments, not all of them
 
+146. Typedef, Type Alias & Alias Templates (C++11)
+- typedef
+  - Introduces a name for an existing type
+    - Produces a shorter name for existing types
+    - Simplifies declaration of some types
+```cpp
+typedef unsigned int UINT; UINT val {};
+typedef long long LLONG; LLONG elem {};
+typedef std::vector<std::list<Employee>> Teams;
+Teams testingTeams;
+Tems::iterator it = testingTeams.begin();
+typedef const char *(*ErrorFn) (int);
+ErrorFn pfn = GetErrorMessage;
+```
+- type alias (C++11)    
+  - Same as typedef
+    - `using <identifier>=<type>;`
+  - **Can be coupled with template**
+```cpp
+using UINT = unsigned int; UINT val {};
+using LLONG = long long; LLONG elem {};
+using Teams= std::vector<std::list<Employee>>;
+Teams testingTeams;
+Teams::iterator it = testingTeams.begin();
+using ErrorFn = const char *(*)(int);
+Error pfn = GetErrorMessage;
+template<typename T>
+using Names = std::vector<std::list<T>>;
+Names<std::string> names;
+Names<int> inames;
+```
 
+147. Type Traits (C++11)
+- can introspect
+  - Find the characteristics of types at compile time
+  - Transforms the properties of the type
+- Useful in template metaprogramming
+- Will return a boolean or a type at introspection
+- is_void
+- is_null_pointer
+- is_integral
+```cpp
+#include <iostream>
+#include <type_traits>
+template<typename T>
+T Divide(T a, T b) {
+  if(std::is_floating_point<T>::value == false){
+    std::cout << "Not floating point. We stop here\n";
+    return 0;
+  }
+  return a/b;
+}
+int main() {
+  std::cout << Divide(5,2) << std::endl;
+}
+```
+
+148. static_assert (C++11)
+- Can check expression at compile time
+
+## Section 13: Lambda Expressions (C++11)
+
+150. Callbacks revisited - Function pointers
+```cpp
+#include <iostream>
+using Comparator = bool(*)(int,int);
+template<typename T, int size>
+void Sort(T(&arr)[size], Comparator comp) {
+  for (int i=0;i<size-1;++i) {
+    for (int j=0;j<size-1;++j) {
+      if (comp(arr[j],arr[j+1])) {
+        T temp = std::move(arr[j]);
+        arr[j] = std::move(arr[j+1]);
+        arr[j+1] = std::move(temp);
+      }
+    }
+  }
+}
+bool Comp_asc(int x, int y) {
+  return x > y;
+}
+bool Comp_dsc(int x, int y) {
+  return x < y;
+}
+int main() {
+  int arr[] {3,7,2,9};
+  Sort(arr, Comp_dsc); 
+  for (auto &x: arr) std::cout << x << std::endl;
+  return 0;
+}
+```
+- Callback as function pointer
+  - Function pointers will not be inlined and might not be optimized
+  - Function points would be global
+
+151. Callbacks - function objects
+- Instead of a function pointer, we may use a member function with operator overloaded() of class/structure (after instantiated), allowing optimization and having function state
+- Function object
+  - Functor
+  - Object with overloaded function call operator
+  - Call to overloaded function call operator resembles a global function call
+    - a functor becomes a class with an overloaded operator()
+  - Can be used as a callback instead of function pointers
+  - More efficient than function pointers
+  - Usually impplemented as structs
+- Function pointer vs Function object
+
+| Function Pointer | Function object|
+|------------------|----------------|
+|Invoked through a pointer    | Invoked through an object |
+| Dynamic in nature           | Static in nature|
+| Can be specified at runtime | Must be specified at compile time|
+| Difficult to optimize       | Easy to optimize |
+| Slow                        | Fast |
+| Cannot store state          | Can store state |
+
+- Steps to use functors
+  - Instantiate one variable
+    - Constructor may not be necessary
+    - Ex) `myStruct myObj;` No () call
+  - Call the instantiated functor object
+    - Using an overloaded operator()
+    - Can be injected as an argument, playing call back function
+    - Will have a state (or pre-stored data) from the construction when instantiated
+
+152. Lambda Expressions
+- Defines an anonymous function object
+- Syntactic sugar for a function object
+- Can be passed as an argument
+- Compiler handles it as a class with operator overloaded function calls
+- Syntax
+```
+[] (<agrs>) <mutable> <exception specification> -> <return type>
+{ 
+}
+```
+- To use a single anonymous function, we need () operator to overload
+```cpp
+[] () { std::cout <<"hello world\n";} (); // add '()' after {...}
+```
+- We may define/label a lambda function object then add () to the function label when we call the function
+```cpp
+auto fnc = []() { std::cout << "hello world 2\n"; } ; // no '()' after {...}
+fnc();  // add '()' after the function label
+```
+- type of fnc is a class
+
+153. Lambda Expressions - Internals
+- How to define return type from Lambda expression
+  - Return type will be deduced but explicitly given using `->`
+  - `auto fnc = []()->double { return 3.5; } ;`
+- Generic lambda
+  - Similar to template function, the argument data type might be deduced using auto
+```cpp
+#include <iostream>
+template<typename T>
+struct Anonym {
+  T operator() (T x, T y) const {
+    return x+y;
+  }
+};
+int main() {
+  auto fnc = []()->double { return 3.5; } ;
+  std::cout << fnc() << std::endl;
+  auto sumLambda = [] (auto x, auto y) { return x+y;};
+  Anonym<int> myFobj;
+  std::cout << myFobj(5,2) << std::endl; // template function object 
+  std::cout << sumLambda(5,2) << std::endl; // generic lambda
+  return 0;
+}
+```
+
+154. Lambda Expressions Capture List - Part I
+- Instead of a structs based functor, lambda expression could be a light solution
+- Capture list using `[]`
+  - Pass by value
+    - Use `&` to pass by reference
+  - Captured variable cannot be modified
+    - Using `mutable` will be able to modify the value
+```cpp
+#include <iostream>
+#include <vector>
+template<typename T, typename CB>
+void ForEach(std::vector<T> v, CB ops) {
+  for (auto &x: v) {
+    std::cout << " " << ops(x);
+  }
+  std::cout << std::endl;
+}
+int main(){
+  std::vector<int> myV = {1, -3, 2, -7, -9};
+  ForEach(myV, [](auto x) { return -x;});
+  ForEach(myV, [](auto x) { return std::abs(x);});
+  int offset = 10;
+  ForEach(myV, [offset](auto x) { return x+offset;});
+  return 0;
+}
+```
+
+155. Lambda Expressions Capture List - Part II
+- Multiple captured variables: `[var, var2]() {...}`
+- Multiple captured variables as reference: `[&var, &var2]() {...}`
+- All local variables as values: `[=]() {...}`
+- All local variables as referenes: `[&]() {...}`
+- Mixed : `[=, &var]() {...}`
+- All member data : `[this]() {...}`
+
+156. Lambda Expressions Capture List - Part III
+- Nested lambda expression
+```cpp
+#include <iostream>
+int main(){
+  [](int x) {
+    x*=2;
+    [](int x) {
+      std::cout << x << std::endl;
+    }(x); // note operator (x)
+  }(5); // note operator (5)
+  return 0;
+}
+```
+- This prints `10`
+
+156. Generalized Lambda Capture (C++14)
+- Allows the creation of new variables in the capture clause
+- The type of variables are deduced from the expression
+- Those variables must be initialized
+- Use `&` for a reference
+- Syntax
+  - `[var=expression](args)`
+  - `[&var=expression](args)`
+  - May need mutable to have file stream as captured list
+```cpp
+std::ofstream outf("file.txt");
+auto write = [out=std::move(out)](int x) mutable {
+  out << x ;
+};
+```
+157. Assignment
+- Create lambda expressions & their equivalent function objects for the following
+  - T Max(T,T)
+    - Lesson: When a functor is created, a constructor may not be necessary. 
+    - Lesson: when template is used, the instantiated object must specify the type used
+```cpp
+template<typename T> struct fnctr1 {
+  //T Max() {}; // No constructor necessary
+  T operator() (T a, T b) const {
+    return a > b ? a : b;
+  }
+};
+...
+  fnctr1<float> a_Max;
+```
+- Sample code
+```cpp
+#include <iostream>
+#include <vector>
+#include <iterator>
+template<typename T> struct fnctr1 {
+  //T Max() {}; // No constructor necessary
+  T operator() (T a, T b) const {
+    return a > b ? a : b;
+  }
+};
+template<typename T> struct fnctr2 {
+  bool operator() (T a, T b) const {
+    return a > b ? true : false;
+  }
+};
+template<typename T> struct fnctr3 {
+  bool operator() (T a, T b) const {
+    return a > b ? false : true ;
+  }
+};
+template<typename T> struct fnctr4 {
+  std::pair<T,T> operator() (T begin, T end) {
+    auto minX = begin;
+    auto maxX = begin;
+    for (auto it = begin; it != end; ++it) {
+      if (*minX > *it) minX=it;
+      if (*maxX < *it) maxX=it;
+    }
+    std::make_pair(minX, maxX);
+  }
+};
+int main() {
+  // Assignment 1
+  auto l_Max = [](auto a, auto b) {
+    return a > b ? a : b;
+  };
+  auto l_Greater = [](auto a, auto b) {
+    return a > b ? true : false;
+  };
+  auto l_Less = [](auto a, auto b) {
+    return a > b ? false : true;
+  };
+  auto l_MinMax = [](auto a, auto b) {
+    auto minX = a;
+    auto maxX = a;
+    for (auto it=a; it !=b; ++it) {
+      std::cout << *it << " " << *minX << " " << *maxX << std::endl;
+      if (*minX > *it) minX = it;
+      if (*maxX < *it) maxX = it;      
+    }
+    return std::make_pair(minX, maxX);
+  };
+  fnctr1<float> a_Max;
+  fnctr2<float> a_Greater;
+  fnctr3<float> a_Less;
+  std::vector<int> myV = {1, 5, 2, 11, -3, 7};
+  
+  std::cout << a_Max(1.1f, 2.5f) << std::endl;;
+  std::cout << l_Max(1.1f, 2.5f) << std::endl;
+  std::cout << a_Greater(1.1f, 2.5f) << std::endl;;
+  std::cout << l_Greater(1.1f, 2.5f) << std::endl;
+  std::cout << a_Less(1.1f, 2.5f) << std::endl;;
+  std::cout << l_Less(1.1f, 2.5f) << std::endl;
+  fnctr4<int> a_MinMax;
+  auto rv =   a_MinMax(begin(myV), end(myV));
+  std::cout << *(rv.first) << " " << *(rv.second) << std::endl;
+  return 0;
+}
+```
+- Q: a_MinMax() is not compiled. Why?
+
+## Section 14: STL
+
+159. Introduction
+- Container types
+  - Sequence: array, vector, list, deque, forward_list
+  - Associative: set, multiset, map, multimap
+  - Unordered: unordered_set, unordered_multiset, unordered_map, unordered_multimap
+
+160. std::array(C++11)
+- Thin wrapper ver C-style static array
+- Cannot grow
+- Iterator
+  - Pointer like objects
+  - Accesses elements by their poistion
+  - Created through begin() and end() functions in the containers
+    - Never dereference end(), as it is outside of the container
+  - To access value, use `*itr`
+
+161. std::vector
+- Not good for insertion/deletion
+
+162. std::deque
+- Reads as `dek`
+- Similar to vector but good at adding/removal from the beginning
+- Not good for insertion/deletion
+
+163. std::list & std::forward_list (C++11)
+- std::list
+  - Two way linked list
+  - Good at insertion/deletion
+  - No random access
+    - Has to go through linked lists (use for-loop or while-loop)
+  - Size info using .size()
+- std::forward_list
+  - One way linked list
+  - No size info
+    - Use distance algorithm. No member function for size
+```cpp
+forward_list<int> l2 = { 6, 11, 0 };
+int size2 = distance(l2.begin(), l2.end());
+```
+
+164. Sequence Containers Demo code
+
+165. std::set & std::multiset
+- Implemented as a binary tree
+- Stored as sorted order (ascending or descending)
+- Value acts as a key
+- Fast search. .find() function returns an iterator
+```cpp
+std::set<int> s {8,2, 1,9};
+...
+auto itr = s.find(2);
+if (itr != s.end()) {
+  std::cout << "Found \n";
+} else {
+  std::cout << "Not found\n";
+}
+```
+- No random access
+- Cannot modify elements directly
+- Multiset allows copy
+
+166. std::map & std::multimap
+- Implemented as a binary tree
+- key vs map
+- key cannot be modified directly
+- If the key doesn't exist, it will allocate with default value per type
+
+168. Unordered containers (C++11) - part I
+- Unordered containers
+  - Associative containers implemented as hash tables
+    - Hash table/hash map: data structure which maps keys to value through hash functions which compute an index
+  - Values are hashed and stored in undefined order
+  - Fast search , insertion/deletion but performance may vary over time
+- std::unordered_set: stores values
+- std::unordered_map: stores pairs
+- iterators are constant
+
+169. Unordered containers (C++11) - part II
+
+170. std::hash (C++11)
+- For user-defined containers
+
+172. Big O notation & Performance of containers
+- Complexity
+  - Amount of time taken by an algorithm to run for input size of *n*
+  - Commonly Big-O notation is used
+    - O(1) : constant time
+    - O(n) : linear
+- Ex) Vector:
+  - Index using []: O(1)
+  - push_back/pop_back: O(1)
+  - insert/erase/find: O(n)
+  - sort: O(n*log*n)
+- Summary
+  - Use vector for random access, but not insertion & deletion
+  - Use deque when elements need to be inserted/removed from both ends
+  - Use list if frequent insertions and deletions are required
+  - Use associative containers if loopkup/search is important
+  - Use unordered containers if elements need not to be ordered
+  - When sorting is required, use set/map
+
+173. Algorithms -Part I
+- STL provides algorithms for common tasks
+  - Sorting, removing, searching, numeric, ...
+  - More optimized than handwriting
+  - Some algorithms can be customized through user-defined operations
+  - Some containers provide specialized versions of algorithms
+  - Use <algorithm> header
+
+174. Algorithms -Part II
+- Combine algorithm functions with lambda for more flexible programming
+```cpp
+#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+class Employee {
+  int m_Id;
+  std::string m_Name;
+  std::string m_pLang;
+public:
+  Employee(const int i, const std::string &Name, const std::string &Lang) 
+  : m_Id(i), m_Name(Name), m_pLang(Lang) { }
+  ~Employee() = default;
+  const std::string & GetName() const {
+    return m_Name;
+  }
+  const std::string & GetProgramLang() const {
+    return m_pLang;
+  }
+  const int GetId() const {
+    return m_Id;
+  }
+};
+int main() {
+  std::vector<Employee> emp { Employee {101, "John", "C++"}, 
+                              Employee {201, "Amy", "Java"},
+                              Employee {301, "Bob", "C++"} };
+  // sorting by Name
+  std::sort(emp.begin(), emp.end(), [] (const auto &e1, 
+                                        const auto &e2) {
+    return e1.GetName() < e2.GetName(); }); 
+  for (const auto &el : emp) {
+    std::cout << el.GetId() << std::endl;
+  }
+  // Count how many C++
+  auto cppCount = std::count_if(emp.begin(), emp.end(), [](const auto &el) {
+    return el.GetProgramLang() == "C++";  }  );
+  std::cout << "C++ users = " << cppCount << std::endl;
+  // Print user id for C++
+  std::for_each(emp.begin(), emp.end(), [](const auto &el) {
+    if (el.GetProgramLang() == "C++") 
+      std::cout << "C++ user id= " << el.GetId() << std::endl;
+  });
+  return 0;
+}
+```
+
+175. Container Changes in C++11 - Part I
+- Brace list initialization
+- emplace_back()
+  - variadic member function
+  - creates an object (if it is a container of a Class) then push_back. Same as push_back() for primitive or an existing class object
+
+176. Container Changes in C++11 - Part II
+- emplace_back() will invoke copy construction for a class object
+  - To enable move constructor, not copy constructor, the move operator in the class must be declared with `noexcept`
+
+177. Container Changes in C++11 - Part III
+- vector size() vs capacity()
+  - capacity() is larger than size() usually
+  - shrink_fit() will match capacity() with size()
+- std::string supports `.data()` like vector container  
+ 
+178. Container Changes in C++11 - Part IV
+
+179. Container Changes in C++11 - Part V
+- emplace_hint() might be faster than emplace()
+
+180. STL Project
+- Contact info: First/last name, Primary phone number, secondary phone number, email id, address, company, group(friends, family, coworker, acquaintance)
+- Display all contacts sorted by first or last name (users may choose)
+- Display only first name with primary number
+- Display contacts from the same company only
+- Display contacts based on group type
+- Allow contact search by first or last name
+- Display count of contacts by company and group
+```cpp
+#include <iostream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <algorithm>
+class Contact {
+  std::string m_firstName, m_lastName, 
+       m_primPhoneNumber, m_secPhoneNumber,
+       m_emailId, m_address, m_company;
+  std::unordered_map<std::string,std::string> m_group;
+public:
+  Contact() = default;
+  Contact(std::string firstName, std::string lastName,
+          std::string primPN,    std::string secPN, 
+          std::string emailId,   std::string address,
+          std::string company)
+          : m_firstName(firstName), m_lastName(lastName), 
+       m_primPhoneNumber(primPN), m_secPhoneNumber(secPN),
+       m_emailId(emailId), m_address(address), m_company(company) {}
+  ~Contact() = default;
+  const std::string GetFName() const { return m_firstName; }
+  const std::string GetLName() const { return m_lastName; }
+  const std::string GetPrimaryPhoneNumber() const { return m_primPhoneNumber; }
+  const std::string GetCompany() const { return m_company; }
+};
+int main() {
+  std::vector<Contact> myV {
+    Contact {"Clark", "Kent", "0123", "456", "abc@alpha", "1 street", "IBM"},
+    Contact {"James", "Khan", "314", "753", "xyz@beta", "2 street", "AWS"},
+    Contact {"Shaun", "Dave", "789", "135", "pi@alpha", "3 street", "IBM"} 
+    };
+  // sorting
+  std::sort(myV.begin(), myV.end(), [] (const auto & e1, const auto &e2) { 
+    return e1.GetFName() < e2.GetFName();});
+  for (auto &el : myV) std::cout << el.GetFName() << std::endl;
+  std::sort(myV.begin(), myV.end(), [] (const auto & e1, const auto &e2) { 
+    return e1.GetLName() < e2.GetLName();});
+  for (auto &el : myV) std::cout << el.GetLName() << std::endl;
+  // display
+  std::for_each(myV.begin(), myV.end(), [](const auto &el) {
+    std::cout << el.GetFName() << " " << el.GetPrimaryPhoneNumber() << std::endl;
+  });
+  // Find same company only
+  std::for_each(myV.begin(), myV.end(), [] (const auto &el) {
+    if (el.GetCompany().compare("IBM") == 0) std::cout << el.GetFName() << " " 
+      << el.GetLName() << " " << el.GetCompany() << std::endl;
+  });
+  return 0;
+}
+```
+
+## Section 15: C++ Concurrency
 
 182. Concurrency basics
-- Provides better user experience at GUI
+- Can provide better user experience at GUI
 
 183. Thread creation
 - callable: pointer, function, lambda function ...
@@ -1732,7 +2442,543 @@ int main() {
 - Note that the promise (inp) was sent even before it was assigned
     - .set_value() was applied to setup the value later
 
-199. Propagating exception
+193. Propagating exception
 - Instead of inp.set_value(), use inp.set_exception
     - `data.set_exception(std::make_exception_ptr(ex))` for `std::exception &ex`
 
+## Section 16: C++17 Core Language Features
+
+195. Deprecated and removed features
+
+196. Changes
+- Direct list initialization
+  - Will deduce the type for one element
+  - Not working for multiple elements
+```cpp
+auto a{1}; //OK
+auto b {1,2}; // ill-formed
+```
+
+197. Attributes
+- `[[deprecated("...")]]` :  text that could be used to explain the rationale for deprecation and/or to suggest a replacing entity 
+  - Ref: https://en.cppreference.com/w/cpp/language/attributes/deprecated
+- `[[nodiscard]]` :  text that could be used to explain the rationale for why the result should not be discarded 
+  - Return value must be stored
+  - Ref: https://en.cppreference.com/w/cpp/language/attributes/nodiscard
+
+198. Feature test macros
+- `__has_include` (C++17)
+  - Can check if a header is available for inclusion or not
+  - Can track the progress of partial implementation of new C++ standards
+  - Can be used with `#if` & `#elif` expressions only
+
+199. if & switch with initialization
+- Enhanced if
+  - `if (initialization ; condition) { ... }`
+- Regular if:
+```cpp
+  std::string txt{"hello world"};
+  std::ofstream out {"file.txt"};
+  if (! txt.empty() ) {
+    out << txt;
+  } else {
+    out << "no text";
+  }
+```
+- Enhanced if:
+```cpp
+  if (std::ofstream out {"file.txt"}; ! txt.empty() ) {
+    out << txt;
+  } else {
+    out << "no text";
+  }
+```
+- Note that `out` is not visible outside of if-else statement
+- We may need to check if `out` is nullptr or not 
+```cpp
+  if (std::ofstream out {"file.txt"}; out && !txt.empty() ) {
+    out << txt;
+  } else {
+    //out << "no text"; if out is nullptr, this will crash
+    std::cout << "something happend\n";
+  }
+```
+- `switch` also can use similar initialization
+
+200. inline variables
+- Global name must be defined ONCE
+  - Or use `extern` keyword in the header file and the header file can be included in many source files
+  - `inline` (C++17) variable works similarly
+- static member data can be initialized using `inline` inside of the class
+
+201. Nested namespace
+
+202. noexcept
+- noexcept function pointer must point to another noexcept
+- Regular function pointer can point a regular or noexcept
+```cpp
+void foo() noexcept{}
+void bar() {}
+int main() {
+  // void (*p)();
+  // p = foo;// works
+  // void (*p)() noexcept;
+  // p = foo; // works
+  // void (*p)() noexcept;
+  // p = bar; // not compiled
+  void (*p)() noexcept;
+  p = foo; // works
+  return 0;
+}
+```
+
+203. constexpr Lambda
+- Lambda functions might be used to return member data of a class
+- When class object is deleted, the return value from Lambda would be null as the object is gone
+- In order to avoid such case, use `[*this]` instead of ``[this]`, having copy of class data, when class object is generated on heap (using a pointer)
+
+204. Structured Bindings
+- Allows initialization of multiple variables with the elements or members of an object
+- The object could be object of a class/struct or an array
+- For objects of classes, the member should be **public**
+- The number of variables should match with the number of elements in the object
+- Syntax
+  - `auto [variables] = object;`
+  - `<cv qualifiers> auto &[variables] = object;`
+- Lesson:
+  - For parametrized constructor with `Employee emp{ 123, "John"};`
+    - `Employee(int i, std::string name)` works OK
+    - `Employee(int i, &std::string name)` doesn't work as the "John" is R-value while `&std::string name` gets L-value
+    - `Employee(int i, const &std::string name)` will accept R-value
+```cpp
+#include <iostream>
+#include <string>
+#include <map>
+#include <vector>
+struct Employee {
+  int Id;
+  std::string Name;
+  Employee() = default;
+  Employee(int i, std::string name) : Id(i), Name(name) {}
+};
+int main() {
+  // passing by value
+  Employee emp{ 123, "John"};
+  auto [n, txt] = emp;
+  std::cout << n << " " << txt << std::endl;
+  // passing by reference  
+  auto &[i, name] = emp;
+  i++; name += " is the firstname";
+  std::cout << i << " " << name << std::endl;
+  // mapping of key vs value
+  std::map<std::string, std::string> groupdata {
+    {"firstK", "Piano"}, {"secondK", "Guitar"}
+  };
+  for (auto &[key, value] : groupdata) {
+    std::cout << key << " " << value << std::endl;
+  }
+  // array to individual variables
+  //std::vector<int> myV {11, 33, 22}; not working for structured bindings
+  int myV[] {11,22,33};
+  auto [a,b,c] = myV;
+  std::cout << a << " " << b << " " << c << std::endl;
+  return 0;
+}
+```
+
+205. Expression Evaluation Order
+- Some C macro
+  - Ref: https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros?view=msvc-170
+  - `__func__` : the name of the enclosing function
+  - `__FUNCSIG__` : function signature for MSVC
+  - `__PRETTY_FUNCTION__` : function signature for GCC
+    - Ref: https://stackoverflow.com/questions/48857887/pretty-function-in-visual-c
+  - `__DATE__` : compilation date of the current source file
+  - `__FILE__` : the name of the current source file
+  - `__LINE__` : the line number
+  - `__STDC__` : 
+```cpp
+#include<iostream>
+void Print() {
+std::cout << "__func__:" << __func__ << std::endl
+  << "__PRETTY_FUNCTION__: " << __PRETTY_FUNCTION__ << std::endl
+  << "__DATE__:" << __DATE__  << std::endl
+  << "__FILE__:" << __FILE__  << std::endl
+  << "__LINE__:" << __LINE__  << std::endl
+  << "__STDC__:" << __STDC__  << std::endl;
+}
+// << "__FUNCSIG__:" << __FUNCSIG__  << std::endl // for MSVC
+int main() {
+  Print();
+  return 0;
+}
+```
+- Screenshot
+```bash
+$ g++ -std=c++17 205_order/main.cc 
+$ ./a.out 
+__func__:Print
+__PRETTY_FUNCTION__: void Print()
+__DATE__:Apr 30 2022
+__FILE__:205_order/main.cc
+__LINE__:7
+__STDC__:1
+```
+
+206. Mandatory Copy Elision - part I
+- https://stackoverflow.com/questions/12953127/what-are-copy-elision-and-return-value-optimization
+- Optimization technique to reduce the number of object creation
+
+207. Mandatory Copy Elision - part II
+
+## Section 17: C++17 Template Features
+
+208. Class Template Argument Deduction (CTAD)
+- Allows argument deduction for functions/classes
+- Compiler generated 
+  - Ex) `std::pair p3 {2,5};` integer type is deduced by the compiler
+- User-defined CTAD
+```cpp
+template<typename T> 
+class Data {
+  public:
+  Data(const T &t) {...}
+}
+Data(const char *) -> Data<std::string>; // this is user-defined CTAD
+```
+- Gives a hint to compiler when `const char *` argument is loaded, `std::string` type will be used
+
+209. Folding Basics
+- Applies a binary operator to a list of values recursively
+  - Results are combined recursively, building up the final result
+  - Variadic template may do similar processes over a template pack
+    - But folding overloads with recursion
+
+210. Fold Expressions - Unary folds
+- Unary right fold: (pack op ...)
+- Unary left fold: (... op pack)
+- Binary right fold: (pack op ... op init)
+- Binary left fold: (init op ... op pack)
+```cpp
+#include <iostream>
+// base function
+auto Sum() {  return 0; }
+// variadic template function
+template<typename T, typename ...Args>
+auto Sum(T a, Args...args) { return a + Sum(args...);}
+//Unary right fold
+template<typename...Args>
+auto Sum_UR(Args...args) { return (args + ...);}
+//Unary left fold
+template<typename...Args>
+auto Sum_UL(Args...args) { return (... + args);}
+int main() {
+  std::cout << "Variadic: " << Sum(5,4,3,2,1) << std::endl;
+  std::cout << "Unary right fold: " << Sum_UR(5,4,3,2,1) << std::endl;
+  std::cout << "Unary left fold: " << Sum_UL(5,4,3,2,1) << std::endl;
+  return 0;
+}
+```
+- As there is no initial value in unary folding, empty argument will generate compiler error: `Sum_UR()` will not compile
+
+211. Fold Expressions - Binary folds
+```cpp
+//Binary right fold
+template<typename...Args>
+auto Sum_BR(Args...args) { return (args + ... + 0);}
+//Binary left fold
+template<typename...Args>
+auto Sum_BL(Args...args) { return (0+ ... + args);}
+```
+- operators: 
+  - https://en.cppreference.com/w/cpp/language/fold (+ - * / % ^ & | = < > << >> += -= *= /= %= ^= &= |= <<= >>= == != <= >= && || , .* ->*)
+  - Logical AND (&&). The value for the empty pack is true
+  - Logical OR (||). The value for the empty pack is false
+  - The comma operator (,). The value for the empty pack is void()
+```cpp
+#include <iostream>
+template<typename... Args>
+bool AnyOfEven(Args...args) { return(... || (args%2 == 0));}
+template<typename... Args>
+bool AllOfEven(Args...args) { return(... && (args%2 == 0));}
+template<typename... Args, typename Predicate>
+bool AnyOfP(Predicate  p, Args...args) { return(... || p(args));}
+int main() {
+  std::cout << "Any even? " << AnyOfEven(7,8,9) << std::endl;
+  std::cout << "All even? " << AllOfEven(7,8,9) << std::endl;
+  std::cout << "Any even? " << AnyOfP([](int x){return x%2==0;}, 7,8,9) << std::endl;
+  return 0;
+}
+```
+
+212. Fold Expressions - Recap
+- Variadic template will generate assembly functions for every recursion but folding will generate only one function
+
+213. Type Traits Suffixes
+
+214. if constexpr - part I
+- Compile-Time if
+  - Allows the condition of an if statement to be evaluated at compile time
+  - Also discards branches of an if statement at compile time
+  - Evaluation condition must be a constant condition
+  - if constexpr can be used inside functions, not outside
+    - Cannot be used globally
+    - Cannot replace preprocessing grammar
+- Sample code
+  - We may print a value from Print() function
+  - In order to print the value when a pointer is loaded, we may print `*value` instead of `value`
+  - For array, we may do for-loop, printing each element 
+```cpp
+#include <iostream>
+#include <type_traits>
+template<typename T>
+void Print(const T& value) {
+  if  (std::is_pointer_v<T>) {
+    std::cout << *value << std::endl;
+  } else if  (std::is_array_v<T>) {
+    for (auto v: value) std::cout << v<< ' ';
+    std::cout << std::endl;
+  } else {
+    std::cout << value << std::endl;
+  }
+}
+int main() {
+  int value {5};
+  Print(value); // will break at *value and for loop
+  Print(&value); // will break at for loop
+  int arr[] = {4,3,2,1}; // this is OK for every condition
+  Print(arr);
+  return 0;
+}
+```
+- This code will not be compiled as some data type (integer, pointer) is not valid in certain conditional statements
+- Injecting `if constexpr`, the compiler will generate binary functions for each conditional statement, overloading different cases of argument types. Other branches are not compiled and invalid evaluation is avoided
+```cpp
+#include <iostream>
+#include <type_traits>
+template<typename T>
+void Print(const T& value) {
+  if constexpr (std::is_pointer_v<T>) {
+    std::cout << *value << std::endl;
+  } else if constexpr (std::is_array_v<T>) {
+    for (auto v: value) std::cout << v<< ' ';
+    std::cout << std::endl;
+  } else {
+    std::cout << value << std::endl;
+  }
+}
+int main() {
+  int value {5};
+  Print(value);
+  Print(&value);
+  int arr[] = {4,3,2,1};
+  Print(arr);
+  return 0;
+}
+```
+
+215. if constexpr - part II
+
+## Seciton 18: C++17 Standard Library Components
+
+216. std::optional - part I
+- Why we need this: https://devblogs.microsoft.com/cppblog/stdoptional-how-when-and-why/
+
+217. std::optional - part II
+
+218. std::optional - part III
+
+219. std::variant - part I
+- A type safe replacement for union type
+- Uses the storage of the largest member
+- Members are destroyed outside of scope
+- Throws `bad_variant_access` on invalid access
+```cpp
+#include <iostream>
+#include <variant>
+int main() {
+  try {
+    std::variant<int, std::string> v{ "hello"};
+    auto val = std::get<std::string> (v);
+    val = std::get<1>(v);
+    auto activeIndex = v.index();
+    std::cout << val << " at " << activeIndex << std::endl;
+    val = std::get<0>(v); // will throw Unexpeted index
+  } catch(std::exception &ex) {
+    std::cout << "Exception: " << ex.what() << std::endl;
+  }
+  return 0;
+}
+```
+
+220. std::variant - part II
+
+221. std::variant - part III
+
+222. std::any
+- Type safety
+  - C++ is a strongly typed language
+  - Objects are declared with a specific type and that cannot be changed later
+  - In some cases, we may require an object that should hold values of different types
+  - This is difficult to achieve in C++, except using void*
+    - But not type safe
+    - No way to know the type
+    - Cannot access the value in a type-safe way
+    - Need to manage the object lifetime
+- std::any (C++17)
+  - A wrapper that can hold value of any arbitrary type
+  - Replacement of void*
+  - Contains both value & its type
+  - The value is accessed through `any_cast<>`
+  - May allocate memory on the heap
+  - Throws exception of type `bad_any_cast` wrong type access
+```cpp
+#include <iostream>
+#include <string>
+#include <any>
+struct Employee {
+  int Id;
+  std::string Name;
+  Employee() = default;
+  Employee(int i, std::string name) : Id(i), Name(name) {}
+  ~Employee() { std::cout << "Destructed\n";}
+};
+int main() {
+  std::any v = 5;
+  std::cout << std::any_cast<int>(v) << std::endl;
+  //v = "Hello"; // this will produce bad_any_cast in the any_cast<> as this is char *
+  v = std::string("Hello");
+  std::cout << std::any_cast<std::string>(v) <<std::endl;
+  v = Employee(432,"J Johnson"); // destructed called as copy constructor was made
+  v.reset(); // destructed due to reset()
+  v = 5;
+  auto &v2 = std::any_cast<int&> (v);
+  v2 = 100;
+  std::cout << std::any_cast<int> (v) << std::endl; // prints 100 as referenced
+  return 0;
+}
+```
+223. std::string_view - part I
+- Read-only 
+- Can be accessed through .data()
+- Will not work with C string functions as it might not have a null terminator
+- Do not return string view to string from a function
+- Do not assign temporary strings to string views
+- Avoid as class members
+
+224. std::string_view - part II
+
+225. Filesystem - path
+```cpp
+#include <iostream>
+#include <filesystem>
+namespace fs = std::filesystem ;
+void UsingPath() {
+	fs::path selectedPath{R"(E:\Data\Material\C++\Assignments.docx)"} ;
+	std::cout << selectedPath << std::endl;
+	std::cout << selectedPath.string() << std::endl;
+	selectedPath.remove_filename() ;
+	selectedPath /= "newfile" ;
+	if (selectedPath.has_root_name()) {
+		std::cout << "root name\t = " << selectedPath.root_name().string() << std::endl;
+	}
+	if (selectedPath.has_root_path()) {
+		std::cout << "root path\t = " << selectedPath.root_path().string() << std::endl;
+	}
+	if (selectedPath.has_root_directory()) {
+		std::cout << "root directory\t = " << selectedPath.root_directory().string() << std::endl;
+	}
+	if (selectedPath.has_parent_path()) {
+		std::cout << "parent path\t = " << selectedPath.parent_path().string() << std::endl;
+	}
+	if (selectedPath.has_relative_path()) {
+		std::cout << "relative path\t = " << selectedPath.relative_path().string() << std::endl;
+	}
+	if (selectedPath.has_filename()) {
+		std::cout << "filename\t = " << selectedPath.filename().string() << std::endl;
+	}
+	if (selectedPath.has_stem()) {
+		std::cout << "stem part \t = " << selectedPath.stem().string() << std::endl;
+	}
+	if (selectedPath.has_extension()) {
+		std::cout << "extension\t = " << selectedPath.extension().string() << std::endl;
+	}
+}
+```
+
+226. Filesystem - directory_entry
+```cpp
+void TraversingDirectory(std::string_view file) {
+	fs::path currentPath{file} ;
+	std::vector<fs::directory_entry> dir_entries{} ;
+	for(const auto & dir_entry : fs::directory_iterator{currentPath}) {
+		dir_entries.push_back(dir_entry) ;
+	}
+	std::partition(dir_entries.begin(), dir_entries.end(), [](const fs::directory_entry & de) {
+		return de.is_directory() ;
+	}) ;
+	for(const auto &dir_entry : dir_entries) {
+		switch(const auto &p = dir_entry.path() ;/*dir_entry.status().type()*/ fs::status(p).type()) {
+		case fs::file_type::directory:
+			std::cout << "[DIR]\t" << p.string() << std::endl; 
+			break ;
+		case fs::file_type::regular:
+			std::cout << '\t' << p.string() << '\t' << dir_entry.file_size() << std::endl; 
+			break ;
+		}
+	}
+}
+```
+
+227. Filesystem - directory functions
+- `create_directory()` returns true/false by the status 
+
+228. Filesystem - Permissions
+```cpp
+void demo_perms(fs::perms p)
+{
+    std::cout << ((p & fs::perms::owner_read) != fs::perms::none ? "r" : "-")
+              << ((p & fs::perms::owner_write) != fs::perms::none ? "w" : "-")
+              << ((p & fs::perms::owner_exec) != fs::perms::none ? "x" : "-")
+              << ((p & fs::perms::group_read) != fs::perms::none ? "r" : "-")
+              << ((p & fs::perms::group_write) != fs::perms::none ? "w" : "-")
+              << ((p & fs::perms::group_exec) != fs::perms::none ? "x" : "-")
+              << ((p & fs::perms::others_read) != fs::perms::none ? "r" : "-")
+              << ((p & fs::perms::others_write) != fs::perms::none ? "w" : "-")
+              << ((p & fs::perms::others_exec) != fs::perms::none ? "x" : "-")
+              << '\n';
+}
+void Permissions(std::string_view file) {
+	fs::path file_to_modify{file} ;
+	if(!fs::exists(file_to_modify)) {
+		std::cout << "Path does not exist = >" << file_to_modify.string() << std::endl ;
+		return ;
+	}
+	auto perm = fs::status(file_to_modify).permissions() ;
+	demo_perms(perm) ;
+	std::cout << "Changing permissions\n" ;
+	fs::permissions(file_to_modify,fs::perms::owner_write, fs::perm_options::add) ;
+	perm = fs::status(file_to_modify).permissions() ;
+	demo_perms(perm) ;
+```
+
+229. Parallel Algorithms - part I
+- C++17 provides overloads to STL algorithms with parallel execution
+  - Using execution policy
+- Execution policies
+  - All execution policies existing in <execution> header and in std::execution namespace
+  - Each of the policy is an individual type
+  - sequenced_policy - seq
+  - parallel_policy - par
+    - Might use threads from a thread pool
+  - parallel_unsequenced_policy - par_unseq 
+    - Execution may be parallellized, vectorized or migrated across threads    
+
+230. Parallel Algorithms - part II
+
+231. Parallel Algorithms - part III
+- Exception handling
+  - If an element access function throws an exception which is not handled, all parallel algorithms call std::terminate
+    - In the sequential execution as well
+  - If we need to handle exception, use standard algorithm, which is non-prallel
+  - Parallel algorithm may throw std::bad_alloc if they fail to acquire memory during execution
