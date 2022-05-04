@@ -18,14 +18,14 @@ template<typename T> struct fnctr3 {
   }
 };
 template<typename T> struct fnctr4 {
-  std::pair<T,T> operator() (T begin, T end) {
+  std::pair<T,T> operator() (typename std::vector<T>::iterator begin, typename std::vector<T> end) {
     auto minX = begin;
     auto maxX = begin;
     for (auto it = begin; it != end; ++it) {
       if (*minX > *it) minX=it;
       if (*maxX < *it) maxX=it;
     }
-    std::make_pair(minX, maxX);
+    return std::make_pair(*minX, *maxX);
   }
 };
 
@@ -68,6 +68,6 @@ int main() {
   // std::cout << findX(begin(myV), end(myV))[3] << std::endl;
   // //std::cout << begin(myV)[0] << std::endl;
   //auto rv = l_MinMax(myV.begin(), myV.end());
-  std::cout << *(rv.first) << " " << *(rv.second) << std::endl;
+  std::cout << rv.first << " " << rv.second << std::endl;
   return 0;
 }
