@@ -29,6 +29,20 @@ template<typename T> struct fnctr4 {
   }
 };
 
+struct fnctr5 {
+template<typename T> 
+auto operator() (typename std::vector<T>::iterator begin, typename std::vector<T> end) {
+  // Note that template<> is located for the operator overloading, not for struct. No template deduction is necessary
+  // Return typs can be handled by auto  
+    auto minX = begin;
+    auto maxX = begin;
+    for (auto it = begin; it != end; ++it) {
+      if (*minX > *it) minX=it;
+      if (*maxX < *it) maxX=it;
+    }
+    return std::make_pair(*minX, *maxX);
+  }
+};
 
 int main() {
   // Assignment 1
@@ -69,5 +83,7 @@ int main() {
   // //std::cout << begin(myV)[0] << std::endl;
   //auto rv = l_MinMax(myV.begin(), myV.end());
   std::cout << rv.first << " " << rv.second << std::endl;
+  fnctr5 a2_MinMax; // No template deduction
+  auto rv2 =   a_MinMax(begin(myV), end(myV)); // works OK
   return 0;
 }
