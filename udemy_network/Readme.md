@@ -786,3 +786,448 @@ PING 192.168.1.1 (192.168.1.1) 56(84) bytes of data.
   - Each router hop reduces a packet's time to live (TTL) field by 1 until it reaches 0. Then the packet is dropped
   - Layer 2 frames do not have a TTL field, and frames can circulate endlessly in a loop (broadcast storm)
 - STP can prevent broadcast storm, which yields network outage
+
+89. STP port states
+- STP - the backstory
+  - Ethernet bridge: a legacy networking device that made forwarding decision in SW, based on destination MAC addresses
+  - Ethernet switch: a modern networking device that makes forwarding decisions in HW, based on destination MAC addresses
+- The Time to Live (TTL) issue
+- STP Port States
+  - 4 Questions
+    - Who is the root bridge?
+      - The switch with the lowest Bridge ID
+      - Bridge ID (BID): Priority 2 bytes + MAC address 6 bytes
+    - What are the root ports?
+      - The one (and only one) port on a non-root Bridge that is closest to the root bridge, in terms of cost
+    - What are the designated ports?
+      - The one (and only one) port on each segment that is closes to the root bridge in terms of cost
+    - What are the blocking (non-designated) ports?
+      - A port that is administratively enabled, but is not a root port nor a designated port
+
+90. STP example
+- How to build a STP topology
+
+91. STP Convergence Times
+```
+         DP (SW1) DP
+       / Root Bridge \
+      /               \
+    RP                RP
+(SW1)                   (SW3)
+    DP ---------------BLK
+```
+- Whne DP(SW1)---RP (SW3) is broken
+  - Blocking (20sec)
+  - Listening(15sec)
+  - Learning (15sec)
+  - Forwarding
+    - Total 50 sec delay then BLK of SW3 becomes RP
+
+92. STP Variants
+- Common Spanning TRee (CST)
+  - Used by IEEE 802.1D
+  - The same STP topology is ued by all VLANs
+- PVST+
+  - Per-VLAN Spanning Tree (PVST)
+  - Each VLAN run its own instance of STP
+  - '+' indicates that the switches are interconnected via 802.1Q trunks
+- MSTP
+  - Multiple Spanning Trees Protocol
+  - IEEE 802.1s
+- RSTP
+  - Rapid Spanning Tree Protocol
+  - Typically converges b/w a few milliseconds and about 6 seconds
+  - IEEE 802.1w
+
+93. Link Aggregation
+- Connects mutiple ports b/w switches
+  - Allows higher bandwidth b/w switches
+  - Provides load-balancing
+  - Creates redundant links
+- PAgP: Port Aggregation Protocol
+- LACP: Link Aggregation Control Protocol
+
+94. Port mirroring
+- Capturing packets b/w client and server for investigation
+- How to sniff the packet?
+  - Wireshark
+- Gets copies of the frame
+
+95. Distributed switching
+- Collpased core vs Three-tier designs
+- Three-tier architecture
+  - Core layer: connecting multiple buildings. Partial mesh topology
+  - Distribution layer: SW-SW in access layer
+  - Access layer: SW-PCs. Star topology
+- Collapsed core: Two tier topology. For small building
+  - Collapsed core layer
+  - Access loayer
+- Spine-leaf design for data centers
+  - Spine switches
+  - Leaf switches
+  - Nodes
+  - Spine Switches + Leaf switches corresponds to a single logical switch
+
+## Section 10: Module 8: Demisytifying Wireless Networks
+
+96. Demisytifying Wireless Networks
+
+97. Introduction to Wireless LANs
+- Ad hoc wireless LAN
+  - Wireless client ~~~ wireless client
+  - Bluetooth
+- Infrastructure wireless LAN
+  - Through access point
+    - Acess Point is connected to a switch  
+- Mesh wireless LAN
+- Autonomous APs
+  - Can provide seamless connection over multipe APs but they must have same configuration
+- Lightweight APs
+  - Doesn't need admin every AP
+  - WLAN controller configures one time and the configuration can be distributed to other APs
+  - LWAPP: Lightweight Access Point Protocol
+  - CAPWAP: Control and Provisioning of wireless access points
+
+98. WLAN Antennas
+- Radiation Pattern
+  - H plane: xy plane
+  - E plane : including z axis
+- Omnidirectional antennas
+  - Designed to propagate singal in all direcitons
+  - Lower gain with a less focused path
+  - Better for broad coverage
+- Directional antennas
+  - Higher gain with a very focused path
+  - Better for specifically directing coverage
+  - Patch antenna
+  - Yagi antenna
+  - Dish antenna
+
+99. Wireless Range Extenders
+- Regenerates client singals into AP
+- Ranges are extended
+
+100. WLAN Frequencies and Channels
+- Wireless frequency bands
+  - 2.4 GHz band
+    - 14 different channels
+    - 5MHz b/w channels
+    - Exception 12 MHz b/w 13 & 14
+    - Channel 14 only allowed in Japan for 802.11b
+    - Due to interference, actual signals are 1-3, 4-8, 9-13, each 22Mhz range
+  - 5 GHz band
+
+101. WLAN Standards
+
+|standard | year | freq | max band width | transmission method |
+|---------|----|------|----------------|------------|
+|802.11   | 1997 | 2.4GHz | 1 or 2 Mbps | DSSS for FHSS|
+|802.11a  | 1999 | 5GHz | 54 Mbps | OFDM |
+|802.11b  | 1999 | 2.4GHz | 11 Mbps | DSSS |
+|802.11g  | 2003 | 2.4GHz | 54 Mbps | OFDM |
+|802.11n  | 2009 | 2.4 and 5GHz | 150 Mbps | OFDM |
+|802.11ac | 2014 | 5GHz | 3.5 Gbps | OFDM |
+|802.11ax | 2019 | 2.4 and 5GHz | 9.6 Mbps | OFDMA |
+
+- DSSS (Direct-Sequence Spread Spectrum)
+  - A single bit can be sent using a 2MHz frequency range
+  - Using Barker 11 Coding, 1bit is transmitted along with 10 extra bits (called chips), which provide protection from interference
+  - A symbol is the sequence of 11 bits being sent to encode a single bit
+  - Used in the older IEEE 802.11b wireless standard
+- FDM (Frequency Division Multiplexing)
+- Orthogonal Frequency Division Multiplexing (OFDM): a data transmission technique that sends different signals using different subchannels, where adjacent subchannels are transmitted at right angles to one another
+- Quadrature Amplitude Modulation (QAM)
+  - 16-QAM: identifies 16 different targets in a constellation, each of which present 4bits
+  
+| standard | QAM | Bits represented | Supported channel widths|
+|----------|-----|------------------|-----------------------|
+| 821.11n  |   64-QAM |  6bits | 20/40 MHz|
+| 821.11ac |  256-QAM |  8bits | 20/40/80/160 MHz|
+| 821.11ax | 1024-QAM | 10bits | 20/40/80/160 MHz|
+
+- Beamforming
+  - Combination of constructive/destructive interference
+- SU-MIMO (Single-User Multiple Input, Multiple Output)
+- MU-MIMO (Multi-User Multiple Input, Multiple Output)
+- Orthogonal Frequency Division Multiple Access (OFDMA)
+  - IEEE 802.11ax (WiFi6)
+  - Target Wake Time (TWT): schedules when a client can send and receive, resulting in less latency and power savings
+  - BSS Coloring: allows signals for one SSID on a specific channel to be distinguished from singals for a different SSID using the same channel by **coloring** that traffic
+
+102. Regulartory Impacts of Wireless Channels
+- Standard Bodies
+  - FCC (North America)
+  - MKK (Japan)
+  - ETSI (Europe)
+
+## Section 11: Module 9 - Addressing Networks with IPv4
+
+103. Addressing Networks with IPv4
+
+104. Binary numbering
+- 10.1.2.3 => 00001010.00000001.00000010.00000011
+
+105. Binary practice exercise #1
+
+106. Binary practice exercise #2
+
+107. IPv4 Address Format
+- Classless Inter-Domain Routing (CIDR) Notation: Identifies the number of bits in an IPv4 address's network address, using a forward slash followed by the number of binary 1s in the subnet mask
+  - Ex) 10.1.2.3/8
+
+| Dotted Decimal Notation | 10 | 1 | 2 | 3 |
+|-------------------------|----|---|---|---|
+| IP address (in binary)  | 00001010 | 00000001 | 00000010 | 00000011 |
+|Subnet Mask | 11111111 | 00000000 | 00000000 | 00000000 |
+|| Network Bits | | Host Bits ||
+
+- 10.1.2.3: IP address with no subnet information
+- 10.1.2.3/8: IP address with Prefix notation
+- 10.1.2.3 255.0.0.0 : IP address with Dotted Decimal Notation
+
+- IPv4 Address Format
+
+| Address class | Value in first octet | classful mask (dotted decimal) | classful mask (prefix notation) |
+|---|--|--|--|
+|A | 1-126   | 255.0.0.0     | /8  |
+|B | 128-191 | 255.255.0.0   | /16 |
+|C | 192-223 | 255.255.255.0 | /24 |
+|D | 224-239 | N/A           | N/A |
+|E | 240-255 | N/A           | N/A |
+
+- Note that first octet 127 is excluded
+  - Loopback IPv4 Address: 127.0.0.1
+  - A device can attempt to connect to itsefl by attempting to connect to 127.0.0.1
+
+108. Public vs. Private IPv4 Addresses
+- Private IPv4 Addresses
+  - Will have overlapping numbers among different private groups as numbers are not infinite
+
+| Address Class |  Address Range | Default subnet Mask |
+|--|--|--|
+|A | 10.0.0.0 - 10.255.255.255 | 255.0.0.0|
+|B | 172.16.0.0 - 172.31.255.255 | 255.255.0.0 |
+|B | 169.254.0.0 - 169.254.255.255 | 255.255.0.0 |
+|C | 192.168.0.0 - 192.168.255.255 | 255.255.255.0 |
+
+- Automatic Private IP Addressing (APIPA): automatically configures an IPv4 address (beginning 169.254) for clients that neither had an IPv4 address statically  assigned nor dynamically obtained an IPv4 address
+
+109. IPv4 Unicast, Broadcast, and Multicast
+- When a server sends video data into SW then to many PCs
+  - IPv4 Unicast
+    - One-to-one
+    - Not scalable
+  - IPv4 Broadcast
+    - One-to-all
+    - There might be some PCs not need video dat
+  - IPv4 Multicast
+    - One-to-many
+    - Identifies PCs need video
+
+110. The need for subnetting
+
+| Address class | Assignable IP addresses |
+|--|--|
+|A| 16,777,214|
+|B| 65,534|
+|C| 254 |
+
+- Avoid wasting addresses
+  - For network 192.0.2.0/24, if there are two servers only, using .1 & .2, then 252 addresses are wasted
+  - For groups of private address ranges, we can find the overlapping address and bits, and can narrow down the range of subnetting
+- An IPv4 address contains 2 components: an IP address and a subnet mask. A subnet mask is used with an IP address to differentiate between the network and host portions of an address. A subnet mask is also used to define what addresses can be used within a given range. 
+
+111. Calculating Available subnets
+- Class A network: has a number in the range 1-126 in the first octet and a default subnet mask of /8
+- Class B network: 128-191 in the first octet and a default subnet mask of /16
+- Class C network: 192-223 and /24
+- Ex)
+  - A subnet mask of 255.255.255.224 is applied to a Class C network of 192.168.1.0/24
+  - Network class? C
+  - Natural Mask (netmask) ? /24
+  - Subnet mask? 255.255.255.224
+    - 224 => 11100000
+    - 255.255.255.224 = 11111111.11111111.11111111.11100000
+      - **Count the number of 1** => 27 => /27
+  - Borrowed bits? => 3
+  - Number of subnets? 2^3 = 8
+
+112. Calculating Available hosts
+- 2^h - 2
+  - h: number of host bits
+  - why subtract 2?
+    - Where all bits are 0
+    - Where all bits are 1
+- Ex)
+  - A subnet mask of 255.255.255.224 is applied to a Class C network 192.168.1.0/24
+  - How many hosts can be assigned in each subnet?
+    - Number of 1s in subnet mask? => 27
+    - How many host bits? 32-27 = 5
+    - Number of hosts? 2^5 - 2 = 30
+
+113. Subnetting Practice Exercise #1
+- Your company is assigned the 172.20.0.0/16 network. Use a subnet mask that will accommodate 47 subnets while simultaneously accommodating the max. number of hosts per subnet. What subnet mask will you use?
+  - This is Class B
+  - Implying 47 different departments in a building
+  - 2^6 = 64 > 47 > 2^5 = 32. Therefore we need 6 borrowed bits
+  - This is Class B and netmask is /16
+  - 16 + 6 = 22 bit subnet mask: 11111111.11111111.11111100.00000000
+    - /22 or 255.255.252.0
+    - 8+2=10. 2^10 - 2 = 1022?
+
+114. Subnetting Practice Exercise #2
+-  Your company is assigned the 172.20.0.0/16 network. Use a subnet mask that will accommodate 100 hosts per subnet while maximizing the number of available subnets
+  - This is Class B
+  - To have 100 hosts, 7 host bits (2^7-2 = 126 > 100)
+  - 32-7 = 25. /16 is Class B and we need 9 borrowed bits
+  - 11111111.11111111.11111111.10000000 or /25 or 255.255.255.128
+
+115. Calculating Usable Ranges of IPv4 Addresses
+- Find the first usable IP address by adding a binary 1 to the network address
+- Find the last usable IP addresss by subtracting a binary 1 from the Directed Broadcast Address
+
+116. Subnetting Practice Exercise #3
+- You want to apply a 26-bit subnet mask to 192.168.0.0/24 network address space. What are the subnets and what are the usable address ranges in each subnet?
+  - 26-24 = 2 borrowed bits
+  - 11111111.11111111.11111111.11000000 or /26 or 255.255.255.192
+  - Interesting octet is 4th octet
+  - Block size = 256 - 192 = 64  
+  - To determine the first subnet, set borrowed bits + host bits as 0
+    - 192.168.0.0/26
+  - Determine additional subnets by adding the block size in the interesting octet
+    - 192.168.0.0
+    - 192.168.0.64
+    - 192.168.0.128
+    - 192.168.0.192
+
+| subnet | directed broadcast | Usable IP ranges |
+| -- | -- | --|
+|192.168.0.0   | 192.168.0.63  | 192.168.0.1 - 192.168.0.62    |
+|192.168.0.64  | 192.168.0.127 | 192.168.0.65 - 192.168.0.126  |
+|192.168.0.128 | 192.168.0.191 | 192.168.0.129 - 192.168.0.190 |
+|192.168.0.192 | 192.168.0.255 | 192.168.0.193 - 192.168.0.254 |
+
+## Section 12: Module 10 - Addressing Networks with IPv6
+
+117. Addressing Networks with IPv6
+- Typically written in hexadecimal number
+
+118. Hexadecimal Numbering
+- 198 = 16*12+6 = 0xC6
+- 0x2F = 16*2 + 15 = 00101111 in nibbles
+- 0xBC = 16*11 + 12 = 10111100
+
+119. IPv6 Address Format
+- Prefix + Host
+- 32 hexadecimal numbers
+- 8 "quartets" of 4 hexadecimal digits separated by a colon
+- One hexadecimal digit represents 4 binary bits
+- 128 bits total length
+- No broadcasts
+  - But all node multicast
+- No fragmentation (MTU discovery performed for each session)
+
+120. Shortening an IPv6 Address
+- Omit leading zeros in a quartet
+  - Represents consecutive quartets containing all zeros with a double colon (only once per address)
+  - 23A0:201A:00B2:0000:0000:0000:0400:0001/64 => 23A0:201A:B2::400:1/64
+
+121. IPv6 Address shortening exercise
+- 2000:0000:0000:0000:1234:0000:0000:000B/64 => 2000::1234:0:0:B/64
+
+122. IPv6 Global Unicast
+- 001 (3bits) + Global Routing Prefix (45bits) + subnet ID (16bits) + Interface ID (64bits)
+- Addressing starts with 2000::/3
+
+123. IPv6 Multicast
+- Joining multicast group
+- 11111111(8bits) + Flags (4bits) + Scope (4bits) + Group ID (112bits)
+- Flags 
+  - 4 bits: ORPT
+  - 0: reserved and set to 0
+  - R: if set to a 1, P and T must also be set to 1. This would indicate that a Rendezvous Point (RP) address was embedded in the address
+- Scope Examples
+  - 1: Interface-Local scope
+  - 2: Link-Local scope
+  - 4: Admin-Local scope
+  - 5: Site-Local scope
+  - 8: Organization-Local Scope
+  - E: Global Scope  
+- FF02::1 All nodes in the link-local scope
+- FF02::2 All routers in the link-local scope
+
+124. IPv6 Link Local
+- FE80::/10
+
+125. IPv6 Unique Local
+- Starts with FC00::/7
+- Not routable in the public internet
+- Similar to IPv4 private addresses
+- L bit set as 1
+
+126. IPv6 Loopback
+- ::1
+  - localhost
+  - 127 Zeros
+  - 127.0.0.1 of IPv4
+  - Can be used to verify the IPv6 stack is operating on a device
+
+127. IPv6 Unspecified
+  - `::`
+  - All zeros over 128 bits
+  - Used for a client's source address when sending an neighbor solicitation message
+  - Used for a client's source address when sending a Router solicitation message
+
+128. IPv6 Solicted-Node Multicast
+- Begins with FF02::1:FF/104
+- Address ends with the last 24 bits of the corresponding IPv6 address
+- Used instead of an IPv4 Address Resolution Protocol (ARP) broadcast
+- Also used for Duplicate Address Detection (DAD)
+
+129. EUI-64 Address
+- 64bit Extended Unique Identifier (EUI-64)
+- Uses the MAC address of an interface to create 64bit interface ID
+  - But a MAC address is only 48 bits long
+  - Split the 48 bit MAC address in the middle
+  - Insert FF.FE in the middle
+  - Replace dot to colon delimiter
+  - Convert the first 2 hex digits to binary
+  - Flip the 7th bit
+
+130. IPv6 Autoconfiguration
+
+131. IPv6 Traffic Flows
+- Unicast: one to one
+- Multicast : one to many
+- Anycast: one to nearest
+
+132. Dual Stack
+- When IPv4 and IPv6 coexist
+- The PC must have IPv4 and IPv6 address (dual stack)
+
+133. Tunneling IPv6 through an IPv4 network
+- Sending IPv6 packet encapsulated in IPv4 packet
+- Only needed during a network's migration to IPv6
+
+134. IP Address Mangement (IPAM)
+
+## Section 13: Module 11 - Explaining IP Routing
+
+135. Explaining IP Routing
+- Following packets
+
+136.  Packet flow in a routed network
+
+137. Static and default routes
+
+138. Routing protocols
+
+139. RIP
+
+140. OSPF
+
+141. EIGRP
+
+142. BGP
+
+143 Subinterfaces
