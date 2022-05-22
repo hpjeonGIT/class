@@ -1678,11 +1678,12 @@ PING 192.168.1.1 (192.168.1.1) 56(84) bytes of data.
 - DNS Reflected: Spoofs their IP address to be the IP address of the victim and sends a large number of DNS queries to multiple publicly available DNS servers
 
 164. On-path Attacks
-- Aka Man-in-the-middle Attack
+- Aka Man-in-the-middle (MiTM) Attack 
 - A malicious user injects inside a communication flow b/w two systems, enabling them to intercept or manipulate that flow's traffic
   - MAC Flooding: attacker floods switch with so many fake MAC addresses, the switch's MAC address table fills to capacity
   - ARP Poisoning: Unsolicated ARP replies are sent to the victim, claiming the attacker's MAC address is the MAC address of the victim's default gateway
     - Now the attacker can intercept the traffic
+    - Dynamic ARP Inspection (DAI) is used to inspect an ARP to make sure it is legitimate. VLANs, Port Security, and ACLs can’t prevent ARP poisoning
   - Rogue DHCP: The attacker's DHCP server tells the victim that the IP address of the default gateway is the attacker's IP address
     - DHCP snooping: Assigns specific ports for DHCP server 
 
@@ -1696,35 +1697,332 @@ PING 192.168.1.1 (192.168.1.1) 56(84) bytes of data.
 - Shoulder surfing
 
 167. Other Common Attacks
+- Insider threat: a malicious user that is a part of an organization
+- Logic bomb: a malicious piece of code that can perform some destructuve action based on a time or an event
+- Rogue access point: a wireless AP installed on a network without proper authorization
+- Evil twin: a rogue AP appearing to be a legitimate wireless AP
+- War driving: Driving around a geographical area in an attempt to find WiFi hotspots
+- Malware
+- DNS poisoning
+- Ransomware
+- Spoofing: when malicious users falsify their MAC or IP addresses, in an attempt to conceal their identity
+- Deauthentication: an attack where a malicious user sends a deauthentication frame along a spoofed IP address to wireless AP, which causes a legitimate user to be dropped from the wireless network, making the client to reconnect to rogue access point
+- Brue force
 
 168. Common Defense Strategies
+- Best practice
+  - Change default credentials
+  - Avoid Common passwords
+  - Upgrade firmware
+  - Patch and update
+  - Perform file hashing
+  - Disable unnecessary services
+  - Use secure protocols
+  - Generate new keys
+  - Disable unused ports
+    - IP ports
+    - Device ports
+- Mitigating network threats
+  - Signature management: keep attack signatures current on devices, such as IDS and IPS sensors
+  - Device hardening: apply a collection of best practice procedures to secure network devices
+  - Change the native VLAN: configure a trunk's untagged VLAN to a non-default value
+  - Define privileged user accounts : instad of a single admin account
+  - File Integrity Monitoring
+  - Role separation: assign different sets of permissions to different categories of users
+  - Honeypot deployment: configure a host that does not contain sensitive information
+    - A honeynet is a computer network that intentionally has vulnerabilities embedded into it for the sole reason of analyzing how an attacker would attempt to breach a network. Honeynets contain honeypots (A single system intentionally made unsecure to bait attackers)
+  - Penetration test (aka pen testing)
+  - Network segmentation: subdivide a network into different segments using VLANs and DMZs
+  - Defense in Depth: multiple layers of security, as opposing to have a single security solution
+  - Zero trust: no user is given a default set of permissions
+  - Least privilege: users are given the minimum set of privileges that still allows them to perform their work
 
 169. Switch Port Defense
+- MAC flooding attack
+  - Attackers send series of MAC addresses, yielding MAC table overflow
+  - Port security: sets allow max addresses to have  
 
 170. Access Control Lists
+- ACLs
+  - Can permit or deny traffic
+  - Can be applied inbound or outbound
+  - Processed top-down
+  - Implicit deny any statement at the bottom
+  - Can be standard or extended
+  - More specific ACEs placed near the top
+  - Standard ACLs placed near destination
+  - Extended ACLs placed near source
 
 171. Wireless Security Options
+- Authentication: username/passwd
+- Encryption
+- Wired Equivalent Privacy (WEP)
+  - The security standard specified by IEEE802.11
+  - RC4 encryption, which is trivial to crack
+- Primary modes of key distribution
+  - Two modes of key distribution
+  - Pre-shared key (PSK) model (aka personal mode): matching keys are preconfigured on wireless clients and AP
+    - Pre-shared key might be stolen
+  - Enterprise mode: credentials from an authentication server (eg RADIUS server), then session key is provided during a permitted session
+- Enhanced Encryption Protocols
+  - Temporal Key Integrity Protocol (TKIP)
+    - Improved encryption, compared to WEP
+  - Advanced Encryption Standard (AES)
+    - Significantly stronger than TKIP
+- Enhanced Security Protocols
+  - WiFi Protected Access (WPA)
+    - Used TKIP for enhanced encryption
+    - Upgraded security in SW without requiring new HW
+    - Used a longer initialization vector, 24 bits -> 48 bits
+  - WiFi Protected Access II (WPA2)
+    - A requirement for WiFi certification in 2006
+    - Required support for AES
+    - Required more processing power than WPA
+    - Susceptible to KRACK vulnerability (found in 2016)
+    - CCMP (Counter Mode Cipher Block Chaining Message Authentication Code Protocol) is an encryption protocol used with WPA2. CCMP replaced the functionality of TKIP (Temporal Key Integrity Protocol) in WPA2.
+  - WiFi Protected Access III (WPA3)
+    - Uses 192 bit AES encryption (for Enterprise mode)
+    - Uses Protected Management Frames (PMFs) to prevent other devices from spoofing management frames
+    - Ues Simultaneous Authentication of Equals (SAE) to require interaction with the network before generating a key, to prevent dictionary attacks
+    - Prevents eavesdropping on public network (or networks with pre-shared keys)
+    - Replaces WiFi Protected Setup (WPS) with Device Provisioning Protocol (DPP)
+- Isolating Wireless Access
+  - Guest Network Isolation: isolates wireless clients from an organization's internal network, while allowing the guest clients to access one another and the internet
+  - Wireless Client Isolation: Isolates wireless clients from any other local network devices, with exceptions such as a DHCP server and default gateway
+- MAC filtering
+  - Only allows a device on a network if its MAC address is allowed
+- Geofencing: can use a mobile device's GP location to permit or deny netowork access, or to grant or revoke network permissions
+  - In shopping malls
+- Captive portal: redirects users to connect to a network page where the user might be prompted to provide information or agree to terms of use
 
 172. Extensible Authentication Protocols (EAPs)
+- PC -> AP (authenticator) -> Authentication server (RADIUS)
+  - PC/AP will get a session key
+- Extensible Authentication Protocol - transport layer security (EAP-TLS)
+  - One of the original authentication method by IEEE 802.1X
+  - Authenticates end users and RADIUS servers using a Message Authentication Code derived from the digital certificates of the end users and RAIDUS servers
+  - Requires a Certificate Authority (CA)
+  - Allows a client to login using their credentials stored in a MS Active Directory database
+- EAP-FAST (Flexible Authentication via Secure Tunneling)
+  - A client uses a Protected Access Crendential (PAC) to request access to the network
+  - Consists of two or three phases:
+    - Phase 0 (optional): A client's PAC is dynamically configured
+    - Phase 1: The client and AAA server use the PAC to establish a TLS tunnel
+    - Phase 2: The client sends user information across the tunnel
+- Protected Extensible Authentication Protocol (PEAP)
+  - PEAP version 0 (EAP-MSCHAPv2): use MS Active Directory to store user credentials
+  - PEAPv1/EAP-GTC (Generic Token Card): Uses generic databases (LDAP and OTP) for authentication
 
 173. Authentication Servers
+- AAA
+  - Authentication: who are you?
+  - Authorization: what are you allowed to do?
+  - Accounting: what did you do?
 
+| TACACS+ | RAIDUS|
+|---------|-------|
+| Cisco-Proprietary| Industry-standard|
+| TCP | UDP|
+| Separates AAA functions | Combines AAA functions|
+|Two-way challenge response | One-way challenge Response|
+| Encrypts entire packet | Only encrypts password|
+
+- Kerberos
+  - Key Distribution Center (KDC)
+    - Authentication Server
+    - Ticket Granting Server
+  - Client -> sends username/passwd to Authentication server through hash -> Authentication server sends encrypted key to Ticket granting server -> Ticket granting allows the client to use file server
+  - Clients never decrypts key
+  - Some implementations use public key certificates
+- Single Sign-on
+  - Lightweight Directory Access Protocol (LDAP)
+  
 174. User Authentication
+- Multi-factor authentication
+  - What a user KNOWS: passwd
+  - What a user HAS: key card, text message
+  - What a user IS: biometric scanner
+  - WHERE a user is: location/GPS signal
+  - What a user DOES: drawing pattern, clicking a button
+  - IEEE 802.1X
+  - Network access control
+    - Posture validation: applies a set of requirements to the login process
+      - Minimum version of anti-virus SW before joining the network
+      - OS version/patch status
+  - MAC filtering
+  - Captive Portal: wifi in a hotel, asking name/id
 
 175. Physical Security
+- Detection
+  - Motion detection
+  - Asset Tracking Tags
+  - Video surveillance
+  - Tamper detection : lock
+- Prevention
+  - Badges
+  - Biometrics
+  - Training
+  - Access Control Vestibule (aka mantrap)
+  - Locks: doors, racks, cabinets
+  - Smart lockers
+- Equipment disposal
+  - Erase configuration/factor reset
+  - Sanitize device
+  - Darik's Boot and Nuke (DBAN): an open source application that securely erases hard drives
+  - Hammering
 
 176. Forensic Concepts
+- Network Forensics
+  - Detect suspicious activity
+  - Incident investigation
+- Cateogries
+  - Catch-it-as-you-can
+    - Needs large storage
+  - Stop, look, listen
+- Tools
+  - wireshark.org
+  - syslog
 
 177. Securing STP
+- Switch port protection
+  - BPDU guard: a Cisco feature that shuts down a port if a BPDU is received
+    - PortFast
+  - Root guard: a switchport feature used to prevent another switch on the port which the feature is enabled on from changing its root bridge
 
 178. Router Advertisement (RA) Guard
+- SLAAC(Stateless Address Auto-Configuration): IPv6 feature that allows a client to dynamically determine its IPv6 address using EUI-64 address and a router advertisement (RA) message containing its network Prefix
+- Potential threats
+  - Convincing a client that attacker is the default router
+  - Sending incorrect SLAAC information to client
+  - RA guard
 
 179. Securing DHCP
+- DHCP snooping
+  - Blocks untrusted DHCP offer
 
 180. IoT security concerns
+- Many IoT devices were not designed with security in mind
+- IoT devices might use weak encryption to preserve processing power
+- Many users leave the default passwords on IoT devices
+- SW patches might not be automatically deployed
+- IoT security best practice
+  - Use strong passwd
+  - Place IoT devices on their own VLAN
 
 181. Cloud Security
-
+- TLS tunnel 
+- VPN connection
+- Private WAN
+- CASB (Cloud Access Security Broker): SW sits b/w users and cloud resources
+  - Monitors traffic to enforce security polices
+  - Generates alerts if any malicious activity is detected
+  
 182. IT Risk Management
+- Five steps Model
+  - Identify Attack Targets
+  - Rank Data
+  - Determine Risk Levels
+    - Risk level = Probability of breach \* Financial impact of breach
+  - Set Risk Tolerances
+- Monitor
+- Terms
+  - Threat vs Vulnerability
+  - Posture Assessment
+  - Penetration Testing
+  - Process and Vendor Assessments
 
 ## Section 17: Module 15: Monitoring and Analyzing Networks
+
+183. Monitoring and analyzing networks
+
+184. Device Monitoring Tools
+- Security Information and Event Management (SIEM)
+  - Collection of HW/SW
+- Syslog
+- Interface statistics
+- CPU and memory statistics
+- Monitoring Processes
+  - Log reviewing
+  - Port scan
+  - Vulnerability scan
+  - Patch management
+  - Compare with baseline data
+  - Packet analysis 
+    - wiresharks.org
+  - Netflow Collector
+
+185. SNMP
+- Simple Network Management Protocol
+  - SNMP Manager
+  - SNMP agent: sits on devices
+  - Management Information Base (MIB)
+  - Object Identifier (OID)
+  - Trap Notification
+  - Query/respond
+- SNMP security options
+  - version 1: Community strings
+  - version 2c: Community strings
+  - version 3: Encryption, Integrity Checking, and Authentication Services
+
+186. Remote Access Methods
+- Site-to-Site VPN : office environment
+- Client-to-Site VPN : home or hotel
+- Internet Protocol Security (IPsec)
+  - May need configuration on all devices
+- Secure Sockets Layer (SSL)
+- Transport Layer Security (TLS)
+  - Web-browser already has security layers
+- Datagram Transport Layer Security (DTLS)
+- Remote Desktop Protocol (RDP)
+- Virtual Network Computing (VNC)
+- http vs https
+- ftp or tftp vs sftp or ftps
+
+187. Environment Monitoring
+- Temperature & humidity
+  - Network Operations Center
+  - Environmental Monitor: sends an alert through email, text, ...
+- Power
+  - Uninterruptible Power Supply (UPS)
+  - Generator
+
+188. Wireless Network Monitoring
+- Wireless Survey SW: superimposes a heat map on a physical map
+
+## Section 18: Module 18: Examining Best Practices for Network Administration
+
+189. Examining Best Practices for Network Administration
+
+190. Safety Procedures
+
+191. Wiring Management
+- Intermediate Distribution Frame (IDF): A common location within a building in which cables from nearby offices terminate (wiring closet)
+- Main Distribution Frame (MDF)
+- Minimum bend radius - do not bend optical cable too much
+- Writing Best practice
+  - Plenum cables: fire-resistant
+  - Avoid spaghetii wirting
+  - Use correct cable lengths
+  - Label both ends of the cable
+
+192. Power Management
+
+193. Rack Management
+
+194. Change Control
+
+195. High Availability
+
+196. Cloud High Availability
+
+197. Active-Active vs. Active-Passive
+
+198. Disaster Recovery
+
+199. Standards, Polices, and Rules
+
+200. Documentation
+
+201. Site Survey
+
+## Section 19: Module 17: Troubleshooting Networks
