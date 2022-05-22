@@ -1133,11 +1133,11 @@ PING 192.168.1.1 (192.168.1.1) 56(84) bytes of data.
   - 23A0:201A:00B2:0000:0000:0000:0400:0001/64 => 23A0:201A:B2::400:1/64
 
 121. IPv6 Address shortening exercise
-- 2000:0000:0000:0000:1234:0000:0000:000B/64 => 2000::1234:0:0:B/64
+- `2000:0000:0000:0000:1234:0000:0000:000B/64` => `2000::1234:0:0:B/64`
 
 122. IPv6 Global Unicast
 - 001 (3bits) + Global Routing Prefix (45bits) + subnet ID (16bits) + Interface ID (64bits)
-- Addressing starts with 2000::/3
+- Addressing starts with `2000::/3`
 
 123. IPv6 Multicast
 - Joining multicast group
@@ -1215,19 +1215,516 @@ PING 192.168.1.1 (192.168.1.1) 56(84) bytes of data.
 
 135. Explaining IP Routing
 - Following packets
+- Connects networks, route between them (InterVLAN routing), and possibly provide internet connectivity. This device is usually a multilayer switch or a router. Routing within the same VLAN and Intranet communication doesn’t require a default gateway. 
 
 136.  Packet flow in a routed network
+- How it routes packets in the network?
+- ARP (Address Resolution Protocol)
+  - A Data Link protocol used to dynamically map an IP address to a MAC addres
+- Flow:
+  - In addition to source/destination IP, MAC address of the corresponding server is necessary
+  - PC -> R1 -> R2 -> server
+  - Packets leave the PC and arrives at R1
+  - R1 does ARP and finds R2
+  - R2 does ARP and finds the server
+- Static vs dynamic routing protocol
 
 137. Static and default routes
+- Static routes
+  - May not scale well
+  - Administratively added routes
+  - Very Believable (AD=1)
+  - Specfies a next hop to reach a network
+- Default routes
+  - Doesn't have large routing table
+  - Can be static or dynamic
+  - Used if a router doesn't have a more specific route entry
 
 138. Routing protocols
+- RIP: a distance Vector routing protocol. not very scalable
+- OSPF: a link state routing protocol
+- EIGRP: an advanced Distance Vector routing protocol
+- BGP: a path vector routing protocol. 
+- Consideration
+  - Scalability
+  - Vendor interoperability
+  - Familarity
+  - Convergence
+- Administrative distance (AD)
+  - Directly connected : 0
+  - Static : 1 (by default)
+  - EIGRP : 90
+  - OSPF : 110
+  - RIP : 120
+- IGP (Interior Gateway Protocol)
+  - RIP
+  - OSPF
+  - EIGRP
+- Autonomous System (AS):network under a single administrative control
+- EGP (Exterior Gateway Protocol)
+  - BGP
+- Routine protocol comparision
 
-139. RIP
+| Routing Protocol | Distance-vector | Linke-state | Path-Vector|
+|--|--|--|--|
+| RIP   | v |   |    |
+| OSPF  |   | v |    |
+| EIGRP | v |   |    |
+| BGP   |   |   |  v |
+
+- Hop count: The metric used by RIP that measures the number of routers that must be crossed to reach a destination network
+- Link state database: maintained by  OSPF that contains information about network topology
+- Dijkstra Algorithm: assigns costs to links and calculates the shortest path b/w any two points in a network
+
+139. RIP (Routing Information Protocol)
+- RIPv1
+  - Not on modern network anymore. Early 90s
+  - Broadcasts routing info to every devices like printers, PCs, ...
+    - Every 30 sec
+  - No VLSM Support
+  - IPv4 only
+- VLSM (Variable Lenght Subnet Mask) support: the ability of a routing protocol to advertise a network with a non default subnet mask
+- RIPv2
+  - Multicasts (224.0.0.9)
+  - VLSM support
+  - Authentication
+  - IPv4
+- RIPng
+  - Multicasts (FF02::9)
+  - IPv6
+  - Uses hop count: 19 as infinite
+  - Full & triggered updates
+  - Split horizon: prevents a routing protocol from an advisement out the inteface on which it was received
+    - Prevents hop count contamination by broken devices
+  - Poison Reverse: sends an advisement with an infinite metric for an unreachable route
+    - When AD becomes 16 due to contamination then removes it from the table
 
 140. OSPF
+- Most of corporate network
+- One of Link state routing protocols
+  - Every router has a map of the network
+- Open shortest path first (OSPF) characteristics
+- Open standard
+- Establishes adjacencies with other routers
+- Sends Link State Advertisement (LSAs) to other routers in an area
+- Constructs a Link State Database from received LSAs
+- Runs the Dijkstra Shortest Path First (SPF) Algorithm to determine the shortest path to a network
+- Attempts to inject the best path for each network into a router's IP routing tabe
+- OSPF terminology
+  - Hello: A protocol used to discover OSPF neighbors and confirm reachability
+  - Link State Advertisement (LSA): information a router sends and receives about network reachability (not a packet)
+  - Link State Update (LSU): a packet that carries LSAs
+  - Link State Request (LSR): Used by a router to request specific LSA
+  - Link State Acknowledgement (LSAck) : Used by a router to confirm it received an LSU
+- Neighborship vs Adjacencies
+  - Neighbors are routers that:
+    - Reside on the same network link
+    - Exchange hello messages
+  - Adjacencies are routers that:
+    - Are neighbors
+    - Have exchanged Link State Updates (LSUs) and Database Description (DD) packets
+    - No. of adjacencies = n*(n-1)/2 where n is the number of routers
+      - Not scale well
+    - Need for the designated routers (DR)
+      - Backup Designated router (BDR) as well
+      - Adjacencies only need to be formed with DR and BDR
+- Can divide OSPF ares into multiple OSPF
+  - Applies Dijkstra algorithm to each area
+  - Area Border Routers (ABRs)
+  - Multi-area OSPF networks must have a backbone area numbered 0 or 0.0.0.0
+- OSPF cost
+  - cost = Reference BW / Interface BW
+  - The default reference BW is 100,000,000 bits per second (100Mbps)
+```
+               R2
+             /    \
+   100 Mbps /      \ 100 Mbps
+           /        \
+         R1 --------- R3
+         |  10 Mpbs  |
+100 Mbps |           | 100 Mpbs
+         |           |
+        SW1         SW2 
+         |           |
+        PC1         PC2
+```
+- Cost for R1-R2-R3 = 1 + 1 + 1 
+- Cost for R1-R3 = 10 + 1 = 11
 
 141. EIGRP
+- Enhanced Interior Gateway Routing Protocol
+- Fast convergence
+- Scalable
+  - > 500 routers
+- Load balancing over unequal cost links
+- Classless (VLSM support)
+- Communicates via multicast (224.0.0.10 or FF02::A)
+- Was Cisco-proprietary but now open
+- EIGRP Metric calculation
+  - Bandwidth
+  - Delay
+  - Reliability
+  - Load
+  - MTU
+- EIGRP path selection
+  - Feasible Distance (FD): EIGRP's metric to a network
+  - Successor route: EIGRP's preferred route to a network
+  - Feasible Successor Route: EIGRP's backup route to a network
+- EIGRP Feasibility condition: An EIGRP route is a feasible successor route if the Reported Distance (RD) from our neighbor is less that the Feasible Distance (FD) of the successor route
+- Feasibility Condition
+```
+              R2
+         /          \
+ 10,000 /            \ 5,000
+       /              \ 
+      /                \
+   R1 ------ R3 ------- R5 ------10.1.1.0/24
+      \ 7,000   10,000 /   1000
+       \              /
+ 4,000  \            / 17,000
+         \          /
+             R4
+```
+- B/W R1 and 10.1.1.0/24:
+
+| Neighbor |RD      |FD     | (Feasible) Successor?|
+|----------|--------|-------|----------------------|
+| R2       | 6,000  | 16,000| Successor |
+| R3       |11,000  | 86,000| Feasible Successor |
+| R4       |18,000  | 22,000|  X |
+
+- If R2 and R3 crash, R1 will send a query through the network and R4 will be connected - but not immediatly
 
 142. BGP
+- Border Gateway Protocol
+- Internet b/w organization
+- Autonomous System (AS)
+- Exterior Gateway Protocol (EGP)
+- Forms neighborships
+- Neighbor's IP address is explicitly configured
+- A TCP session is established b/w neighbors
+- Advertises Address Prefix and Length (called Network Layer Reachability information(NLRI))
+- Advertises a collection of Path attributes used for path selection
+- Path vector routing protocol
+- BGP path attributes
+  - Weight
+  - Local Prefernce
+  - Originate
+  - AS Path Length
+  - Origin type
+  - Multi-exit Discriminator (MED)
+  - Paths
+  - Router ID
 
-143 Subinterfaces
+143. Subinterfaces
+
+## Section 14: Module 12 : Streaming Voice and Video with United Communications
+
+144. Streaming Voice and Video wtih united communications
+
+145. Voice over IP
+- PBX(Private Branch Exchange)
+  - A privately owned telephone switching system
+- Tie Line (aka Tie Trunk)
+  - Interconnects privately owned telephone switching systems
+- PSTN (Public Switched Telephone Network): the worldwide telephone system, made up of an interconnection of multiple telephone companies
+- RTP (Realtime Transport Protocol)
+- Digitizing voice
+  - Nyquist theorem: 2x of the highest frequency
+- Pulse Amplitude Modulation (PAM)
+- Pulse Code Modulation (PCM)
+- Quantization Noise - background noise in PCM
+
+| Codec | Bandwidth (Payload only) | Bandwidth over Ethernet |
+|--|--|--|
+|G.711 | 64 kbps | 87.2 kbps |
+|G.729 | 8 kbps | 31.2 kbps |
+|iLBC | 13.3 or 15.2 kpbs | 28.8 or 38.4 kpbs |
+
+146. Video over IP
+- Terms to know
+  - Frames per second (fps)
+  - Refresh rate
+  - Interlaced video - a half of lines shown next frame
+  - Progressive vide
+  - Pixel
+  - Aspect ratio
+  - Compression standards:
+    - MPEG-1
+    - MPEG-2
+    - MPEG-3
+    - MPEG-4
+    - H.264 (MPEG-4 AVC)
+
+147. Unified communication networks
+
+148. Quality of Service (QoS)
+-  A feature set used to engineer or prioritize various traffic types based on classifications marked in traffic
+- When there is congestion in network
+- Buffer (aka Queue)
+  - Memory allocated by a router interface to temporarily store packets the interface is unable to send at the moment
+- Do you need QoS?
+  - Periodic congestion
+    - If you have congestion 24/7, you need better bandwidth
+- 3 Categories of QoS
+  - Best effort: Not Strict
+    - FIFO (First in First Out)
+  - DiffServ (Differentiated Services): Less Strict
+    - A collection of QoS mechanicsm that classify traffic types and assign policies to those traffic classes
+  - IntServ (Integrated Services): Strict
+    - A QoS mechanism that allows an application to reserve bandwidth for that application by using RSVP
+- Common QoS Mechanisms
+  - Classification and Marking
+  - Queuing
+  - Congestion Avoidance
+    - TCP slow start: Occurs when TCP reduces its window size because of dropped or delayed traffic segments
+    - TCP synchronization (aka Global synchronization): occurs when all TCP flows simultaneously go into TCP slow start due to a queue overflow
+    - Weighted Random Early Detection (WRED): Introduces the possibility of discard for packets with specific markings at specific queue depths
+    - Random Early Detection (RED): Introduces the possibility of packet discard, regardless of markings, at specific queue depth
+  - Policing and Shaping
+    - Traffic conditioners: a category of QoS mechanisms that limits bandwidth for a class of traffic
+  - Link Efficiency
+    - Link Fragmentation and Interleaving (LFI): a QoS mechanism that fragments large packets and interleaves smaller packets with the fragments
+
+149. QoS Markings
+- Class of Service (CoS)
+  - IEEE 802.1Q Frame: Tag Control Information Bytes
+    - PRI + CFI + VLAN ID
+      - PRI is CoS Bits
+- Type of Service (ToS) Byte
+  - Traffic Class Byte in IPv6
+  - IP Precedence : 1+2+3
+  - DSCP: 1+2+3+4+5+6
+- Differentiated Services Code Point (DSCP) Values
+- Random Early Detection (RED)
+  - Output Queue
+    - Introduces Max/Min Threshold
+
+150. QoS Traffic Shaping and Policing
+- Traffic Conditioners
+  - Shaping: Delays excess traffic rather than dropping it
+    - Used on slower speed interfaces
+  - Policing: Drops traffic rather than delaying it
+    - Used on higher speed interfaces
+- Shaping example
+  - CIR (Committed Information Rate ): Average speed over the period of second
+  - Bc (Commited Burst): Number of bits (for shaping) or bytes (for policing) that are deposited in the token bucket during a timing interval
+  - Tc (Timing Interval) = The interval at which tokens are deposited in the token bucket
+  - CIR = Bc/Tc (64,000 bps = 8000 bits / .125 sec)
+
+## Section 15: Module 13 : Virtualizing Network Devices
+
+151. Virtualizing Network Devices
+
+152. Virtualized Devices
+- Virtualized servers: shares a single NIC
+- Hypervisor: SW that can create, start, stop and monitor multiple virtual machines
+  - Type-1 (native or bare metal): Runs directly on the server's hardware, not on OS
+  - Type-2 (hosted): Runs in an traditional OS
+- Virtualization
+  - Virtual NIC: SW associated with a unique MAC address, which can be used by a VM to send/receive packets
+  - Virtual Switch: SW that can connect to other virtual switches, virtual NICs and to a physical NIC
+- Virtual services
+  - Virtual firewall
+  - Virtual router
+  - Virtual SLB (Server Load Balancer)
+
+153. Virtual IP
+- Virtual Router Redundancy Protocol (VRRP)
+  - When a gateway goes down - backup gateway?
+  - Use virtual Router associated with MAC address
+    - Can coordinate BACKUP gateway wtih advertisement interval of 1 sec
+  - Standard
+  - RFC3768
+  - Master and Backup Routers
+  - MAC Address: 0000.5e00.01XX
+  - Preempt Enabled by default
+  - Default master advertisement interval: 1sec
+  - Default Master Down Interval: 3\* Master_advertisement_interval + (256- VRR priority)/256
+  - Multicast Address: 224.0.0.18
+  - Can use interface IP address as virtual IP address
+- First-Hop Redundancy Protocol (FHRP): A protocol that allows a backup router to take over if a client's default router goes down
+
+154. Storange Area Network (SAN) Technology
+- Storage Area network (SAN): A network containing storage devices that can make those storage devices appear to be locally attached to servers, seen in places such as Data Centers. 
+- Direct-Attached Storage (DAS): Storage that is physically attached to a computer
+- Block level storage: an approach to storing and retrieving data based on a block of bytes and bits as opposed to storing and retrieving an entire file. Mail server, RDBMS, ...
+- File-level storage: an approach to storing and retrieving data based on the transfer of entire file, as opposed to transferring blocks of bytes or bits. Regular files on disk/LAN
+- NAS (network-attached storage): a network appliance that acts as a file server (file-level storage) and can be accessed over an ethernet network
+- Fibre channel (FC): a technology that allows high-speed block-level access to storage devices over an FC network (not over an ethernet network)
+  - Needs Host bus adapter, not NIC
+- Fiber channel over ethernet (FCoE)
+  - Fibre channel on ethernet
+  - Expensive solutions
+- iSCSI (Internet Small Computer System Interface): a technology that allows SCSI commands to be sent inside of IP packets, thus allowing block-level access to a remote storage device over an IP network
+
+155. Using Infiniband for SANS
+- Competing over ethernet or FC
+- FCoIB (Fibre Channel over IB)
+
+156. Cloud Technologies
+- XaaS (Anything as a Service)
+- Types of cloud servcies
+  - Public
+  - Private
+  - Hybrid
+  - Community
+- Typical Cloud Services
+  - IaaS: Infrastructure
+  - SaaS: SW
+  - PaaS: Platform. Development environment.
+  - Naas: Network. VPN
+  - Daas: Desktop
+- Elastic Provisioning: Adding/removing resources on an as-needed basis
+
+157. Accessing Cloud Services
+- How enterprise connects to Cloud Provider?
+  - Internet? Not safe
+    - VPN
+  - Private WAN
+    - MPLS
+    - Metro ethernet
+  - Intercloud exchange
+    - Selects among different cloud providers
+    - Remap services as necessary
+
+158. Infrastructure as Code (IaC)
+- Uses configuration files (or code) to
+  - Provision infrastructure devices
+    - Spinning up new servers
+    - Defining virtualized switches, routers, and firewalls
+  - Configure an existing infrastructure
+    - Defining network parameters on an infrastructure device
+    - Configuring routing protocols on a virtualized router
+  - Deploy and manage applications
+    - Install applications on servers
+    - Configure application parameters
+    - Apply updates and patches to applications
+- Sample tools
+  - Terraform
+  - puppet
+    - agents on device
+  - CHEF
+  - ANSIBLE
+    - Playbook: configuration instructions
+      - YAML format
+    - Inventory: contains a list of devices
+    - No agent required on device
+
+159. Multi-tenancy
+
+## Section 16: Module 14 : Securing a Network
+
+160. Securing a network
+
+161. General Security and availability
+- Security Goals
+  - Confidentiality
+    - Through encryption
+  - Integrity
+    - Avoid corruption/data modification
+  - Availability
+- Confidentiality
+  - Firewalls: stateful inspection
+  - Access Control Lists (ACLs)
+    - Ex) SSH, no telnet
+  - Encryption
+    - Symmetric: source/destination have symmetric (shared) key
+      - Data Encryption Standard (DES): older encryption algorithm with 56-bit key
+      - 3DES: Uses three 56-bit DES (total 168)
+      - AES (Advanced Encryption Standard): 128/192/256 bit keys
+    - Asymmetric encription: uses a pair of keys, a public key and a private key
+      - RSA (Rivest, Shamir, Adleman)
+      - Certifciate Authority (CA): a trusted third-party that can sign (ie, encrypt using the CA's private key) a device's digital certificate, allowing the recipient of the digital certificate to validate it using the CA's public key
+      - Ex) amazon.com has x.509.v3 digital certificate with public and private keys
+        1. A client wants a secure connection
+        2. Server sends digital certificate with public key
+        3. Client authenticates the certificate with the CA's public key (built in Web-browser)
+        4. Client generates a string and encrypts it with amazon.com's public key
+        5. Client sends encrypted string to amazon.com
+        6. amaonz.com decrypts the string with its private key
+- Integrity
+  - Hashing algorithms
+    - MD5 (Message Digest 5)
+    - SHA-1 (Secure Hash Algorithm 1): produces 160bit hash digest
+    - HMAC (Hash-based Message authentication code): uses a shared secret key, in conjunction with a hashing algorithm, to create a hash digest. Prevents hash modification
+- Availability
+  - The five nies
+    - 99.999 percent uptime
+    - 5min of downtime per year
+  - Sample threats
+    - Improperly Formatted Data
+    - DoS
+    - DDos
+  - Prevention
+    - OS patches
+    - IDS, IPS, and Firewall appliances
+      - Intrusion Detection System (IDS) sensor: checks incoming traffic with a database of well-known attacks
+      - Intrusion Prevention System (IPS) sensor: checks the signature of traffic with the database and stops it if detected
+        
+162. Vulnerabilities and Exploits
+- Vulnerability: a flaw in a secured system
+- Exploit: SW that can take advantage of a vulnerability
+- Common Vulnerabilities and Exploits (CVE)
+  - MITRE corporation operates the National Cybersecurity FFRDC (Federally Funded Research and Development Center)
+  - Their CVE program identifies, defines, and publishes cybersecurity vulnerabilities
+- Zero-day attack: an exploit launched against a newly discovered vulnerability, before the deveoper can patch the vulnerability
+
+163. Denial of Service Attacks
+- DoS: overwhelms the target with traffic
+- SYN Flood: initiates multiple TCP 3-way handshake but never completes them
+- UDP Flood: sends a large volume of UDP segments, and the victim cannot verify the sender's IP address
+- HTTP Flood: Sends a continuous stream of HTTP instruction (GET or POST)
+- DNS Reflected: Spoofs their IP address to be the IP address of the victim and sends a large number of DNS queries to multiple publicly available DNS servers
+
+164. On-path Attacks
+- Aka Man-in-the-middle Attack
+- A malicious user injects inside a communication flow b/w two systems, enabling them to intercept or manipulate that flow's traffic
+  - MAC Flooding: attacker floods switch with so many fake MAC addresses, the switch's MAC address table fills to capacity
+  - ARP Poisoning: Unsolicated ARP replies are sent to the victim, claiming the attacker's MAC address is the MAC address of the victim's default gateway
+    - Now the attacker can intercept the traffic
+  - Rogue DHCP: The attacker's DHCP server tells the victim that the IP address of the default gateway is the attacker's IP address
+    - DHCP snooping: Assigns specific ports for DHCP server 
+
+165. VLAN Hopping Attacks
+- Switch spoofing: attacker pretends to be an Ethernet switch and sets up a trunk carrying traffic for all VLANs
+- Double tagging: attacker adds two VLAN tags to a frame, the outer tag is a trunk's native VLAN, and the inner tag is the target VLAN
+
+166. Social Engineering Attacks
+- Phishing
+- Tailgaiting (Piggybacking)
+- Shoulder surfing
+
+167. Other Common Attacks
+
+168. Common Defense Strategies
+
+169. Switch Port Defense
+
+170. Access Control Lists
+
+171. Wireless Security Options
+
+172. Extensible Authentication Protocols (EAPs)
+
+173. Authentication Servers
+
+174. User Authentication
+
+175. Physical Security
+
+176. Forensic Concepts
+
+177. Securing STP
+
+178. Router Advertisement (RA) Guard
+
+179. Securing DHCP
+
+180. IoT security concerns
+
+181. Cloud Security
+
+182. IT Risk Management
+
+## Section 17: Module 15: Monitoring and Analyzing Networks
