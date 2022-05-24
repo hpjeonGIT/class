@@ -2006,23 +2006,228 @@ PING 192.168.1.1 (192.168.1.1) 56(84) bytes of data.
   - Label both ends of the cable
 
 192. Power Management
+- UPS
+- SPS: mechanically switches to battery at outage. Might not be acceptable for some devices.
 
 193. Rack Management
+- Rack options
+  - 2-Post
+  - 4-Post
+  - Rails
+  - Lockable
+- Rack management
+  - Optimize cooling
 
 194. Change Control
+- Did anything change?
+- Change control system
+  - Team members must be aware of each other's change
 
 195. High Availability
+- The 5 nies of availability
+  - 99.999%
+  - 5 min per year
+- Fault tolerance
+  - Might impact performance
+  - Increases complexity
+- Multiple ISPs for internet access
 
 196. Cloud High Availability
+- Tier 1: 99.671% availability, 24hrs/year
+- Tier 2: 99.741% availability, 22hrs/year
+- Tier 3: 99.982% availability, 1.6hr/year
+- Tier 4: 99.995% availability, 20.6min/year
 
 197. Active-Active vs. Active-Passive
+- From HQ to multiple ISPs
+  - Active(ISP1)-Active(ISP2): higher througput
+  - Active(ISP1)-Passive(ISP2): ISP2 as a backup
+- First-Hop Redundancy Protocol (FHRP): a protocol that can provide redundancy to a subnet's default gateway
+  - Hot Standby Router Protocol (HSRP): active-passive
+    - Hello every 3 sec
+  - Virtual Router Redundancy Protocol (VRRP):  ative-passive
+    - Advertisement every 1 sec
+  - Gateway Load Balancing Protocol (GLBP): active-active
+    - Active Virtual Gateway (AVG) responds to the gateway queries with different MAC addresses, coordinating traffic
 
 198. Disaster Recovery
+- Types of backups
+  - Full
+  - Differential: backs up changes since last full backup
+  - Incremental: backup all changes since last full, differential, or incremental backup
+  - Snapshot: backup including state information
+- Cold site
+  - Power
+  - HVAC
+  - Floor space
+  - No HW yet
+- Warm site
+  - Power
+  - HVAC
+  - Floor space
+  - Server HW
+- Hot Site
+  - Power
+  - HVAC
+  - Floor space
+  - Server HW
+  - Synchronized already
+- Service Level Agreement (SLA): The promise you make to your users about how long a system will be down in the event of a disaster
+- Recovery Time Objective (RTO): The maximum amount of time a system will be offline after a disaster
+- Recovery Point Objective (RPO): The maximum amount of data that can be lost due to a disaster
+- Mean Time B/w Failures (MTBF): The average amount of time before a product fails
+- Mean Time To Repair (MTTR): The average amount of time required to repair a failed product
 
 199. Standards, Polices, and Rules
+- Privileged User Agreement
+- Password Policy
+- On-Boarding/Off-Boarding Procedures
+  - For new-hire/leaving employees
+- Licensing Restrictions
+- International Export Controls
+- Data Loss Prevention
+- Remote Access Policies
+- Incident Response Polices
+- BYOD Policy
+- Acceptable Use Corporate Resource Policy
+- NDA
+- System Life Cycle
+- Safety Procedures and Policies
 
 200. Documentation
+- Same as 199?
 
 201. Site Survey
 
 ## Section 19: Module 17: Troubleshooting Networks
+
+202. Troubleshooting Networks
+
+203. 7-Step Troubleshooting Methodology
+1) Identify the problem
+  - Gather information
+  - Duplicate the problem if possible
+  - Question Users
+  - Identify Symptoms
+  - Determine if anything changed
+  - Approach multiple problems individually
+2)  Establish a theory of probable cause
+  - Question the obvious
+  - Consider Multiple Approaches
+    - Top-to-Bottom/Bottom-to-Top of OSI model
+    - Divide and Conquer
+3) Test the theory to determine the cause
+4) Establish a plan of action to resolve the problem and identify potential effects
+5) Implement the solution or escalate as necessary
+6) Verify full system functionality, and if applicable, implement preventive measures
+7) Document Findings, Actions, and Outcomes
+
+204. CLI Troubleshooting Utilities
+- telnet -> ssh
+- arp -a : gateway IP and MAC address
+- nslookup
+- dig www.google.com : nameserver utility
+- host www.cnn.com
+- ifconfig
+- ping
+- iptables --help
+- sudo tcpdump -c 5 -v : captures 5 packets
+- nmap :finds which ports are open
+  - Not available in default distribution
+- traceroute
+- Windows command
+  - arp -a
+  - ipconfig
+    - ipconfig/release : releases DHCP address
+    - ipcofig /renew : gets new DHCP address
+  - nbtstat -c
+  - netstat : IP session status
+  - tracert : shows router hop up to destiny IP
+  - pathping : similar to tracert but collects statistics
+
+205. Network Appliance Commands
+- show config
+- show running-config
+- show startup-config
+- show ip route
+- Full duplex : both of send/receive
+- Half duplex : one of send/receive
+- CRC (Cyclic Redundancy Check): checks packets for errors
+- Giant: an error that occurs when a frame's size is bigger than its MTU, yields FCS error
+- RUNT: frame whose size is too small (less than 64 bytes for an ethernet frame)
+- debug ospf hello
+- Debugging is very expensive
+
+206. Device Metrics and Sensors
+
+207. Environmental Metrics and Sensors
+
+208. Common LAN issues
+- Attenuation: signal degradation by time
+- Latency
+  - 150ms for VoIP
+- Jitter
+- Crosstalk
+- EMI
+- Open/Short
+- Incorrect Pin-Out
+- Incorrect cable type
+- Bad port
+- Transceiver Mismatch
+- TX/RX Reverse
+- Duplex/Speed Mismatch
+- Damaged Cables
+- Bent pins
+- Bottlenecks
+- VLAN Mismatch
+- Network Connection LED status indicator
+
+209. Common Wireless Network Issues
+- Reflection
+- Refraction
+- Absorption
+- Attenuation
+- Effective Isotropic Radiated Power (EIRP)
+- Incorrect Antenna Type
+- Incorrect Antenna Placement
+- Channel Overlap
+- Association Time
+- Captive Portal Issues
+- AP Disassociation
+- Overcapacity
+- Distance Limitations
+- Wrong SSID
+- Security Type Mismatch
+- Power Levels
+- Signal-to-Noise Ratio
+
+210. Common Network Service Issues
+- Name resolution
+  - ping 8.8.8.8 # google dns server
+- Wrong default gateway IP
+- Wrong subnet mask
+- Overlapping IP Addresses
+- Overlapping MAC Addresses
+- Expired IP Addresses
+- Rogue DHCP server
+- Untrusted SSL Certificate
+- Wrong time
+- Exhausted DHCP Scope
+- Blocked ports (by firewall)
+- Incorrect Firewall settings
+- Incorrect ACL settings
+- Service not Responding
+- HW Issue
+
+211. General Networking Issues
+- Device Misconfiguration
+- Missing routes
+- Routing loops
+- Interface Status
+- Baselines
+- Collisions
+- Broadcast Storm
+- Multicast Flooding
+- Asymmetrical Routing
+- DNS issues
+- NTP issues
