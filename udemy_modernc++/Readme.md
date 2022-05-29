@@ -361,6 +361,16 @@ void operator()() { ... }
 
 63. Operator overloading - part IV
 - Use `friend` to access member data (?)
+- Defile `<<` for std::cout as a member function
+```cpp
+class MyClass {
+...
+    friend std::ostream & operator << (std::ostream &out, const MyClass& a) {
+      out << a.getStr();
+      return out;
+    }
+};
+```
 
 64. Operator overloading - part V
 - Overloading `->` and `*`
