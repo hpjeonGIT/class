@@ -595,7 +595,7 @@ int main() {
 
 ## Section 4: Proxy
 
-27. Introduciton
+27. Introduction
 - An alias
 - When you cannot modify the original object
 - The interface of proxy is same to the original object
@@ -1006,7 +1006,985 @@ int main() {
   - `std::shared_ptr<Foo> p(new Foo('a', true, Blue));` or `auto p = std::make_shared<Foo>('a', true, Blue);`
 
 35. Remote Proxy - I
+- Remote proxy will connect to a class located in a separate server
+  - RPC api is necessary
+  - stub is the gate of SERVER
+
 36. Remote Proxy - II
+- The example uses WIN32 api
+
 37. Remote Proxy - III
+
 38. Smart Proxy
+- Proxy with automatic deallocation like smart pointer
+- Using virtualProxy above
+- Extra header component
+```cpp
+template<typename T>
+class Pointer {
+  T * m_ptr;
+public:
+  Pointer(T* ptr) : m_ptr{ptr} {}
+  ~Pointer() { delete m_ptr;}
+  T *Get() { return m_ptr; }
+};
+```cpp
+- main source
+int main() {
+  Pointer<Image> p = new Bitmap{"Smiley.txt"};
+  p.Get()->Load();
+  p.Get()->Display();
+}
+```
+- When p is destructed, the object is deleted and memory leak is avoided
+- As p is an object, not a pointer, needs Get() function. Or overload operator of `->`
+
 39. Pros & Cons
+- Pros
+  - Creates a layer of indirection
+  - Can hide the location of the real subject
+  - Allows restricted access to the real subject
+  - Provides matching interface
+- Cons
+  - Tight coupling b/w the proxy and the real subject
+  - Adds only one new behavior
+- When to use
+  - when it is not feasible to use the real object directly
+
+## Section 5: Decorator
+
+41. Introduction
+- Without modifying the object, we add new muliple behavior
+- Purpose
+  - Attach additional responsibilities to an object dynamically. Decorators provide a flexible alternative to subclassing for extending functionality
+  - Additional features are added to an object, not a class
+- Implementation
+  - A decorator's interface must conform to the interface of the object it decorates
+    - Must inherit from common base class
+  - Abstract decorator is not recquired if only one responsibility has to be added
+    - The decorator can itself forward the calls to the object
+  - Abstract decorator & its base class should be lightweight
+    - Should focus on defining interface, not storing data
+    - Avoid adding concrete implementation as not all subclasses may require it
+    - These objects are part of every decorator and will make the decorators bulky to use
+  - Decorator changes the skin; alternative is to change the guts (Strategy Pattern)
+
+42. Basic Example - I
+- base.h
+```cpp
+#pragma once
+class Component {
+public:
+  virtual void Operation() = 0;
+  virtual ~Component() = default;
+};
+class ConcreteComponent: public Component {
+public:
+  void Operation() override;
+};
+class ConcreteDecoratorA: public Component {
+    Component *m_ptr{};
+public:
+  ConcreteDecoratorA(Component * ptr) : m_ptr{ptr} {}
+  void Operation() override;
+};
+class ConcreteDecoratorB: public Component {
+    Component *m_ptr{};
+public:
+  ConcreteDecoratorB(Component * ptr) : m_ptr{ptr} {}
+  void Operation() override;
+};
+```
+- base.cxx
+```cxx
+#include "base.h"
+#include <iostream>
+void ConcreteComponent::Operation() {
+  std::cout <<"[ConcreteComponent] Operation invoked\n";
+}
+void ConcreteDecoratorA::Operation() {
+  std::cout << "[ConcreteDecoratorA] Operation invoked\n";
+  m_ptr->Operation();
+}
+void ConcreteDecoratorB::Operation() {
+  std::cout << "[ConcreteDecoratorB] Operation invoked\n";
+  m_ptr->Operation();
+}
+int main() {
+  ConcreteComponent component{};
+  ConcreteDecoratorA decA{&component} ;
+  ConcreteDecoratorB decB{&decA};
+  decB.Operation();
+}
+```
+- When runs, ConcreteaDecoratorB->ConcreteDecoratorA->ConcreteComponent are invoked sequentially
+- Basically decorators are wrappers
+- Similar to proxy but it adds more responsibility instead of facilitating controlled use/access 
+
+43. Basic Example - II
+- We may make a Decorator class to inherit Component class
+- base.h
+```cpp
+#pragma once
+class Component {
+public:
+  virtual void Operation() = 0;
+  virtual ~Component() = default;
+};
+class ConcreteComponent: public Component {
+public:
+  void Operation() override;
+};
+class Decorator: public Component {
+  Component * m_ptr{};
+public:
+  Decorator(Component * ptr) : m_ptr {ptr} {}
+  void Operation() override;
+};
+class ConcreteDecoratorA: public Decorator {
+  using Decorator::Decorator;
+public:
+};
+class ConcreteDecoratorB: public Decorator {
+  using Decorator::Decorator;
+public:
+};
+```
+- base.cxx
+```cxx
+#include "base.h"
+#include <iostream>
+void ConcreteComponent::Operation() {
+  std::cout <<"[ConcreteComponent] Operation invoked\n";
+}
+void Decorator::Operation() {
+  m_ptr->Operation();
+}
+int main() {
+  ConcreteComponent component{};
+  ConcreteDecoratorA decA{&component} ;
+  ConcreteDecoratorB decB{&decA};
+  decB.Operation();
+}
+```
+
+44. Streams - I
+- Basic stream for input/output file stream
+- base.h
+```cxx
+#pragma once
+#include <string>
+#include <fstream>
+class InputStream {
+public:
+  virtual bool Read(std::string &text) = 0;
+  virtual void Close() = 0;
+  virtual ~InputStream() = default;
+};
+class FileInputStream: public InputStream {
+  std::ifstream m_Reader;
+public:
+FileInputStream() = default;
+FileInputStream(const std::string& fileName);
+  bool Read(std::string &text) override;
+  void Close() override;
+};
+class OutputStream {
+public:
+  virtual void Write(const std::string &text) = 0;
+  virtual void Close() = 0;
+  virtual ~OutputStream() = default;
+};
+class FileOutputStream: public OutputStream {
+  std::ofstream m_Writer{};
+public:
+  FileOutputStream() = default;
+  FileOutputStream(const std::string& fileName);
+  void Write(const std::string& text) override;
+  void Close() override;
+};
+```
+- base.cxx
+```cxx
+#include "base.h"
+#include <iostream>
+FileInputStream::FileInputStream(const std::string& fileName) {
+  m_Reader.open(fileName);
+  if (!m_Reader) {
+    throw std::runtime_error {"Could not open the file for reading"};
+  }
+}
+bool FileInputStream::Read(std::string& text) {
+  text.clear();
+  std::getline(m_Reader,text);
+  return !text.empty();
+}
+void FileInputStream::Close() {
+  if(m_Reader.is_open()) {
+    m_Reader.close();
+  }
+}
+FileOutputStream::FileOutputStream(const std::string& fileName){
+  m_Writer.open(fileName);
+  if(!m_Writer) {
+    throw std::runtime_error{"Could not open file for writing"};
+  }
+}
+void FileOutputStream::Write(const std::string& text) {
+  m_Writer << text;
+}
+void FileOutputStream::Close() {
+  if (m_Writer.is_open()) {
+    m_Writer.close();
+  }
+}
+void Read() {
+  FileInputStream Input{"test.txt"};
+  std::string text{};
+  while(Input.Read(text)) {
+    std::cout << text << std::endl;
+  }
+}
+void Write() {
+  FileOutputStream output{"test.txt"};
+  output.Write("First line\n");
+  output.Write("Second line\n");
+  output.Write("Third line\n");
+}
+int main() {
+  Write();
+  Read();
+  return 0;
+}
+```
+
+45. Streams - II
+- Let's implement buffering
+- How to override Read/Write without modifying the base class member functions?
+
+46. Streams - III
+- We pretend buffering, without real buffering
+- buff.h
+```cxx
+#pragma once
+#include <string>
+#include <fstream>
+class InputStream {
+public:
+  virtual bool Read(std::string &text) = 0;
+  virtual void Close() = 0;
+  virtual ~InputStream() = default;
+};
+class FileInputStream: public InputStream {
+  std::ifstream m_Reader;
+public:
+FileInputStream() = default;
+FileInputStream(const std::string& fileName);
+  bool Read(std::string &text) override;
+  void Close() override;
+};
+class OutputStream {
+public:
+  virtual void Write(const std::string &text) = 0;
+  virtual void Close() = 0;
+  virtual ~OutputStream() = default;
+};
+class FileOutputStream: public OutputStream {
+  std::ofstream m_Writer{};
+public:
+  FileOutputStream() = default;
+  FileOutputStream(const std::string& fileName);
+  void Write(const std::string& text) override;
+  void Close() override;
+};
+class BufferedOutputStream: public FileOutputStream {
+  char m_Buff[512]{};
+  using FileOutputStream::FileOutputStream;
+public:
+  void Write(const std::string& text) override;
+  void Close() override;
+};
+class BufferedInputStream: public FileInputStream {
+  using FileInputStream::FileInputStream;
+  char m_Buff[512]{};
+public:
+  bool Read(std::string& text) override;
+  void Close() override;
+};
+```
+- buff.cxx
+```cxx
+#include "buff.h"
+#include <iostream>
+FileInputStream::FileInputStream(const std::string& fileName) {
+  m_Reader.open(fileName);
+  if (!m_Reader) {
+    throw std::runtime_error {"Could not open the file for reading"};
+  }
+}
+bool FileInputStream::Read(std::string& text) {
+  text.clear();
+  std::getline(m_Reader,text);
+  return !text.empty();
+}
+void FileInputStream::Close() {
+  if(m_Reader.is_open()) {
+    m_Reader.close();
+  }
+}
+FileOutputStream::FileOutputStream(const std::string& fileName){
+  m_Writer.open(fileName);
+  if(!m_Writer) {
+    throw std::runtime_error{"Could not open file for writing"};
+  }
+}
+void FileOutputStream::Write(const std::string& text) {
+  m_Writer << text << '\n';
+}
+void FileOutputStream::Close() {
+  if (m_Writer.is_open()) {
+    m_Writer.close();
+  }
+}
+void Read() {
+  BufferedInputStream Input{"test.txt"};
+  std::string text{};
+  while(Input.Read(text)) {
+    std::cout << text << std::endl;
+  }
+}
+void Write() {
+  BufferedOutputStream output{"test.txt"};
+  output.Write("First line");
+  output.Write("Second line");
+  output.Write("Third line");
+}
+void BufferedOutputStream::Write(const std::string& text) {
+  std::cout << "Buffered Write\n";
+  FileOutputStream::Write(text);
+}
+void BufferedOutputStream::Close() {
+  FileOutputStream::Close();
+}
+bool BufferedInputStream::Read(std::string& text) {
+  std::cout << "Buffered Read\n";
+  auto result = FileInputStream::Read(text);
+  return result; // bool type
+}
+void BufferedInputStream::Close() {
+  FileInputStream::Close();
+}
+int main() {
+  Write();
+  Read();
+  return 0;
+}
+```
+
+47. Streams - IV
+- Adding encryption/decryption
+
+48. Streams - V
+- Mixing encryption + buffering
+- When multiple layers (encryption, compression, network, ...) are required
+  - Inherting multiple classses will not be a good solution
+  - Instead of inheriting, allocate an attribute using the base class
+
+49. Streams - VI
+
+50. Decorator Types
+- Dynamic decorator
+  - Behavior is added at runtime
+- Static decorator
+  - Decorator is chosen at compile-time
+  - Cannot be changed at runtime
+  - Can use the mixin clss
+    - Mixin
+      - Not from a base class but a class may use method from other classes
+      - Not for C++/C#/java
+- Functional decorator
+  - Decorates a function instead of an object
+
+51. Static decorator
+
+52. Functional Decorator
+- Accepts functions and callable objects as arguments
+```cxx
+#include <iostream>
+int Square(int x) { return x*x; }
+int Add(int x, int y) { return x+y; }
+template<typename T>
+auto PrintResult(T func) {
+  return [func](auto&&...args) {
+    std::cout << "Result is: ";
+    return func(args...);
+  };
+}
+int main() {
+  auto result = PrintResult(Square); //return value is a lamba expression
+  std::cout << result(5) << std::endl;
+  auto result2 = PrintResult(Add); //return value is a lamba expression
+  std::cout << result2(5,1) << std::endl;
+  return 0;
+}
+```
+
+53. Pros & Cons
+- Pros
+  - Flexible way of adding responsibilities to an object rather than inheritance
+    - Uses Composition
+    - Dynamic unlike inheritance
+  - Features are added incrementally as the code progresses
+  - You pay for the features only when you use
+  - Easy to add a combination of capabilities
+    - Same capability can be added twice
+  - Components don't have to know about their decorators
+- Cons
+  - A decorated component is not identical to the component itself
+  - Lots of small objects are created
+    - Can make code messed up
+- When to use
+  - Responsibilities are added transparently and dynamicllay
+  - Supports combination of behaviors
+  - When legacy system needs new behavior
+- Proxy vs decorator
+  - Proxy allows one wrapper only
+    - One behavior only
+    - Tight coupling b/w classes
+    - Adds restrictions
+    - Compile-time
+  - Decorator wraps multiple layer
+    - Multiple behavior
+    - Loose coupling b/w classes
+    - Adds new behavior
+    - Runtime
+
+## Section 6: Composite
+
+55. Introduction
+- UI, drawing, ...
+- Grouping in ppt. scaling up/down affects all boxes in the group
+
+56. Composite intent and implementation overview
+- Intent: Composes objects into tree structures to represent part-whole hierarchies. Composite lets clients treat individual objects and compositions of objects uniformly
+- Implementation
+  - The leaf and composite should be treated uniformly by the client
+  - The Component class should define as many common operations possible for all subclasses
+    - Clietns should not have to differentiate b/w leaf & composite
+  - Type of data structure to use for storage inside composite depends on required efficiency
+
+57. Basic Example
+- base.h
+```cxx
+#pragma once
+#include <vector>
+#include <iostream>
+#include <algorithm>
+class Component {
+public:
+  virtual void Operation() = 0;
+  virtual void Add(Component *pComponent) = 0;
+  virtual void Remove(Component *pComponent) = 0;
+  virtual Component * GetChild(int index) = 0;
+  virtual ~Component() = default;
+};
+class Leaf: public Component {
+public:
+  void Add(Component* pComponent) override;
+  Component* GetChild(int index) override;
+  void Operation() override;
+  void Remove(Component* pComponent) override;
+};
+class Composite : public Component {
+  std::vector<Component*> m_Children {};
+public:
+  void Add(Component* pComponent) override;
+  Component* GetChild(int index) override;
+  void Operation() override;
+  void Remove(Component* pComponent) override;
+};
+```
+- base.cxx
+```cxx
+#include "base.h"
+int depth{};
+void Leaf::Add(Component* pComponent) {}
+Component* Leaf::GetChild(int index) {return nullptr;}
+void Leaf::Operation() {
+  std::cout << "[Leaf] Operation\n";
+}
+void Leaf::Remove(Component* pComponent){}
+
+void Composite::Add(Component* pComponent) {
+  m_Children.push_back(pComponent);
+}
+Component* Composite::GetChild(int index) {
+  return m_Children[index];
+}
+void Composite::Operation() {
+  ++depth;
+  std::cout << "[Composite] Operation\n";
+  for(auto pChild: m_Children) {
+    for(int i=0;i<depth; ++i) {std::cout << '\t';}
+    std::cout << "|-";
+    pChild->Operation();
+  }
+  --depth;
+}
+void Composite::Remove(Component* pComponent){
+  auto newend = std::remove(m_Children.begin(), m_Children.end(), pComponent);
+  m_Children.erase(newend, end(m_Children));
+}
+int main() {
+  Leaf leaf1, leaf2, leaf3;
+  Composite subroot;
+  subroot.Add(&leaf3);
+  Composite root;
+  root.Add(&leaf1);
+  root.Add(&leaf2);
+  root.Add(&subroot);
+  root.Operation();
+  return 0;
+}
+```
+- Results
+```bash
+$g++ -std=c++17 chap57/base.cxx 
+$ ./a.out 
+[Composite] Operation
+	|-[Leaf] Operation
+	|-[Leaf] Operation
+	|-[Composite] Operation
+		|-[Leaf] Operation
+```  
+- By running the root, the entire tree is executed
+  - This is how graphic renderer draws
+
+58. UI Example overview
+- Win32 API
+
+59. UI example - I
+
+60. UI example - II
+
+61. UI example - III
+
+62. Pros & Cons
+
+## Section 7: Bridge
+
+65. Introduction
+- An abstraction represents an idea of an entity with relevant details
+- Irrelevant or unwanted details are ignored
+
+66. Bridge intent and implementation Overview
+- Abstraction and its implementation may vary. They are done in separate hierarchies
+- Connection b/w abstraction and implementation hierarcy is called **bridge**
+- The alternative name is handle-body
+  - Handle: abstraction
+  - Body: implementation
+- Intent: decouples an abstraction from its implementation
+
+67. Basic Example
+- base.h
+```cxx
+#pragma once
+class Implementor {
+public:
+  virtual void OperationImpl() = 0;
+  virtual ~Implementor() = default;
+};
+class ConcreteImplementorA: public Implementor {
+public:
+  void OperationImpl() override;
+};
+class ConcreteImplementorB: public Implementor {
+public:
+  void OperationImpl() override;
+};
+class Abstraction {
+protected:
+  Implementor *m_pImplementor{};
+public:
+  explicit Abstraction(Implementor* m_p_implementor)
+     : m_pImplementor(m_p_implementor) {}
+  virtual void Operation() = 0;
+  virtual ~Abstraction() = default;
+};
+class RefinedAbstraction: public Abstraction {
+  using Abstraction::Abstraction;
+public:
+  void Operation() override;
+};
+```
+- base.cxx
+```cxx
+#include "base.h"
+#include <iostream>
+void ConcreteImplementorA::OperationImpl() {
+  std::cout << "[ConcreteImplementorA] Implmentation invoked\n";
+}
+void ConcreteImplementorB::OperationImpl() {
+  std::cout << "[ConcreteImplementorB] Implmentation invoked\n";
+}
+void RefinedAbstraction::Operation() {
+  std::cout << "[RefinedAbstraction] =>";
+  m_pImplementor->OperationImpl();
+}
+int main() {
+  ConcreteImplementorA impl;
+  Abstraction *p = new RefinedAbstraction(&impl);
+  p->Operation();
+  return 0; 
+}
+```
+- Abstraction is coupled with Implementor class, which is inherited to ConcreteImplementorA/B
+- RefineAbstraction class can use the method of ConcreteImplementorA/B through Bridge design
+
+68. Shapes Hierarchy - I
+69. Shapes Hierarchy - II
+70. Shapes Hierarchy - III
+71. Shapes Hierarchy - IV
+72. Shapes Hierarchy Issues
+- Abstract: shape, line, circle, rectangle
+- Implementation: GDI, DirectX, OpenGL
+- Line method may use GDI or OpenGL through Bridge
+
+73. Bridge Implementation
+- When a new shape function is necessary, add more abstraction classes
+- When new library is added, add more implementor classes
+
+74. Handle-Body - I
+- Handle-Body
+  - A one to one relationship b/w Abstraction and its implementor is also called degenerate bridge
+  - The alternative name for this pattern is Handle-Body
+    - Abstraction -> Handle
+    - Implementor -> Body
+  - Aliases as Cheshire Cat, compilation firewall, Opaque pointer or D-Pointer
+  - As known as Pointer to Implementation (PIMPL)
+- PIMPL
+  - Creates a wrapper around a class
+  - Shields the clients from changes to the implementor
+  - Prevents compilation changes from seeping into multiple source files
+  - Hides the complex details of a class from the clients
+  - Implements extra functionality for the implementation class
+
+75. Handle-Body - II
+76. Handle-Body - III
+77. PIMPL - I
+78. PIMPL - II
+- More common in C++
+
+79. Static Bridge
+- Inherits abstract and implementor together
+
+80. Pros & Cons
+
+## Section 8: Flyweight
+
+82. Introduction
+- Can minimize memory usage
+- Beneficial when we create large number of objects
+- Instead of storing data individually in each object, it can be stored outside & shared b/w objects
+- This will drastically reduce the overall memory requirement
+- Intrinsic state
+  - canbe shared b/w flyweights
+- Extrinsic state
+  - Not shareable
+  - Some information is not part of the object
+  - Computed outside of flyweight and passed to them when required
+
+83. Intent & Implementation Overview
+- Uses sharing to support large numbers of fine-grained objects efficiently
+- Implementation
+  - In most cases, the client does not create the flyweight itself
+  - It is requested from a pool
+  - Typically a factory that may use associative container to store the flyweights
+  - A client requests a flyweight through its key
+  - The pool will either create it with intrinsic state or supply an existing one
+  - The extrinsic state should be computed separately
+  - The interface of the flyweight does not enforce sharing
+  - The pool can instantiate all flyweights and keep thme around permanently if their count is low
+  - The flyweights are immutable, and their behavior depends on the extrinsic state
+
+84. Basic Implementation
+- base.h
+```cxx
+#pragma once
+#include <unordered_map>
+class Flyweight {
+public:
+  virtual void Operation(int extrinsic) = 0;
+  virtual ~Flyweight() = default;
+};
+class ConcreteFlyweight: public Flyweight {
+  int *m_pIntrinsicState{};
+public:
+  ConcreteFlyweight(int* mPIntrinsicState)
+  : m_pIntrinsicState(mPIntrinsicState){}
+  void Operation(int extrinsic) override;
+};
+class UnsharedConcreteFlyweight: public Flyweight {
+  int m_InternalState{};
+public:
+  UnsharedConcreteFlyweight(int m_InternalState)
+  : m_InternalState(m_InternalState){}
+  void Operation(int extrinsic) override;
+};
+class FlyweightFactory {
+  inline static std::unordered_map<int, Flyweight *> m_Flyweights{};
+public:
+  Flyweight* GetFlyweight(int key);
+  Flyweight* GetUnsharedFlyweight(int value);
+};
+```
+- base.cxx
+```cxx
+#include "base.h"
+#include <iostream>
+void ConcreteFlyweight::Operation(int extrinsic) {
+  std::cout << "Intrinsic state:" << * m_pIntrinsicState << std::endl;
+  std::cout << "Extrinsic state:" << extrinsic << std::endl; 
+}
+void UnsharedConcreteFlyweight::Operation(int extrinsic) {
+  std::cout << "Internal state:" << m_InternalState << std::endl;
+  std::cout << "Extrinsic state:" << extrinsic << std::endl;
+}
+Flyweight* FlyweightFactory::GetFlyweight(int key) {
+  auto found = m_Flyweights.find(key) != end(m_Flyweights);
+  if (found) {
+    return m_Flyweights[key];    
+  }
+  static int intrinsicState{100};
+  Flyweight *p = new ConcreteFlyweight{&intrinsicState};
+  m_Flyweights[key] = p;
+  return p;
+}
+Flyweight* FlyweightFactory::GetUnsharedFlyweight(int value) {
+  return new UnsharedConcreteFlyweight{value};
+}
+int main() {
+  int extrinsicState = 1;
+  FlyweightFactory factory;
+  auto f1 = factory.GetFlyweight(1);
+  auto f2 = factory.GetFlyweight(1);
+  auto f3 = factory.GetFlyweight(1);
+  f1->Operation(extrinsicState++);
+  f2->Operation(extrinsicState++);
+  f3->Operation(extrinsicState++);
+  return 0;
+}
+```
+- Clients will use a factory function
+- Intrinsic data is declared as static
+  - Note that it is mutable, and cannot be modified
+
+85. Game Implementation - I
+- model.h
+```cxx
+#pragma once
+#include <iostream>
+#include <string_view>
+#include <vector>
+#include <memory>
+struct Position3D {
+  int x,y,z;
+  friend std::ostream& operator<< (std::ostream&os, const Position3D& obj) {
+    return os << "{" << obj.x <<","<<obj.y <<","<<obj.z <<")\n";
+  }
+};
+class Model {
+public:
+  virtual void Render();
+  virtual void Render(Position3D position);
+};
+class Vegetation: public Model {
+  inline static int m_Count {};
+  std::vector<int> m_MeshData{};
+  const char *m_Texture{};
+  std::string m_Tint{};
+  Position3D m_Position{};
+public:
+  Vegetation(std::string_view tint, Position3D position);
+  void Render() override;
+  static void ShowCount();
+};
+```
+- model.cxx
+```cxx
+#include "model.h"
+void Model::Render() {}
+void Model::Render(Position3D position){}
+Vegetation::Vegetation(std::string_view tint, 
+                       Position3D position) 
+            : m_Tint{tint}, m_Position{position} {
+  ++m_Count;
+  m_MeshData.assign({5,1,2,8,2,9});
+  m_Texture = R"(
+    #
+   ###
+  #####
+    #
+    #
+    #
+)";
+}
+void Vegetation::Render() {
+  std::cout << m_Texture;
+  std::cout << "Mesh: " ;
+  for (auto m: m_MeshData) {
+    std::cout << m << " ";    
+  }
+  std::cout << "\nTint" << m_Tint << std::endl;
+  std::cout << "Position: " << m_Position << std::endl;
+}
+//void Vegetation::Render(Position3D position){}
+void Vegetation::ShowCount() {
+  std::cout << "Total objects created: " << m_Count << std::endl;
+}
+int main() {
+  std::vector<std::shared_ptr<Vegetation>> m_Trees{};
+  for(int i=0;i<15;++i) {
+    if (i<5) {
+      m_Trees.push_back(std::make_shared<Vegetation>("Green", Position3D{i*10,i*10,i*10}));
+    } else if (i>5 && i <= 10) {
+      m_Trees.push_back(std::make_shared<Vegetation>("Dark Green", Position3D{i*10,i*10+10,i*10}));
+    } else {
+      m_Trees.push_back(std::make_shared<Vegetation>("Light Green", Position3D{i*10+10,i*10,i*10}));
+    }
+  }
+  for (auto tree: m_Trees) {
+    tree->Render();
+  }
+  Vegetation::ShowCount();
+}
+```
+- Total 15 objects are made
+
+86. Game Implementation - II
+- model.h
+```cxx
+#pragma once
+#include <iostream>
+#include <string_view>
+#include <vector>
+#include <memory>
+#include <unordered_map>
+struct Position3D {
+  int x,y,z;
+  friend std::ostream& operator<< (std::ostream&os, const Position3D& obj) {
+    return os << "{" << obj.x <<","<<obj.y <<","<<obj.z <<")\n";
+  }
+};
+class Model {
+public:
+  virtual void Render();
+  virtual void Render(Position3D position);
+};
+class VegetationData {
+  std::vector<int> m_MeshData{};
+  const char *m_Texture{};
+public:
+  VegetationData();
+  const char *GetTexture() const;
+  const std::vector<int> & GetMeshData() const;
+};  
+class Vegetation: public Model {
+  inline static int m_Count {};
+  VegetationData *m_pVegData{};
+  std::string m_Tint{};
+public:
+  Vegetation(std::string_view tint, VegetationData *p);
+  void Render(Position3D position) override;
+  static void ShowCount();
+};
+using VegetationPtr = std::shared_ptr<Vegetation>;
+class VegetationFactory {
+  std::unordered_map<std::string_view, VegetationPtr> m_Flyweights{};
+  VegetationData * m_pVegData{};
+public:
+  VegetationFactory(VegetationData* mPVegData) : m_pVegData{mPVegData}{}
+  VegetationPtr GetVegetation(std::string_view tint);
+};
+```
+- mode.cxx
+```cxx
+#include "model.h"
+void Model::Render() {}
+void Model::Render(Position3D position){}
+VegetationData::VegetationData() {
+m_MeshData.assign({5,1,2,8,2,9});
+  m_Texture = R"(
+    #
+   ###
+  #####
+    #
+    #
+    #
+)";
+}
+const char* VegetationData::GetTexture() const {
+  return m_Texture;
+}
+const std::vector<int>& VegetationData::GetMeshData() const {
+  return m_MeshData;
+}
+Vegetation::Vegetation(std::string_view tint, 
+                       VegetationData *p) 
+            : m_Tint{tint}, m_pVegData{p} {
+  ++m_Count;
+            }
+void Vegetation::Render(Position3D position) {
+  std::cout << m_pVegData->GetTexture();
+  std::cout << "Mesh: " ;
+  for (auto m: m_pVegData->GetMeshData()) {
+    std::cout << m << " ";    
+  }
+  std::cout << "\nTint" << m_Tint << std::endl;
+  std::cout << "Position: " << position << std::endl;
+}
+//void Vegetation::Render(Position3D position){}
+void Vegetation::ShowCount() {
+  std::cout << "Total objects created: " << m_Count << std::endl;
+}
+VegetationPtr VegetationFactory::GetVegetation(std::string_view tint) {
+  auto found = m_Flyweights.find(tint) != end(m_Flyweights);
+  if (!found) {
+    m_Flyweights[tint] = std::make_shared<Vegetation>(tint, m_pVegData);
+  }
+  return m_Flyweights[tint];
+}
+int main() {
+  std::vector<VegetationPtr> m_Trees{};
+  VegetationData data{};
+  VegetationFactory factory{&data};
+  for(int i=0;i<15;++i) {
+    if (i<5) {
+      m_Trees.push_back(factory.GetVegetation("Green"));
+      m_Trees[i]->Render({i*10,i*10,i*10});
+    } else if (i>5 && i <= 10) {
+      m_Trees.push_back(factory.GetVegetation("Dark Green"));
+      m_Trees[i]->Render({i*10,i*10+10,i*10});
+    } else {
+      m_Trees.push_back(factory.GetVegetation("Light Green"));
+      m_Trees[i]->Render({i*10+10,i*10,i*10});
+    }
+  }
+  Vegetation::ShowCount();
+  return 0;
+}
+```
+- We make Vegetation data as intrinsic
+- Positions are extrinsinc
+- Total 3 objects are created
+- Needs a factory to make VegetationData object
+- For string_view type, do not use `&`
+
+87. Game Implementation - III
+
+88. String Interning - I
+89. String Interning - II
+90. String Interning - III
+
+91. Boost.Flyweight
+92. Pors & Cons
