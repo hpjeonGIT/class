@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.0.0)
+function(print_detail var)
+  message("testing ${ARGC} ${ARGV} ${ARGN} ${ARGV0} ${ARGV1}")
+endfunction()
+print_detail("Name")
+print_detail("Name" "AGE")

@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.0.0)
+FOREACH (NAME abc;def; xyz) 
+ MESSAGE(${NAME})
+ENDFOREACH()
+foreach(x RANGE 101 104)
+  message("x=${x}")
+endforeach()

@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.0.0)
+set(Name Charlie)
+set(Age 45)
+function(print_detail var)
+  message("My ${var} is ${${var}}")
+endfunction()
+print_detail(Name)
+print_detail(Age)

@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.0.0)
+SET(VAR a b c;d "e;f" 2.7 "hello world")
+list(APPEND VAR 1.6 XX)
+list(REMOVE_AT VAR 2 -3)
+message(${VAR})
+message("${VAR}")

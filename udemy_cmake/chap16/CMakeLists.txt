@@ -1,0 +1,5 @@
+SET(Name "Bob Smith")
+SET(List Bob Smith)
+message("hello world from ${Name}  and ${List} " )
+set(VAR "aa;bb;cc")
+message(${VAR}, "${VAR}")
