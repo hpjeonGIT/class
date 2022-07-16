@@ -453,19 +453,302 @@ To free slab objects and pagecache:
   - Now reload : nmcli con reload; nmcli dev status
 
 49. Troubleshooting tips related with device names of ethernet interface
+- eno1: en for ethernet, o for on-board, then device number
+- ens1: en for ethernet, s for slot
+- /etc/udev/rules.d/80-net-name-slot.rules for persistent naming
+  - Can make customized rule as well
 
 50. Disable consistent network device naming
 
 51. Overview NetworkManager
-
+- NetworkManager
+  - A daemon monitors and manages network settings
+  - Managed using nmcli and other GUI tool
+  - /etc/sysconfig/network-scripts is updated in the back-end
+    - /etc/NetworkManager/system-connections in Ubuntu
+```bash
+$ nmcli dev status
+DEVICE           TYPE      STATE        CONNECTION      
+wlp4s0           wifi      connected    Bucs            
+enp3s0           ethernet  unavailable  --              
+lo               loopback  unmanaged    --    
+```          
+  
 52. Practice Lab Session - 1
 
 53. Practice Lab Session - 2
 
 54. Capturing packets with tcpdump
+- When a server responds slowly, may be used to investigate the packets
 
 55. Practice Lab Session - 3
-
+- tcpdump -i eth0 # using an interface eth0
+- tcpdump -c 5 -i eth0 # 5 counts
+- tcpdump -n -c 5 -i eth0 # better description
+- tcpdump -n -c 5 -i eth0 port 22 # port 22 only
+- tcpdump -w 0001.pcap -i eth0 # write to 0000.pcap
+ 
 ## Section 7: Troubleshooting Boot Issues
 
+56. A traditional boot sequence
+- As Power up
+  - system startup by Bios/Bootmonitor
+  - Stage 1 bootloader by Master Boot Record
+  - Stage 2 bootloader by LILO, GRUB, ...
+  - Kernel by Linux
+  - Init by User space
+    - /sbin/init
+    - /etc/rc.d/rc.sysinit
+    - /etc/inittab
+
+- MBR
+  - 446 bytes of bootloader
+  - 64 bytes of partition table
+  - 2 bytes of magic number
+
+57. targets/runlevels in boot process
+- Run level and scripts directory
+  - /etc/rc.d/rc0.d/ : Shutdown/hal system
+  - /etc/rc.d/rc1.d/ : Single user mode
+  - /etc/rc.d/rc2.d/ : Multiuser with no network services
+  - /etc/rc.d/rc3.d/ : Default txt/console only. Full multiuser
+  - /etc/rc.d/rc4.d/ : Reserved for local use. X-windows (slackware/BSD)
+  - /etc/rc.d/rc5.d/ : XDM X-windows GUI (Redhat/System V)
+  - /etc/rc.d/rc6.d/ : Reboot
+  - s or S # single user/maintenance mode (slackware)
+  - M : Multiuser mode (slackware)
+  - Each folder has K* or S* scripts
+    - K for kill process
+    - S for start
+
+58. Overview of Grub2
+- GRand Unified Bootloader: GRUB
+- Mediator b/w BIOS and OS Kernel
+- Allows multiple kernels and users can select one at boot time
+
+59. Configuring grub2
+- grub.cfg: made through grub2-mkconfig
+  - /boot/grub2/grub.cfg is generated at Linux installation and regenerated when a new kernel is installed
+- Kernel index
+  - 0: current kernel
+  - 1~...: old kernels
+- /etc/grub.d folder has 00_header, 10_linux, ... files
+  - At /boot/grub2/grub.cfg
+```
+### BEGIN /etc/grub.d/00_header ###
+if [ -s $prefix/grubenv ]; then
+...
+### END /etc/grub.d/00_header ###
+```  
+- Keep the backup of /boot/grub2/grub.cfg
+
+60. Grub2 features
+- GRUB2 menu configuration settings are taken from /etc/default/grub
+  - After edit, run grub2-mkconfg then new grub.cfg will be produced - `grub2-mkconfig -o /boot/grub2/grub.cfg`
+- grub2 searches the compressed kernel image file called vmlinz in /boot
+- grub2 load the vmlinuz into memroy and extracts the content of the initramfs image file into a temporary, memory based file system (tmpfs)
+- The initial RAM disk (initrd) is an initial root file system that is mounted before the real root file system
+
+61. Booting into grub menu
+- At grub menu -> e key to edit
+- At grub menu -> c to get command shell
+  - linux16 /vmlinuz-3.10.0-327.el7.x86)64 root=/dev/sda2
+  - init
+  - initrd16 /init
+  - initrd16 /initramfs-3.10.0-327.el7.x86_64.img
+  - boot
+  - Now will boot using the img
+
+62. Protect grub by applying passwd
+- grub-md5-crypt
+  - Get hashed passwd
+- Then edit /boot/grub/grub.conf, injecting `password --md5 XXXXXX`
+- In grub2:
+  - Edit /etc/grub.d/10_linux and remove `--unrestricted` in CLASS definition
+  - Run grub2-setpassword
+  - Will generate /boot/grub2/user.cfg
+  - grub2-mkconfig -o /boot/grub2/grub.cfg
+
+63. initramfs file missing or corrupted
+- Screen will be blank at boot
+- Load iso image from optical or usb
+- Enter rescue mode
+- Start shell prompt
+- chroot /mnt/sysimage
+- Recreate initramfs
+  - cd /boot
+  - `dracut -f initramfs-$(uname -r).img $(uname-r)`
+- Or use grub console
+  - root (hd0,0)
+  - setup(hd0)
+- Reboot
+
+64. grub file missing
+- When grub conf file is missing
+- At boot, grub prompt
+- root (hd0,0)
+  - For different partitions, root (hd0,1)
+- kernel /vmlinuz-2.32-220.el6.x86_64 ro root=/dev/mapper/vg_sat_lv # make sure to use the correct name
+- initrd /initramfs-2.6.32-220.el6.x86_64.img
+- Login to the system and recover grub.cfg
+
+65. mbr corrupted - 1
+- Deleting MBR
+  - df -h # find the dev like /dev/sda1
+  - dd if=/dev/zero of=/dev/sda bs=256 count=1 # 1st 256 block of /dev/sda will be zeroed
+- reboot
+  - As MBR is gone, it will find next bootable device
+  - Or mount CD or usb if there is no available device
+    - Enter Rescue mode
+
+66. mbr corrupted - 2
+- Recovering MBR
+  - chroot /mnt/sysimage
+  - df -h # check mounted system
+  - grub-install /dev/sda # bootable device
+  - Reboot
+- Or run grub prompt
+  - root (hd0,0) # select the first partition
+  - setup (hd0)
+  - quit # then reboot
+
+67. Rescue mode in RHEL7
+- Single user mode with root passwd
+- Will mount all local file systems
+- No active network/no multiple users
+- Activating rescue mode
+  - Select rescue mode from grub menu
+  - Or select `e` from grub menu, then append `systemd.unit=rescue.target` to the linxu16 command
+    - ctrl+a for the start of the line or ctrl+e for the end of the line
+    - ctrl+x to boot
+
+68. Practice Lab Session
+
+69. Reset the root passwd using installation disk
+- Troubleshooting mode from bootable disk
+  - Choose Rescue mode
+  - Choose Continue
+  - chroot /mnt/sysimage
+  - passwd root # Now can reset root passwd
+
+70. Reset the root passwd using rd.break
+- Edit mode from grub boot screen
+- Remove rhgb and quiet parameters from linux16 line command or linuxefi
+- Append `rd.break enforcing=0` to the linux16 or linuxefi command
+- ctrl+x to boot
+- If a prompt is not obvious, press **Backspace** 
+- File system is mounted as read-only on /sysroot
+- mount -o remount,rw /sysroot # remount as writable
+- chroot /sysroot
+- df -h # will not work
+- passwd # can change passwd
+
+71. Repairing File systems issues at boot
+- systemd attempts to repair bad file system but emergency shell may appear if it is too severe
+- Non-existent device or UUID at /etc/fstab
+- Non-existent mount point in /etc/fstab
+- In-correct mount options in /etc/fstab
+- Can add `nofail` option in /etc/fstab to avoid failure
+  - Not recommended to use
+  - Application may not notice the absence of the device
+
+72. Repair file systems issues - lab
+- When /etc/fstab is corrupted
+  - Boot message shows failure at mounting
+  - Will ask root passwd for maintenance
+  - mount # shows mounted systems
+    - Find any read-only mounted systems
+  - mount -o remount.rw / # remount all system as writable
+  - Edit /etc/fstab
+
+73. Repair file systems issues - lab
+- When /etc/fstab is corrupted
+  - Boot as rescue mode
+  - mount # find any read-only systems
+  - mount -o remount.rw /dev/mapper/rhcl-root /
+  - Edit /etc/fstab
+  - systemctl daemon-reload
+  - exit
+
 ## Section 8: Troubleshooting Security Issues
+
+74. Troubleshooting a SELinux issue
+- getenforce
+- chcon -R 
+
+75. Changing SELinux context
+- unconfined_u
+- object_r
+- default_t
+- chcon -t httpd_sys_content_t /testselinux
+- restorecon -v /testselinux
+- semanage fcontext -a -t httpd_sys_content_t /testselinux
+- ls -ltrZ /testselinux
+
+76. Troubleshooting ftp connectivity issue using booleans
+- getenforce
+- ps -efZ|grep -i vsftpd
+- cd /var/ftp
+- ls -ltrdZ /var/ftp
+- getsebool -a |grep -i ftp_home
+- setsebool -P ftp_home_dir on
+
+77. SELinux Audit Logs & Troubleshooting
+- cd /var/log
+- ll messages
+- cd audit
+- Check audit.log
+- Or use SELinux Alert Browser
+
+78. Overview of PAM security
+- Pluggable Authentication Modules
+  - Management layer b/w Linux applications and the Linux native authentication system
+  - /etc/passwd and /etc/shadow
+  - Users like www, apache, ftp, ...
+
+79. Concepts of PAM
+- /etc/pam.d and /etc/security
+
+80. PAM Modules & Configurations
+- PAM modules
+  - /lib/security
+  - /lib64/security
+  - pam_tally2
+  - pam_unix
+  - pam_localuser 
+- PAM configuration
+  - /etc/pam.d
+  - /etc/security
+  - /etc/pam.d/vsftpd
+  - /etc/pam.d/sshd
+
+81. PAM Module Groups
+- PAM configuration file
+  - Module_Interface
+    - Auth group
+    - Account group
+    - Session group
+    - Password group
+  - Control_flag
+  - Module_Name
+  - Module_Arg
+
+82. Control Flags in PAM
+- Order matters
+```
+auth requisite pam_securetty.so
+auth required pam_rootok.so
+auth sufficient pam_ldap.so
+```
+
+83. PAM Modules
+- pam_unix Module
+  - Checks user's credentials against /etc/shadow
+  - auth requires pam_unix.so
+  - auth, session, password management group
+- pam_deny Module
+  - Restricts access. 
+  - Use this module in the end of modle to protect from misconfiguration
+  - Use this module in the beginning then service will be disabled
+  
+84. Last Lecture
