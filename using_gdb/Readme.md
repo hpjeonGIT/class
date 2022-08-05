@@ -194,3 +194,28 @@ $ ls -alrt
   - https://stackoverflow.com/questions/5455832/how-to-print-0x4rbp-in-gdb
   - p $rbp-0x4
   - x /w $rbp-0x4
+
+## TUI at GDB
+- CppCon 2015: Greg Law " Give me 15 minutes & I'll change your view of GDB" from Youtube
+- ctl+x,a
+- ctl+x,2
+```
+   ┌──ex2.cxx─────────────────────────────────────────────────────────────────────────────┐
+  >│4         return static_cast<double> (i/j);                                           │
+   │5       }                                                                             │
+   │6       int main() {                                                                  │
+   │7         double x;                                                                   │
+   │8         x = comp(3,0);                                                              │
+   │9         std::cout << "x = " << x << std::endl;                                      │
+   └──────────────────────────────────────────────────────────────────────────────────────┘
+  >│0x560c710ba918 <comp(int, int)+14>      idivl  -0x8(%rbp)                             │
+   │0x560c710ba91b <comp(int, int)+17>      cvtsi2sd %eax,%xmm0                           │
+   │0x560c710ba91f <comp(int, int)+21>      pop    %rbp                                   │
+   │0x560c710ba920 <comp(int, int)+22>      retq                                          │
+   │0x560c710ba921 <main()>                 push   %rbp                                   │
+   │0x560c710ba922 <main()+1>               mov    %rsp,%rbp                              │
+   └──────────────────────────────────────────────────────────────────────────────────────┘
+core LWP 26611 In: comp                                           L4    PC: 0x560c710ba918 
+(gdb) 5 in /home/hpjeon/hw/class/udemy_gdb/ex2.cxx
+(gdb) 
+```
