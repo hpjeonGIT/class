@@ -68,7 +68,7 @@
   - Applicatin Layer: Data
   - Transport layer: segment
   - Network layer: Packet
-  - Data linke layer: Frame
+  - Data link layer: Frame
   - Physical layer: bits
   
 10. A Big picture
@@ -269,29 +269,174 @@ c0 ─ s1 ─ s2 ─ h1
 - Ethernet frame
   - Preamble (8 bytes) + Dest Address (6bytes) + Src Address (6bytes) + type (2bytes) + info [46-1500] + FCS (4bytes)
   - Ref: https://en.wikipedia.org/wiki/Ethernet_frame
+- Maximum size of ethernet frame = MTU
 
 32. How layer 2 Routing is done?
+- Scenario
+  - A router X is connected to a subnet of 12.1.1.0/24
+    - Machine D, E, F are connected to the subnet
+    - Now machine E sends packet/frame to D
+    - D accepts the pack as destiny MAC address matches
+    - F rejects as dest_MAC doesn't match
+    - Q1: how E knows D's MAC address?
+      - A: Using ARP (Address Resolution Protocol)
+    - Q2: can we not send packet/frame to F as it is unnecessary?
+      - A: use L2 switch
 
 33. ARP Goals
+- Sender must know the receiver's MAC address, given that the sender know the recipient IP address already
+- L3 routers and devices maitain a table called ARP table
+- ARP table contains the mapping of IP to MAC of direct neighbors
 
 34. ARP Standard Message Format
+- ARM works with two types of messages
+  - ARP request (broadcast msg)
+  - ARP reply (unicast msg)
+- ARP message never crocess the subnet boundary
+- Ref: http://www.tcpipguide.com/free/t_ARPMessageFormat.htm
+![Snapshot of pgadmin](./arpformat.png)
 
 35. Address Resolution Protocol Part 1
+- From the scenario of 32:
+  - E (12.1.1.3/24) wants to send packet to D (12.1.1.2)
+  - E prepares the ethernet hdr to send packet (?frame?)
+  - E looks up ARP table for IP=12.1.1.2. When ARP table doesn't containt it:
+  - E checks if IP of D is located within the subnet
+  - When it is in the same subnet, E sends out APR request msg on all local interfaces operating in network of 12.1.1.0/24
+  - E places the packet on wire
+    - The corresponding ethernet hdr will be: preamble (8) + Dest_MAC(ff:ff:ff:ff:ff:ff, which is broadcast) + Src_MAC(of E) + 806 + info[46-1500] (ARP msg) + FCS (4)
+    - Type 806 means ARP message
+    - ARP msg will be: opcode 1(ARP req) + MAC of E + 12.1.1.3 (src IP) + 00:00:00:00:00:00 + 12.1.1.2
 
 36. Address Resolution Protocol Part 2
+- Continuing how to find MAC of D from E:
+  - Type 806 means ARP message but doesn't differentiate ARP request or ARP reply
+    - This is done in the first byte of ARP msg
+      - 1 for request
+      - 2 for reply
+  - If E has multiple if's, it will send the request to the corresponding subnet only
+  - ARP request packet is received by all interfaces in the subnet as this is broadcast
+  - All receiving machines chop off the ethernet hdr and handover packet to ARP protocol
+  - Datalink layer hands-over the frame to the next layer in TCP/IP stack - ARP protocol
+  - When dest_IP == if of the receiving interface, the corresponding machine sends back ARP reply while the others discard the packet
+  - ARP reply contents: src_MAC = MAC of D, dest_MAC= MAC of E, src ip = 12.1.1.2, dest ip = 12.1.1.3, TYPE=ARP REPLY
+    - Ethernet hdr: preamble(8) + MAC of D + MAC of E + 806 + Info[46-1500] (ARP reply hdr) + FCS(4)
+    - ARP reply hdr: 2 (ARP reply) + MAC of D (src MAC) + 12.1.1.2 (src IP) + MAC of E (dest MAC) + 12.1.1.3 (dest ip)
+  - E updates its ARP table 
+  - E now inserts D's MAC in ethernet hdr then send
+  - Packets are recevied by all interfaces connected to the wire while all discard but D (Thrashing)
+- ARP msgs never crosses L3 router boundary
+- ARP request is broadcast while ARP reply is unicast
+- ARP works on Layer 2 only
 
 37. Address Resolution Protocol Demonstration
+- Very BAD voice recording
+```bash
+$ arp -n
+Address                  HWtype  HWaddress           Flags Mask            Iface
+192.168.1.49             ether   7c:2e:bd:43:ac:90   C                     wlp4s0
+192.168.1.132            ether   e8:9f:80:59:22:c4   C                     wlp4s0 # <--- 192.168.1.234 not found
+...
+$ ping 192.168.1.234  # ping gets MAC address
+64 bytes from 192.168.1.234: icmp_seq=1 ttl=64 time=209 ms
+--- 192.168.1.234 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+$ arp -n
+Address                  HWtype  HWaddress           Flags Mask            Iface
+192.168.1.49             ether   7c:2e:bd:43:ac:90   C                     wlp4s0
+192.168.1.132            ether   e8:9f:80:59:22:c4   C                     wlp4s0
+192.168.1.234            ether   98:b8:ba:46:76:d1   C                     wlp4s0 # <--- Now 192.168.1.234 found
+...
+```
 
 38. Layer 2 Switch Concept
+- L2 switch is called a bridge and a layer 2 device
+- Layer 2 device uses MAC addresses only
+- MAC table is built through MAC learning 
+- L2 switch makes entries of MAC table by inspecting the contents (src MAC address) of ethernet hdr of the frame
+- For unknown MAC address, it floods the frame out of all ports
 
 39. L2 Switch Functioning
 
 40. Layer 2 Switch Example
 
 41. Lab Session
+- Creating custom topologies using python
+- L2 Routing
+- L3 Routing
+- Inter-Vlan routing
+- https://github.com/sachinites/SocketProgrammingMininet
 
 42. Test Topology Description
+```py
+net = Mininet()
+# Add hosts
+h1 = net.addHost('h1')
+h2 = net.addHost('h2')
+# Add L2 switch s5
+s5 = net.addHost('s5')
+# Link names
+Link(h1,s5)
+Link(h2,s5)
+net.build()
+# remove default ip
+h1.cmd("ifconfig h1-eth0 0")
+h2.cmd("ifconfig h2-eth0 0")
+s5.cmd("ifconfig s5-eth0 0")
+s5.cmd("ifconfig s5-eth1 0")
+s5.cmd("ifconfig s5-eth0 0")
+s5.cmd("brctl addbr vlan10")
+s5.cmd("ifconfig vlan10 up")
+s5.cmd("brctl addif vlan10 s5-eth0")
+s5.cmd("brctl addif vlan10 s5-eth1")
+h1.cmd("ifconfig h1-eth0 10.0.10.1 netmask 255.255.255.0")
+h2.cmd("ifconfig h2-eth0 10.0.10.2 netmask 255.255.255.0")
+h1.cmd("ip route add default via 10.0.10.254 dev h1-eth0")
+h2.cmd("ip route add default via 10.0.10.254 dev h2-eth0")
+CLI(net)
+net.stop()
+```
 
 43. L2 Topology Demo
 
 44. L2 Topology Assignment
+
+## Section 5: Layer 3 Routing
+
+45. Layer 3 Routing Overview
+- Routing done at network layer
+- Only IP Addresses
+  - No role of MAC addresses
+- Scenario
+  - Host B -> Router R1: L2 routing
+  - Router R1 -> Internet -> Router R2: L3 routing
+  - Router R2 -> Host F: L2 routing
+
+46. Why we need L3 Routes?
+- Scenario
+  - A topology of 3 L3 routers (vm, vm1, vm2)
+  - vm - subnet1 - vm1 - subnet2 - vm2
+  - To ping from vm to vm1, L2 routing is good enough
+  - To ping from vm to vm2, L3 routing is required
+
+47. Semantics of Layer 3 Routes
+
+48. Routing table look up
+
+49. L3 Routing Topology
+
+50. Layer 3 Operations and Flowchart
+
+51. Layer 3 Routing Example
+
+52. Loopback Interfaces - Introduction
+
+53. Loopback Interfaces - Properties
+
+54. Routing using Loopback IP Address as Destination Address
+
+55. Lab session on L3 Routing
+
+56. L3 Topology Construction and Demo
+
+## Section 6: Data Structure for L3 Routing Tables
