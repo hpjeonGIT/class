@@ -85,8 +85,129 @@ Program received signal SIGFPE, Arithmetic exception.
 type = int
 ```
 2. GDB part 2
+  - When your program starts, the call stack has only one frame, that of function main
+  - Each function call pushes a new frame into the stack
+  - Recursive functions can generate many frames
+```c
+#include<stdio.h>	 	 
+void func1();	 	 
+void func2();	 	 
+int main() 
+{	 	 
+	int i=10;	 	 
+	func1();	 	 
+	printf("In Main(): %d\n",i);	 	 
+}	 	 
+void func1() 
+{	 	 
+	int n=20;	 	 
+	printf("In func1(): %d\n",n);	 	 
+	func2();	 	 
+}	 	 
+void func2() 
+{	 	 
+	int n = 30;	 	 
+	printf("In func2() : %d\n",n);	 	 
+}	
+```
+  - using `info frame`
+    - no argument is same to `info frame 0`
+```bash
+(gdb) bt
+#0  func1 () at 6/backtrace.c:14
+#1  0x0000555555554663 in main () at 6/backtrace.c:8
+(gdb) list
+9		printf("In Main(): %d\n",i);	 	 
+10	}	 	 
+11	
+12	void func1() 
+13	{	 	 
+14		int n=20;	 	 
+15		printf("In func1(): %d\n",n);	 	 
+16		func2();	 	 
+17	}	 	 
+18	
+(gdb) info frame
+Stack level 0, frame at 0x7fffffffd590:
+ rip = 0x555555554688 in func1 (6/backtrace.c:14); 
+    saved rip = 0x555555554663
+ called by frame at 0x7fffffffd5b0
+ source language c.
+ Arglist at 0x7fffffffd580, args: 
+ Locals at 0x7fffffffd580, Previous frame's sp is 0x7fffffffd590
+ Saved registers:
+  rbp at 0x7fffffffd580, rip at 0x7fffffffd588
+(gdb) info frame 1
+Stack frame at 0x7fffffffd5b0:
+ rip = 0x555555554663 in main (6/backtrace.c:8); 
+    saved rip = 0x7ffff7a03c87
+ caller of frame at 0x7fffffffd590
+ source language c.
+ Arglist at 0x7fffffffd5a0, args: 
+ Locals at 0x7fffffffd5a0, Previous frame's sp is 0x7fffffffd5b0
+ Saved registers:
+  rbp at 0x7fffffffd5a0, rip at 0x7fffffffd5a8
+```
+  - Note that saved rip at frame 0 is same to rip at frame 1
+  - `info variables` will print all system variables (too many)
+  - `info locals` will print local variables
+  - `info args` will print the arguments in the current frame
+  - `info registers` will print all registers such as rax, rbx, rbp, ...
+  - `condition 3 i==5` breaks at breakpoint 3 when i==5
+```bash
+(gdb) info breakpoints
+Num     Type           Disp Enb Address            What
+2       breakpoint     keep y   0x0000555555554663 in main 
+                                                   at 6/backtrace.c:9
+(gdb) condition 2 i==5
+(gdb) info breakpoints
+Num     Type           Disp Enb Address            What
+2       breakpoint     keep y   0x0000555555554663 in main 
+                                                   at 6/backtrace.c:9
+	stop only if i==5
+```
+  - `enable/disable 3` : will enable disable breakpoint 3
+  - ctrl+x+a or `tui enable` : tui window opens
+  - ctrl+l to redraw tui window
+  - `disassemble functionName`
+```bash
+(gdb) disassemble main
+Dump of assembler code for function main:
+   0x000055555555464a <+0>:	push   %rbp
+   0x000055555555464b <+1>:	mov    %rsp,%rbp
+   0x000055555555464e <+4>:	sub    $0x10,%rsp
+   0x0000555555554652 <+8>:	movl   $0xa,-0x4(%rbp)
+   0x0000555555554659 <+15>:	mov    $0x0,%eax
+   0x000055555555465e <+20>:	callq  0x555555554680 <func1>
+=> 0x0000555555554663 <+25>:	mov    -0x4(%rbp),%eax
+   0x0000555555554666 <+28>:	mov    %eax,%esi
+   0x0000555555554668 <+30>:	lea    0xf5(%rip),%rdi        # 0x555555554764
+   0x000055555555466f <+37>:	mov    $0x0,%eax
+   0x0000555555554674 <+42>:	callq  0x555555554520 <printf@plt>
+   0x0000555555554679 <+47>:	mov    $0x0,%eax
+   0x000055555555467e <+52>:	leaveq 
+   0x000055555555467f <+53>:	retq   
+End of assembler dump.
+```
 
 3. Coredump_Valgrind
+  - `ulimit -c unlimited` # unlimit the size of core files
+  - `gdb <exe> <corefiles>`
+    - where
+    - info locals
+    - info registers
+  - `kill -s SIGABRT <pid>` # terminate working process
+  - Out of bonds memory access
+    - Write overflow: write is attempted into a memory buffer after its legally accessible location
+    - Write underflow: write is attempted into a memory buffer before its legally accessible location
+    - Read overflow: read is attempted on a memory buffer after its last legally accessible location
+    - Read underflow: read is attempted on a memory buffer after its first legally accessible location
+  - Print array value
+    - p &arr # data type
+    - x &arr # array value
+    - x/16 &arr
+    - x/16xb &arr # 16 bytes value
+    - x/32xb &arr # 32 bytes value
 
 4. strace_ltrace 
   - strace: traces system calls and signals
