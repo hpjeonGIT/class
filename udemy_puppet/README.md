@@ -9,7 +9,7 @@
 
 2. Why Puppet
   - Automation general
-    - Cobbler/Kicstart
+    - Cobbler/Kickstart
     - Golden Images
     - Bash scripts
     - Anything repeatable
@@ -83,7 +83,7 @@ end
     - yum install php5
     - Or may configure apt command for Ubuntu
   - Defining state in puppet
-```
+```ruby
   package { 'php5' : ensure -> installed,}
 ```
   - Resoruce types
@@ -116,7 +116,7 @@ end
     - The resource type that we are managing
     - The identifying name of the resource
     - Attributes that we want to manage
-    ```
+    ```ruby
     type { 'title':
       attribute => 'value',
     }
@@ -130,7 +130,7 @@ end
     - Singleton
     - Model configuration by grouping together resources
     - Apply the class to instantiate the configuration
-    ```
+    ```ruby
     class sysadmins {
       group { 'sysadmins':
         ensure => present,
@@ -217,7 +217,7 @@ end
   - Normally the title of the resource is used as the unique identifier
   - Each resource type also has one or more attributes that are **namevars**
   - Resource titles and **namevars** must be unique
-```
+```ruby
 package { 'web server':
    ensure => installed,
    name   => 'httpd',
@@ -237,7 +237,7 @@ package { 'web server':
 - Managing file contents
   - Statically or dynamically
   - `source` specifies a location on the puppet server to serve the file statically
-```
+```ruby
 file { '/etc/httpd/httpd.conf': 
   ensure => file,
   source => 'puppet:///modules/apache/httpd.conf',
@@ -247,7 +247,7 @@ file { '/etc/httpd/httpd.conf':
   }
 ```
   - `content` specifies a string value to populate the file dynamically
-```
+```ruby
 file { '/etc/motd': 
   ensure  => file,
   content => 'Welcome to my system',
@@ -265,7 +265,7 @@ file { '/etc/motd':
     - The file name is relative from the `files` folder in: `<modulename>/files/<filename>`
     - Ex) `puppet:///modules/apache/httpd.conf`
       - Actual file structure is `apache/files/httpd.conf`
-```
+```ruby
 class motd {
   file {'/etc/motd':
   ensure => file,
@@ -291,7 +291,7 @@ class motd {
   - A resource reference is a pointer to a resource declaration: `Package[ 'httpd' ]`
   - Can configure dependency with `require`
     - Resource must be declared in puppet explicitly. Existing resource without declaration will not work
-  ```
+  ```ruby
   package { 'httpd':
     ensure => installed,
   }
@@ -301,7 +301,7 @@ class motd {
   }
   ```
   - Or using `before` attribute:
-  ```
+  ```ruby
   package { 'httpd':
     ensure => installed,
     before => Service['httpd'],
@@ -316,7 +316,7 @@ class motd {
   - Some resource types are **refreshable**, meaning they take an acition when they receive a refresh event
   - Ex) We want to restart httpd when apach configuration file is pupdated
     - Use `subcribe` to send an event notification
-  ```
+  ```ruby
   file { '/etc/httpd/httpd.conf':
     ensure => file,
     source => 'puppet:///modules/apache/httpd.conf',
@@ -327,7 +327,7 @@ class motd {
   }
   ```
     - Or use `notify` 
-  ```
+  ```ruby
   file { '/etc/httpd/httpd.conf':
     ensure => file,
     source => 'puppet:///modules/apache/httpd.conf',
@@ -338,7 +338,7 @@ class motd {
   }
   ```
   - The `exec` resource is also refreshable
-  ```
+  ```ruby
   service {'tinpot':
     ensure => running,
     enable => true,
@@ -352,7 +352,7 @@ class motd {
   ```
 - Implied dependencies
   - `user` resource type auto-requires any groups specified
-  ```
+  ```ruby
   user { 'bob' :
     ensure => present,
     groups => 'sysadmins',
@@ -365,7 +365,7 @@ class motd {
 - Resource chaining
   - A short hand syntax for expressing relationships by referencing the resources and chaining them together
   - `Package['httpd'] -> File['/etc/httpd/httpd.conf']`
-```
+```ruby
 package { 'httpd':
   ensure => installed,
 } ->
@@ -381,19 +381,548 @@ file { '/etc/httpd/httpd.conf':
 - `Package['httpd'] -> File['/etc/httpd/httpd.conf'] ~> Service['httpd']` is equivalent to `Service['httpd'] <~ File['etc/httpd/httpd.conf'] <- Package['httpd']`
 
 10. Interactive exercise: Package/File/Service
+- An exercise of apache module
+  - Manage the httpd package and service
+  - Manage the default httpd.conf file
+  - Ensure the document root exists
+```bash
+cd /etc/puppetlabs/code/environments/production/modules
+mkdir apache
+cd apache
+mkdir manifests
+mkdir files
+cd files
+cp /root/httpd_minimal.conf .
+cd ../manifests
+vim init.pp ## see below
+cd /etc/puppetlabs/code/environment/production/manifests
+vim site.pp ## see below
+```
+- init.pp
+```ruby
+class apache {
+  package { 'httpd':
+    ensure => installed,
+  }
+  file { '/etc/httpd/conf/httpd.conf':
+    ensure => file,
+    source => 'puppet:///modules/apache/httpd_minimal.conf',
+    require => Package['httpd'],
+  }
+  service { 'httpd':
+    ensure => running,
+    enable => true,
+    subscribe => File ['/etc/httpd/conf/httpd.conf'],
+  }
+  file { '/var/www/html':
+    ensure => directory,
+  }
+}
+```
+  - Make sure the chain of dependency
+- site.pp
+```ruby
+node "agent.localdomain" {
+  include motd
+  include apache
+}
+```
+- Now run `puppet agent -t` from the agent node
+  - Check through `systemctl status httpd`
 
 11. Variables
+- Prefixed with `$`
+- Assigned with `=`
+- Must begin with a lower case letter or underscore
+  - `$pkgname = 'apache'`
+- Once declared, cannot be modified or re-declared
+- Can be used as a resource titles/attribute values
+  - `package { $pkgname: .... }`
+- Strings in Puppet must be quoted
+- Single quotes for static content
+- **Double quotes** for interpolated content  
+- When interpolating a variable into a string, the variable must be in brackets
+  - Use brackets within double quotes always
+```ruby
+$prefix = 'README'
+$suffix = 'txt'
+$filename = "${prefix}.${suffix}"
+```
+- Rewriting with variables
+```ruby
+class apache {
+  $package_name = 'httpd'
+  $service_name = 'httpd'
+  $config_file = '/etc/httpd/conf/httpd.conf'
+  package { $package_name:
+    ensure => installed,
+  }
+  file { $config_file:
+    ensure => file,
+    source => 'puppet:///modules/apache/httpd_minimal.conf',
+    require => Package[$package_name],
+  }
+  service { $service_name:
+    ensure => running,
+    enable => true,
+    subscribe => File [$config_file],
+  }
+}
+```
+- Arrays
+  - Declared inside square brackets
+  - Can use an array in the resource title, creating multiple resources
+  - Some resource types can use an array
+```ruby
+$users = ['bob', 'susan', 'peter']
+user { $users: 
+  ensure=> present,
+}
+file {'/etc/app.conf':
+  ensure => file,
+  require => Package['httpd', 'acmeapp'],
+}
+file {'/etc/web.conf':
+  ensure => file,
+  require => [Package['httpd'], Service['acmep']],
+}
+```  
+- Hashes (dictionary)
+  - Using brackets {}
+  - Key valeus are separated by a hashrocket (=>)
+    - Similar to Ruby
+```ruby
+$uids = { 
+  'bob'   => '9999',
+  'susan' => '9998',
+  'peter' => '9997',
+}
+$uid_susan = $uids['susan']
+```
+- Scope
+  - If a variable is not found in the current scope, the next scope is searched
+  - Scopes are namespaced with `::`
+- Facts revisited
+  - Agent facts are sent to the server and available in a hash called `$::facts`
+  - We can use the `facter` command to view facts on the CLI
+  - Facts are also top level variables, but the `$::facts` has is recommended
+  - Ex) `$::facts['os']['family']`
+- Trusted facts
+  - From Agents SSL certificate
+  - Stoped in a top level hash called `$::trusted`
+  - For security, instead of `$::facts['certname']`, `$::trusted['certname']` must be used
 
 12. Conditionals
+- Assignment conditionals
+  - Selectors
+    - Assign data based on evaluation
+    - Not control the flow of the code
+  ```ruby
+  $package_name = $::facts['os']['family'] ? {
+    'Debian' => 'apache2',
+    'Redhat' => 'httpd',
+    'Solaris' => 'CSWApache2',
+    default => 'httpd',
+  }
+  ```
+- Flow conditionals
+  - Case statements
+    - Executes a block of code depending on the evaluation
+  ```ruby
+  case $::facts['os']['family'] {
+    'Redhat': {
+      include yum
+    }
+    'Debian': {
+      include apt
+    }
+    default: {
+      fail ('Unknown OS')
+    }
+  }
+  ```
+  - if/else blocks
+    - `==`: equal
+    - `!=`: not equal
+    - `<`: less than
+    - `<=`: less than or equal to
+    - `>`: greater than
+    - `>=`: greater than or equal to
+    - `=~`: match regular expression
+  ```ruby
+  if $install_package {
+    package { $packagename:
+      ensure=>installed,
+    }
+  }
+  if $environment == 'dev' {
+    include devutils
+  }
+  ```
+- Regular expression
+  - Surround using slashes as `/.../` 
+```ruby
+case $::trusted['certname'] {
+  /.*\.uk\..*/: {
+    include users::london
+  }
+  /.*\.es\..*/: {
+    incluide users::madrid    
+  }
+  default: {
+    fail ('Not in the UK')
+  }
+}
+$country = $domain ? {
+  /.*\.uk$/ => 'United Kingdom',
+  /.*\.es$/ => 'Spain',
+  default   => 'Other palce',
+}
+```
+- Case sensitivity
+  - By default, puppet will use **case insensitivity**
+```ruby
+$pacakge_manager = $::facts['os']['family'] ? {
+  'redhat' => 'yum',
+  'debian' => 'opt',
+  default => 'unknown',
+}
+```
+  - 'redhat' or 'RedHat' will work
+  - To enforce case sensitivity, use `/.../` such as `/RedHat/ => 'yum'`
 
 13. Data Types
+- Datatype begins with a Capital letter like `String`
+- String
+  - `String[4,8]`: strings of 4-8 characters
+- Integer/Float/Numeric
+  - `Integer[5,10]`: integer b/w 5-10
+  - `Float[1.9]`: min value as of 1.9
+  - `Numeric` doesn't support parameters of min/max
+- Array
+  - `Array[String]`
+  - `Array[Any,5]`: Any datatype with 5 array size
+- Hash
+  - `Hash[String, Integer]`
+  - `Hash[String, Integer, 5,10]`
+- `Regexp`
+- `Undef`
+- `Variant[String, Intger]`
+- `Enum['yes','no']`
+- `Optional[String]`
+- Datatype comparison using `=~`
+  - Output will be true or false
+```ruby
+$username = 'micky'
+unless $username =~ String[4,8] {
+  fail('Invalid username')
+}  
+```
+  - Checks a string type with 4-8 characters
 
 14. Functions
+- Server side methods
+  - Functions can be written in Ruby or Puppet DSL
+  - Executed server side during catalog compilation
+  - Functions either return data to assign to a variable or perform an action with no return value
+- Calling functions
+  - Prefixed syntax: funciton(arg,arg)  
+    - `notice("Hello world")`
+  - Chained syntax notation: arg.function(arg,arg)
+    - `"Hello World".notice`
+- Functions can be found at 3 levels
+  - Global function: `function`
+  - Environment level function: `environment::function`
+  - Module funciton: `modulename::funciton`
+- Lambdas (code blocks)  
+  - Anonymous functions
+  - Prefixed syntax: `function(arg,arg) |param,param| { }`
+  - Chained syntax: `argument.function(arg,arg) |param,param| { }`
+```ruby
+$user = with("susan", "susan@example.com") |$u, $e| {
+  { "user_name" => $u,
+    "email"     => $e,
+    }
+}
+```  
+- Loops and iterators
+  - Iterates over hashes or arrays  
+```ruby
+$vhosts = ['acme.com','examle.com', 'abc.org']
+$vhosts.each | $v | {
+  file { ["/var/sites/${v}", "/var/log/vhots/${v}" ]:
+    ensure => directory,
+  }
+}
+```
+- Data validation
+  - Use datatype explicitly
+  - Ex) `$vhosts.each | String $hostname, Integer $port | {...}`
+```ruby
+$users = ['kate','susan', 'fred']
+$users.each | String $u| {
+  user {$u:
+    ensure     => present,
+    managehome => true,
+  }
+  file { "/home/${u}/.bashrc":
+    ensure => file,
+    owner  => $u,
+    group  => $u,
+    content => 'export PATH=$PATH:/opt/puppetlabs/puppet/bin',
+  }
+}
+```
+- Writing functions
+  - Puppet supports three types of functions
+    - Legacy Ruby API (will be deprecated)
+      - Global name space. Very dangerous
+    - Modern Ruby API
+      - Scope is defined through namespace
+    - Puppet DSL functions
+- Function demo
+  - Given a hostname of xxx-{p,d,q}-yyy return the hosts's environment by matching
+    - p = Production
+    - d = Development
+    - q = QA
+  ```
+  cd /etc/puppetlabs/code/environments/production/modules
+  mkdir hostname
+  cd hostname
+  mkdir manifests
+  mkdir functions
+  cd functions
+  vim environment.pp
+  cd ../manifests
+  vim init.pp
+  puppet apply -e 'include hostname'
+  ```
+  - environment.pp
+  ```ruby
+  function hostname::environment(String $host) >> String {
+    $env_name = $host ? {
+      /[^\-]+-p-[^\-]+/ => 'Production',
+      /[^\-]+-d-[^\-]+/ => 'Development',
+      /[^\-]+-q-[^\-]+/ => 'QA',
+    }
+    $env_name
+  }
+  ```
+  - init.pp
+  ```ruby
+  class hostname {
+    $server_name = 'oradb-p-001'
+    $environment_name = hostname::environment($server_name)
+    notify { "My environment is ${environment_name}": }
+  }
+  ```
+- Module layout
+  - files
+  - functions -> Puppet DSL functions
+  - lib
+    - puppet
+      - functions -> Ruby functions
+  - manifests
 
 15. Templates
+- Using puppet templates
+  - We embed code into static content to create templates
+  - Templates are normally used for serving dynamic file contents
+  - Puppet supports 2 template formats
+    - EPP (Embedded Puppet), native puppet DSL templates
+    - ERB (Embedded Ruby), Legacy Ruby Templates
+  - EPP templates are called using the in-built epp function
+  - Tempaltes are served from the templates folder directly under the module root: `<modulepath>/<module name>/templates/name.epp`
+- Calling puppet templates
+  - The epp function is used to render a template and return the content
+  - The first argument is the location of the template as `<modulename>/<file>`
+  - The second argument is a hash of parameters to pass to the template
+    - Key/values are defined in this hash (dictionary)
+  ```ruby
+  $params = { 'role' => 'database', 'server_name' => 'oracle01' }
+  $output = epp('mymodule/welcome.epp', $params)
+  ```
+- Writing puppet templates
+  - Templates are static content with embedded dynamic tags surrounded by `<%...%>`
+  - There are 3 types of tags
+    - `<% | ... | %>`: parameter tag
+    - `<%  ...  %>`: functional tag
+    - `<%= ...  %>`: expression substitution tag
+  ```ruby
+  <% | String $role, String $servr_name |%>
+  Welcome to <%= $server_name %>
+  This machine is a <%= $role %> server
+  ```
+- Blank lines
+  - Ending with `%>` yields new line
+  - To avoid the new line, end with `-%>`
 
 16. Parameterized Classes
+- Puppet classes must be designed to be re-usable, sharable components
+- We can use class parameters to make instantiation of a class customizable
+- Implements class like a function, feeding arguments
+  - Using the resource declaration syntax, we can pass parameters to a class the same way as resource attributes
+    - Default values are allowed
+    - Datatype might be enforced
+  ```ruby
+  class apache ( 
+    String $version, 
+    String $docroot, 
+    String $bindaddress, 
+    Integer $port=80) {...}
+  ...
+  class { 'apache' :
+    version => '2.2.3',
+    docroot => '/sites/default',
+    bindaddress => '10.0.1.15',
+    port => 80,
+  }
+  ```
 
 17. Defined Resource Types
+- Introduction
+  - Similar to classes, but provides a configuration model that can be instantiated multiple times
+  - When you need to group together several resources into a repeatable template
+- Example
+  - Apache resource regarding conf file/doc root/index.html  
+    - Couple them as vhost
+- Writing defined resource types
+  - Named as `<module>::<name>`
+  - They should be placed in a manifest file that corresponds with the name
+  - A defined resource of `apache::vhost`is defined in `<modulepath>/apache/manifests/vhost.pp`
+  - Defined resources are written using the `define` keyword
+  - The syntax is almost identical to a writing a class
+```ruby
+define apache::vhost (
+  String $docroot = "/var/www/${name}",
+  Integer $port,
+) {
+  file { $docroot:
+    ensure => directory,
+  }
+  file { "/etc/httpd/conf.d/${name}.conf":
+    ensure => file,
+    content => epp('apache/vhost.epp', { "port" => $port }),
+  }
+  file { "${docroot}/index.html":
+    ensure => file,
+  }
+}
+```
+- Declaring a defined resource
+  - Defined resources are declared when the same syntax as regular resources
+  - The resource attributes are passed to the parameters of the defined resource type
+  - The resource title is passed to the `$name` variable above
+```ruby
+apache::vhost { "acme.com":
+  port => 80,
+}
+```
+- Q: Is `$name` pre-defined position holder for the resource title?
+```ruby
+apache::vhost { "example.com":
+  port => 81,
+  docroot => '/sites/example.com',
+}
+apache::vhost { "foo.com":
+  port => 80,
+  docroot => '/sites/foo.com',
+}
+apache::vhost { "acme.com":
+  port => 80,
+  docroot => '/sites/acme.com',
+}
+```
 
 18. Advanced Resource Declarations in Puppet4
+- Best practice
+- Resource grouping
+  - Multiple resource of the same type can be long to write
+  - We can declare multiple resources within the same resource declaration block
+  - 3 resources separately
+  ```ruby
+  file {
+    '/etc/foo':
+    ensure => file,
+    source => 'puppet:///mymodule/foo',
+  }
+  file {
+    '/etc/bar':
+    ensure => file,
+    source => 'puppet:///mymodule/bar',
+  }
+  file {
+    '/etc/tango':
+    ensure => file,
+    source => 'puppet:///mymodule/tango',
+  }
+  ```
+  - Grouping: can save some lines. Use semicolon `;` to separate resources
+  ```ruby
+  file {
+    '/etc/foo':
+      ensure => file,
+      source => 'puppet:///mymodule/foo';
+    '/etc/bar':
+      ensure => file,
+      source => 'puppet:///mymodule/bar';
+    '/etc/tango':
+      ensure => file,
+      source => 'puppet:///mymodule/tango';
+  }
+  ```
+- Resource defaults
+  - When declaring lots of resources of the same type with identical attributes, we can reduce the amount of code by using resource defaults
+  - Puppet supports two types of resource defaults
+    - Reference syntax
+    - Resource declaration syntax
+```ruby
+File {
+  owner => 'root',
+  group => 'root',
+  mode  => '0777',
+}
+file {
+  '/etc/foo':
+    ensure => file;
+  '/etc/bar':
+    ensure => file;
+  '/etc/tango':
+    ensure => file;
+}
+```
+- In puppet4, we use `default` keyword
+```ruby
+file {
+  default:
+    owner => 'root',
+    group => 'root',
+    mode  => '0777';
+  '/etc/foo':
+    ensure => file;
+  '/etc/bar':
+    ensure => file;
+  '/etc/tango':
+    ensure => file;
+}
+```
+- Dynamic attributes
+  - Puppet supports the ability to define resource attributes dynamically from a hash
+  - To pass dynamic resources to a declaration we can use the special `*` attribute
+```ruby
+$attrs = {
+  'owner' => 'root',
+  'group' => 'root',
+  'mode'  => '0644',
+}
+file { '/tmp/foo':
+  ensure => file,
+  *      => $attrs,  
+}
+```
+  - `*` can be used in default attributes as well
+
+## Section 4: Conclusion
+
+19. Next Steps
+  - Hiera
