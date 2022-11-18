@@ -219,3 +219,10 @@ core LWP 26611 In: comp                                           L4    PC: 0x56
 (gdb) 5 in /home/hpjeon/hw/class/udemy_gdb/ex2.cxx
 (gdb) 
 ```
+
+
+## backtrace at throw
+- Use `catch throw` prior to run
+  - `bt` after crash will show which line threw
+- Use `catch catch` for catch
+- Same in ARM DDT
