@@ -1,4 +1,5 @@
-## Java 17: Learn and dive deep into Java
+## Summary
+- Title: Java 17: Learn and dive deep into Java
 - Instructor: Ryan Gonzalez
 
 ## Section 1: Welcome to the course
@@ -1052,15 +1053,1415 @@ public class Main {
 96. Introduction to Generics
 
 97. Generic Method and Generic Interface
+- `<T extends Number>`: any type from Number only. String data will not be compiled
+- MinMax.java:
+```java
+public interface MinMax<T extends Number> {
+  T min(T x, T y);
+  T max(T x, T y);
+}
+class MyClass implements MinMax<Double> {
+  @Override
+  public Double min(Double x, Double y)  {
+    return x>y ? y: x;
+  }
+  @Override
+  public Double max(Double x, Double y)  {
+    return x>y ? x: y;
+  }
+}
+/* Not compiled due to extends Number above
+class MyClass2 implements MinMax<String> {
+  @Override
+  public String min(String x, String y)  {
+    return x>y ? y: x;
+  }
+  public String max(String x, String y)  {
+    return x>y ? x: y;
+  }
+}
+*/
+```
 
 98. Wildcards
+- ?:Presents unknown type
+- Unbounded type : `MyArray<?>`
+- Lowerbound wild card: `<? Super ...>`
+- Upperbound wild card: `<? extends ...>`
 
 ## Section 13: Collections Framework
 
+99. Introduction to Collections
+- Containers for data
+- Iterable
+  - Collection
+    - List
+      - ArrayList
+      - LinkedList
+      - Vector - Stack
+    - Queue
+      - Deque
+        - ArrayDeque
+    - Set - SortedSet - Tree Set
+      - HashSet
+      - LinkedHashSet
+- Map
+  - HashTable
+  - HashMap - LinkedHashMap
+  - SortedMap - NavigableMap - TreeMap
+
+100. Introduction to ArrayList
+- Iterable - Collection - List - ArrayList
+```java
+import java.util.ArrayList;
+import java.util.List;
+public class Main {
+  public static void main(String[] args) {
+    List<Integer> numbers = new  ArrayList<>();
+    numbers.add(99);
+    numbers.add(null);
+    numbers.add(5);
+    System.out.println(numbers);
+  }
+}
+```
+- ArrayList
+  - Maintains elements insertion order
+  - Stores null and duplicate elements
+  - Can insert elements at any location
+  - Zero-based index
+  - Allwos fast random access
+  - ArrayList doesn't store primitive data types
+- ArrayList under the hood
+  - Default initial size = 10
+  - Threshold/minCapacity/loadFactor = 0.75
+    - If data is larger than 75% of the array, java will increase the array
+    - Insertion/removal of mid-elements is very expensive due to re-arrangement of contiguous memory
+
+101. Collection interface methods
+```java
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Collection;
+public class Main {
+  public static void main(String[] args) {
+    Collection<Integer> c1 = new ArrayList<>();
+    c1.add(1);
+    Collection<Integer> c2 = List.of(2,7,1,3,0);
+    Collection<Integer> c3 = new ArrayList<>() {{ add(4); add(5); add(6);}};
+    c1.addAll(c2); // Concatenating Lists
+    System.out.println(c1);
+  }
+}
+```
+- remove(): Removes the corresponding elements
+- removeAll(): Removes elements within the argument collection
+- retainAll(): Removes all except the elements of argument collection
+- isEmpty(): true or false
+- size(): returns the size
+
+102. List interface methods
+```java
+import java.util.ArrayList;
+import java.util.List;
+public class Main {
+  public static void main(String[] args) {
+    List<String> l1 = new ArrayList<>();
+    l1.add("first");
+    l1.add("second");
+    l1.add(null);
+    System.out.println(l1);
+    System.out.println(l1.isEmpty());
+    System.out.println(l1.size());
+    System.out.println(l1.indexOf("second"));
+    System.out.println(l1.indexOf("Second")); // returns -1
+  }
+}
+```
+- sort() with null crashes
+  - To sort with null, use Comparator.nullsLast or nullsFirst such as: `l1.sort(Comparator.nullsLast(Comparator.naturalOrder()));`
+
+103. Sorting List
+```java
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Comparator;
+public class SortingStrings  {
+  public static void main(String[] args) {
+    List<String> l1 = new ArrayList<>(List.of("B123", "Daw", "aZZ"));
+    System.out.println("Before sorting: " + l1);
+    l1.sort(Comparator.naturalOrder()); // sort by ASCII number
+    l1.sort(String.CASE_INSENSITIVE_ORDER); // case insensitive order
+    Comparator<String> lc = Comparator.comparingInt(String::length); // comparator by String length
+    Comparator<String> lc2 = (s1,s2)->Integer.compare(s1.charAt(1), s2.charAt(1)); // sort by 2nd Char
+    l1.sort(lc2);
+    System.out.println("After sorting" + l1);
+  }
+}
+```
+
+104. Example on Using Array List
+
+105. Introduction to LinkedList
+- Fast insertion/removal than ArrayList
+- Queue
+   - FIFO
+
+106. LinkedList
+- Queue
+  - offer(), poll(), peek(): doesn't yield error even when empty
+  - add(), remove(), element()
+- Deque
+  - offerFirst(), offerLast(), pollFirst(), pollLast(), peekFirst(), peekLast()
+  - addFirst(), addLast(), removeFirst(), removeLast(), getFirst(), getLast()
+  
+107. ArrayDeque (pronounced Array Deck)
+- Fast add/remove from both sides
+- ArrayDequeAsStack.java:
+```java
+import java.util.ArrayDeque;
+public class ArrayDequeAsStack {
+  // Insertion from Head:  push offerFirst  addFirst
+  // remove from head:     pop  poll pollFirst  removeFirst
+  // Examine from head:    peek  peekFirst  getFirst
+  public static void main(String[] args) {
+    ArrayDeque<String> arrayDeque = new ArrayDeque<>();
+    arrayDeque.push("Book1");
+    arrayDeque.push("Book2");
+    arrayDeque.offerFirst("Book3");
+    arrayDeque.addFirst("Book4");
+    String element = arrayDeque.getFirst();
+    System.out.println(element);
+    System.out.println(arrayDeque);
+  }
+}
+```
+- ArrayDequeAsQueue.java:
+```java
+import java.util.ArrayDeque;
+public class ArrayDequeAsQueue {
+  // Insertion from tail:  offer offerLast  addLast
+  // remove from head:     poll  pollFirst  removeFirst
+  // Examine from head:    peek  peekFirst  getFirst
+  public static void main(String[] args) {
+    ArrayDeque<String> arrayDeque = new ArrayDeque<>();
+    arrayDeque.offer("customer1");
+    arrayDeque.offerLast("customer2");
+    arrayDeque.addLast("customer3");
+    arrayDeque.offer("customer4");
+
+    String element = arrayDeque.removeFirst();
+    System.out.println(element);
+
+    System.out.println(arrayDeque);
+  }
+}
+```
+
+108. PriorityQueue
+- Main.java:
+```java
+import java.util.PriorityQueue;
+public class Main {
+  // retrieval: poll, remove, peek, element
+  public static void main(String[] args) {
+    PriorityQueue<Integer> numbers = new PriorityQueue<>();
+    numbers.add(99);
+    numbers.add(45);
+    numbers.add(1);
+    System.out.println(numbers.poll());
+    System.out.println(numbers.poll());
+    System.out.println(numbers.poll());
+    PriorityQueue<String> letters = new PriorityQueue<>();
+    letters.add("z");
+    letters.add("s");
+    letters.add("a");
+    System.out.println(letters.poll());
+    System.out.println(letters.poll());
+    System.out.println(letters.poll());
+  }
+}
+```
+
+109. Introduction to HashMap
+- key and value
+- put(), putAll(), putIfAbsent(), computeIfAbsent(), computeIfPresent(), compute()
+  - If the same key is used, put() will overwrite the value
+  - In order to avoid overwriting, may use putIfAbsent()
+- Example1.java:
+```java
+import java.util.*;
+public class Example1 {
+  // adding / updating entry to map entry set:
+  // put, putAll, putIfAbsent, computeIfAbsent, computeIfPresent, compute
+  public static void main(String[] args) {
+    Map<Integer, String> students = new HashMap<>();
+    students.put(1, "John");
+    students.put(2, "Tom");
+   Map<Integer, String> otherMap = new HashMap<>(Map.of(3, "Samantha", 4, "Olivia"));
+    students.putAll(otherMap);
+    students.putIfAbsent(1, "Ryan");
+    students.computeIfAbsent(1, k-> {
+      System.out.println(k);
+      return  "Ryan";
+    });
+    students.computeIfPresent(8, (k,v) -> v.toUpperCase()+"!!");
+    students.compute(4, (k, v)-> {
+      if(students.containsKey(k)){
+        return v.toUpperCase()+"**";
+      }
+      return "Ryan";
+    });
+    System.out.println(students);
+  }
+}
+```
+
+110. HashMap
+
+111. Why is it called HashMap and Example on HashMap
+- Array of nodes/buckets/bins
+  - Initial capacity of nodes = 16
+  - key->hashing mechanism -> hashkey
+- Hash collision: two different keys generate the same hash key
+
+112. LinkedHashMap
+- Doubly linked list to maintain insertion order
+- Contains unique keys
+- May have one or more null values
+- Maintain insertion order or access order (LRU)
+- Max entries option
+
+113. TreeMap
+- Key/value in sorted order
+
+114. HashSet
+- Set: unique elements only
+- Internally uses HashMap
+  - Repeated values are stored with different keys
+
+115. LinkedHashSet
+- Unique elements only in insertion order
+
+116. TreeSet
+- Unique elements in natural order
+- No null
+
 ## Section 14: Stream API
+
+117. Introduction to Java Stream API
+- A stream is a sequence of data that supports multiple operations like filtering and mapping
+- Streams don't change the original structure
+- Streams don't hold data - streams process data
+- Stream API pipeline
+  - Stream source: Array, ArrayList, HashMap, ...
+  - Stream operations: map(), distinct(), peek(), limit(), reduce(), filter(), ...
+  - Results: Number, Array, ArrayList, HashMap, ...
+- All streams are lazy
+  - Intermediate operations are not evaluated until terminal operation is invoked.
+- parallelStream can take benefit from multiple-cores
+
+118. Introduction to Terminal Operations and Optional Keyword
+- Optional keyword: may not contain values
+  - OptionalInt, OptionalLong, OptionalDouble, Optional<Integer>, ...
+- Terminal operations
+  - findAny(), findFirst(), allMatch(), anyMatch(), noneMatch(), ...
+  - `intList.parallelStream().findAny()` may return different values every time due to paralle operations
+
+119. More on Terminal operations methods (reduce)
+- Using reduce()
+- ReduceExample1.java:
+```java
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+public class ReduceExample1 {
+  public static void main(String[] args) {
+    List<Integer> list = new ArrayList<>(List.of(1, 2, 3, 4));
+   Optional<Integer> sum = list.stream().reduce((acc, n)-> {
+     System.out.println("acc: " + acc + ", n: " + n);
+    return acc * n;
+   });
+    System.out.println(sum);
+  Integer result =   list.stream().reduce(10, Integer::sum);
+  }
+}
+```
+- String concatenation works in the similar way
+
+120. Introduction to Collectors
+- Reduction operations using Collectors
+```java
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+public class AccumulatorsExample {
+  public static void main(String[] args) {
+    List<String> list = new ArrayList<>(List.of("java", "is", "awesome", "ai", "abab", "python"));
+    String joinedString = list.stream().collect(Collectors.joining(" ", ">>> ", " <<<"));
+   Map<String, Integer> map = list.stream().collect(Collectors.toMap(s1-> s1, s1-> s1.length()));
+   List<Integer> list1 = Stream.of(1, 2, 3).collect(Collectors.toUnmodifiableList());
+    Map<Integer, Set<String>> collect = list.stream().collect(Collectors.groupingBy(String::length, Collectors.toSet()));
+    Map<Boolean, List<String>> partitioned = list.stream().collect(Collectors.partitioningBy(s-> s.contains("a")));
+    System.out.println(partitioned);
+  }
+}
+```
+
+121. Intermediate Operations
+- Chaining methods
 
 ## Section 15: Date time and math APIs
 
+122. Introduction to Date Time APIs Part 1
+- Before Java8
+  - SimpleDateFormat class (java.text)
+    - Concrete class for formatting (date to text) and parsing (text to date) dates
+  - Calendar class (java.util)
+    - Provides many methods to get detailed information about a specific date
+  - Date class (java.util)
+    - Creates objects represents a specific instant in time with millisecond precision
+- Month notation
+  - MM: 12
+  - MMM: Dec
+  - MMMM: December
+- Date
+  - E: Tue
+  - EEEE: Tuesday
+- Java date starts from 1900
+- Unix epoch: 1970-01-01
+```java
+import java.text.SimpleDateFormat;
+import java.util.Date;
+public class JavaSE7APIPart1 {
+    public static void main(String[] args){
+        SimpleDateFormat simpleDateFormat =
+            new SimpleDateFormat("EEEE, MM/dd/yyyy HH:mm:ss.SS Z");
+        Date today = new Date();
+        System.out.println(simpleDateFormat.format(today));
+
+    }
+}
+```
+- Results: `Saturday, 12/03/2022 15:47:15.789 -0500`
+
+123. Introduction to Date Time APIs Part 2
+- Date::getDate(), getYear(), getDay() are deprecated
+- Date::getTime(): milliseconds since 1970:01:01:00:00
+```java
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+/*
+    Date starts from 1900
+    Unix epoch:  Time starts from 1970-1-1
+ */
+public class DateCalendarExamples{
+    public static void main(String[] args) throws ParseException {
+        SimpleDateFormat simpleDateFormat =
+            new SimpleDateFormat("dd/MM/yyyy");
+        Date today = new Date();
+        System.out.println(simpleDateFormat.format(today));
+        System.out.println(today.getDate());
+        System.out.println(today.getYear());
+        System.out.println(today.getDay());
+        System.out.println(today.getMonth());
+        System.out.println(today.getTime());
+        Date date = simpleDateFormat.parse("29/12/1979");
+        System.out.println(date);
+        //-------------------------------------------
+        System.out.println(new Date());
+        Calendar calendar = new GregorianCalendar();
+        System.out.println(calendar.get(Calendar.ERA));
+        System.out.println(calendar.get(Calendar.YEAR));
+        System.out.println(calendar.get(Calendar.MONTH)); // index
+        System.out.println(calendar.get(Calendar.WEEK_OF_YEAR));
+        System.out.println(calendar.get(Calendar.DATE));
+        System.out.println(calendar.get(Calendar.DAY_OF_MONTH));
+        System.out.println(calendar.get(Calendar.DAY_OF_YEAR));
+        System.out.println(calendar.get(Calendar.DAY_OF_WEEK)); // not index
+        System.out.println(calendar.get(Calendar.HOUR));
+        System.out.println(calendar.get(Calendar.HOUR_OF_DAY));
+        System.out.println(calendar.get(Calendar.MINUTE));
+        System.out.println(calendar.get(Calendar.SECOND));
+        System.out.println(calendar.get(Calendar.MILLISECOND));
+        System.out.println(calendar.get(Calendar.AM_PM)); // 0: AM, 1: PM
+    }
+}
+```
+
+124. LocalDate Part 1
+```java
+import java.time.*;
+import java.time.temporal.ChronoField;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
+public class LocalDateExample {
+    public static void main(String[] args) {
+        LocalDate today = LocalDate.now();
+        System.out.println("today: " + today);
+        LocalDate hiringDate = LocalDate.of(2017, Month.DECEMBER, 29);
+        System.out.println("hiringDate: " + hiringDate);
+        LocalDate futureDate = LocalDate.parse("2027-12-27");
+        System.out.println("futureDate: " + futureDate);
+        System.out.println(today.getYear());
+        System.out.println(today.lengthOfYear());
+        System.out.println(today.get(ChronoField.YEAR));
+        System.out.println(today.getMonth());
+        System.out.println(today.getMonthValue());
+        System.out.println(today.lengthOfMonth());
+        System.out.println(today.get(ChronoField.MONTH_OF_YEAR));
+        System.out.println(today.getDayOfWeek());
+        System.out.println(today.get(ChronoField.DAY_OF_WEEK));
+        System.out.println(today.getDayOfMonth());
+        System.out.println(today.get(ChronoField.DAY_OF_MONTH));
+        System.out.println(today.getDayOfYear());
+        System.out.println(today.get(ChronoField.DAY_OF_YEAR));
+        System.out.println(today.isLeapYear());
+        boolean before = today.isBefore(hiringDate);
+        System.out.println(before);
+        boolean after = today.isAfter(hiringDate);
+        System.out.println(after);
+        LocalDateTime atStartOfDay = today.atTime(9, 15);
+        atStartOfDay = today.atStartOfDay();
+        System.out.println( atStartOfDay);
+        LocalDate with = today.with(TemporalAdjusters.lastDayOfYear());
+        System.out.println(with);
+        LocalDate with2 = today.with(TemporalAdjusters.firstInMonth(DayOfWeek.MONDAY));
+        System.out.println( with2);
+        //// plus and minus
+        today.minusDays(10);
+        today.minusMonths(2);
+        today.minusYears(2);
+        //// number and temporal unit
+        today.minus(12, ChronoUnit.MONTHS);
+        //// temporal amount
+        today.minus(Period.ofDays(12));
+        //// years of experience
+        Period period = Period.between(hiringDate, today);
+        System.out.println("period " + period);
+        System.out.println(period.getYears());
+        //// years of experience
+        LocalDate experience = today
+            .minusYears(hiringDate.getYear())
+            .minusMonths(hiringDate.getMonthValue())
+            .minusDays(hiringDate.getDayOfMonth());
+        System.out.println("experience: " + experience);
+
+        System.out.println(LocalDate.MIN);
+        System.out.println(LocalDate.MAX);
+    }
+}
+```
+
+125. LocalDate Part 2
+```java
+import java.time.*;
+import java.time.temporal.ChronoField;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
+
+public class LocalDateExample {
+    public static void main(String[] args) {
+        LocalDate today = LocalDate.now();
+        System.out.println("today: " + today);
+        LocalDate hiringDate = LocalDate.of(2017, Month.DECEMBER, 29);
+        System.out.println("hiringDate: " + hiringDate);
+        LocalDate futureDate = LocalDate.parse("2027-12-27");
+        System.out.println("futureDate: " + futureDate);
+        System.out.println(today.getYear());
+        System.out.println(today.lengthOfYear());
+        System.out.println(today.get(ChronoField.YEAR));
+        System.out.println(today.getMonth());
+        System.out.println(today.getMonthValue());
+        System.out.println(today.lengthOfMonth());
+        System.out.println(today.get(ChronoField.MONTH_OF_YEAR));
+        System.out.println(today.getDayOfWeek());
+        System.out.println(today.get(ChronoField.DAY_OF_WEEK));
+        System.out.println(today.getDayOfMonth());
+        System.out.println(today.get(ChronoField.DAY_OF_MONTH));
+        System.out.println(today.getDayOfYear());
+        System.out.println(today.get(ChronoField.DAY_OF_YEAR));
+        System.out.println(today.isLeapYear());
+        boolean before = today.isBefore(hiringDate);
+        System.out.println(before);
+        boolean after = today.isAfter(hiringDate);
+        System.out.println(after);
+        LocalDateTime atStartOfDay = today.atTime(9, 15);
+        atStartOfDay = today.atStartOfDay();
+        System.out.println( atStartOfDay);
+        LocalDate with = today.with(TemporalAdjusters.lastDayOfYear());
+        System.out.println(with);
+        LocalDate with2 = today.with(TemporalAdjusters.firstInMonth(DayOfWeek.MONDAY));
+        System.out.println( with2);
+        //// plus and minus
+        today.minusDays(10);
+        today.minusMonths(2);
+        today.minusYears(2);
+        //// number and temporal unit
+        today.minus(12, ChronoUnit.MONTHS);
+        //// temporal amount
+        today.minus(Period.ofDays(12));
+        //// years of experience
+        Period period = Period.between(hiringDate, today);
+        System.out.println("period " + period);
+        System.out.println(period.getYears());
+        //// years of experience
+        LocalDate experience = today
+            .minusYears(hiringDate.getYear())
+            .minusMonths(hiringDate.getMonthValue())
+            .minusDays(hiringDate.getDayOfMonth());
+        System.out.println("experience: " + experience);
+        System.out.println(LocalDate.MIN);
+        System.out.println(LocalDate.MAX);
+    }
+}
+```
+
+126. LocalTime and LocalDateTime
+- LocalTime example:
+```java
+import java.time.Duration;
+import java.time.LocalTime;
+import java.time.temporal.ChronoField;
+import java.time.temporal.ChronoUnit;
+public class LocalTimeExample {
+    public static void main(String[] args) {
+        LocalTime now = LocalTime.now();
+        System.out.println("now: " + now);
+        LocalTime workStart = LocalTime.parse("08:00");
+        System.out.println("work start: " + workStart);
+        LocalTime workEnd = LocalTime.of(16, 0);
+        System.out.println("work end: " + workEnd);
+        System.out.println(now.getHour());
+        System.out.println(now.getMinute());
+        System.out.println(now.getSecond());
+        System.out.println(now.get(ChronoField.AMPM_OF_DAY)); // 0: AM, 1: PM
+        System.out.println(LocalTime.MIN);
+        System.out.println(LocalTime.MAX);
+        // calculating difference between times
+        System.out.println("Working hours: " + (workStart.until(workEnd, ChronoUnit.HOURS)));
+        System.out.println("Working hours: " + ChronoUnit.HOURS.between(workStart, workEnd));
+        System.out.println("Working hours: " + Duration.between(workStart, workEnd));
+        // plus and minus methods
+        now.plus(1, ChronoUnit.HOURS);
+        now.plusHours(1);
+        now.plusMinutes(5);
+        // before and after methods
+        boolean isBefore = LocalTime.parse("09:40").isBefore(LocalTime.parse("09:35"));
+        System.out.println(isBefore);
+        System.out.println(now.truncatedTo(ChronoUnit.HOURS));
+    }
+}
+```
+- LocalDateTime example:
+```java
+mport java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.Month;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
+import java.util.Locale;
+import java.time.LocalDateTime;
+public class LocalDateTimeExample {
+    public static void main(String[] args) {
+        LocalDateTime now = LocalDateTime.now();
+        System.out.println(now);
+        //String isoFormat = now.format(DateTimeFormatter.ISO_TIME);
+        //System.out.println(isoFormat);
+        //
+        //String patternFormat = now.format(DateTimeFormatter.ofPattern("E, MMM dd hh:mm a"));
+        //System.out.println(patternFormat);
+        //String italianLocale = now.format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withLocale(Locale.ITALIAN));
+        //System.out.println( italianLocale);
+        String chineseLocale = now.format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withLocale(Locale.CHINA));
+        System.out.println(chineseLocale);
+        LocalDateTime lastVisit = LocalDateTime.of(2021, Month.JANUARY, 25, 6, 30);
+        LocalDateTime lastUpdate = LocalDateTime.parse("2023-12-30T13:45:50.63", DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        //System.out.println(lastUpdate);
+        LocalDate date = LocalDate.now();
+        LocalTime time = LocalTime.now();
+        LocalDateTime dateTime = date.atTime(time);
+        System.out.println(dateTime);
+    }
+}
+```
+
+127. Zoneid, ZoneOffset, and OffsetDateTime classes
+```java
+import java.time.*;
+import java.util.Map;
+import java.util.Set;
+public class TimeZones {
+    /*
+        ZoneId Formats:
+             20:30Z
+             GMT+02:00
+             America/Los_Angeles (Area/City)
+     */
+    public static void main(String[] args) {
+        //System.out.println(LocalDateTime.now());
+        //System.out.println(Instant.now()); // Zulu time = GMT
+        //UTC: the primary time standard by which the world regulates clocks and time
+        Instant nowUtc = Instant.now();
+        //System.out.println(nowUtc.getEpochSecond()); // Returns: the seconds from the epoch of 1970-01-01T00:00:00Z
+        //System.out.println(System.currentTimeMillis());
+        //long startTime = System.currentTimeMillis();
+        //// some code
+        //System.out.println(System.currentTimeMillis() - startTime);
+        // list of zones available
+        //Set<String> availableZoneIds = ZoneId.getAvailableZoneIds();
+        //availableZoneIds.forEach(System.out::println);
+        // list of zone shortIDs
+        Map<String, String> shortIds = ZoneId.SHORT_IDS;
+        shortIds.forEach((k, v)-> System.out.println(k + " -> " + v));
+        // Get Your Current ZoneId
+        //System.out.println(ZoneId.systemDefault());
+        // Other places ZoneId
+        ZoneId tokyoTimeZone = ZoneId.of("Asia/Tokyo");
+        ZoneId calcuttaTimeZone = ZoneId.of("Asia/Calcutta");
+        ZoneId asiaSingapore = ZoneId.of("Asia/Singapore");
+        // Date and Time now in my Zone
+        //System.out.println(ZonedDateTime.now());
+        // Date and Time now in different time zones
+        //System.out.println(LocalDateTime.now(tokyoTimeZone));
+        //System.out.println(ZonedDateTime.now(tokyoTimeZone));
+        //System.out.println(nowUtc.atZone(tokyoTimeZone));
+        //System.out.println(ZonedDateTime.now(calcuttaTimeZone));
+        //System.out.println(Instant.now().atZone(calcuttaTimeZone));
+        //ZonedDateTime zonedDateTime = ZonedDateTime.of(LocalDateTime.now(), tokyoTimeZone);
+        //System.out.println(zonedDateTime);
+        // If you don't know the time zone, but you know the offset
+        ZoneOffset offset = ZoneOffset.of("-02:00");
+        OffsetDateTime offsetDateTime = OffsetDateTime.of(LocalDateTime.now(), offset);
+        System.out.println(offsetDateTime);
+        System.out.println(ZoneOffset.MIN);
+        System.out.println(ZoneOffset.MAX);
+    }
+}
+```
+
+128. Introduction to Math classs
+- Math.random(): returns random number [0,1)
+- Ref: https://www.javatpoint.com/java-math
+
+129. Generate random numbers
+- Different ways of generating random numbers
+```java
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
+public class RandomNumbers {
+    public static void main(String[] args) {
+        for (int i = 0; i < 100; i++) {
+            System.out.println(getRandomNumber_4(4, 9));
+        }
+    }
+    static int getRandomNumber_1(int min, int max){
+        Random random = new Random();
+        int range = max - min;
+        return random.nextInt(range) + min;
+    }
+    static int getRandomNumber_2(int min, int max){
+        Random random = new Random();
+        return random.ints(min, max)
+            .findFirst()
+            .orElse(0);
+    }
+    static int getRandomNumber_3(int min, int max){
+        int range = max - min;
+            int rand = (int)(Math.random() * range) + min;
+            return rand;
+    }
+    static int getRandomNumber_4(int min, int max){
+      return   ThreadLocalRandom
+            .current()
+            .nextInt(min, max);
+    }
+}
+```
+
+130. Guess the number game
+
 ## Sectino 16: File manipulation (I/O and NIO)
 
+131. Introduction to Java IO
+- Java uses streams to perform IO operations
+- Two types of IO streams
+  - Byte stream is convenient for handling the input/output of bytes (PDF, videos, MP3, images)
+  - Character stream uses Unicode to handle the input/output of characters
+
+132. FileInputStream, FileOutputStream, FileReader, FileWriter Classes
+- FileInputStream: reads byte streams
+- FileOutputStream: writes byte streams
+- FileReader: reads streams of characters
+- FileWriter: writes streams of characters
+```java
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+public class Main {
+  static String filePath = "/tmp/udemy_java/132/file.txt";
+  public static void main(String[] args) throws FileNotFoundException, IOException {
+    FileOutputStream fos = new FileOutputStream(filePath);
+    String sent = "java writes";
+    fos.write(sent.getBytes());
+    try(FileInputStream fis = new FileInputStream(filePath)) {
+      byte[] bytes = fis.readAllBytes();
+      String readText = new String(bytes);
+      System.out.println(readText);
+    }
+  }
+}
+```
+
+133. ByteArrayInputStream, ByteArrayOutputStream, CharArrayReadr/Writer Classes
+```java
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+public class ByteArrayInputStreamByteArrayOutputStreamExample {
+   static String filePath = "/Users/ryan/Desktop/file.txt";
+    public static void main(String[] args) throws IOException {
+        String word = "java";
+        byte[] bytes = word.getBytes();
+        //try(ByteArrayInputStream bais = new ByteArrayInputStream(bytes)){
+        //    System.out.println(bais.available());
+        //    for (int i = 0; i < bytes.length; i++) {
+        //        System.out.println((char) bais.read());
+        //    }
+        //}
+       try(ByteArrayOutputStream baos = new ByteArrayOutputStream();
+           FileOutputStream fos = new FileOutputStream(filePath, true)){
+           //System.out.println(baos.size());
+           baos.write('a');
+           baos.write('b');
+           baos.write('c');
+           baos.write('d');
+           //System.out.println(baos.size());
+           //System.out.println(baos);
+           baos.writeTo(fos);
+            baos.flush();
+       }
+    }
+}
+```
+```java
+import java.io.CharArrayReader;
+import java.io.CharArrayWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+public class CharArrayReaderWriter {
+    static String filePath = "/Users/ryan/Desktop/file.txt";
+    public static void main(String[] args) throws IOException {
+        String word = "java";
+        char[] chars = word.toCharArray();
+        //try(CharArrayReader car = new CharArrayReader(chars)){
+        //    int i;
+        //    while ((i = car.read()) != -1){
+        //        System.out.println((char) i);
+        //    }
+        //}
+        try(CharArrayWriter caw = new CharArrayWriter();
+            FileWriter fw = new FileWriter(filePath)){
+            caw.write("hello Java");
+            caw.write("hello Java2");
+            System.out.println(caw);
+            caw.writeTo(fw);
+        }
+    }
+}
+```
+
+134. BufferedInputStream BufferedOutputStream, Buffered Reader, BufferedWriter Classes
+- When reading/writing lage files in chunks
+- mark(): marks the starting point for buffer
+- reset(): goes back to the marking point
+```java
+import java.io.*;
+public class BufferedInputStreamBufferedOutputStreamExample {
+    // BufferedInputStream and BufferedOutputStream are efficient
+    // when reading and writing large files in chunks
+    static String filePath = "/Users/ryan/Desktop/file.txt";
+    public static void main(String[] args) throws IOException {
+        String word = "hello java";
+        byte[] bytes = word.getBytes();
+      //try(  FileOutputStream fos = new FileOutputStream(filePath);
+      //      BufferedOutputStream bos = new BufferedOutputStream(fos)){
+      //    bos.write(bytes);
+      //}
+        try(FileInputStream fis = new FileInputStream(filePath);
+             BufferedInputStream bis = new BufferedInputStream(fis))    {
+            System.out.println((char)bis.read()); // h
+            System.out.println((char)bis.read()); // e
+            bis.mark(200);
+            System.out.println((char)bis.read()); // l
+            System.out.println((char)bis.read()); // l
+            System.out.println((char)bis.read()); // o
+            System.out.println((char)bis.read()); // 
+            bis.reset();
+            System.out.println("after reset");
+            System.out.println((char)bis.read()); // l
+            System.out.println((char)bis.read()); // l
+            System.out.println((char)bis.read()); // o
+            //System.out.println(new String(bis.readAllBytes()));
+        }
+    }
+}
+```
+- After reset(), note that `llo` is re-read
+```java
+import java.io.*;
+public class BufferedReaderBufferedWriterExample {
+    static String filePath = "/Users/ryan/Desktop/file.txt";
+    public static void main(String[] args) throws IOException {
+        //String word = "hello java";
+        //char[] chars = word.toCharArray();
+        //try(FileWriter fw = new FileWriter(filePath);
+        //BufferedWriter bw = new BufferedWriter(fw)){
+        //    bw.write(word);
+        //    bw.newLine();
+        //    bw.write(chars);
+        //}
+        try(FileReader fr = new FileReader(filePath);
+        BufferedReader br = new BufferedReader(fr)){
+            //List<String> list = br.lines().filter(l -> l.contains("3")).toList();
+            //System.out.println(list);
+            //System.out.println(br.readLine());
+            //System.out.println(br.readLine());
+            //br.mark(200);
+            //System.out.println(br.readLine());
+            //System.out.println(br.readLine());
+            //br.reset();
+            //System.out.println(br.readLine());
+            //System.out.println(br.readLine());
+            String line;
+            while ((line = br.readLine()) != null){
+                System.out.println(line);
+            }
+        }
+    }
+}
+```
+
+135. Introduction to Serialization
+- Converts an object into a byte stream
+- Advantages of serialization
+  - Marshaling
+  - JVM indepedent
+  - Saves the object's state
+- how to serialize an object?
+  - Classes must implement directly or indirectly the serializable or externalizable interfaces
+  - ObjectInputStream and ObjectOutputStream classes used to serialization and deserialization
+  - Optional: add the `SerialVersionUID` field, a unique identifier used by JVM to compare the version of a class
+  - Static and transient fields will not be serialized
+
+136. Serialization Code using ObjectInputStream, ObjectOutputStream Classes
+```java
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+public class Main {
+    static String filePath = "/Users/ryan/Desktop/employee.txt";
+    public static void main(String[] args) throws Exception {
+        serialize();
+        deserialize();
+    }
+    static void serialize() throws Exception{
+        Employee employee = new Employee(101, "John Doe", "1234");
+        try (FileOutputStream fos = new FileOutputStream(filePath);
+             ObjectOutputStream out = new ObjectOutputStream(fos)){
+            out.writeObject(employee);
+        }
+    }
+    static void deserialize() throws Exception{
+        try (FileInputStream fis = new FileInputStream(filePath);
+             ObjectInputStream in = new ObjectInputStream(fis)){
+            Employee employee =(Employee) in.readObject();
+            System.out.println("id: " + employee.id);
+            System.out.println("name: " + employee.name);
+            System.out.println("password: " + employee.password);
+        }
+    }
+}
+```
+
+137. File/Folder handling (File class)
+- Creating folders/changing permissions
+```java
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+public class Main {
+    // File:
+    //      classes are responsible for file I/O operation
+    //      representation of a file or directory pathname.
+    //      contains several methods for handling files and folders
+    public static void main(String[] args) throws IOException {
+        File directory = new File( "folder1/folder2/folder3"); // relative path
+        if(directory.mkdirs()){
+            System.out.println("directory created...");
+        }
+        File file = new File("folder1/folder2/folder3/text.txt");
+        if(file.createNewFile()){
+            System.out.println("file created...");
+        }
+        // get information
+        System.out.println("file path: " + file.getPath()); // relative path
+        System.out.println("absolute path: " + file.getAbsolutePath());
+        System.out.println("file exists: " + file.exists());
+        System.out.println("is file: " + directory.isFile());
+        System.out.println("is directory: " + directory.isDirectory());
+        System.out.println("is hidden: " + file.isHidden());
+        System.out.println("last modified in millis: " + file.lastModified());
+        ZonedDateTime lastModified = Instant.ofEpochMilli(file.lastModified()).atZone(ZoneId.systemDefault());
+        System.out.println("last modified date time: " + lastModified);
+        // check permissions
+        System.out.println("can read: " + file.canRead());
+        System.out.println("can write: " + file.canWrite());
+        System.out.println("can execute: " + file.canExecute());
+        file.setWritable(true);
+        try(FileWriter fw = new FileWriter(file)){
+            fw.write("java is awesome 2222");
+        }
+    }
+}
+```
+
+138. Listing Files and Directories (recursively using File class)
+```java
+import java.io.File;
+import java.util.Arrays;
+public class Main {
+    public static void main(String[] args) {
+        File dir = new File("folder1/folder2");
+        //String[] list = dir.list();
+        File[] list = dir.listFiles(((dir1, name) -> name.contains("txt")));
+        for (File file: list){
+            System.out.println(file.getName());
+        }
+    }
+    static void traverseDirectory(File dir){
+        File[] list = dir.listFiles();
+        for(File file: list){
+            if(file.isDirectory()){
+                System.out.println("directory: " + file.getName());
+                traverseDirectory(file);
+            }else {
+                System.out.println("file found: " + file.getName());
+            }
+        }
+    }
+}
+```
+
+139. Introduction to NIO Path interface
+- The Path interface along Java7, repreesenting a path in the file system
+- Disadvantages of the File class
+  - No support for symbolic links
+  - Methods return false instead of throwing
+  - Doesn't support Accessl Control List
+  - Causes problems with large directories
+  - Limited to the current OS
+  - No file copy/move capability
+
+140. Create Files/Directories using NIO Path interface and File Class
+```java
+import java.io.IOException;
+import java.nio.file.*;
+public class Main {
+    public static void main(String[] args) throws IOException {
+        //Path path = Paths.get("Users", "ryan", "Desktop", "folder1");
+        Path path = Paths.get("/Users/ryan/Desktop/folder1");
+        if(Files.notExists(path)){
+            Files.createDirectories(path);
+        }
+        Path path1 = FileSystems.getDefault().getPath("");
+        Path filePath = Paths.get(path.toString(),"text.txt");
+        if(Files.notExists(filePath)){
+            Files.createFile(filePath);
+        }
+    }
+}
+```
+
+141. Read File Atgtributes(NIO Path and Files) 
+```java
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.DosFileAttributes;
+import java.nio.file.attribute.PosixFileAttributes;
+public class Main {
+    public static void main(String[] args) throws IOException {
+        Path absPath = Paths.get("/Users/ryan/Desktop/code/FileAttributesList");
+        Path directoryPath = Paths.get("Folder1");
+        Path filePath = Paths.get("Folder1", "text.txt");
+        System.out.println("directoryPath: " + directoryPath);
+        System.out.println("isAbsolute: " + absPath.isAbsolute());
+        System.out.println("Absolute Path: " + directoryPath.toAbsolutePath());
+        System.out.println("URI: " + directoryPath.toUri());
+        System.out.println("Name: " + directoryPath.getFileName());
+        System.out.println("Parent: " + absPath.getParent());
+        System.out.println("Root: " + directoryPath.toAbsolutePath().getRoot());
+        System.out.println("Exist: " + Files.exists(directoryPath));
+        System.out.println("Not Exist: " + Files.notExists(directoryPath));
+        System.out.println("Hidden: " + Files.isHidden(directoryPath));
+        System.out.println("Is Readable: " + Files.isReadable(filePath));
+        BasicFileAttributes bfa = Files.readAttributes(filePath, BasicFileAttributes.class);
+        //PosixFileAttributes posixFileAttributes = Files.readAttributes(filePath, PosixFileAttributes.class); // Posix ONLY
+        //DosFileAttributes dosFileAttributes = Files.readAttributes(filePath, DosFileAttributes.class); // DOS system only
+        //= Files.readAttributes(filePath, PosixFileAttributes.class);
+        System.out.println(bfa.creationTime());
+        System.out.println(bfa.isDirectory());
+        System.out.println(bfa.lastAccessTime());
+        System.out.println(bfa.lastModifiedTime());
+        System.out.println(bfa.isRegularFile());
+        System.out.println(bfa.size());
+    }
+}
+```
+
+142. Write Read/Write Files using NIO Files class
+```java
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
+public class Main {
+    static String str = "Hello Java\n";
+    static byte[] bytes = "some bytes\n".getBytes();
+    static List<String> list = new ArrayList<>() {{
+        add("list item 1");
+        add("list item 2");
+    }};
+    public static void main(String[] args) throws IOException {
+        Path path = Path.of("myFolder", "myFile.txt");
+        Files.write(path, bytes, StandardOpenOption.APPEND);
+        Files.write(path, list, StandardOpenOption.APPEND);
+        Files.writeString(path, str, StandardOpenOption.APPEND);
+        try (OutputStream outputStream
+                 = Files.newOutputStream(path, StandardOpenOption.APPEND)) {
+            outputStream.write(65);
+        }
+        try (BufferedWriter bw =
+               Files.newBufferedWriter(path, StandardOpenOption.APPEND) ){
+            bw.write("hello java again");
+        }
+        // reading data
+        String s = Files.readString(path);
+        System.out.println(Files.readAllLines(path));
+        byte[] bytes1 = Files.readAllBytes(path);
+        InputStream in = Files.newInputStream(path);
+        BufferedReader br = Files.newBufferedReader(path);
+    }
+}
+```
+- File.readString(): reads the entire lines
+- File.readAllLines(): reads all lines into List
+
+143. Normalizing, Relativizing, Joining, and Comparing Paths
+- normalize(): removes redundancy from path
+- relativize(): creates a path b/w two paths. How to reach argument path from the object path
+- resolve(): concatenates two paths (object + argument)
+- equals(): compares two paths. true or false
+- startsWith(): checks if a path starts with another path. true or false
+- endsWith(): checks if a path ends with another path. true or false
+
+144. Listing Files and Directories using NIO File Class
+```java
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileVisitOption;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Stream;
+public class WalkExample {
+    public static void main(String[] args) throws IOException {
+        Path path = Path.of("my_folder");
+        // ******** old method
+        //File file = new File("my_folder");
+        //System.out.println(Arrays.toString(file.list()));
+        // ******** new method 1
+        //try(Stream<Path> paths = Files.list(path)){
+        //    //paths.filter(f-> f.endsWith("txt"));
+        //    paths.forEach(System.out::println);
+        //}
+        // ******** new method 2
+        try(Stream<Path> paths = Files.walk(path, 3, FileVisitOption.FOLLOW_LINKS)){
+            //paths.forEach(System.out::println);
+            List<Path> PDFs = paths.filter(p-> p.toString().endsWith("pdf")).toList();
+            System.out.println(PDFs);
+        }
+    }
+}
+```
+- Files.walk(): commonly used
+- Files.walkFileTree(): when action is requred
+  - FileVisitor object is necessary
+```java
+import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+public class WalkTreeExample {
+    public static void main(String[] args) throws IOException {
+        MyFileVisitor visitor = new MyFileVisitor();
+        Path path = Path.of("my_folder");
+        Files.walkFileTree(path, visitor);
+    }
+}
+class MyFileVisitor extends SimpleFileVisitor<Path>{
+    @Override
+    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+        System.out.println("At file: " + file);
+        return FileVisitResult.CONTINUE;
+    }
+    @Override
+    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+        System.out.println("Before visiting: " + dir);
+        return FileVisitResult.CONTINUE;
+    }
+}
+```
+
+145. Copy, Move, Delete files using NIO Files Class
+```java
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+public class Main {
+    public static void main(String[] args) throws IOException {
+        Path srcPath = Path.of("my_folder/A/B/file.txt");
+        Path destPath = Path.of("copied_files/file2.txt");
+        //Files.copy(srcPath, destPath, StandardCopyOption.REPLACE_EXISTING);
+        //Files.deleteIfExists(destPath);
+        //Files.move(srcPath, destPath);
+        Path srdDir = Path.of("my_folder");
+        Path destDir = Path.of("new_folder");
+        Files.copy(srdDir, destDir);
+        CopyDirectory.copy(srdDir, destDir);
+    }
+}
+class CopyDirectory extends SimpleFileVisitor<Path> {
+    private Path src,  dest;
+
+    private CopyDirectory(Path srcDirectory, Path desDirectory) {
+        this.src = srcDirectory;
+        this.dest = desDirectory;
+    }
+    public static boolean copy(Path srcPath, Path destPath){
+        CopyDirectory visitor = new CopyDirectory(srcPath, destPath);
+        try {
+            Files.walkFileTree(srcPath, visitor);
+            return true;
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+            return false;
+        }
+    }
+    @Override
+    public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+        try {
+            Path targetFile = dest.resolve(src.relativize(file));
+            Files.copy(file, targetFile);
+        } catch (IOException e) {
+            System.err.println(e.getMessage());
+            return FileVisitResult.TERMINATE;
+        }
+        return FileVisitResult.CONTINUE;
+    }
+    @Override
+    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attributes) {
+        try {
+            Path newDir = dest.resolve(src.relativize(dir));
+            if(Files.notExists(newDir)) {
+                Files.createDirectory(newDir);
+            }
+        } catch (IOException e) {
+            System.err.println(e.getMessage());
+            return FileVisitResult.TERMINATE;
+        }
+        return FileVisitResult.CONTINUE;
+    }
+}
+```
+
+146. Watch Service API
+- File system change tracker
+```java
+import java.io.IOException;
+import java.nio.file.*;
+public class Main {
+    public static void main(String[] args) throws IOException, InterruptedException {
+            try(WatchService watchService = FileSystems.getDefault().newWatchService()){
+                Path dir = Paths.get("/Users/ryan/Desktop/myFolder");
+                dir.register(watchService, StandardWatchEventKinds.ENTRY_DELETE,
+                    StandardWatchEventKinds.ENTRY_CREATE,
+                    StandardWatchEventKinds.ENTRY_MODIFY);
+                WatchKey watchKey = watchService.take();
+                do{
+                    for(WatchEvent<?> event: watchKey.pollEvents()){
+                        System.out.println("kind: " + event.kind());
+                        System.out.println("context: " + event.context());
+                        System.out.println("count: " + event.count());
+                    }
+                }while (watchKey.reset());
+            }
+    }
+}
+```
+
 ## Section 17: Unit testing using Junit 5
+
+147. Introduction to JUnit5
+- Testing levels
+  - Unit
+  - Integration
+  - Acceptance
+- Testing methods
+  - Black-box: uni testers are not aware of the internal functionality of the system
+  - While-box: the functional behavior of the SW is tested by the developers to validate their execution
+  - Grey-box
+- Test project
+  - MathUtils
+
+148. @Test @assertEquals
+- assertEquals(a,b)
+
+149. @DisplayName
+- Description of the test
+
+150. assertThrows @TestMethodOrder @Order
+- Executable object
+  - Not executed when defined
+  - Lambda expression
+
+151. Junit 5 Test LifeCycle
+- @BeforeAll
+  - @BeforeEach
+    - @Test
+  - @AfterEach
+  - @BeforeEach
+    - @Test
+  - @AfterEach
+- @AfterAll
+
+152. assertAll assertTrue assertFalse
+
+153. assertNull assertNotNull
+
+154. @ParameterizedTest @CsvSource
+
+155. @ValueSource
+
+156. @CsvFileSource @Disabled fail
+
+157. @RepeatedTest assertTimeout
+
+158. assertArrayEquals assertIterableEquals
+```java
+package com.JUnitExample;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+public class MathUtil {
+    public int add(int x, int y) {
+        return x + y;
+    }
+    public int subtract(int x, int y) {
+        return x - y;
+    }
+    public Integer divide(int x, int y) throws Exception {
+        if (y == 0) {
+            throw new Exception("zeros aren't allowed");
+        } else if (x == 0) {
+            return null;
+        }
+        return x / y;
+    }
+    public boolean isEven(int number) {
+        return number % 2 == 0;
+    }
+    public int generateRandom(int limit) throws InterruptedException {
+        Thread.sleep(500);
+        return new Random().nextInt(limit);
+    }
+    public int[] duplicate(Integer[] numbers) {
+        return Arrays.stream(numbers).mapToInt(e -> e * 2).toArray();
+    }
+    public List<Integer> duplicate(List<Integer> numbers) {
+        return numbers.stream().map(e -> e * 2).toList();
+    }
+}
+```
+```java
+package com.JUnitExample;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+public class MathUtil {
+    public int add(int x, int y) {
+        return x + y;
+    }
+    public int subtract(int x, int y) {
+        return x - y;
+    }
+    public Integer divide(int x, int y) throws Exception {
+        if (y == 0) {
+            throw new Exception("zeros aren't allowed");
+        } else if (x == 0) {
+            return null;
+        }
+        return x / y;
+    }
+    public boolean isEven(int number) {
+        return number % 2 == 0;
+    }
+    public int generateRandom(int limit) throws InterruptedException {
+        Thread.sleep(500);
+        return new Random().nextInt(limit);
+    }
+    public int[] duplicate(Integer[] numbers) {
+        return Arrays.stream(numbers).mapToInt(e -> e * 2).toArray();
+    }
+    public List<Integer> duplicate(List<Integer> numbers) {
+        return numbers.stream().map(e -> e * 2).toList();
+    }
+}
+```
+
+## Section 18: Students Questions and Answers
+
+159. Widening and Narrowing of Primitive types
+- Widening (upcasting)
+  - Converts small data type to large data type
+  - byte(8) -> short(16) -> int(32) -> long(64)
+  - float(32) -> double (64)
+- Narrowing (downcasting)
+  - Converts big data type into smal data type
+    - Extra casting like `byte b = 1; long x = (byte) b;`
+  - Dangerous due to data loss possibility
+  - byte(8) <- short(16) <- int(32) <- long(64)
+  - float(32) <- double (64)
