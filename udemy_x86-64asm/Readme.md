@@ -1159,6 +1159,8 @@ main:
   xor rax,rax
   ret
 ```
+- Ref: https://stackoverflow.com/questions/63125919/how-to-avoid-floating-point-exceptions-in-unused-simd-lanes
+  - Issues of clang for divps optimization over divide-by-zero
 
 51. imul and idiv instruction example
 ```asm
@@ -1253,12 +1255,526 @@ main:
   ret
 ```
 
-54. Rol and Rcl instructions
+54. rol and rcl instructions
+- Rotate instruction
+- Rotate Left: highest bit into the lowest
+  - 11011011 ->
+  - 10110111: rotate left by 1bit. Carry Flag is 1 as the lowest bit
+  - 01101111: rotate left by 2bits. Carry Flag is 1 as the lowest bit
+  - 11011110: rotate left by 3bits. Carry Flag is 0 as the lowest bit
+- Rotate Carry Left
+  - Value of the highest bit moves to the Carry Flag
+  - Value in the Carry Flag is moved to the lowest bit
+  - 11011011 ->
+  - 10110110: rotate carry left by 1bit. Carry Flag 0 is injected in the lowest bit while the highest bit is moved to Carry Flag (1)
+  - 01101101: rotate carry left by 2bits. Carry Flag 1 is moved to the lowest while the highest bit 1 moves to the Carry Flag
+  - 11011011: rotate carry left by 3bits. Carry Flag 1 moves to the lowest and the highest bit 0 moves to the Carry Flag
+- clc: Clears Carry Flag
+  - Ref: https://www.felixcloutier.com/x86/clc
+```asm
+section .data
+var dd 1
+section .text
+global main
+main:    
+    ; rol reg, imm  
+    ; rol reg, cl 
+    ; rol mem, imm  
+    ; rol mem, cl
+    mov al,11000101b
+    mov cl,5
+    rol al,cl    
+    rol dword[var],8
+    ; rcl reg, imm  
+    ; rcl reg, cl 
+    ; rcl mem, imm  
+    ; rcl mem, cl
+    clc
+    mov bl,11000101b
+    rcl bl,5    
+    xor rax, rax
+    ret
+```
 
-55. Ror and Rcr instructions
+55. ror and rcr instructions
+- Rotate Right
+  - The lowest bit into the highest
+  - The same lowest bit is copied into Carry Flag 
+  - 11011011, CF=0 =>
+  - Rotate Right by 1bit:  11101101, CF=1
+  - Rotate Right by 2bits: 11110110, CF=1
+  - Rotate Right by 3bits: 01111011, CF=0
+- Rotate Carry Right
+  - The lowest bit into the Carry Flag
+  - The Carry Flag value into the highest bit
+  - 11011011, CF=0 =>
+  - Rotate Carry Right by 1bit:  01101101, CF=1
+  - Rotate Carry Right by 2bits: 10110110, CF=1
+  - Rotate Carry Right by 3bits: 11011011, CF=0
+```asm
+section .text
+global main
+main:      
+    ; ror reg, imm   
+    ; ror reg, cl   
+    ; ror mem, imm
+    ; ror mem, cl
+    mov al,00011011b
+    ror al,2    
+    ; rcr reg, imm   
+    ; rcr reg, cl   
+    ; rcr mem, imm
+    ; rcr mem, cl
+    clc
+    mov bl,00011011b
+    rcr bl,2       
+    xor rax, rax
+    ret
+```
 
 ## Section 13: Strings
 
+56. movs instrucion
+- Copies a data item (byte, word, double word) from the source string to the destination string
+- cld: Clears Direction Flag 
+  - Ref: https://c9x.me/x86/html/file_module_x86_id_29.html
+```asm
+section .data
+source db "hello world",0
+length equ $-source
+destination times length db 0
+section .text
+global main
+main:
+  mov rbp,rsp
+  ; source:      rsi
+  ; destination: rdi
+  ; movsb: byte
+  ; movsw: word
+  ; movsd: dword
+  ; movsq: qword
+  cld
+  mov rsi,source
+  mov rdi,destination
+  ; (gdb) x/s &source
+  ; 0x601028 <source>:      "hello world"
+  ; (gdb) x/s &destination
+  ; 0x601034 <destination>: ""
+  mov rcx,length
+  rep movsb
+  ; (gdb) x/s &destination
+  ; 0x601034 <destination>: "hello world"  
+  xor rax,rax
+  ret
+```
+
+57. stos instruction
+- Copies the data item from AL/AX/EAX/RAX to the destination string, pointed to by ES:DI in memory
+```asm
+section .data
+wordlist dw 0x12,0xab,0x45,0x67
+count equ 4
+section .text
+global main
+main:   
+    ; destination: rdi
+    ; stosb         al
+    ; stosw         ax
+    ; stosd        eax
+    ; stosq        rax    
+    cld
+    mov rdi,wordlist
+    mov rcx,count
+    mov ax,1
+    rep stosw    
+    xor rax, rax
+    ret
+```
+
+58. lods instruction
+- Loads the memory byte or word addressed in the destination register into the AL, AX, or EAX register. Before executing the lods instruction, load the index values into the SI source-index register
+  - Ref: https://docs.oracle.com/cd/E19455-01/806-3773/instructionset-61/index.html
+```asm
+section .data
+string db "programming",0
+length equ $-string
+section .text
+global main
+main:      
+    ; source:  rsi
+    ; lodsb     al
+    ; lodsw     ax
+    ; lodsd    eax
+    ; lodsq    rax
+    cld
+    mov rsi,string
+    mov rdi,rsi
+    mov rcx,length-1    
+convert:    
+    lodsb    
+    sub al,32
+    stosb    
+    loop convert    
+    xor rax, rax
+    ret
+```
+
+59. scas instruction
+- Searches a particular character or set of characters in a string
+```asm
+section .data
+string db "assembly language",0
+length equ $-string
+found db 0
+section .text
+global main
+main:    
+    ; destination:  rdi
+    ; scasb         al
+    ; scasw         ax
+    ; scasd        eax
+    ; scasq        rax
+    cld
+    mov al,'b'
+    mov rdi,string
+    mov rcx,length
+    repne scasb    
+    jnz NotFound    
+    mov byte[found],1
+    jmp End    
+NotFound:
+    mov byte[found],0    
+End:        
+    xor rax, rax
+    ret
+```
+
+60. cmps instruction
+- Compares two strings
+```asm
+section .data
+dwordlist1 dd 0x11111111,0x22222222,0x33333333
+dowrdlist2 dd 0x11111111,0x22222222,0x44444444
+count equ 3
+equal db 0
+section .text
+global main
+main:     
+    ; source1:  rsi
+    ; source2:  rdi
+    ; cmpsb
+    ; cmpsw
+    ; cmpsd
+    ; cmpsq
+    cld
+    mov rsi,dwordlist1
+    mov rdi,dowrdlist2
+    mov rcx,count
+    repe cmpsd
+    jnz NotEqual    
+    mov byte[equal],1
+    jmp End    
+NotEqual:
+    mov byte[equal],0    
+End:   
+    xor rax, rax
+    ret
+```
+
 ## Section 14: Stack and Procedures
 
+61. Introduction to procedures
+
+62. Stack
+- Last In/First Out
+- RSP: stack pointer register
+- push/pop instruction
+  - pushing/popping 8-bit or 32bit registers in 64-bit mode is not allowed
+  - pop instruction does not accept immediate value
+```asm
+section .data
+var dq 7
+section .text
+global main
+main:
+    ; push imm    
+    ; push reg   
+    ; push mem  
+    ; pop reg
+    ; pop mem
+    push 800 ; push 800 into stack
+    pop rax  ; retrieve the last value from the stack to $rax
+    ;
+    mov rbx,20
+    push rbx
+    push qword[var]
+    ; (gdb) x/w $rsp ; stack pointer value
+    ; 0x7fffffffd588: 0x00000007 (this is hexa)
+    pop rcx ; rcx is 7
+    ; (gdb) x/w $rsp
+    ; 0x7fffffffd590: 20 (this is decimal)
+    pop qword[var] ; now var is 20
+    xor rax, rax
+    ret
+```
+
+63. Procedures
+```asm
+section .data
+action db "procedure is called",0
+PrintProc dq 0
+section .text
+global main
+PrintString:
+  ;PRINT_STRING action ; not working
+  ret
+main:
+  mov rbp,rsp    
+  ;
+  ; call label
+  call PrintString
+  ;
+  ; call reg
+  mov rax,PrintString
+  call rax
+  ;
+  ; call mem
+  mov qword[PrintProc],PrintString
+  call qword[PrintProc]
+  xor rax, rax
+  ret
+```
+
+64. Nested Procedures Calls
+- rsp or stack point of each procedure must be same to the beginning when returns. If different, it will crash
+```asm
+section .data
+action db "procedure is called",0
+PrintProc dq 0
+section .text
+global main
+Proc3:
+  ; x $rsp = 0x004004a6
+  ret
+Proc2:
+  ; x $rsp = 0x004004ac
+  call Proc3
+  ; x $rsp = 0x004004ac
+  ret
+Proc1:
+  ; x $rsp = 0x004004b5
+  call Proc2
+  ; x $rsp = 0x004004b5
+  ret
+main:
+  mov rbp,rsp    
+  call Proc1
+  ; x $rsp = 0xf7a03c87
+  xor rax, rax
+  ret
+```
+
+65. Passing Parameters Part 1
+- How to pass parameters
+  - Through registers
+  - Through stacks
+```asm
+section .data
+array dq 1000,1001,1002,1003
+count equ ($-array)/8
+section .text
+global main
+ArraySum:
+    xor rax,rax
+.Add:        
+    add rax,[rdx]
+    add rdx,8
+    loop .Add    
+    ret    
+main:
+    mov rcx,count
+    mov rdx,array
+    call ArraySum
+    PRINT_DEC 8,rax
+    xor rax, rax
+    ret
+```
+
+66. Passing Parameters Part 2
+```asm
+section .data
+gt     db "Parameter 1 is greater than parameter 2",0
+lssequ db "Parameter 1 is less than or equal to parameter 2",0
+section .text
+global main
+IsGreater:
+    mov rcx,[rsp+16]
+    mov rdx,[rsp+8]    
+    cmp rcx,rdx
+    jg .Greater
+    mov rax,0
+    jmp .End    
+.Greater:
+    mov rax,1
+.End:                        
+    ret    
+main: 
+    push 1
+    push -5  
+    call IsGreater    
+    test rax,rax
+    jnz .Greater    
+    PRINT_STRING lssequ
+    jmp .End    
+.Greater:
+    PRINT_STRING gt
+.End:   
+    add rsp,16    
+    xor rax, rax
+    ret
+```
+
+67. Local Variables
+- Variables within a procedure
+```asm
+section .data
+varA dq 100
+varB dq 200
+section .text
+global main
+Proc:
+    push rbp
+    mov rbp,rsp    
+    sub rsp,16    
+    mov rcx,[rbp+24]
+    mov rdx,[rbp+16]    
+    mov [rbp-8],rcx
+    mov [rbp-16],rdx      
+    mov rsp,rbp
+    pop rbp    
+    ret
+main:    
+    push qword[varA]
+    push qword[varB]
+    call Proc    
+    add rsp,16
+    xor rax, rax
+    ret
+```
+
+68. Microsoft x64 calling convention
+- The first 4 parameters -> RCX RDX R8 R9
+  - Others are on the stack
+- Return value -> RAX
+- RAX RCX RDX R8 R9 R10 R11: caller saved registers
+- RBX RBP RDI RSI R12 R13 R14 R15: callee saved registers
+- RSP is aligned on 16byte boundary
+- 32 bytes of shadow space
+- Clean up the stack is the caller's responsibility
+
+![stack](./stack_MS.png)
+
+69. Microsoft x64 calling convention example
+```asm
+section .data
+message db "Result is %d",0
+section .text
+global main
+extern printf
+Addition:
+    push rbp
+    push r12
+    push r13    
+    mov rbp,rsp
+    sub rsp,48    
+    mov r12,rcx
+    add r12,rdx
+    add r12,r8
+    add r12,r9
+    mov [rbp-8],r12    
+    mov r13,[rbp+64]
+    add r13,[rbp+72]
+    add r13,[rbp+80]
+    add r13,[rbp+88]
+    mov [rbp-16],r13    
+    add r12,r13
+    mov rax,r12    
+    mov rsp,rbp    
+    pop r13
+    pop r12
+    pop rbp    
+    ret
+main:    
+    sub rsp,72    
+    mov rcx,1
+    mov rdx,2
+    mov r8, 3
+    mov r9, 4
+    mov qword[rsp+32],5
+    mov qword[rsp+40],6
+    mov qword[rsp+48],7
+    mov qword[rsp+56],8
+    call Addition    
+    mov rcx,message
+    mov rdx,rax
+    call printf    
+    add rsp,72
+    xor rax, rax
+    ret
+```
+
+70. Single-line macros
+- `%define` keyword
+- Can alias register names
+- Can define a function
+  - Use parentheses as many as possible to avoid any ambiguity
+```asm
+%define size 100
+%define size 500
+%define move mov
+%define destination rdi
+%define source rsi
+%define bsize size*8
+%define size 1
+%define sum(x,y) ((x)+(y))
+section .text
+global main
+main:  
+    move source,10           ; mov rsi,10   
+    move destination,source  ; mov rdi,rsi
+    mov rax,bsize            ; mov rax,1*8
+    mov rbx,sum(1,2)
+    xor rax, rax
+    ret
+```
+
+71. Multi-line macros
+- B/w `%macro` and `%endmacro`
+```asm
+%macro clear_reg 1.nolist
+    xor %1,%1
+%endmacro
+%macro min 3.nolist
+    mov %1,%2    
+    cmp %1,%3
+    jl %%less    
+    mov %1,%3
+%%less:      
+%endmacro
+section .text
+global main
+main:    
+    min rax,1,3
+    min rbx,10,-10    
+    PRINT_DEC 8,rax
+    NEWLINE
+    PRINT_DEC 8,rbx    
+    clear_reg rax
+    ret
+```
+
+72. I/O macros
+
 ## Section 15: Conclusion
+
+73. Conclusion
