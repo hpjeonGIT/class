@@ -2,6 +2,10 @@
 - Title: Write Your Own Operating System From Scratch - Step by Step
 - Instructor: x-BIT Development
 
+## References
+- https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
+- https://github.com/cfenollosa/os-tutorial
+
 ## Section 1: Introduction
 
 1. Introduction
@@ -687,7 +691,7 @@ nasm -f bin -o boot.bin boot.asm
 dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
 ```
 
-10. Testing on Windoss 10
+10. Testing on Windows 10
 
 11. Testing on Linux (Ubuntu)
 ```bash
@@ -1036,7 +1040,1899 @@ ReadPacket: times 16 db 0
    - UEFI boot loaders use 32 bit protected mode or 64bit long mode
 
 19. Set Video Mode
+- Use ASCII code and set foreground/background color
+- loader.asm:
+```assembly
+[BITS 16]
+[ORG 0x7e00]
+start:
+    mov [DriveId],dl
+    mov eax,0x80000000
+    cpuid
+    cmp eax,0x80000001
+    jb NotSupport
+    mov eax,0x80000001
+    cpuid
+    test edx,(1<<29)
+    jz NotSupport
+    test edx,(1<<26)
+    jz NotSupport
+LoadKernel:
+    mov si,ReadPacket
+    mov word[si],0x10
+    mov word[si+2],100
+    mov word[si+4],0
+    mov word[si+6],0x1000
+    mov dword[si+8],6
+    mov dword[si+0xc],0
+    mov dl,[DriveId]
+    mov ah,0x42
+    int 0x13
+    jc  ReadError
+GetMemInfoStart:
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    mov edi,0x9000
+    xor ebx,ebx
+    int 0x15
+    jc NotSupport
+GetMemInfo:
+    add edi,20
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    int 0x15
+    jc GetMemDone
+    test ebx,ebx
+    jnz GetMemInfo
+GetMemDone:
+TestA20:
+    mov ax,0xffff
+    mov es,ax
+    mov word[ds:0x7c00],0xa200
+    cmp word[es:0x7c10],0xa200
+    jne SetA20LineDone
+    mov word[0x7c00],0xb200
+    cmp word[es:0x7c10],0xb200
+    je End
+SetA20LineDone:
+    xor ax,ax
+    mov es,ax
+SetVideoMode:
+    mov ax,3
+    int 0x10        
+    mov si,Message
+    mov ax,0xb800
+    mov es,ax
+    xor di,di
+    mov cx,MessageLen
+PrintMessage:
+    mov al,[si]
+    mov [es:di],al
+    mov byte[es:di+1],0xa
+    add di,2
+    add si,1
+    loop PrintMessage
+ReadError:
+NotSupport:
+End:
+    hlt
+    jmp End
+DriveId:    db 0
+Message:    db "Text mode is set"
+MessageLen: equ $-Message
+ReadPacket: times 16 db 0
+```
+![video_bochs](./bochs_19.png)
+- Printed without BIOS service
 
 20. Protected Mode
+- Entering protected mode
+  - Load GDT
+  - Load IDT
+  - Enable Protected Mode
+  - Jump to PM Entry
+- GDT (Global Descriptor Table)
+  - Segment registers: cs ds es ss
+- IDT (Interrupt Descriptor Table)
+  - Up to 256 entries
+  - Handling keyboard, input, ...
+- 4 levels of privilege
+  - Level 0: kernel
+  - Level 1/2:
+  - Level 3: user program
+- How to figure out the current privilege level?
+  - Current Privilege Level: stored in cs and ss
+  - Descriptor Privilege LeveL: stored in descriptors
+  - Requested Privilege Level: stored in segment selectors
+- Descriptor entry
+  - Code segment
+  - Data segment
+- loader.asm:
+```assembly
+[BITS 16]
+[ORG 0x7e00]
+start:
+    mov [DriveId],dl
+    mov eax,0x80000000
+    cpuid
+    cmp eax,0x80000001
+    jb NotSupport
+    mov eax,0x80000001
+    cpuid
+    test edx,(1<<29)
+    jz NotSupport
+    test edx,(1<<26)
+    jz NotSupport
+LoadKernel:
+    mov si,ReadPacket
+    mov word[si],0x10
+    mov word[si+2],100
+    mov word[si+4],0
+    mov word[si+6],0x1000
+    mov dword[si+8],6
+    mov dword[si+0xc],0
+    mov dl,[DriveId]
+    mov ah,0x42
+    int 0x13
+    jc  ReadError
+GetMemInfoStart:
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    mov edi,0x9000
+    xor ebx,ebx
+    int 0x15
+    jc NotSupport
+GetMemInfo:
+    add edi,20
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    int 0x15
+    jc GetMemDone
+    test ebx,ebx
+    jnz GetMemInfo
+GetMemDone:
+TestA20:
+    mov ax,0xffff
+    mov es,ax
+    mov word[ds:0x7c00],0xa200
+    cmp word[es:0x7c10],0xa200
+    jne SetA20LineDone
+    mov word[0x7c00],0xb200
+    cmp word[es:0x7c10],0xb200
+    je End    
+SetA20LineDone:
+    xor ax,ax
+    mov es,ax
+SetVideoMode:
+    mov ax,3
+    int 0x10    
+    cli
+    lgdt [Gdt32Ptr]
+    lidt [Idt32Ptr]
+    mov eax,cr0
+    or eax,1
+    mov cr0,eax
+    jmp 8:PMEntry  ; The index of the selector is 8
+                   ; 00001000(binary)
+                   ; index T RPL
+ReadError:
+NotSupport:
+End:
+    hlt
+    jmp End
+[BITS 32]
+PMEntry:
+    mov ax,0x10
+    mov ds,ax
+    mov es,ax
+    mov ss,ax
+    mov esp,0x7c00
+    mov byte[0xb8000],'P'
+    mov byte[0xb8001],0xa
+PEnd:
+    hlt
+    jmp PEnd    
+DriveId:    db 0
+ReadPacket: times 16 db 0
+Gdt32:
+    dq 0
+Code32:         ; Code segment
+    dw 0xffff
+    dw 0
+    db 0
+    db 0x9a
+    db 0xcf
+    db 0
+Data32:         ; Data segment
+    dw 0xffff
+    dw 0
+    db 0
+    db 0x92
+    db 0xcf
+    db 0    
+Gdt32Len: equ $-Gdt32
+Gdt32Ptr: dw Gdt32Len-1
+          dd Gdt32
+Idt32Ptr: dw 0
+          dd 0
+```
+- Both of code segment and data segment are necessary
 
 21. Long Mode
+- 64 bit mode and compatibility mode
+  - OS runs in 64-bit mode
+  - OS kernel and applications run in 64-bit mode
+- Entering Long mode
+  - Load GDT
+  - Load IDT
+  - Prepare for paging and enable it
+  - Enable long mode
+  - Jump to LM entry
+- Global Descriptor Table
+  - Segment registeres: cs ds es ss
+- Descriptor entry
+  - Code segment
+  ![code_segment](./long_mode_code_seg.png)
+  - Data segment
+  ![data_segment](./long_mode_data_seg.png)
+- Canonical address: the bits 63 through to the most-significant implemented bit are either all ones or all zeros
+- loader.asm:
+```assembly
+[BITS 16]
+[ORG 0x7e00]
+start:
+    mov [DriveId],dl
+    mov eax,0x80000000
+    cpuid
+    cmp eax,0x80000001
+    jb NotSupport
+    mov eax,0x80000001
+    cpuid
+    test edx,(1<<29)
+    jz NotSupport
+    test edx,(1<<26)
+    jz NotSupport
+LoadKernel:
+    mov si,ReadPacket
+    mov word[si],0x10
+    mov word[si+2],100
+    mov word[si+4],0
+    mov word[si+6],0x1000
+    mov dword[si+8],6
+    mov dword[si+0xc],0
+    mov dl,[DriveId]
+    mov ah,0x42
+    int 0x13
+    jc  ReadError
+GetMemInfoStart:
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    mov edi,0x9000
+    xor ebx,ebx
+    int 0x15
+    jc NotSupport
+GetMemInfo:
+    add edi,20
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    int 0x15
+    jc GetMemDone
+    test ebx,ebx
+    jnz GetMemInfo
+GetMemDone:
+TestA20:
+    mov ax,0xffff
+    mov es,ax
+    mov word[ds:0x7c00],0xa200
+    cmp word[es:0x7c10],0xa200
+    jne SetA20LineDone
+    mov word[0x7c00],0xb200
+    cmp word[es:0x7c10],0xb200
+    je End    
+SetA20LineDone:
+    xor ax,ax
+    mov es,ax
+SetVideoMode:
+    mov ax,3
+    int 0x10
+    cli
+    lgdt [Gdt32Ptr]
+    lidt [Idt32Ptr]
+    mov eax,cr0
+    or eax,1
+    mov cr0,eax
+    jmp 8:PMEntry
+ReadError:
+NotSupport:
+End:
+    hlt
+    jmp End
+[BITS 32]
+PMEntry:
+    mov ax,0x10
+    mov ds,ax
+    mov es,ax
+    mov ss,ax
+    mov esp,0x7c00
+    cld
+    mov edi,0x70000
+    xor eax,eax
+    mov ecx,0x10000/4
+    rep stosd    
+    mov dword[0x70000],0x71007
+    mov dword[0x71000],10000111b
+    lgdt [Gdt64Ptr]
+    mov eax,cr4
+    or eax,(1<<5)
+    mov cr4,eax
+    mov eax,0x70000
+    mov cr3,eax
+    mov ecx,0xc0000080
+    rdmsr
+    or eax,(1<<8)
+    wrmsr
+    mov eax,cr0
+    or eax,(1<<31)
+    mov cr0,eax
+    jmp 8:LMEntry
+PEnd:
+    hlt
+    jmp PEnd
+[BITS 64]
+LMEntry:
+    mov rsp,0x7c00
+    mov byte[0xb8000],'L'
+    mov byte[0xb8001],0xa
+LEnd:
+    hlt
+    jmp LEnd    
+DriveId:    db 0
+ReadPacket: times 16 db 0
+Gdt32:
+    dq 0
+Code32:
+    dw 0xffff
+    dw 0
+    db 0
+    db 0x9a
+    db 0xcf
+    db 0
+Data32:
+    dw 0xffff
+    dw 0
+    db 0
+    db 0x92
+    db 0xcf
+    db 0    
+Gdt32Len: equ $-Gdt32
+Gdt32Ptr: dw Gdt32Len-1
+          dd Gdt32
+Idt32Ptr: dw 0
+          dd 0
+Gdt64:
+    dq 0
+    dq 0x0020980000000000
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1
+          dd Gdt64
+```
+
+## Section 5: Exceptions and Interrupts Handling on the x86
+
+22. Jumping to Kernel
+- loader.asm
+```asm
+[BITS 16]
+[ORG 0x7e00]
+start:
+    mov [DriveId],dl
+    mov eax,0x80000000
+    cpuid
+    cmp eax,0x80000001
+    jb NotSupport
+    mov eax,0x80000001
+    cpuid
+    test edx,(1<<29)
+    jz NotSupport
+    test edx,(1<<26)
+    jz NotSupport
+LoadKernel:
+    mov si,ReadPacket
+    mov word[si],0x10
+    mov word[si+2],100
+    mov word[si+4],0
+    mov word[si+6],0x1000
+    mov dword[si+8],6
+    mov dword[si+0xc],0
+    mov dl,[DriveId]
+    mov ah,0x42
+    int 0x13
+    jc  ReadError
+GetMemInfoStart:
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    mov edi,0x9000
+    xor ebx,ebx
+    int 0x15
+    jc NotSupport
+GetMemInfo:
+    add edi,20
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    int 0x15
+    jc GetMemDone
+    test ebx,ebx
+    jnz GetMemInfo
+GetMemDone:
+TestA20:
+    mov ax,0xffff
+    mov es,ax
+    mov word[ds:0x7c00],0xa200
+    cmp word[es:0x7c10],0xa200
+    jne SetA20LineDone
+    mov word[0x7c00],0xb200
+    cmp word[es:0x7c10],0xb200
+    je End    
+SetA20LineDone:
+    xor ax,ax
+    mov es,ax
+SetVideoMode:
+    mov ax,3
+    int 0x10    
+    cli
+    lgdt [Gdt32Ptr]
+    lidt [Idt32Ptr]
+    mov eax,cr0
+    or eax,1
+    mov cr0,eax
+    jmp 8:PMEntry
+ReadError:
+NotSupport:
+End:
+    hlt
+    jmp End
+[BITS 32]
+PMEntry:
+    mov ax,0x10
+    mov ds,ax
+    mov es,ax
+    mov ss,ax
+    mov esp,0x7c00
+    cld
+    mov edi,0x70000
+    xor eax,eax
+    mov ecx,0x10000/4
+    rep stosd
+    mov dword[0x70000],0x71007
+    mov dword[0x71000],10000111b
+    lgdt [Gdt64Ptr]
+    mov eax,cr4
+    or eax,(1<<5)
+    mov cr4,eax
+    mov eax,0x70000
+    mov cr3,eax
+    mov ecx,0xc0000080
+    rdmsr
+    or eax,(1<<8)
+    wrmsr
+    mov eax,cr0
+    or eax,(1<<31)
+    mov cr0,eax
+    jmp 8:LMEntry
+PEnd:
+    hlt
+    jmp PEnd
+[BITS 64]
+LMEntry:
+    mov rsp,0x7c00
+    cld
+    mov rdi,0x200000 ; destination
+    mov rsi,0x10000  ; source
+    mov rcx,51200/8  ; this is counter
+    rep movsq        ; copy 
+    jmp 0x200000     ; we jump to kernel
+LEnd:
+    hlt
+    jmp LEnd    
+DriveId:    db 0
+ReadPacket: times 16 db 0
+Gdt32:
+    dq 0
+Code32:
+    dw 0xffff
+    dw 0
+    db 0
+    db 0x9a
+    db 0xcf
+    db 0
+Data32:
+    dw 0xffff
+    dw 0
+    db 0
+    db 0x92
+    db 0xcf
+    db 0    
+Gdt32Len: equ $-Gdt32
+Gdt32Ptr: dw Gdt32Len-1
+          dd Gdt32
+Idt32Ptr: dw 0
+          dd 0
+Gdt64:
+    dq 0
+    dq 0x0020980000000000
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1
+          dd Gdt64
+```
+- kernel.asm:
+```asm
+[BITS 64]
+[ORG 0x200000]
+start:
+    mov byte[0xb8000],'K'
+    mov byte[0xb8001],0xa
+End:
+    hlt
+    jmp End
+```
+- build.sh:
+```bash
+nasm -f bin -o boot.bin boot.asm
+nasm -f bin -o loader.bin loader.asm
+nasm -f bin -o kernel.bin kernel.asm
+dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
+dd if=loader.bin of=boot.img bs=512 count=5 seek=1 conv=notrunc
+dd if=kernel.bin of=boot.img bs=512 count=100 seek=6 conv=notrunc
+```
+- command:
+    - bash build.sh
+    - Enter c in the prompt
+    - Find K in the bochs terminal
+
+23. Reload GDT
+- kernel.asm
+```asm
+[BITS 64]
+[ORG 0x200000]
+start:
+    ; cs selector: 0x7c00
+    ; offset     : RSP
+    ;
+    lgdt [Gdt64Ptr]
+    push 8
+    push KernelEntry
+    db 0x48
+    retf
+KernelEntry:
+    mov byte[0xb8000],'K'
+    mov byte[0xb8001],0xa
+End:
+    hlt
+    jmp End
+Gdt64:
+    dq 0
+    dq 0x0020980000000000
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1
+          dq Gdt64
+```
+- lgdt/lidt: Load Global/Interrupt Descriptor Table Register
+    - Ref: https://www.felixcloutier.com/x86/lgdt:lidt
+- retf: far return. Return to the same privilege level
+
+24. Exceptions and Interrupts Handling
+- Interrupts: HW interrupts
+- Exceptions: internal errors
+
+![interrupt_handling](./interrupt_handling.png)
+![interrupt_handling2](./interrupt_handling2.png)
+
+- IST is not used in the lecture
+- DPL in attributes will be edited
+- There are 256 different interrupt handling
+
+![interrupt_handling3](./interrupt_handling3.png)
+
+- kernel.asm:
+```asm
+[BITS 64]
+[ORG 0x200000]
+start:
+    ;  63....32  31...16  15...0  bit
+    ;  xxxxxxxx  xxxxxxx  xxxxxx  handler0 address
+    mov rdi,Idt       ; IDT, interrupt handler
+    mov rax,Handler0
+    mov [rdi],ax     ; first 2 bytes (15...0)
+    shr rax,16        
+    mov [rdi+6],ax   ; 31...16
+    shr rax,16
+    mov [rdi+8],eax  ; 63...32
+    lgdt [Gdt64Ptr]
+    lidt [IdtPtr]
+    push 8
+    push KernelEntry
+    db 0x48
+    retf
+KernelEntry:
+    mov byte[0xb8000],'K'
+    mov byte[0xb8001],0xa
+    xor rbx,rbx
+    div rbx   ; yields divide by zero to make an interrupt
+End:
+    hlt
+    jmp End
+Handler0:
+    mov byte[0xb8000],'D'  ; We print 'D' in the screen
+    mov byte[0xb8001],0xc  ; character in red
+    jmp End
+    iretq
+Gdt64:
+    dq 0
+    dq 0x0020980000000000
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1  ; 2byte
+          dq Gdt64       ; 8byte
+Idt:
+    %rep 256  ; repeat 256 times
+        dw 0
+        dw 0x8  ; attribute field 6byte
+        db 0
+                 ; P DPL TYPE 
+        db 0x8e  ; 1 00  01110 
+        dw 0
+        dd 0
+        dd 0
+    %endrep
+IdtLen: equ $-Idt
+IdtPtr: dw IdtLen-1 ; 2byte
+        dq Idt      ; 8byte
+```
+- Kernel code runs -> divide by zero -> Handler0 is activated
+
+25. Saving Registers
+- kernel.asm:
+```asm
+[BITS 64]
+[ORG 0x200000]
+start:
+    mov rdi,Idt
+    mov rax,Handler0
+    mov [rdi],ax
+    shr rax,16
+    mov [rdi+6],ax
+    shr rax,16
+    mov [rdi+8],eax
+    lgdt [Gdt64Ptr]
+    lidt [IdtPtr]
+    push 8
+    push KernelEntry
+    db 0x48
+    retf
+KernelEntry:
+    mov byte[0xb8000],'K'
+    mov byte[0xb8001],0xa
+    xor rbx,rbx
+    div rbx
+End:
+    hlt
+    jmp End
+Handler0:
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15    
+    mov byte[0xb8000],'D'
+    mov byte[0xb8001],0xc
+    jmp End
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+    iretq
+Gdt64:
+    dq 0
+    dq 0x0020980000000000
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1
+          dq Gdt64
+Idt:
+    %rep 256
+        dw 0
+        dw 0x8
+        db 0
+        db 0x8e
+        dw 0
+        dd 0
+        dd 0
+    %endrep
+IdtLen: equ $-Idt
+IdtPtr: dw IdtLen-1
+        dq Idt
+```
+
+26. Setting Up the Interrupt Controller
+- HW interrupt
+    - The programmable interrupt controller
+        - Manages the interrupt requests (IRQ)
+    - The programmable interval timer
+        - Periodic timer
+- kernel.asm:
+```asm
+[BITS 64]
+[ORG 0x200000]
+start:
+    mov rdi,Idt
+    mov rax,Handler0
+    mov [rdi],ax
+    shr rax,16
+    mov [rdi+6],ax
+    shr rax,16
+    mov [rdi+8],eax
+    mov rax,Timer
+    add rdi,32*16
+    mov [rdi],ax
+    shr rax,16
+    mov [rdi+6],ax
+    shr rax,16
+    mov [rdi+8],eax
+    lgdt [Gdt64Ptr]
+    lidt [IdtPtr]
+    push 8
+    push KernelEntry
+    db 0x48
+    retf
+KernelEntry:
+    ; 7 6 5 4 3 2 1 0 bit
+    ; 00   11  010  0
+    mov byte[0xb8000],'K'
+    mov byte[0xb8001],0xa
+InitPIT:
+    mov al,(1<<2)|(3<<4) ; 1193182/100 = 11931
+    out 0x43,al
+    mov ax,11931
+    out 0x40,al
+    mov al,ah
+    out 0x40,al
+InitPIC:
+    mov al,0x11
+    out 0x20,al
+    out 0xa0,al
+    ; Initialization Commmand word 2
+    ; 7 6 5 4 3 2 1 0 bit
+    ; 0 0 1 0 0 0 0 0 = 32
+    mov al,32
+    out 0x21,al
+    mov al,40
+    out 0xa1,al
+    ; Initialization Commmand word 3
+    ; 7 6 5 4 3 2 1 0 bit
+    ; 0 0 0 0 0 1 0 0 = 4
+    ; 0 0 0 0 0 0 1 0 = 2
+    mov al,4
+    out 0x21,al
+    mov al,2
+    out 0xa1,al
+    ; Initialization Commmand word 4
+    ; 7 6 5 4 3 2 1 0 bit
+    ; 0 0 0 0 0 0 0 1
+    mov al,1
+    out 0x21,al
+    out 0xa1,al
+    mov al,11111110b
+    out 0x21,al
+    mov al,11111111b
+    out 0xa1,al
+    sti
+End:
+    hlt
+    jmp End
+Handler0:
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+    mov byte[0xb8000],'D'
+    mov byte[0xb8001],0xc
+    jmp End
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+    iretq
+Timer:
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+    mov byte[0xb8020],'T'
+    mov byte[0xb8021],0xe
+    jmp End   
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+    iretq
+Gdt64:
+    dq 0
+    dq 0x0020980000000000
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1
+          dq Gdt64
+Idt:
+    %rep 256
+        dw 0
+        dw 0x8
+        db 0
+        db 0x8e
+        dw 0
+        dd 0
+        dd 0
+    %endrep
+IdtLen: equ $-Idt
+IdtPtr: dw IdtLen-1
+        dq Idt
+```
+
+27. Getting to Ring3
+- How to jump from Ring0 to Ring3
+    - Lower 2bit of cs register
+- Ref: https://stackoverflow.com/questions/18717016/what-are-ring-0-and-ring-3-in-the-context-of-operating-systems
+    - CPU is in one of 4 rings
+    - Linux kernel only uses 0 and 3
+        - 0 for kernel. Can do anything
+        - 3 for users
+```asm
+[BITS 64]
+[ORG 0x200000]
+start:
+    mov rdi,Idt
+    mov rax,Handler0
+    mov [rdi],ax
+    shr rax,16
+    mov [rdi+6],ax
+    shr rax,16
+    mov [rdi+8],eax
+    mov rax,Timer
+    add rdi,32*16
+    mov [rdi],ax
+    shr rax,16
+    mov [rdi+6],ax
+    shr rax,16
+    mov [rdi+8],eax
+    lgdt [Gdt64Ptr]
+    lidt [IdtPtr]
+    push 8
+    push KernelEntry
+    db 0x48
+    retf
+KernelEntry:
+    mov byte[0xb8000],'K'
+    mov byte[0xb8001],0xa
+    ; High Address: ss Selector
+    ;               RSP
+    ;               Rflags
+    ;               cs selector
+    ; Low Adddress: RIP <= RSP
+InitPIT:
+    mov al,(1<<2)|(3<<4)
+    out 0x43,al
+    mov ax,11931
+    out 0x40,al
+    mov al,ah
+    out 0x40,al
+InitPIC:
+    mov al,0x11
+    out 0x20,al
+    out 0xa0,al
+    mov al,32
+    out 0x21,al
+    mov al,40
+    out 0xa1,al
+    mov al,4
+    out 0x21,al
+    mov al,2
+    out 0xa1,al
+    mov al,1
+    out 0x21,al
+    out 0xa1,al
+    mov al,11111110b
+    out 0x21,al
+    mov al,11111111b
+    out 0xa1,al
+    push 0x18|3
+    push 0x7c00
+    push 0x2
+    push 0x10|3
+    push UserEntry
+    iretq
+End:
+    hlt
+    jmp End
+UserEntry:
+    mov ax,cs
+    and al,11b
+    cmp al,3
+    jne UEnd
+    mov byte[0xb8010],'U'
+    mov byte[0xb8011],0xE
+UEnd:
+    jmp UEnd
+Handler0:
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15    
+    mov byte[0xb8000],'D'
+    mov byte[0xb8001],0xc
+    jmp End
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+    iretq
+Timer:
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+    mov byte[0xb8020],'T'
+    mov byte[0xb8021],0xe
+    jmp End
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+    iretq
+Gdt64:
+    dq 0                   ; D L P DPL 1 1 C
+    dq 0x0020980000000000  ; 0 1 1  00 1 1 0
+    dq 0x0020f80000000000  ; 0 1 1  11 1 1 0
+                           ; P DPL 1 0 0 W 0
+    dq 0x0000f20000000000  ; 1  11 1 0 0 1 0
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1
+          dq Gdt64
+Idt:
+    %rep 256
+        dw 0
+        dw 0x8
+        db 0
+        db 0x8e
+        dw 0
+        dd 0
+        dd 0
+    %endrep
+IdtLen: equ $-Idt
+IdtPtr: dw IdtLen-1
+        dq Idt
+```
+
+28. Interrupts Handling in Ring3 Part I
+- kernel.asm:
+```asm
+[BITS 64]
+[ORG 0x200000]
+start:
+    mov rdi,Idt
+    mov rax,Handler0
+    mov [rdi],ax
+    shr rax,16
+    mov [rdi+6],ax
+    shr rax,16
+    mov [rdi+8],eax
+    mov rax,Timer
+    add rdi,32*16
+    mov [rdi],ax
+    shr rax,16
+    mov [rdi+6],ax
+    shr rax,16
+    mov [rdi+8],eax
+    lgdt [Gdt64Ptr]
+    lidt [IdtPtr]
+SetTss:
+    mov rax,Tss
+    mov [TssDesc+2],ax
+    shr rax,16
+    mov [TssDesc+4],al
+    shr rax,8
+    mov [TssDesc+7],al
+    shr rax,8
+    mov [TssDesc+8],eax
+    mov ax,0x20
+    ltr ax
+    push 8
+    push KernelEntry
+    db 0x48
+    retf
+KernelEntry:
+    mov byte[0xb8000],'K'
+    mov byte[0xb8001],0xa
+InitPIT:
+    mov al,(1<<2)|(3<<4)
+    out 0x43,al
+    mov ax,11931
+    out 0x40,al
+    mov al,ah
+    out 0x40,al
+InitPIC:
+    mov al,0x11
+    out 0x20,al
+    out 0xa0,al
+    mov al,32
+    out 0x21,al
+    mov al,40
+    out 0xa1,al
+    mov al,4
+    out 0x21,al
+    mov al,2
+    out 0xa1,al
+    mov al,1
+    out 0x21,al
+    out 0xa1,al
+    mov al,11111110b
+    out 0x21,al
+    mov al,11111111b
+    out 0xa1,al
+    ;sti
+    push 0x18|3
+    push 0x7c00
+    push 0x202
+    push 0x10|3
+    push UserEntry
+    iretq
+End:
+    hlt
+    jmp End
+UserEntry:
+    mov ax,cs
+    and al,11b
+    cmp al,3
+    jne UEnd
+    mov byte[0xb8010],'U'
+    mov byte[0xb8011],0xE
+UEnd:
+    jmp UEnd
+Handler0:
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15    
+    mov byte[0xb8000],'D'
+    mov byte[0xb8001],0xc
+    jmp End
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+    iretq
+Timer:
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+    mov byte[0xb8020],'T'
+    mov byte[0xb8021],0xe
+    jmp End
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+    iretq
+Gdt64:
+    dq 0
+    dq 0x0020980000000000
+    dq 0x0020f80000000000
+    dq 0x0000f20000000000
+TssDesc:
+    dw TssLen-1
+    dw 0
+    db 0
+    db 0x89
+    db 0
+    db 0
+    dq 0
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1
+          dq Gdt64
+Idt:
+    %rep 256
+        dw 0
+        dw 0x8
+        db 0
+        db 0x8e
+        dw 0
+        dd 0
+        dd 0
+    %endrep
+IdtLen: equ $-Idt
+IdtPtr: dw IdtLen-1
+        dq Idt
+Tss:
+    dd 0
+    dq 0x150000
+    times 88 db 0
+    dd TssLen
+TssLen: equ $-Tss
+```
+![HW_interrupt](./hw_interrupt.png)
+
+29. Interrupts Handling in Ring3 Part II
+30. Spurious Interrupt Handling
+
+## Section 6: Working with C
+
+31. Kernel main
+- build.sh:
+```bash
+nasm -f bin -o boot.bin boot.asm
+nasm -f bin -o loader.bin loader.asm
+nasm -f elf64 -o kernel.o kernel.asm
+gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c main.c 
+ld -nostdlib -T link.lds -o kernel kernel.o main.o
+objcopy -O binary kernel kernel.bin 
+dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
+dd if=loader.bin of=boot.img bs=512 count=5 seek=1 conv=notrunc
+dd if=kernel.bin of=boot.img bs=512 count=100 seek=6 conv=notrunc
+```
+- link.lds:
+    - Ref: https://bravegnu.org/gnu-eprog/lds.html
+```
+OUTPUT_FORMAT("elf64-x86-64")
+ENTRY(start)
+SECTIONS
+{
+    . = 0x200000;
+    .text : {
+        *(.text)
+    }
+    .rodata : {
+        *(.rodata)
+    }
+    . = ALIGN(16);
+    .data : {
+        *(.data)
+    }
+    .bss : {
+        *(.bss)
+    }
+}
+```
+- kernel.asm:
+```
+section .data
+Gdt64:
+    dq 0
+    dq 0x0020980000000000
+    dq 0x0020f80000000000
+    dq 0x0000f20000000000
+TssDesc:
+    dw TssLen-1
+    dw 0
+    db 0
+    db 0x89
+    db 0
+    db 0
+    dq 0
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1
+          dq Gdt64
+Tss:
+    dd 0
+    dq 0x190000
+    times 88 db 0
+    dd TssLen
+TssLen: equ $-Tss
+section .text
+extern KMain
+global start
+start:
+    lgdt [Gdt64Ptr]
+SetTss:
+    mov rax,Tss
+    mov [TssDesc+2],ax
+    shr rax,16
+    mov [TssDesc+4],al
+    shr rax,8
+    mov [TssDesc+7],al
+    shr rax,8
+    mov [TssDesc+8],eax
+    mov ax,0x20
+    ltr ax
+InitPIT:
+    mov al,(1<<2)|(3<<4)
+    out 0x43,al
+    mov ax,11931
+    out 0x40,al
+    mov al,ah
+    out 0x40,al
+InitPIC:
+    mov al,0x11
+    out 0x20,al
+    out 0xa0,al
+    mov al,32
+    out 0x21,al
+    mov al,40
+    out 0xa1,al
+    mov al,4
+    out 0x21,al
+    mov al,2
+    out 0xa1,al
+    mov al,1
+    out 0x21,al
+    out 0xa1,al
+    mov al,11111110b
+    out 0x21,al
+    mov al,11111111b
+    out 0xa1,al
+    push 8
+    push KernelEntry
+    db 0x48
+    retf
+KernelEntry:
+    mov rsp,0x200000
+    call KMain
+End:
+    hlt
+    jmp End
+```
+- main.c
+```c
+void KMain(void)
+{
+    char* p = (char*)0xb8000; 
+    p[0] = 'C';
+    p[1] = 0xa;
+}
+```
+- Text mode video memory is a buffer located at 0xB8000 for color monitor and 0xB00000 for monochrome
+    - Ref: http://kernelx.weebly.com/text-console.html
+- Color code: https://gist.github.com/Pwootage/1396569
+    - 0xa is green
+ 
+32. Putting it all together
+- System V AMD64 calling convention
+    - The first 6 parameters -> RDI RSI RDX RCX R8 R9 others are on the stack
+    - Return value -> RAX
+    - RAX RCX RDX RSI RDI R8 R9 R10 R11 Caller saved registers
+    - RBX RBP R12 R13 R14 R15 Callee saved registers
+- trap.h
+```c
+#ifndef _TRAP_H_
+#define _TRAP_H_
+#include "stdint.h"
+struct IdtEntry {
+    uint16_t low; /* bottom 2bytes as offset */
+    uint16_t selector;
+    uint8_t res0;
+    uint8_t attr;
+    uint16_t mid;
+    uint32_t high;
+    uint32_t res1;
+};
+struct IdtPtr {
+    uint16_t limit;
+    uint64_t addr;
+} __attribute__((packed));
+struct TrapFrame {
+    int64_t r15;
+    int64_t r14;
+    int64_t r13;
+    int64_t r12;
+    int64_t r11;
+    int64_t r10;
+    int64_t r9;
+    int64_t r8;
+    int64_t rbp;
+    int64_t rdi;
+    int64_t rsi;
+    int64_t rdx;
+    int64_t rcx;
+    int64_t rbx;
+    int64_t rax;
+    int64_t trapno;
+    int64_t errorcode;
+    int64_t rip;
+    int64_t cs;
+    int64_t rflags;
+    int64_t rsp;
+    int64_t ss;
+};
+void vector0(void);
+void vector1(void);
+void vector2(void);
+void vector3(void);
+void vector4(void);
+void vector5(void);
+void vector6(void);
+void vector7(void);
+void vector8(void);
+void vector10(void);
+void vector11(void);
+void vector12(void);
+void vector13(void);
+void vector14(void);
+void vector16(void);
+void vector17(void);
+void vector18(void);
+void vector19(void);
+void vector32(void);
+void vector39(void);
+void init_idt(void);
+void eoi(void);
+void load_idt(struct IdtPtr *ptr);
+unsigned char read_isr(void);
+#endif
+```
+- Using `__attribute__((packed))`
+    - No insertion of padding
+    - Ref: https://stackoverflow.com/questions/8568432/is-gccs-attribute-packed-pragma-pack-unsafe
+- trap.asm
+```asm
+section .text
+extern handler
+global vector0
+global vector1
+global vector2
+global vector3
+global vector4
+global vector5
+global vector6
+global vector7
+global vector8
+global vector10
+global vector11
+global vector12
+global vector13
+global vector14
+global vector16
+global vector17
+global vector18
+global vector19
+global vector32
+global vector39
+global eoi
+global read_isr
+global load_idt
+Trap:
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+    inc byte[0xb8010]
+    mov byte[0xb8011],0xe
+    mov rdi,rsp  ; first parameter
+    call handler ; from C code
+TrapReturn:
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax       
+    add rsp,16
+    iretq
+vector0:
+    push 0
+    push 0
+    jmp Trap
+vector1:
+    push 0
+    push 1
+    jmp Trap
+vector2:
+    push 0
+    push 2
+    jmp Trap
+vector3:
+    push 0
+    push 3	
+    jmp Trap 
+vector4:
+    push 0
+    push 4	
+    jmp Trap   
+vector5:
+    push 0
+    push 5
+    jmp Trap    
+vector6:
+    push 0
+    push 6	
+    jmp Trap      
+vector7:
+    push 0
+    push 7	
+    jmp Trap  
+vector8:
+    ; no 0 push as it will be done from C code
+    push 8
+    jmp Trap  
+; vector9 is reserved
+vector10:
+    push 10	
+    jmp Trap                    
+vector11:
+    push 11	
+    jmp Trap    
+vector12:
+    push 12	
+    jmp Trap                    
+vector13:
+    push 13	
+    jmp Trap    
+vector14:
+    push 14	
+    jmp Trap
+; vector15 is reserved 
+vector16:
+    push 0
+    push 16	
+    jmp Trap                    
+vector17:
+    push 17	
+    jmp Trap                         
+vector18:
+    push 0
+    push 18	
+    jmp Trap                   
+vector19:
+    push 0
+    push 19	
+    jmp Trap
+vector32:
+    push 0
+    push 32
+    jmp Trap
+vector39:
+    push 0
+    push 39
+    jmp Trap
+eoi:
+    mov al,0x20
+    out 0x20,al
+    ret
+read_isr:
+    mov al,11
+    out 0x20,al
+    in al,0x20
+    ret
+load_idt:
+    lidt [rdi]
+    ret
+```
+- trap.c
+```c
+#include "trap.h"
+static struct IdtPtr idt_pointer;
+static struct IdtEntry vectors[256];
+static void init_idt_entry(struct IdtEntry *entry, uint64_t addr, uint8_t attribute)
+{
+    entry->low = (uint16_t)addr;
+    entry->selector = 8;
+    entry->attr = attribute;
+    entry->mid = (uint16_t)(addr>>16);
+    entry->high = (uint32_t)(addr>>32);
+}
+void init_idt(void)
+{
+    init_idt_entry(&vectors[0],(uint64_t)vector0,0x8e);
+    init_idt_entry(&vectors[1],(uint64_t)vector1,0x8e);
+    init_idt_entry(&vectors[2],(uint64_t)vector2,0x8e);
+    init_idt_entry(&vectors[3],(uint64_t)vector3,0x8e);
+    init_idt_entry(&vectors[4],(uint64_t)vector4,0x8e);
+    init_idt_entry(&vectors[5],(uint64_t)vector5,0x8e);
+    init_idt_entry(&vectors[6],(uint64_t)vector6,0x8e);
+    init_idt_entry(&vectors[7],(uint64_t)vector7,0x8e);
+    init_idt_entry(&vectors[8],(uint64_t)vector8,0x8e);
+    init_idt_entry(&vectors[10],(uint64_t)vector10,0x8e);
+    init_idt_entry(&vectors[11],(uint64_t)vector11,0x8e);
+    init_idt_entry(&vectors[12],(uint64_t)vector12,0x8e);
+    init_idt_entry(&vectors[13],(uint64_t)vector13,0x8e);
+    init_idt_entry(&vectors[14],(uint64_t)vector14,0x8e);
+    init_idt_entry(&vectors[16],(uint64_t)vector16,0x8e);
+    init_idt_entry(&vectors[17],(uint64_t)vector17,0x8e);
+    init_idt_entry(&vectors[18],(uint64_t)vector18,0x8e);
+    init_idt_entry(&vectors[19],(uint64_t)vector19,0x8e);
+    init_idt_entry(&vectors[32],(uint64_t)vector32,0x8e);
+    init_idt_entry(&vectors[39],(uint64_t)vector39,0x8e);
+    idt_pointer.limit = sizeof(vectors)-1;
+    idt_pointer.addr = (uint64_t)vectors;
+    load_idt(&idt_pointer);
+}
+void handler(struct TrapFrame *tf)
+{
+    unsigned char isr_value;
+    switch (tf->trapno) {
+        case 32:
+            eoi();
+            break;            
+        case 39:
+            isr_value = read_isr();
+            if ((isr_value&(1<<7)) != 0) {
+                eoi();
+            }
+            break;
+        default:
+            while (1) { }
+    }
+}
+```
+- kernel.asm
+```asm
+section .data
+Gdt64:
+    dq 0
+    dq 0x0020980000000000
+    dq 0x0020f80000000000
+    dq 0x0000f20000000000
+TssDesc:
+    dw TssLen-1
+    dw 0
+    db 0
+    db 0x89
+    db 0
+    db 0
+    dq 0
+Gdt64Len: equ $-Gdt64
+Gdt64Ptr: dw Gdt64Len-1
+          dq Gdt64
+Tss:
+    dd 0
+    dq 0x190000
+    times 88 db 0
+    dd TssLen
+TssLen: equ $-Tss
+section .text
+extern KMain
+global start
+start:
+    lgdt [Gdt64Ptr]
+SetTss:
+    mov rax,Tss
+    mov [TssDesc+2],ax
+    shr rax,16
+    mov [TssDesc+4],al
+    shr rax,8
+    mov [TssDesc+7],al
+    shr rax,8
+    mov [TssDesc+8],eax
+    mov ax,0x20
+    ltr ax
+InitPIT:
+    mov al,(1<<2)|(3<<4)
+    out 0x43,al
+    mov ax,11931
+    out 0x40,al
+    mov al,ah
+    out 0x40,al
+InitPIC:
+    mov al,0x11
+    out 0x20,al
+    out 0xa0,al
+    mov al,32
+    out 0x21,al
+    mov al,40
+    out 0xa1,al
+    mov al,4
+    out 0x21,al
+    mov al,2
+    out 0xa1,al
+    mov al,1
+    out 0x21,al
+    out 0xa1,al
+    mov al,11111110b
+    out 0x21,al
+    mov al,11111111b
+    out 0xa1,al
+    push 8
+    push KernelEntry
+    db 0x48
+    retf
+KernelEntry: 
+    xor ax,ax
+    mov ss,ax
+    
+    mov rsp,0x200000
+    call KMain
+    sti
+End:
+    hlt
+    jmp End
+```
+- build.sh
+```
+nasm -f bin -o boot.bin boot.asm
+nasm -f bin -o loader.bin loader.asm
+nasm -f elf64 -o kernel.o kernel.asm
+nasm -f elf64 -o trapa.o trap.asm
+gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c main.c 
+gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c trap.c 
+ld -nostdlib -T link.lds -o kernel kernel.o main.o trapa.o trap.o
+objcopy -O binary kernel kernel.bin 
+dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
+dd if=loader.bin of=boot.img bs=512 count=5 seek=1 conv=notrunc
+dd if=kernel.bin of=boot.img bs=512 count=100 seek=6 conv=notrunc
+```
+
+33. Simple library functions
+
+34. Print function
+
+35. Assertion
+
+## Section 7: Memory Management
+
+36. Retrieve Memory Map
+
+![memory_map](./memory_map.png)
+
+- In loader.asm:
+```asm
+GetMemInfoStart:
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    mov dword[0x9000],0
+    mov edi,0x9008
+    xor ebx,ebx
+    int 0x15
+    jc NotSupport
+GetMemInfo:
+    add edi,20
+    inc dword[0x9000] 
+    test ebx,ebx
+    jz GetMemDone
+    mov eax,0xe820
+    mov edx,0x534d4150
+    mov ecx,20
+    int 0x15
+    jnc GetMemInfo
+```
+- memory.h:
+```c
+#ifndef _MEMORY_H_
+#define _MEMORY_H_
+#include "stdint.h"
+struct E820 {
+    uint64_t address;
+    uint64_t length;
+    uint32_t type;
+} __attribute__((packed));
+struct FreeMemRegion {
+    uint64_t address;
+    uint64_t length;
+};
+void init_memory(void);
+#endif
+```
+- memory.c:
+```c
+#include "memory.h"
+#include "print.h"
+#include "debug.h"
+static struct FreeMemRegion free_mem_region[50];
+void init_memory(void)
+{
+    int32_t count = *(int32_t*)0x9000;
+    uint64_t total_mem = 0;
+    struct E820 *mem_map = (struct E820*)0x9008;	
+    int free_region_count = 0;
+    ASSERT(count <= 50);
+	for(int32_t i = 0; i < count; i++) {        
+        if(mem_map[i].type == 1) {
+            free_mem_region[free_region_count].address = mem_map[i].address;
+            free_mem_region[free_region_count].length = mem_map[i].length;
+            total_mem += mem_map[i].length;
+            free_region_count++;
+        }        
+        printk("%x  %uKB  %u\n", mem_map[i].address, mem_map[i].length/1024, (uint64_t)mem_map[i].type);
+	}
+    printk("Total memory is %uMB\n", total_mem/1024/1024);
+}
+```
+
+37. Paging
+
+![new_memory_map](./new_memory_map.png)
+
+- Mapping virtual page into physical memory page
+
+38. Memory Allocator
+- Collects free memory based on physical memory, not virtual
+
+39. Memory Pages
+
+40. Free Memory Page
+
+41. User Space
+
+## Section 8: Processes
+
+## Section 9: Keyboard and console
+
+48. Write a PS/2 keyboard driver 1
+- Kyeboard scan code: https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
+
+49. Write a PS/2 keyboard driver 2
