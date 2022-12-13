@@ -3,8 +3,8 @@
 - Instructor: x-BIT Development
 
 ## References
-- https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
-- https://github.com/cfenollosa/os-tutorial
+- [1] https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
+- [2] https://github.com/cfenollosa/os-tutorial
 
 ## Section 1: Introduction
 
@@ -662,7 +662,7 @@ start:
     mov ss,ax
     mov sp,0x7c00 ; 
 PrintMessage:
-    mov ah,0x13
+    mov ah,0x13  ; service 13 - print string. For tty mode, mov ah,0x0e
     mov al,1
     mov bx,0xa ; 0xa means the character is printed in bright screen
     xor dx,dx
@@ -685,6 +685,7 @@ times (0x1be-($-$$)) db 0
     db 0x55     ; signature
     db 0xaa	    ; signature
 ```
+- [2]: `int 0x10` is a general interrupt for video services
 - Build script (build.sh)
 ```bash
 nasm -f bin -o boot.bin boot.asm
@@ -716,10 +717,12 @@ $ sudo dd if=boot.img of=/dev/sdb bs=512 count=1
 12. Testing on MacOS
 
 13. Test Disk Extension Service
+- [2]: When the computer boots, the BIOS doesn't know how to load the OS, so it delegates that task to the boot sector. Thus, the boot sector must be placed in a known, standard location. That location is the first sector of the disk (cylinder 0, head 0, sector 0) and it takes 512 bytes. To make sure that the "disk is bootable", the BIOS checks that bytes 511 and 512 of the alleged boot sector are bytes **0xAA55**.
 - Adding the check of disk extension
 ```assembly
 [BITS 16]
-[ORG 0x7c00]
+[ORG 0x7c00] ; global offset
+; [2]  since offsetting 0x7c00 everywhere is very inconvenient, assemblers let us define a "global offset" for every memory location, with the ORG command
 start:
     xor ax,ax   
     mov ds,ax
@@ -760,6 +763,7 @@ times (0x1be-($-$$)) db 0
     db 0x55
     db 0xaa
 ```
+- BIOS places memory at 0x7c00
 - ./build.sh and bochs again
 
 ## Section 4: Loading the Loader and Switching to Long Mode
@@ -2319,7 +2323,10 @@ TssLen: equ $-Tss
 ![HW_interrupt](./hw_interrupt.png)
 
 29. Interrupts Handling in Ring3 Part II
+
 30. Spurious Interrupt Handling
+- Not real interrupt
+- 
 
 ## Section 6: Working with C
 
@@ -2591,7 +2598,7 @@ TrapReturn:
     pop	rcx
     pop	rbx
     pop	rax       
-    add rsp,16
+    add rsp,16   ; traps here
     iretq
 vector0:
     push 0
@@ -2670,7 +2677,8 @@ vector39:
     push 39
     jmp Trap
 eoi:
-    mov al,0x20
+    mov al,0x20  ; processing the interrupt 
+    ; ref: https://stackoverflow.com/questions/14848645/what-does-this-x86-assembly-language-code-with-io-ports-0x61-and-0x20-do
     out 0x20,al
     ret
 read_isr:
@@ -2678,7 +2686,7 @@ read_isr:
     out 0x20,al
     in al,0x20
     ret
-load_idt:
+load_idt:       ; no idt command in C so we write in asm
     lidt [rdi]
     ret
 ```
@@ -2841,6 +2849,29 @@ dd if=kernel.bin of=boot.img bs=512 count=100 seek=6 conv=notrunc
 34. Print function
 
 35. Assertion
+- debug.h
+```c
+#ifndef _DEBUG_H_
+#define _DEBUG_H_
+#include "stdint.h"
+#define ASSERT(e) do {                      \
+        if (!(e))                           \
+            error_check(__FILE__,__LINE__); \
+} while (0) 
+void error_check(char *file, uint64_t line);
+#endif
+```
+- debug.c
+```c
+void error_check(char *file, uint64_t line)
+{
+    printk("\n------------------------------------------\n");
+    printk("             ERROR CHECK");
+    printk("\n------------------------------------------\n");
+    printk("Assertion Failed [%s:%u]", file, line);
+    while (1) { } /* infinite loop */
+}
+```
 
 ## Section 7: Memory Management
 
@@ -2925,14 +2956,811 @@ void init_memory(void)
 39. Memory Pages
 
 40. Free Memory Page
+```c
+#include "memory.h"
+#include "print.h"
+#include "debug.h"
+#include "lib.h"
+#include "stddef.h"
+#include "stdbool.h"
+static void free_region(uint64_t v, uint64_t e);
+static struct FreeMemRegion free_mem_region[50];
+static struct Page free_memory;
+static uint64_t memory_end;
+uint64_t page_map;
+extern char end;
+void init_memory(void)
+{
+    int32_t count = *(int32_t*)0x9000;
+    uint64_t total_mem = 0;
+    struct E820 *mem_map = (struct E820*)0x9008;	
+    int free_region_count = 0;
+    ASSERT(count <= 50);
+	for(int32_t i = 0; i < count; i++) {        
+        if(mem_map[i].type == 1) {			
+            free_mem_region[free_region_count].address = mem_map[i].address;
+            free_mem_region[free_region_count].length = mem_map[i].length;
+            total_mem += mem_map[i].length;
+            free_region_count++;
+        }
+        printk("%x  %uKB  %u\n",mem_map[i].address,mem_map[i].length/1024,(uint64_t)mem_map[i].type);
+	}
+    for (int i = 0; i < free_region_count; i++) {                  
+        uint64_t vstart = P2V(free_mem_region[i].address);
+        uint64_t vend = vstart + free_mem_region[i].length;
+        if (vstart > (uint64_t)&end) {
+            free_region(vstart, vend);
+        } 
+        else if (vend > (uint64_t)&end) {
+            free_region((uint64_t)&end, vend);
+        }       
+    }   
+    memory_end = (uint64_t)free_memory.next+PAGE_SIZE;   
+    printk("%x\n",memory_end);
+}
+static void free_region(uint64_t v, uint64_t e)
+{
+    for (uint64_t start = PA_UP(v); start+PAGE_SIZE <= e; start += PAGE_SIZE) {        
+        if (start+PAGE_SIZE <= 0xffff800040000000) {            
+           kfree(start);
+        }
+    }
+}
+void kfree(uint64_t v)
+{
+    ASSERT(v % PAGE_SIZE == 0);
+    ASSERT(v >= (uint64_t) & end);
+    ASSERT(v+PAGE_SIZE <= 0xffff800040000000);
+
+    struct Page *page_address = (struct Page*)v;
+    page_address->next = free_memory.next;
+    free_memory.next = page_address;
+}
+void* kalloc(void)
+{
+    struct Page *page_address = free_memory.next;
+    if (page_address != NULL) {
+        ASSERT((uint64_t)page_address % PAGE_SIZE == 0);
+        ASSERT((uint64_t)page_address >= (uint64_t)&end);
+        ASSERT((uint64_t)page_address+PAGE_SIZE <= 0xffff800040000000);
+
+        free_memory.next = page_address->next;            
+    }   
+    return page_address;
+}
+static PDPTR find_pml4t_entry(uint64_t map, uint64_t v, int alloc, uint32_t attribute)
+{
+    PDPTR *map_entry = (PDPTR*)map;
+    PDPTR pdptr = NULL;
+    unsigned int index = (v >> 39) & 0x1FF;
+    if ((uint64_t)map_entry[index] & PTE_P) {
+        pdptr = (PDPTR)P2V(PDE_ADDR(map_entry[index]));       
+    } 
+    else if (alloc == 1) {
+        pdptr = (PDPTR)kalloc();          
+        if (pdptr != NULL) {     
+            memset(pdptr, 0, PAGE_SIZE);     
+            map_entry[index] = (PDPTR)(V2P(pdptr) | attribute);           
+        }
+    } 
+    return pdptr;    
+}
+static PD find_pdpt_entry(uint64_t map, uint64_t v, int alloc, uint32_t attribute)
+{
+    PDPTR pdptr = NULL;
+    PD pd = NULL;
+    unsigned int index = (v >> 30) & 0x1FF;
+    pdptr = find_pml4t_entry(map, v, alloc, attribute);
+    if (pdptr == NULL)
+        return NULL;       
+    if ((uint64_t)pdptr[index] & PTE_P) {      
+        pd = (PD)P2V(PDE_ADDR(pdptr[index]));      
+    }
+    else if (alloc == 1) {
+        pd = (PD)kalloc();  
+        if (pd != NULL) {    
+            memset(pd, 0, PAGE_SIZE);       
+            pdptr[index] = (PD)(V2P(pd) | attribute);
+        }
+    } 
+    return pd;
+}
+bool map_pages(uint64_t map, uint64_t v, uint64_t e, uint64_t pa, uint32_t attribute)
+{
+    uint64_t vstart = PA_DOWN(v);
+    uint64_t vend = PA_UP(e);
+    PD pd = NULL;
+    unsigned int index;
+    ASSERT(v < e);
+    ASSERT(pa % PAGE_SIZE == 0);
+    ASSERT(pa+vend-vstart <= 1024*1024*1024);
+    do {
+        pd = find_pdpt_entry(map, vstart, 1, attribute);    
+        if (pd == NULL) {
+            return false;
+        }
+        index = (vstart >> 21) & 0x1FF;
+        ASSERT(((uint64_t)pd[index] & PTE_P) == 0);
+        pd[index] = (PDE)(pa | attribute | PTE_ENTRY);
+        vstart += PAGE_SIZE;
+        pa += PAGE_SIZE;
+    } while (vstart + PAGE_SIZE <= vend); 
+    return true;
+}
+void switch_vm(uint64_t map)
+{
+    load_cr3(V2P(map));   
+}
+static void setup_kvm(void)
+{
+    page_map = (uint64_t)kalloc();
+    ASSERT(page_map != 0);
+    memset((void*)page_map, 0, PAGE_SIZE);        
+    bool status = map_pages(page_map, KERNEL_BASE, memory_end, V2P(KERNEL_BASE), PTE_P|PTE_W);
+    ASSERT(status == true);
+}
+void init_kvm(void)
+{
+    setup_kvm();
+    switch_vm(page_map);
+    printk("memory manager is working now");
+}
+void free_pages(uint64_t map, uint64_t vstart, uint64_t vend)
+{
+    unsigned int index; 
+    ASSERT(vstart % PAGE_SIZE == 0);
+    ASSERT(vend % PAGE_SIZE == 0);
+    do {
+        PD pd = find_pdpt_entry(map, vstart, 0, 0);
+        if (pd != NULL) {
+            index = (vstart >> 21) & 0x1FF;
+            ASSERT(pd[index] & PTE_P);           
+            kfree(P2V(PTE_ADDR(pd[index])));
+            pd[index] = 0;
+        }
+        vstart += PAGE_SIZE;
+    } while (vstart+PAGE_SIZE <= vend);
+}
+static void free_pdt(uint64_t map)
+{
+    PDPTR *map_entry = (PDPTR*)map;
+    for (int i = 0; i < 512; i++) {
+        if ((uint64_t)map_entry[i] & PTE_P) {            
+            PD *pdptr = (PD*)P2V(PDE_ADDR(map_entry[i]));           
+            for (int j = 0; j < 512; j++) {
+                if ((uint64_t)pdptr[j] & PTE_P) {
+                    kfree(P2V(PDE_ADDR(pdptr[j])));
+                    pdptr[j] = 0;
+                }
+            }
+        }
+    }
+}
+static void free_pdpt(uint64_t map)
+{
+    PDPTR *map_entry = (PDPTR*)map;
+    for (int i = 0; i < 512; i++) {
+        if ((uint64_t)map_entry[i] & PTE_P) {          
+            kfree(P2V(PDE_ADDR(map_entry[i])));
+            map_entry[i] = 0;
+        }
+    }
+}
+static void free_pml4t(uint64_t map)
+{
+    kfree(map);
+}
+void free_vm(uint64_t map)
+{   
+    //free_pages(map,vstart,vend);
+    free_pdt(map);
+    free_pdpt(map);
+    free_pml4t(map);
+}
+```
 
 41. User Space
 
 ## Section 8: Processes
 
+42. The first process
+- 2 processes
+    - each process has the same kernel space
+    - User spaces are different
+- process.h
+```c
+#ifndef _PROCESS_H_
+#define _PROCESS_H_
+#include "trap.h"
+struct Process {
+    int pid;
+	int state;
+	uint64_t page_map;	
+	uint64_t stack;
+	struct TrapFrame *tf;
+};
+struct TSS {
+    uint32_t res0;
+    uint64_t rsp0;
+    uint64_t rsp1;
+    uint64_t rsp2;
+	uint64_t res1;
+	uint64_t ist1;
+	uint64_t ist2;
+	uint64_t ist3;
+	uint64_t ist4;
+	uint64_t ist5;
+	uint64_t ist6;
+	uint64_t ist7;
+	uint64_t res2;
+	uint16_t res3;
+	uint16_t iopb;
+} __attribute__((packed));
+#define STACK_SIZE (2*1024*1024)
+#define NUM_PROC 10
+#define PROC_UNUSED 0
+#define PROC_INIT 1
+void init_process(void);
+void launch(void);
+void pstart(struct TrapFrame *tf);
+#endif
+```
+- process.c
+```c
+#include "process.h"
+#include "trap.h"
+#include "memory.h"
+#include "print.h"
+#include "lib.h"
+#include "debug.h"
+extern struct TSS Tss; 
+static struct Process process_table[NUM_PROC];
+static int pid_num = 1;
+void main(void);
+static void set_tss(struct Process *proc)
+{
+    Tss.rsp0 = proc->stack + STACK_SIZE;    
+}
+static struct Process* find_unused_process(void)
+{
+    struct Process *process = NULL;
+    for (int i = 0; i < NUM_PROC; i++) {
+        if (process_table[i].state == PROC_UNUSED) {
+            process = &process_table[i];
+            break;
+        }
+    }
+    return process;
+}
+static void set_process_entry(struct Process *proc)
+{
+    uint64_t stack_top;
+    proc->state = PROC_INIT;
+    proc->pid = pid_num++;
+    proc->stack = (uint64_t)kalloc();
+    ASSERT(proc->stack != 0);
+    memset((void*)proc->stack, 0, PAGE_SIZE);   
+    stack_top = proc->stack + STACK_SIZE;
+    proc->tf = (struct TrapFrame*)(stack_top - sizeof(struct TrapFrame)); 
+    proc->tf->cs = 0x10|3;
+    proc->tf->rip = 0x400000;
+    proc->tf->ss = 0x18|3;
+    proc->tf->rsp = 0x400000 + PAGE_SIZE;
+    proc->tf->rflags = 0x202;    
+    proc->page_map = setup_kvm();
+    /*
+                Kernel stack
+    low address: rip (0x400000) <=RSP
+                 cs
+                 rflags
+                 rsp (0x600000)
+    high address:ss
+    */
+    ASSERT(proc->page_map != 0);
+    ASSERT(setup_uvm(proc->page_map, (uint64_t)main, PAGE_SIZE));
+}
+void init_process(void)
+{  
+    struct Process *proc = find_unused_process();
+    ASSERT(proc == &process_table[0]);
+
+    set_process_entry(proc);
+}
+void launch(void)
+{
+    set_tss(&process_table[0]);
+    switch_vm(process_table[0].page_map);
+    pstart(process_table[0].tf);
+}
+void main(void)
+{
+    char *p = (char*)0xffff800000200020;
+    *p = 1;
+}
+```
+
+43. System call
+- Using interrupt, run print function
+- From user mode: print function -> int 0x80
+- In the kernel mode: handler -> system call -> write screen
+- syscall.h
+```c
+#ifndef _SYSCALL_H_
+#define _SYSCALL_H_
+#include "trap.h"
+typedef int (*SYSTEMCALL)(int64_t *argptr);
+void init_system_call(void);
+void system_call(struct TrapFrame *tf);
+#endif
+```
+- syscall.c
+```c
+#include "syscall.h"
+#include "print.h"
+#include "debug.h"
+#include "stddef.h"
+static SYSTEMCALL system_calls[10];
+static int sys_write(int64_t *argptr)
+{    
+    write_screen((char*)argptr[0], (int)argptr[1], 0xe);  
+    return (int)argptr[1];
+}
+void init_system_call(void)
+{
+    system_calls[0] = sys_write;
+}
+void system_call(struct TrapFrame *tf)
+{
+    int64_t i = tf->rax;
+    int64_t param_count = tf->rdi;
+    int64_t *argptr = (int64_t*)tf->rsi;
+    if (param_count < 0 || i != 0) { 
+        tf->rax = -1;
+        return;
+    }    
+    ASSERT(system_calls[i] != NULL);
+    tf->rax = system_calls[i](argptr);
+}
+```
+
+44. Scheduling
+- How to switch from one process to another
+- Every 10ms, timer interrupt runs and user mode is trapped
+- process.c
+```c
+#include "process.h"
+#include "trap.h"
+#include "memory.h"
+#include "print.h"
+#include "lib.h"
+#include "debug.h"
+extern struct TSS Tss; 
+static struct Process process_table[NUM_PROC];
+static int pid_num = 1;
+static struct ProcessControl pc;
+static void set_tss(struct Process *proc)
+{
+    Tss.rsp0 = proc->stack + STACK_SIZE;    
+}
+static struct Process* find_unused_process(void)
+{
+    struct Process *process = NULL;
+    for (int i = 0; i < NUM_PROC; i++) {
+        if (process_table[i].state == PROC_UNUSED) {
+            process = &process_table[i];
+            break;
+        }
+    }
+    return process;
+}
+static void set_process_entry(struct Process *proc, uint64_t addr)
+{
+    uint64_t stack_top;
+    proc->state = PROC_INIT;
+    proc->pid = pid_num++;
+    proc->stack = (uint64_t)kalloc();
+    ASSERT(proc->stack != 0);
+    memset((void*)proc->stack, 0, PAGE_SIZE);   
+    stack_top = proc->stack + STACK_SIZE;
+    proc->context = stack_top - sizeof(struct TrapFrame) - 7*8;   
+    *(uint64_t*)(proc->context + 6*8) = (uint64_t)TrapReturn;
+    proc->tf = (struct TrapFrame*)(stack_top - sizeof(struct TrapFrame)); 
+    proc->tf->cs = 0x10|3;
+    proc->tf->rip = 0x400000;
+    proc->tf->ss = 0x18|3;
+    proc->tf->rsp = 0x400000 + PAGE_SIZE;
+    proc->tf->rflags = 0x202;   
+    proc->page_map = setup_kvm();
+    ASSERT(proc->page_map != 0);
+    ASSERT(setup_uvm(proc->page_map, P2V(addr), 5120));
+    proc->state = PROC_READY;    
+}
+static struct ProcessControl* get_pc(void)
+{
+    return &pc;
+}
+void init_process(void)
+{
+    struct ProcessControl *process_control;
+    struct Process *process;
+    struct HeadList *list;
+    uint64_t addr[2] = {0x20000, 0x30000};
+    process_control = get_pc();
+    list = &process_control->ready_list;
+    for (int i = 0; i < 2; i++) {
+        process = find_unused_process();
+        set_process_entry(process, addr[i]);
+        append_list_tail(list, (struct List*)process);
+    }
+}
+void launch(void)
+{
+    struct ProcessControl *process_control;
+    struct Process *process;
+    process_control = get_pc();
+    process = (struct Process*)remove_list_head(&process_control->ready_list);
+    process->state = PROC_RUNNING;
+    process_control->current_process = process;   
+    set_tss(process);
+    switch_vm(process->page_map);
+    pstart(process->tf);
+}
+static void switch_process(struct Process *prev, struct Process *current)
+{
+    set_tss(current);
+    switch_vm(current->page_map);
+    swap(&prev->context, current->context); /* from trap.asm */
+}
+static void schedule(void)
+{
+    struct Process *prev_proc;
+    struct Process *current_proc;
+    struct ProcessControl *process_control;
+    struct HeadList *list;
+    process_control = get_pc();
+    prev_proc = process_control->current_process;
+    list = &process_control->ready_list;
+    ASSERT(!is_list_empty(list));    
+    current_proc = (struct Process*)remove_list_head(list);
+    current_proc->state = PROC_RUNNING;   
+    process_control->current_process = current_proc;
+    switch_process(prev_proc, current_proc);   
+}
+void yield(void)
+{
+    struct ProcessControl *process_control;
+    struct Process *process;
+    struct HeadList *list;
+        process_control = get_pc();
+    list = &process_control->ready_list;
+    if (is_list_empty(list)) {
+        return;
+    }
+    process = process_control->current_process;
+    process->state = PROC_READY;
+    append_list_tail(list, (struct List*)process);
+    schedule();
+}
+```
+
+45. Sleep and Wake up
+- In process.c:
+```c
+void sleep(int wait)
+{
+    struct ProcessControl *process_control;
+    struct Process *process;    
+    process_control = get_pc();
+    process = process_control->current_process;
+    process->state = PROC_SLEEP;
+    process->wait = wait;
+    append_list_tail(&process_control->wait_list, (struct List*)process);
+    schedule();
+}
+void wake_up(int wait)
+{
+    struct ProcessControl *process_control;
+    struct Process *process;
+    struct HeadList *ready_list;
+    struct HeadList *wait_list;
+    process_control = get_pc();
+    ready_list = &process_control->ready_list;
+    wait_list = &process_control->wait_list;
+    process = (struct Process*)remove_list(wait_list, wait);
+    while (process != NULL) {       
+        process->state = PROC_READY;
+        append_list_tail(ready_list, (struct List*)process);
+        process = (struct Process*)remove_list(wait_list, wait);
+    }
+}
+```
+
+46. Exit and Wait
+- In process.c:
+```c
+void exit(void)
+{
+    struct ProcessControl *process_control;
+    struct Process* process;
+    struct HeadList *list;
+    process_control = get_pc();
+    process = process_control->current_process;
+    process->state = PROC_KILLED;
+    list = &process_control->kill_list;
+    append_list_tail(list, (struct List*)process);
+    wake_up(1);
+    schedule();
+}
+void wait(void)
+{
+    struct ProcessControl *process_control;
+    struct Process *process;
+    struct HeadList *list;
+    process_control = get_pc();
+    list = &process_control->kill_list;
+    while (1) {
+        if (!is_list_empty(list)) {
+            process = (struct Process*)remove_list_head(list); 
+            ASSERT(process->state == PROC_KILLED);
+            kfree(process->stack);
+            free_vm(process->page_map);            
+            memset(process, 0, sizeof(struct Process));   
+        }
+        else {
+            sleep(1);
+        }
+    }
+}
+```
+
+47. Terminate a process
+- In trap.c:
+```c
+void handler(struct TrapFrame *tf)
+{
+    unsigned char isr_value;
+    switch (tf->trapno) {
+        case 32:  
+            timer_handler();   
+            eoi();
+            break;            
+        case 39:
+            isr_value = read_isr();
+            if ((isr_value&(1<<7)) != 0) {
+                eoi();
+            }
+            break;
+        case 0x80:                   
+            system_call(tf);
+            break;
+        default:
+            if ((tf->cs & 3) == 3) {
+                printk("Exception is %d\n", tf->trapno);
+                exit();
+            }
+            else {                                      
+                while (1) { }
+            }
+    }
+    if (tf->trapno == 32) {       
+        yield();
+    }
+}
+```
+
 ## Section 9: Keyboard and console
 
 48. Write a PS/2 keyboard driver 1
 - Kyeboard scan code: https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
+- PS2 keyboard through IRQ 1
+- keyboard.c
+```c
+#include "keyboard.h"
+#include "print.h"
+#include "process.h"
+static unsigned char shift_code[256] = {
+    [0x2A] = SHIFT, [0x36] = SHIFT, [0xAA] = SHIFT, [0xB6] = SHIFT
+};
+static unsigned char lock_code[256] = {
+    [0x3A] = CAPS_LOCK
+};
+static char key_map[256] = {
+    0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+    '-', '=', '\b', 0, 'q', 'w', 'e', 'r', 't', 'y', 'u',
+    'i', 'o', 'p', '[', ']', '\n', 0, 'a', 's', 'd', 'f',
+    'g', 'h', 'j', 'k', 'l', ';', '\'', '`', 0, '\\', 'z',
+    'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' '
+};
+static char shift_key_map[256] = {
+    0, 1, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
+    '_', '+', '\b', '\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U',
+    'I', 'O', 'P', '{', '}', '\n', 0, 'A', 'S', 'D', 'F', 'G',
+    'H', 'J', 'K', 'L', ':', '"', '~', 0, '|', 'Z', 'X', 'C',
+    'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' '
+};
+static unsigned int flag;
+static char keyboard_read(void)
+{
+    unsigned char scan_code;
+    char ch;
+    scan_code = in_byte(0x60);
+    if (scan_code == 0xE0) {
+        flag |= E0_SIGN;   
+        return 0;
+    }
+    if (flag & E0_SIGN) {
+        flag &= ~E0_SIGN;
+        return 0;
+    }
+    if (scan_code & 0x80) {
+        flag &= ~(shift_code[scan_code]);
+        return 0;
+    }
+    flag |= shift_code[scan_code];
+    flag ^= lock_code[scan_code];
+    if (flag & SHIFT) {
+        ch = shift_key_map[scan_code];
+    }
+    else {
+        ch = key_map[scan_code];
+    }
+    if (flag & CAPS_LOCK) { 
+        if('a' <= ch && ch <= 'z')
+            ch -= 32;
+        else if('A' <= ch && ch <= 'Z')
+            ch += 32;
+    }
+    return ch;
+}
+void keyboard_handler(void)
+{
+    char ch[2] = { 0 };
+    ch[0] = keyboard_read();
+    if (ch[0] > 0) {
+        printk("%s", ch);
+    }
+}
+```
 
 49. Write a PS/2 keyboard driver 2
+- Key buffer
+- keyboard.h
+```c
+#ifndef _KEYBOARD_H_
+#define _KEYBOARD_H_
+#include "stdint.h"
+struct KeyboardBuffer {
+    char buffer[500];
+    int front;
+    int end;
+    int size;
+};
+#define E0_SIGN (1 << 0)
+#define SHIFT (1 << 1)
+#define CAPS_LOCK (1 << 2)
+char read_key_buffer(void);
+void keyboard_handler(void);
+unsigned char in_byte(uint16_t port);
+#endif
+```
+
+50. Interact with kernel using console
+- Yields prompt and reads command
+    - Doesn't actually execute as no command is implemented
+- main.c:
+```c
+#include "lib.h"
+#include "console.h"
+#include "stdint.h"    
+static void cmd_get_total_memory(void)
+{
+    uint64_t total;   
+    total = get_total_memoryu();
+    printf("Total Memory is %dMB\n", total);
+}
+static int read_cmd(char *buffer)
+{
+    char ch[2] = { 0 };
+    int buffer_size = 0;
+    while (1) {
+        ch[0] = keyboard_readu();
+        
+        if (ch[0] == '\n' || buffer_size >= 80) {
+            printf("%s", ch);
+            break;
+        }
+        else if (ch[0] == '\b') {    
+            if (buffer_size > 0) {
+                buffer_size--;
+                printf("%s", ch);    
+            }           
+        }          
+        else {     
+            buffer[buffer_size++] = ch[0]; 
+            printf("%s", ch);        
+        }
+    }
+    return buffer_size;
+}
+static int parse_cmd(char *buffer, int buffer_size)
+{
+    int cmd = -1;
+    if (buffer_size == 8 && (!memcmp("totalmem", buffer, 8))) {
+        cmd = 0;
+    }
+    return cmd;
+}
+static void execute_cmd(int cmd)
+{ 
+    CmdFunc cmd_list[1] = {cmd_get_total_memory};   
+    if (cmd == 0) {       
+        cmd_list[0]();
+    }
+}
+int main(void)
+{
+    char buffer[80] = { 0 };
+    int buffer_size = 0;
+    int cmd = 0;
+    while (1) {
+        printf("shell# ");
+        buffer_size = read_cmd(buffer);
+        if (buffer_size == 0) {
+            continue;
+        }        
+        cmd = parse_cmd(buffer, buffer_size);        
+        if (cmd < 0) {
+            printf("Command Not Found!\n");
+        }
+        else {
+            execute_cmd(cmd);             
+        }            
+    }
+    return 0;
+}
+```
+
+## Section 10: Bonus: File system
+
+51. Introduction
+- FAST16
+    - File system structure
+    - Open or read files
+    - Load programs
+- How to load the file system in the boot process
+- In this class, we load all disk into memory as mounting disk is quite complex
+
+52. Working with Windows 10
+
+53. Working with Linux (Ubuntu)
+- File system image using FreeDOS
+    - Download iso image (FD12CD.iso)
+    - bximage -> 1 (Convert hard disk image to other format) -> hd -> flat -> 512 -> 100 -> os.img
+    - bochs -> 3 (Edit) -> 12 -> 4 (First HD/CD on channel 0) -> disk -> os.img (New file name) -> flat -> 203 -> 16 -> 63 -> 512 (sector size) -> Generic 1234 (new model name) -> auto -> auto -> 5 (Second HD/CD on channel 0) -> cdrom -> FD12CD.iso (downloaded FreeDOS image) -> inserted -> Generic 1234 -> auto -> 15 (Boot options) -> 1 -> cdrom (Boot from) -> 0 -> 0 (return to Main Menu) -> 4 (Save options to) -> bochsrc -> 6 -> c
+    - Now FreeDOS runs
+- gnome-disk-image-mounter --writable os.img
+- hexdump -C os.img
+
+54. Working with MacOS
+
+55. The New loader
+
+56. FAST16 Structure
+
+57. Loading Files from the FAST16 Image
+
+58. The idle process
+
+59. The File Module
+
+60. Fork
+
+61. Exec
+
+62. The New Console
+
+63. ls command
+
+## Section 11: Conclusion
+
+64. Conclusion
