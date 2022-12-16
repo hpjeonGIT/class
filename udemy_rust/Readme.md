@@ -99,10 +99,11 @@ fn main() {
   second_name();
 }
 ```
-- Command to run: `cargo run --bin a1`
-  - rust built may have failed
-  - Use `rustc a1.rs; ./a1`
-- ? no results at CLI
+- Command to run: `cargo new a1; cd a1`
+  - Edit `src/main.rs`
+  - `cargo run`
+  - Or
+    - Use `rustc src/main.rs -o a1; ./a1`
 
 12. Demo: Numeric Types and Arithmetic
 
@@ -736,27 +737,575 @@ fn main() {
 ```
 
 65. Coding Exercise: Hashmap Basics
+```rs
+use std::collections::HashMap;
+fn main() {
+  let mut stock = HashMap::new();
+  stock.insert("Chair",5);
+  stock.insert("Bed",0);
+  stock.insert("Table",2);
+  let mut total_stock = 0;
+  for (item, qty) in stock.iter() {
+    total_stock = total_stock + qty;
+    // let stock_count = if qty == 0 { // this yields : no implementation for `&{integer} == {integer}`
+    let stock_count = if qty == &0 { // note that we use reference of 0
+      "out of stock".to_owned()
+    } else {
+      format!("{:?}",qty)
+    };
+    println!("item={:?}, stock={:?}", item, stock_count);
+  }
+  println!("total stock = {:?}", total_stock);
+}
+```
+- .iter() yields borrowed memory
 
 ## Section 8: Real World
 
 66. Demo: User input
+- `io::Result<>` has its own error type. No need for error type
+```rs
+use std::io;
+fn get_input() -> io::Result<String> {
+  let mut buffer = String::new();
+  io::stdin().read_line(&mut buffer)?; // borrows buffer muttably
+  Ok(buffer.trim().to_owned())
+}
+fn main() {
+  let mut all_input = vec![];
+  let mut times_input = 0;
+  while times_input < 2 {
+    match get_input() {
+      Ok(words) => {
+        all_input.push(words);
+        times_input += 1;
+      }
+      Err(e) => println!("error: {:?}", e),
+    }
+  }
+  for input in all_input {
+    println!("Original: {:?}, captialized: {:?}",
+              input,
+              input.to_uppercase()
+    );
+  }
+} 
+```
 
 67. Coding Exercise: User input
 
 68. Project 1: Menu-driven billing application
-
+- 
 69. Demo: Basic Closures
+- Closure: anonymous function
+```rs
+fn add_fn(a:i32, b:i32) -> i32 { a + b }
+fn main() {
+  let sum_from_fn = add_fn(1,1);
+  // closure
+  //
+  let add = | a: i32, b: i32| -> i32 { a +b };
+  // Simpler form
+  // let add = |a,b| a + b;
+  let sum = add(1,1);
+}
+```
 
 70. Demo: Map combinator
 
 71. Coding Exercise: Map Combinator
+```rs
+#[derive(Debug)]
+struct User {
+    user_id: i32,
+    name: String,
+}
+/// Locates a user id based on the name.
+fn find_user(name: &str) -> Option<i32> {
+    let name = name.to_lowercase();
+    match name.as_str() {
+        "sam" => Some(1),
+        "matt" => Some(5),
+        "katie" => Some(9),
+        _ => None,
+    }
+}
+fn main() {
+    let user_name = "amy";
+    let user = find_user(user_name).map(|user_id| User {
+        user_id,
+        name: user_name.to_owned(),
+    });
+    match user {
+        Some(user) => println!("{:?}", user),
+        None => println!("user not found"),
+    }
+}
+```
 
 72. Demo: Modules
+```rs
+mod greet {
+  fn hello() { println!("hello"); } 
+  fn goodbye() { println!("goodbye"); }
+}
+fn main() {
+  use greet::hello;
+  hello();
+  greet::goodbye();
+}
+```
 
 73. Demo: Testing
+```rs
+fn all_caps(word: &str) -> String {
+   word.to_uppercase() 
+}
+fn main() {}
+#[cfg(test)]
+mod test {
+  use crate::*; // scope up to the main src
+  #[test]
+  fn check_all_caps() {
+    let result = all_caps("hello");
+    let expected = String::from("HELLO");
+    assert_eq!(result, expected, "string must be uppercase");
+  }
+}
+```
+- Command:
+```bash
+$ rustc --test ./a73.rs
+$ ./a73 
+running 1 test
+test test::check_all_caps ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
 
 74. Coding Exercise: Testing
 
 ## Section 9: Refining Your Code
 
+75. Demo: Option Combinators
+```rs
+fn main() {
+  let a: Option<i32> = Some(1);
+  dbg!(a);
+  let a_is_some = a.is_some(); // having Some() or not
+  dbg!(a_is_some);
+  let a_is_none = a.is_none(); // having None or not
+  dbg!(a_is_none);
+  let a_mapped = a.map(|num| num + 1); // map works only when Some() exists
+  dbg!(a_mapped);
+  let a_filtered = a.filter(|num| num == &1); 
+  dbg!(a_filtered);
+  let a_or_else = a.or_else(|| Some(4));
+  dbg!(a_or_else);
+  let unwrapped = a.unwrap_or_else(|| 0);
+  dbg!(unwrapped);
+}
+```
+
+76. Coding Exercise: Option Combinators
+
+77. Demo: Iterators
+```rs
+fn main() {
+   let numbers = vec! [1,2,3,4,5];
+   /*
+   let mut plus_one = vec![];
+   for num in numbers {
+      plus_one.push(num+1);
+   }
+   */
+   let plus_one: Vec<_> = numbers.iter().map(|num| num+1).collect();
+  let even_num: Vec<_> = numbers.iter().filter(|num| *num%2 == 0).collect(); // note that dereferencing *num is used
+}
+```
+
+78. Coding exercise: Iterators
+
+79. Demo: Ranges
+```rs
+fn main() {
+  let range1 = 1..=3; // [1,3]
+  let range2 = 1..4;  // [1,4)
+  for num in range2 {println!("{:?}",num)};
+}
+```
+
+80. Fundamentals: Traits
+- A way to specify that some functionality exists
+- Standardize functionality across multiple different types
+
+81. Demo: Traits
+```rs
+trait Noise {
+  fn make_noise(&self);
+}
+struct Person;
+struct Dog;
+impl Noise for Person { // implements Noise trait for Person struct
+  fn make_noise(&self) {
+    println!("hello");
+  }
+}
+impl Noise for Dog {
+  fn make_noise(&self) {
+    println!("woof");
+  }
+}
+fn hello(noisy: impl Noise) { // argument is any object implement Noise trait
+  noisy.make_noise();
+}
+fn main() {
+  hello(Person {});
+  hello(Dog {});
+  let mydog = Dog { } ; // No field data for now
+  hello(mydog);
+}
+```
+
+82. Coding Exercise: Traits
+```rs
+trait Perimeter {
+  fn find_perimeter(&self) -> i32; // return type must be shown
+}
+struct Square {
+  side: i32,
+}
+struct Triangle {
+  a: i32,
+  b: i32, 
+  c: i32,
+}
+impl Perimeter for Square {
+  fn find_perimeter(&self) -> i32 { self.side*4 }
+}
+impl Perimeter for Triangle {
+  fn find_perimeter(&self) -> i32 {self.a*self.b*self.c}
+}
+fn main() {
+  let mySQ = Square { side: 3};
+  let myTR = Triangle {a:1,b:2,c:3};
+  println!("{:?}",mySQ.find_perimeter());
+  println!("{:?}",myTR.find_perimeter());
+}
+```
+
+83. Demo: if..let..else
+- Alternative of match
+- When only one case is considered
+```rs
+fn main() {
+   let potential_user = Some("Jerry");
+   // match case
+   match potential_user {
+       Some(user) => println!("user = {:?}", user),
+       None       => println!("no user"),
+   }
+   // if let else (same as above)
+   if let Some(user) = potential_user {
+      println!("user = {:?}", user);
+   } else {
+      println!("no user");
+  }
+}
+```
+
+84. Demo : While...let
+```rs
+fn main() {
+  let mut data = Some(3);
+  while let Some(i) = data {
+    println!("loop");
+    data = None;
+  }
+}
+```
+
+85. Demo: External Crates
+- External libraries (like npm)
+- https://doc.rust-lang.org/cargo/guide/dependencies.html
+
+86. Activity: External Crates
+- cargo new a86
+- cd a86
+- Edit Cargo.toml
+```yaml
+[package]
+name = "a86"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.or
+g/cargo/reference/manifest.html
+[dependencies]
+chrono = "0.4.15"
+```
+- src/main.rs
+```rs
+use chrono::prelude::*;
+fn main() {
+    let local: DateTime<Local> = Local::now();
+    println!("{}",local.format("%Y-%m-%d %H:%M:%S").to_string());
+}
+```
+- Command: cargo run
+
+87. Demo: Default Trait 
+- Enumeration with default value
+```rs
+struct Package {
+  weight: f64,
+}
+impl Package {
+  fn new(weight: f64) -> Self {
+    Self {weight }
+  }
+}
+impl Default for Package {
+  fn default() -> Self {
+    Self { weight: 3.0}
+  }
+}
+fn main() {
+  let p = Package::default();
+  println!("{:?}",p.weight);
+}
+```
+
+88. Demo: const
+```rs
+const MAX_SPEED: i32 = 9000;
+fn clamp_speed ( speed: i32) -> i32 {
+   if speed > MAX_SPEED {
+      MAX_SPEED
+   } else {
+      speed
+   }
+}
+fn main() {}
+```
+
+89. Demo: Modules as separate files
+- cargo new a89
+- 
+- Cargo.toml
+```yaml
+[package]
+name = "a89"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.or
+g/cargo/reference/manifest.html
+[lib]
+name = "demo"
+path = "src/lib.rs"
+[dependencies]
+```
+- src/main.rs
+```rs
+//use demo::*;
+use demo::print_from_lib;
+fn main() {
+  print_from_lib();
+}
+```
+- src/lib.rs
+```rs
+pub fn print_from_lib() {
+  println!("hello from lib");
+}
+```
+
 ## Section 10: Final Project
+
+90. Demo: Custom Error Types
+- Using an external crate: thiserror
+- Cargo.toml
+```yaml
+[package]
+name = "a90"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+thiserror = "1.0"
+```
+
+91. Coding Exercise: Custom Error Types
+```rs
+use thiserror::Error;
+#[derive(Debug, Error)]
+enum ProgramError {
+    #[error("menu error")]
+    Menu(#[from] MenuError),
+    #[error("math error")]
+    Math(#[from] MathError),
+}
+#[derive(Debug, Error)]
+enum MenuError {
+    #[error("menu item not found")]
+    NotFound,
+}
+#[derive(Debug, Error)]
+enum MathError {
+    #[error("divide by zero error")]
+    DivideByZero,
+}
+fn pick_menu(choice: &str) -> Result<i32, MenuError> {
+    match choice {
+        "1" => Ok(1),
+        "2" => Ok(2),
+        "3" => Ok(3),
+        _ => Err(MenuError::NotFound),
+    }
+}
+fn divide(a: i32, b: i32) -> Result<i32, MathError> {
+    if b != 0 {
+        Ok(a / b)
+    } else {
+        Err(MathError::DivideByZero)
+    }
+}
+fn run(step: i32) -> Result<(), ProgramError> {
+    if step == 1 {
+        pick_menu("4")?;
+    } else if step == 2 {
+        divide(1, 0)?;
+    }
+    Ok(())
+}
+fn main() {
+    println!("{:?}", run(1));
+    println!("{:?}", run(2));
+}
+```
+
+92. Demo: New type pattern
+```rs
+#[derive(Debug,Copy,Clone)]
+struct NeverZero(i32);
+impl NeverZero {
+  pub fn new(i: i32) -> Result<Self, String> {
+    if i==0 {
+       Err ("cannot be zero".to_owned())
+    } else {
+       Ok(Self(i))
+    }
+  }
+}
+fn divide(a:i32, b: NeverZero) -> i32{
+   let b = b.0; // tuple data
+   println!("b={:?}",b);
+   a/b
+}
+fn main() {
+  match NeverZero::new(0) {
+   Ok(nz) => println!("{:?}", divide(10,nz)),
+   Err(e) => println!("{:?}", e),
+  }
+}
+```
+
+93. Coding Exercise: New type pattern
+- Derived class and the dedicated method
+- ShirtColor/ShoesColor are inherited from Color
+- print_shirt_color() runs only on ShirtColor, not on ShoesColor
+```rs
+#[derive(Debug)]
+enum Color {
+    Black,
+    Blue,
+    Brown,
+    Custom(String),
+    Gray,
+    Green,
+    Purple,
+    Red,
+    White,
+    Yellow,
+}
+#[derive(Debug)]
+struct ShirtColor(Color);
+impl ShirtColor {
+    fn new(color: Color) -> Self {
+        Self(color)
+    }
+}
+#[derive(Debug)]
+struct ShoesColor(Color);
+impl ShoesColor {
+    fn new(color: Color) -> Self {
+        Self(color)
+    }
+}
+#[derive(Debug)]
+struct PantsColor(Color);
+impl PantsColor {
+    fn new(color: Color) -> Self {
+        Self(color)
+    }
+}
+fn print_shirt_color(color: ShirtColor) {
+    println!("shirt color = {:?}", color);
+}
+fn print_shoes_color(color: ShoesColor) {
+    println!("shoes color = {:?}", color);
+}
+fn print_pants_color(color: PantsColor) {
+    println!("pants color = {:?}", color);
+}
+fn main() {
+    let shirt_color = ShirtColor::new(Color::Gray);
+    let pants_color = PantsColor::new(Color::Blue);
+    let shoes_color = ShoesColor::new(Color::White);
+    print_shirt_color(shirt_color);
+    print_pants_color(pants_color);
+    print_shoes_color(shoes_color);
+}
+```
+
+94. Project2: Personal Contact Manager
+
+95. Fundamentals: Advanced Memory
+- Stack
+  - Data placed sequentially
+  - Limited space
+  - Very fast to work with
+- Heap
+  - Data placed algorithmically
+  - Slower than stack
+  - Uses pointers
+```rs
+enum Answer {
+  Yes,
+  No,
+}
+fn main() {
+  let yes = Answer::Yes;
+  let yes_heap: Box<Answer> = Box::new(yes);
+  let yes_stack = *yes_heap;
+}
+```
+- struct std::boxed::Box
+  - https://doc.rust-lang.org/std/boxed/struct.Box.html
+
+96. Demo: Passing Closures to Functions
+- Using `Fn(...)->...`
+```rs
+fn math(a: i32, b:i32, op: Box<dyn Fn(i32,i32)->i32>) -> i32 {
+  op(a,b)
+}
+fn main() {
+  let add = |a,b| a+b;
+  let add = Box::new(add);
+  println!("{}", math(2,2,add));
+  let mul = Box::new(|a,b| a*b);
+  println!("{}", math(2,2,mul));
+}
+```
+
+97. Demo: Lifetimes
+- Lifetime annotation: `'a`, `'b`, ...
+  - https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html
