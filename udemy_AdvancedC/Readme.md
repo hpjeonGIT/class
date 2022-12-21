@@ -731,23 +731,228 @@ int main() {
 139. Introduction to Padding (Data alignment in conjunction with Structs)
 
 140. Practical Struct Variable Memory Utilization
+```c
+#include <stdio.h>
+#include <stdlib.h>
+typedef struct point {
+   char x;  /* 1byte */
+   short y; /* 2bytes */
+   int z;   /* 4bytes */
+} Point ;  /* 8bytes  - check through sizeof() */
+int main () {
+  Point p1;
+  p1.x = 0xFF;
+  p1.y = 0x1234;
+  p1.z = 0x6789ABCD;
+  return 0;
+}
+```
+- gdb memory address:
+```bash
+(gdb) p &p1
+$6 = (Point *) 0x7fffffffd568
+(gdb) x/2xw 0x7fffffffd568
+0x7fffffffd568: 0x123400ff      0x6789abcd
+```
+- Note that the first block `0x123400ff` is the p1.y and p1.x. Second block `0x6789abcd` is the p1.z
+- Note that p1.x has 00, as padding
+- This is why Point struct is 8 bytes
 
 141. Example #1 - Struct Memory Utilization and Data Alignment (+padding)
+```c
+#include <stdio.h>
+#include <stdlib.h>
+typedef struct point {
+   char x;  /* 1byte */
+   double y; /* 8bytes */
+   int z;   /* 4bytes */
+} Point ;  /* 24 bytes due to the padding by the longest data type */
+int main () {
+  unsigned int bytesPoint = sizeof(Point);
+  printf("%d %d %d %d \n", sizeof(char), sizeof(double), sizeof(int), bytesPoint);
+  Point p1;
+  p1.x = 0xFF;
+  p1.y = 0x0123456789ABCDEF;
+  p1.z = 0x6789ABCD;
+  return 0;
+}
+```
+- gdb snapshot:
+```bash
+(gdb) p &p1
+$2 = (Point *) 0x7fffffffd550
+(gdb) x/8xw 0x7fffffffd550
+0x7fffffffd550: 0x555546ff      0x00005555      0x789abcdf      0x43723456
+#---^^are padding ^^^^^^p1.x------^^^^^^^^------p1.y - why numbers are different? TBD
+0x7fffffffd560: 0x6789abcd      0x00007fff      0x00000000      0x00000000
+#-----------------p1.z
+```
 
 142. Example #2 - Reorganizing members order and its affect on memory utilization
+```c
+#include <stdio.h>
+#include <stdlib.h>
+typedef struct point {
+   char x;   /* 1byte */
+   int y;    /* 4bytes */
+   double z; /* 8bytes */
+} Point ;    /* now 16 bytes */
+int main () {
+  Point p1;
+  p1.x = 0xFF;
+  p1.z = 0x0123456789ABCDEF;
+  p1.y = 0x6789ABCD;
+  return 0;
+}
+```
+- gdb snapshot:
+```bash
+(gdb) p &p1
+$2 = (Point *) 0x7fffffffd560
+(gdb) x/8xw 0x7fffffffd560
+0x7fffffffd560: 0xffffd6ff      0x6789abcd      0x789abcdf      0x43723456
+#-----------------^^^^^^p1.x------p1.y------------p1.z
+0x7fffffffd570: 0x555546a0      0x00005555      0xf7a03c87      0x00007fff
+```
 
 143. Exercise #1 - Structs, Members Organization, Data Alignment and Memory - Question
 
 144. Exercise #1 - Structs, Members Organization, Data Alignment and Memory - Solution 
+- A sample misaligned struct
+```c
+typedef struct point {
+  char x;
+  double y;
+  char z;
+}
+```
+  - This yields 1 + 7 padding + 8 + 1 + 7 padding = 24bytes
+- A sample aligned struct
+```c
+typedef struct point {
+  char x;
+  char z;
+  double y;
+}
+```
+  - This yields 1 + 1 + 6 padding + 8 = 16 bytes
 
 145. Adding Data Member to Struct without increasing the size of a variable in memory
+```c
+typedef struct point {
+  char x;
+  short t; 
+  char z;
+  double y;
+}
+```
+  - This yields 1 + 2 + 1 + 4 padding + 8 = 16 bytes
+  - Note that this struct consumes the same memory of lecture 144 but has one more member data of short t
 
 146. Exercise #2 - Structs, Members Organization, Data Alignment and Memory - Question
 
 147. Exercise #2 - Structs, Members Organization, Data Alignment and Memory - Solution 
+```c
+typedef struct point {
+  char x;
+  int t; 
+  char z;
+  double y;
+}
+```
+- This consumes 1 + 3padding + 4 + 1 + 7padding + 8 = 24 bytes
+```c
+typedef struct point {
+  char x;
+  char z;
+  int t; 
+  double y;
+}
+```
+- This consumes 1 + 1 + 2padding + 4 + 8 = 16 bytes
+- Same results in C++. No optimization or no re-ordering in C++?
 
 148. Data alignment and Padding with structs composition
 
 149. Tightly packing & Packing to UnAligned Data
 
 ## Section 16: Pointers to Functions
+
+150. Function Pointers - Introduction
+- Name of an array = the address of the first element
+- Name of a function = initial address of the function code
+  - `printf("%p\n", func);` prints the address of the func()
+     - This doesn't launch func()
+```c
+#include <stdio.h>
+void func() {
+  printf("hello world\n");
+}
+int main() {
+  func();
+  printf("%p  %p\n", func, main); /* 0x5565d55f268a  0x5565d55f269d */
+  return 0;
+}
+```
+
+151. Problem Example - Movitation to use Functions Pointers
+- Instead of function names, we use addresses to launch those functions
+
+152. Declaration of Pointer to a Function
+
+153. Coding Example with Pointers to Functions
+```c
+#include <stdio.h>
+void ageFunc(int age) {
+  printf("Age is %d\n", age);
+}
+int main() {
+  ageFunc(3);
+  void (*fptr) (int); /* creation */
+  fptr = &ageFunc;
+  printf("%p\n", fptr); /* same memory address below */ 
+  fptr = ageFunc;
+  printf("%p\n", fptr); /* same memory address above */
+  (fptr)(5);  /* launch the function */
+  return 0;
+}
+```
+
+154. Common Mistakes when using a Pointer to a Function
+
+155. An array of Pointers to Functions
+```c
+
+#include <stdio.h>
+void add(int x, int y) {
+  printf("%d + %d = %d\n", x,y,x+y);
+}
+void subtract(int x, int y) {
+  printf("%d - %d = %d\n", x,y,x-y);
+}
+void multi(int x, int y) {
+  printf("%d * %d = %d\n", x,y,x*y);
+}
+int main() {
+  int x = 3, y = 5;
+  void (*fp[]) (int, int) = {&add,&subtract,&multi};
+  (*fp[0])(x,y);
+  (*fp[1])(x,y);
+  (*fp[2])(x,y);
+  return 0;
+}
+```
+
+## Section 17: Files - Advanced Content
+
+## Section 18: Enums
+
+## Section 19: Constants & Pointers Masterclass
+
+## Section 20: Counting Arrays - Part #2 - Practice exercises functions
+
+## Section 21: Optional: Introduction to bitwise operations
+
+## Section 22: OPtional: Basic Algorithms
+
+## Section 23: Congratulations! You've made it! What's next?
