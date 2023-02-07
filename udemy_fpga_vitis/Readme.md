@@ -387,3 +387,10 @@ int main(int argc, char* argv[]) {
 ## Xilinx product
 - Virtex: for DSP
 - Alveo: for HPC
+
+## For Alveo U280 
+- Ref: https://xilinx.github.io/Vitis-Tutorials/2020-2/docs/build/html/docs/Getting_Started/Vitis/Part2.html
+- Xilinx provides base platforms for the Alveo U200, U250, U50 and U280 data-center acceleration cards. Before installing a platform, you need to download the following packages:
+  - Xilinx Runtime (XRT)
+  - Deployment Target Platform
+  - Development Target Platform
