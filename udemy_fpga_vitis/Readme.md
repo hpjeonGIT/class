@@ -350,7 +350,7 @@ int main(int argc, char* argv[]) {
     return (match ? EXIT_FAILURE :  EXIT_SUCCESS);
 }
 ```
-- From GUI, Explorer->vector_addition_system_kernels->vector_addition_kernels.prj, add Hardware Functions
+- From GUI, Explorer->vector_addition_system_kernels->vector_addition_kernels.prj, **add Hardware Functions**
   - Click Add Hardware Functions icon then it will find the function  name from the kernel code
 - Now build project
 - Assistant tab->vector_addition_system will show the status of building
@@ -380,17 +380,616 @@ int main(int argc, char* argv[]) {
   - vivado window will open to show waveform 
 
 26. Actual FPGA Hardware
+- Target as hardware build
+- Takes longer than SW/HW emulation build
 
 27. Exercises
+
+## Section 6: Host program
+
+28. Introduction
+- Objectives
+  - Understanding the program models in Vitis
+  - Understanding the OpenCL concepts in the context of HLS
+  - Learn how to write a host program in Vitis
+
+29. Programming Model
+- Heterogeneous computing using OpenCL
+- Host -> OpenCL API -> XRT <- AXI4 <- Kernel
+- Memory space
+  - Global memory is available to both of Host on CPU and Kernel on FPGA
+  - Kernel get access to the global memory through HP & HPC port
+- Kernel language
+  - C/C++
+  - OpenCL C
+  - RLT(HDLs)
+- Kernel Execution Modes
+  - Sequential Mode: Host program runs Kernel code then exits. Runs another kernel code when necessary through sequential order
+  - Pipelined Mode: Host program may launch multiple Kernel codes, not waiting for the early one finished
+  - Free-Running Mode: Host and Kernel codes run parallel, communicating each other
+![kernelExecutionModes](./kernelExecutionModes.png)
+- In this course, sequential mode only
+
+30. OpenCL Concepts
+- A host cannot control the kernel directly. Instead it should send some commmands to a queue, and it is the OpenCL runtime to read the queue, fetch the command and order the kernel to do something
+- Attached to each device, there must be a context that contains all the related programming objects such as the command queue
+- After defining and setting up a context, the host can send commands and then the OpenCL runtime will execute those commands
+
+31. Host Structure
+- Setting up the environment
+  - Target plaform
+  - Devices
+  - Create Context
+  - Define command queue
+  - Define Program
+- Core commands
+  - Setting up the kernels
+  - Buffer definitions
+  - Data setting
+  - Kernel arguments
+  - Kernel execution on FPGA
+  - Event synchronization
+- Post processing
+  - FPGA cleanup
+  - Deallocate objects
+
+32. Host code
+- OpenCL -> OpenCL C API -> OpenCL C++ API
+- Required macro and headers
+```cpp
+#define CL_HPP_CL_1_2_DEFAULT_BUILD
+#define CL_HPP_TARGET_OPENCL_VERSION 120
+#define CL_HPP_MINIMUM_OPENCL_VERSION 120
+#define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY 1
+#include <CL/cl2.hpp>
+```
+- Settubg up the environment
+  1. Platform and device
+  ```cpp
+  std::vector<cl::Device> devices;
+  cl::Device device;
+  std::vector<cl::Platform> platforms;
+  bool found_device = false;
+  cl::Platform::get(&platforms);
+  for(size_t i=0; (i<platforms.size()) & (found_device==false); i++) {
+    cl::Platform platform = platforms[i];
+    std::string platformName = platform.getInfo<CL_PLATFORM_NAME>();
+    if (devices.size()) {
+      device = devices[0];
+      found_device = true;
+      break;
+    }
+  }
+  if (found_device == false) {
+    std::cout << "Error: unable to find target device " << device.getInfo<CL_DEVICE_NAME>() << std::endl;
+    return EXIT_FAILURE;
+  }
+  ```
+  2. Context: contains command queue, memory objects, kernel program object
+  ```cpp
+  cl::Context context(device);
+  ```
+  3. Command queues
+  ```cpp
+  cl::CommandQueue q(context, device, CL_QUEUE_PROFILING_ENABLE);
+  ```
+  4. Program
+  ```cpp
+  // Load xclbin
+  std::cout << "Loading: '" << xclbinFilename << "'\n";
+  std::ifstream bin_file(xclbinFilename, std::ifstream;binary);
+  bin_file.seekg(0, bin_file.end);
+  unsigned nb = bin_file.tellg();
+  bin_file.seekg(0,bin_file.beg);
+  char *buf = new char [nb];
+  bin_file.read(buf, nb);
+  // Creating program from binary file
+  cl::Program::Binaries bins;
+  bins.push_back({buf.nb});
+  devices.resize(1);
+  cl::Program program(context,devices,bins);
+  ```
+- Executing commands in the FPGA
+  1. Setting up the kernels
+  ```cpp
+  cl::Kernel krnl_vector_add(program,"krnl_vadd");
+  ```
+  2. Buffer transfer to/from the FPGA
+  ```cpp
+  cl::Buffer buffer_a(context, CL_MEM_READ_ONLY, size_in_bytes);
+  cl::Buffer buffer_b(context, CL_MEM_READ_ONLY, size_in_bytes);
+  cl::Buffer buffer_result(context, CL_MEM_WRITE_ONLY, size_in_bytes);
+  ```
+    - A single buffer cannot be larger than 4GB, yet to maximize throughput from the host to global memory. Xilinx also recommends to keep the buffer size at least 2MB if available (UG1393 v2020.2 March 22, 2021)
+  3. Data setting
+  ```cpp
+  int *ptr_a = (int*) q.enqueueMapBuffer(buffer_a, CL_TRUE, CL_MAP_WRITE, 0, size_in_bytes);
+  int *ptr_b = (int*) q.enqueueMapBuffer(buffer_b, CL_TRUE, CL_MAP_WRITE, 0, size_in_bytes);
+  int *ptr_result = (int*) q.enqueueMapBuffer(buffer_result, CL_TRUE, CL_MAP_READ, 0, size_in_bytes);
+  ```
+  4. Kernel Arguments
+  ```cpp
+  int narg=0;
+  krnl_vector_add.setArg(narg++,buffer_a);
+  krnl_vector_add.setArg(narg++,buffer_b);
+  krnl_vector_add.setArg(narg++,buffer_result);
+  krnl_vector_add.setArg(narg++,DATASIZE);
+  ```
+  5. Kernel execution on FPGA
+    - Migrating input data from host to kernel
+    - Invoking the kernel
+    - Migrating the output data from kernel to host
+  ```cpp
+  q.enqueueMigrateMemObjects({buffer_a,buffer_b},0 /* 0 means from host */);
+  q.enqueueTask(krnl_vector_add);
+  q.enqueueMigrateMemObjects({buffer_result},CL_MIGRATE_MEM_OBJECT_HOST);
+  ```
+  6. Even synchronization
+    - All OpenCL enqueue-based API calls are asynchronous
+  ```cpp
+  q.finish();
+  ```
+- Post processing
+  1. FPGA cleanup
+  ```cpp
+  q.enqueueUnmapMemObject(buffer_a, ptr_a);
+  q.enqueueUnmapMemObject(buffer_b, ptr_b);
+  q.enqueueUnmapMemObject(buffer_result, ptr_result);
+  q.finish();
+  ```
+- Quiz:
+  - For a given kernel fuction, define buffer objects
+  ```cpp
+  extern "C" {
+    void spmv_kernel(
+      float        *values,
+      unsigned int *col_indices,
+      unsigned int *row_indices,
+      float        *x,
+      float        *y,
+      unsigned      n,
+      unsigned      m,
+      unsigned      nnz)
+  }
+  ```
+  - input to kernel
+    - values: size of nnz
+    - col_indices: size of m
+    - row_ptr : size of n
+    - x: size of m
+  - output from kernel
+    - y: size of n
+  - Buffer code
+  ```cpp
+  OCL_CHECK(err,buffer_values     =cl::Buffer(context,CL_MEM_READ_ONLY, nnz*sizeof(float),     nullptr,&err));
+  OCL_CHECK(err,buffer_col_indices=cl::Buffer(context,CL_MEM_READ_ONLY, m*sizeof(unsigned_int),nullptr,&err));
+  OCL_CHECK(err,buffer_row_indices=cl::Buffer(context,CL_MEM_READ_ONLY, n*sizeof(unsigned_int),nullptr,&err));
+  OCL_CHECK(err,buffer_x          =cl::Buffer(context,CL_MEM_READ_ONLY, m*sizeof(float),       nullptr,&err));
+  OCL_CHECK(err,buffer_y          =cl::Buffer(context,CL_MEM_WRITE_ONLY,n*sizeof(float),       nullptr,&err));
+  ```
+
+33. Exercises
+
+## Section 7: Scaling Example
+
+34. Introduction
+- Objectives
+  - Studying the memory access pattern of a kernel
+  - Debugging an application on emulators and the actual hardware
+  - For a vector X, we calculate Y = alpha*X + beta
+  
+35. Definition
+- Scaling equation: y = alpha*x + beta
+- 3 inputs of alpha, beta, x
+  - How to handle array or pointer data?
+- 1 output of y
+- Memory latency
+  - ~around 100 cycles
+  - After addres, when data come
+- The processor system sends the scalar values to the accelerator, so the processor is the master and the accelerator is the slave
+- During arrays data transaction, the accelerator is the master and the memory is the slave. Note that the memory controllers are located in the PS system such that th ePS acts as a bridge b/w PL and memory
+
+36. Kernel Execution Model
+![loopExecution](./loopExecution.png)
+- Sequential mode is slow
+- Parallel mode is not feasible
+![pipelined](./pipelined.png)
+- Pipelined mode
+  - Initial Interval is the latency
+  ![pipelined2](./pipelined2.png)
+  - We have to make pipelined as much as possible
+
+37. Kernel code
+- Vitis-HLS applies the pipeline optimization by default to all possible for-loops in a kernel code
+- Vitis-HLS uses a single HP port for communication b/w kernel and memory subsystem
+- Use `extern "C"` for the mix of C/C++ code
+```cpp
+extern "C" {
+  void scaling_kernel(
+    float *x, float*y,
+    float alpha, float beta,
+    int n) {
+      for (int i=0;i<n;i++) {
+        y[i] = alpha*x[i] + beta;
+      }
+    }
+}
+```
+
+38. Burst Data Transfer
+- Kernel timing b/w memory read and write in one cycle
+  - How can this be done?
+- Latency in regular memory read/write
+![mem1](./mem1.png)  
+- Latency in Burst transfer
+![mem2](./mem2.png)  
+  - Data received by streaming along pipeline
+- Common memory overhead through AXI communication
+![mem3](./mem3.png)  
+- AXI Burst protocol
+![mem4](./mem4.png)  
+  - Streaming is the basic idea in Burst data transfer
+- The AXI protocol provides burst data transfer for reading/writing a contiguous block of data
+- The burst data transfer provides a streaming data communication b/w kernel in the FPGA and DDR memory
+
+39. Host code
+- Host code structure
+  - Setting up the environment
+    - Target platform
+    - Devices
+    - Context
+    - Command queue
+    - Program
+  - Core commands
+    - Setting up the kernels
+    - Buffer definitions
+    - Data setting
+    - Kernel Arguments
+    - Kernel execution on FPGA
+    - Event Synchronization
+  - Post processing
+    - FPGA cleanup
+- Kernel & Buffers
+```cpp
+#include <stdlib.h>
+#include <fstream>
+#include <iostream>
+#include <math.h>
+#define CL_HPP_CL_1_2_DEFAULT_BUILD
+#define CL_HPP_TARGET_OPENCL_VERSION 120
+#define CL_HPP_MINIMUM_OPENCL_VERSION 120
+#define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY 1
+#include <CL/cl2.hpp>
+#include <sys/time.h>
+#include <time.h>
+double getTimestamp()
+{
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return tv.tv_usec + tv.tv_sec*1e6;
+}
+double hardware_start;
+double hardware_end;
+double hardware_time;
+int main(int argc, char* argv[]) {
+	unsigned int n =   (1024*1024);
+    if(argc != 2) {
+		std::cout << "Usage: " << argv[0] <<" <xclbin>" << std::endl;
+		return EXIT_FAILURE;
+	}
+    char* xclbinFilename = argv[1];
+    std::vector<cl::Device> devices;
+    cl::Device device;
+    std::vector<cl::Platform> platforms;
+    bool found_device = false;
+    //traversing all Platforms To find Xilinx Platform and targeted
+    //Device in Xilinx Platform
+    cl::Platform::get(&platforms);
+    for(size_t i = 0; (i < platforms.size() ) & (found_device == false) ;i++){
+        cl::Platform platform = platforms[i];
+        std::string platformName = platform.getInfo<CL_PLATFORM_NAME>();
+        if ( platformName == "Xilinx"){
+            devices.clear();
+            platform.getDevices(CL_DEVICE_TYPE_ACCELERATOR, &devices);
+	    if (devices.size()){
+		    device = devices[0];
+		    found_device = true;
+		    break;
+	    }
+        }
+    }
+    if (found_device == false){
+       std::cout << "Error: Unable to find Target Device "
+           << device.getInfo<CL_DEVICE_NAME>() << std::endl;
+       return EXIT_FAILURE;
+    }
+    // Creating Context and Command Queue for selected device
+    cl::Context context(device);
+    cl::CommandQueue queue(context, device, CL_QUEUE_PROFILING_ENABLE);
+    // Load xclbin
+    std::cout << "Loading: '" << xclbinFilename << "'\n";
+    std::ifstream bin_file(xclbinFilename, std::ifstream::binary);
+    bin_file.seekg (0, bin_file.end);
+    unsigned nb = bin_file.tellg();
+    bin_file.seekg (0, bin_file.beg);
+    char *buf = new char [nb];
+    bin_file.read(buf, nb);
+    // Creating Program from Binary File
+    cl::Program::Binaries bins;
+    bins.push_back({buf,nb});
+    devices.resize(1);
+    cl::Program program(context, devices, bins);
+    // 1. Kernel & Buffers
+    cl::Kernel krnl_scaling(program,"scaling_kernel");
+    cl::Buffer buffer_x(context,  CL_MEM_READ_ONLY,  n*sizeof(float));
+    cl::Buffer buffer_y(context,  CL_MEM_WRITE_ONLY, n*sizeof(float));
+    // 2. Kernel arguments
+    float alpha = 1.3;
+    float beta = 47.83;
+    //set the kernel Arguments
+    int narg=0;
+    krnl_scaling.setArg(narg++,buffer_x);
+    krnl_scaling.setArg(narg++,buffer_y);
+    krnl_scaling.setArg(narg++,alpha);
+    krnl_scaling.setArg(narg++,beta);
+    krnl_scaling.setArg(narg++,n);
+    // 3. Input Data Setting
+    float *ptr_x = (float *) queue.enqueueMapBuffer (buffer_x , CL_TRUE , CL_MAP_WRITE , 0, n*sizeof(float));
+    float *ptr_y = (float *) queue.enqueueMapBuffer (buffer_y , CL_TRUE , CL_MAP_READ , 0, n*sizeof(float));
+    for (unsigned int i = 0; i < n; i++) {
+    	ptr_x[i] = rand()/(1.0*RAND_MAX);
+    }
+    hardware_start = getTimestamp();
+    // 4. Kernel execution
+    queue.enqueueMigrateMemObjects({buffer_x},0/* 0 means from host*/);
+    queue.enqueueTask(krnl_scaling);
+    queue.enqueueMigrateMemObjects({buffer_y},CL_MIGRATE_MEM_OBJECT_HOST);
+    queue.finish();
+    hardware_end = getTimestamp();
+    hardware_time = (hardware_end-hardware_start)/1000;
+	std::cout << "Exeution time running kernel in hardware 1: "
+        		    << hardware_time << " msec " << std::endl;
+    // 5. Evaluation
+    //Verify the result
+    int match = 0;
+    for (unsigned int i = 0; i < n; i++) {
+    	float y_sw = alpha*ptr_x[i]+beta;
+		float diff = fabs(y_sw-ptr_y[i]);
+		if(diff > 0.0001 || diff != diff){
+			std::cout << "error occurs at " << i
+					  << " with value y_hw = " << ptr_y[i]
+					  << ", should be y_sw = " << y_sw
+  					  << std::endl;
+            match = 1;
+            break;
+        }
+    }
+    queue.enqueueUnmapMemObject(buffer_x , ptr_x);
+    queue.enqueueUnmapMemObject(buffer_y , ptr_y);
+    queue.finish();
+    std::cout << "TEST " << (match ? "FAILED" : "PASSED") << std::endl;
+    return (match ? EXIT_FAILURE :  EXIT_SUCCESS);
+}
+```
+- During the OpenCL buffere memory, pay attention to the direction of the dataflow and choose a proper argument describing the direction
+- After sending the kernel execution command, the host code must wait for the results
+
+40. Lab: Executing
+- Design Flow
+  - Create a project
+  - Add kernel code
+  - Add host code
+  - Introduce the kernel to the project
+  - SW emulation
+  - HW emulation
+  - Build HW configuration
+- At GUI
+  - A new project
+  - Add src code for kernel/host
+  - At  *_kernels.prj, add HW functions
+  - Build project as SW emulation
+  - Took > 90sec for SW emulation
+
+41. Lab: Debugging
+- Emulation SW debugging
+  - At GUI, right mouse button of the project -> Debug As -> Launch SW emulator
+- Emulation HW debugging
+  - You can see the timing diagram and data exchange b/w host and kernel codes
+- Hardware debugging
+- Ref: ug1393-vitis-application-acceleration document
+  - https://docs.xilinx.com/r/en-US/ug1393-vitis-application-acceleration
+
+42. Exercises
+
+## Section 8: Image Thresholding example
+
+43. Introduction
+- Objectives
+  - Reads an image file
+  - Studying the burst data transaction in a kernel
+  - Working with data files in Vitis
+  - How to use the external SW library in HLS
+
+44. Definition
+- Image thresholding
+  - output_pixel = maxval if input_pixel > threshold or 0 otherwise
+  - Grey image to black/white
+- Kernel pseudo-code
+  - input_image/output_image through AXI Master    
+  - AXIlite for threshold and maxVal arguments
+- Summary
+  - Image thresholding has two pointers (image files) and two scalar arguments (threshold,maxVal)
+  - The port interface for the pointer arguments is master AXI, and the port interface for the scalar arguments is AXI-lite
+
+45. Kernel code
+```cpp
+extern "C" {
+  void image_thresholding_kernel(
+    unsigned char *input_image,
+    unsigned char *output_image,
+    unsigned int n,
+    unsigned int m,
+    unsigned int threshold,
+    unsigned int maxVal)
+  {
+    unsigned char input_pixel;
+    unsighed char output_pixel;
+    for (unsigned int i=0; i<n*m; i++) {
+      input_pixel = input_image[i];
+      output_pixel = (input_pixel > threshold) ? maxVal :0;
+      output_image[i] = output_pixel;
+    }
+  }
+}
+```
+- HP0 port will channel the kernel point arguments b/w DDR memory and FPGA
+- Kernel timing diagram
+![threshold_kernel1](./threshold_kernel1.png)  
+- Kernel execution model
+![threshold_kernel2](./threshold_kernel2.png)  
+- AXI Burst
+  - The memory access in the loop
+    - Must be a monotonically increasing order of access
+    - Must be consecutive in memory - one next to another with no gaps or overlap and in forward order
+- Burst analysis example
+![threshold_kernel3](./threshold_kernel3.png)  
+- Summary
+  - A pipeline micro-architecture can implement image thresholding kernel
+  - Array indices in burst loop must be monotonically increasing without gap
+
+46. Host code
+- Using OpenCV library
+```cpp
+#define CL_HPP_CL_1_2_DEFAULT_BUILD
+#define CL_HPP_TARGET_OPENCL_VERSION 120
+#define CL_HPP_MINIMUM_OPENCL_VERSION 120
+#define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY 1
+#include <CL/cl2.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgcodecs/imgcodecs.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/xfeatures2d.hpp>
+#include <opencv2/videoio/videoio.hpp>
+#include <stdlib.h>
+#include <fstream>
+#include <iostream>
+using namespace std;
+using namespace cv;
+int main(int argc, char* argv[])
+{
+  int status = 0;
+  Mat src_image;
+  Mat grey_image;
+  src_image=imread("data/test_image.jpg");
+  if (!src_image.data) {
+    cout << "Could not open image" << endl;
+    return 0;
+  };
+  unsigned int DATA_SIZE = src_image.rows * src_image.cols;
+  size_t size_in_bytes = DATA_SIZE * sizeof(unsigned char);
+  cvtColor(src_image, grey_image, cv::COLOR_BGR2GRAY);
+  Mat dst, dst_golden;
+  dst = grey_image.clone();
+  dst_golden = grey_image.clone();
+  unsigned int  threshold_value = 128;
+  unsigned int max_binary_value = 255;
+  std::cout << " size_in_bytes = '" << size_in_bytes << "'\n";
+  if(argc != 2) {
+  	std::cout << "Usage: " << argv[0] <<" <xclbin>" << std::endl;
+    return EXIT_FAILURE;
+  }
+  char* xclbinFilename = argv[1];
+  std::vector<cl::Device> devices;
+  cl::Device device;
+  std::vector<cl::Platform> platforms;
+  bool found_device = false;
+  cl::Platform::get(&platforms);
+  for(size_t i = 0; (i < platforms.size() ) & (found_device == false) ;i++){
+  	cl::Platform platform = platforms[i];
+    std::string platformName = platform.getInfo<CL_PLATFORM_NAME>();
+    if ( platformName == "Xilinx"){
+     	devices.clear();
+     	platform.getDevices(CL_DEVICE_TYPE_ACCELERATOR, &devices);
+      if (devices.size()){
+        device = devices[0];
+        found_device = true;
+        break;
+      }
+    }
+  }
+  if (found_device == false){
+    std::cout << "Error: Unable to find Target Device "
+             << device.getInfo<CL_DEVICE_NAME>() << std::endl;
+    return EXIT_FAILURE;
+  }
+  cl::Context context(device);
+  cl::CommandQueue q(context, device, CL_QUEUE_PROFILING_ENABLE);
+  std::cout << "Loading: '" << xclbinFilename << "'\n";
+  std::ifstream bin_file(xclbinFilename, std::ifstream::binary);
+  bin_file.seekg (0, bin_file.end);
+  unsigned nb = bin_file.tellg();
+  bin_file.seekg (0, bin_file.beg);
+  char *buf = new char [nb];
+  bin_file.read(buf, nb);
+  cl::Program::Binaries bins;
+  bins.push_back({buf,nb});
+  devices.resize(1);
+  cl::Program program(context, devices, bins);
+  cl::Kernel krnl_image_thresholding(program,"image_thresholding_kernel");
+  cl::Buffer buffer_in(context,  CL_MEM_READ_ONLY, size_in_bytes);
+  cl::Buffer buffer_out(context, CL_MEM_WRITE_ONLY, size_in_bytes);
+  int narg=0;
+  krnl_image_thresholding.setArg(narg++, buffer_in);
+  krnl_image_thresholding.setArg(narg++, buffer_out);
+  krnl_image_thresholding.setArg(narg++, grey_image.cols);
+  krnl_image_thresholding.setArg(narg++, grey_image.rows);
+  krnl_image_thresholding.setArg(narg++, threshold_value);
+  krnl_image_thresholding.setArg(narg++, max_binary_value);
+  unsigned char *ptr_in = (unsigned char  *) q.enqueueMapBuffer (buffer_in ,  CL_TRUE , CL_MAP_WRITE , 0, size_in_bytes);
+  unsigned char *ptr_out = (unsigned char *) q.enqueueMapBuffer (buffer_out , CL_TRUE , CL_MAP_READ  , 0, size_in_bytes);
+  for (unsigned int i = 0; i< size_in_bytes; i++) {
+  	ptr_in[i] = grey_image.data[i];
+  }
+  dst.data =  ptr_out;
+  q.enqueueMigrateMemObjects({buffer_in},0/* 0 means from host*/);
+  q.enqueueTask(krnl_image_thresholding);
+  q.enqueueMigrateMemObjects({buffer_out},CL_MIGRATE_MEM_OBJECT_HOST);
+  q.finish();
+  imwrite("grey_threshold.jpg", dst);
+  threshold( grey_image, dst_golden, threshold_value, max_binary_value, THRESH_BINARY );
+  imwrite("grey_threshold-golden.jpg", dst_golden);
+  for (int i = 0; i < grey_image.rows*grey_image.cols; i++) {
+	if (dst.data[i] != dst_golden.data[i]) {
+		std::cout << " Error at " << i
+				  << " hardware dst.data = " << dst.data
+               	  << " dst_golden = " << dst_golden.data
+                   << std::endl;
+		status = -1;
+        break;
+	}
+  }
+  cout << "Bye thresholding image" << endl;
+  return status;
+}
+```
+
+47. Emulation - lab
+
+48. Hardware - lab
+
+49. Exercises
+
+## Section 9: Linear Relationship Accelerator Example
+
+50. 
+
 
 
 ## Xilinx product
 - Virtex: for DSP
 - Alveo: for HPC
 
-## For Alveo U280 
-- Ref: https://xilinx.github.io/Vitis-Tutorials/2020-2/docs/build/html/docs/Getting_Started/Vitis/Part2.html
-- Xilinx provides base platforms for the Alveo U200, U250, U50 and U280 data-center acceleration cards. Before installing a platform, you need to download the following packages:
-  - Xilinx Runtime (XRT)
-  - Deployment Target Platform
-  - Development Target Platform
+## Xilinx math library
+- Vitis HLS Math library
