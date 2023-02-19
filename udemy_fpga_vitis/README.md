@@ -1936,10 +1936,531 @@ $ kcachegrind ./svm.callgrind2
 - Objectives
   - Implement the SpMV operator on FPGA efficiently
   - Compare the performance of several SpMV FPGA implementations
-  
+
+80. Definition
+
+81. Baseline code lab
+- Kernel code
+```cpp
+extern "C" {
+void spmv_kernel(
+		float *value,
+		int   *col_index,
+		int   *row_index,
+		float *x,
+		float *y,
+		int n,
+		int m) {
+	int rowStart = 0, rowEnd = n;
+	for (int i = rowStart; i < rowEnd; ++i) {
+		float y0 = 0.0;
+		for (int j=row_index[i]; j<row_index[i+1]; j++) {
+			int k = col_index[j];
+			y0 += value[j] * x[k];
+		}
+		y[i] = y0;
+	}
+}
+}
+```
+- spmv.h
+```cpp
+#pragma once
+void spm_get_size(
+		char         *inputFile,
+		unsigned int &row_size,
+		unsigned int &col_size,
+		unsigned int &data_size);
+unsigned int  read_mtx_spm(
+		char  *inFilename,
+		float *values,
+		unsigned int    *colIndices,
+		unsigned int    *rowPtr);
+//OCL_CHECK doesn't work if call has templatized function call
+#define OCL_CHECK(error,call)                                       \
+    call;                                                           \
+    if (error != CL_SUCCESS) {                                      \
+      printf("%s:%d Error calling " #call ", error code is: %d\n",  \
+              __FILE__,__LINE__, error);                            \
+      exit(EXIT_FAILURE);                                           \
+    }
+```
+- spmv_host.cpp
+```cpp
+#include <stdlib.h>
+#include <fstream>
+#include <iostream>
+#include "spmv.h"
+#include <math.h>
+#define CL_HPP_CL_1_2_DEFAULT_BUILD
+#define CL_HPP_TARGET_OPENCL_VERSION 120
+#define CL_HPP_MINIMUM_OPENCL_VERSION 120
+#define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY 1
+#include <CL/cl2.hpp>
+#include <sys/time.h>
+#include <time.h>
+double getTimestamp()
+{
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return tv.tv_usec + tv.tv_sec*1e6;
+}
+double hardware_start;
+double hardware_end;
+double hardware_time;
+double software_start;
+double software_end;
+double software_time;
+int main(int argc, char* argv[]) {
+	char          inFilename[1000];
+	unsigned int  n;
+	unsigned int  m;
+	unsigned int  nnz;
+	strcpy(inFilename, "data/TSC_OPF_1047.mtx.csr");
+	spm_get_size(inFilename, n, m, nnz);
+	if(argc != 2) {
+		std::cout << "Usage: " << argv[0] <<" <xclbin>" << std::endl;
+		return EXIT_FAILURE;
+	}
+	char* xclbinFilename = argv[1];
+    std::vector<cl::Device> devices;
+    cl::Device device;
+    std::vector<cl::Platform> platforms;
+    bool found_device = false;
+    cl_int err;
+    //traversing all Platforms To find Xilinx Platform and targeted
+    //Device in Xilinx Platform
+    OCL_CHECK(err, err = cl::Platform::get(&platforms));
+    for(size_t i = 0; (i < platforms.size() ) & (found_device == false) ;i++){
+        cl::Platform platform = platforms[i];
+        OCL_CHECK(err, std::string platformName = platform.getInfo<CL_PLATFORM_NAME>(&err));
+        if ( platformName == "Xilinx"){
+            devices.clear();
+            OCL_CHECK(err, err = platform.getDevices(CL_DEVICE_TYPE_ACCELERATOR, &devices));
+	    if (devices.size()){
+		    device = devices[0];
+		    found_device = true;
+		    break;
+	    }
+        }
+    }
+    if (found_device == false){
+       std::cout << "Error: Unable to find Target Device "
+           << device.getInfo<CL_DEVICE_NAME>() << std::endl;
+       return EXIT_FAILURE;
+    }
+    OCL_CHECK(err, cl::Context context(device, NULL, NULL, NULL, &err));
+    OCL_CHECK(err, cl::CommandQueue queue(context, device, cl::QueueProperties::Profiling | cl::QueueProperties::OutOfOrder, &err));
+    // Load xclbin
+    std::cout << "Loading: '" << xclbinFilename << "'\n";
+    std::ifstream bin_file(xclbinFilename, std::ifstream::binary);
+    bin_file.seekg (0, bin_file.end);
+    unsigned nb = bin_file.tellg();
+    bin_file.seekg (0, bin_file.beg);
+    char *buf = new char [nb];
+    bin_file.read(buf, nb);
+    // Creating Program from Binary File
+    cl::Program::Binaries bins;
+    bins.push_back({buf,nb});
+    devices.resize(1);
+    OCL_CHECK(err, cl::Program program(context, devices, bins, NULL, &err));
+    cl::Kernel krnl_spmv;
+    OCL_CHECK(err, krnl_spmv = cl::Kernel(program,"spmv_kernel", &err));
+    cl::Buffer buffer_values;
+    cl::Buffer buffer_col_indices;
+    cl::Buffer buffer_row_indices;
+    cl::Buffer buffer_x;
+    cl::Buffer buffer_y;
+    OCL_CHECK(err, buffer_values = cl::Buffer(context, CL_MEM_READ_ONLY, nnz*sizeof(float), nullptr, &err));
+    OCL_CHECK(err, buffer_col_indices = cl::Buffer(context, CL_MEM_READ_ONLY, nnz*sizeof(unsigned int), nullptr, &err));
+    OCL_CHECK(err, buffer_row_indices = cl::Buffer(context, CL_MEM_READ_ONLY, (n+1)*sizeof(unsigned int), nullptr, &err));
+    OCL_CHECK(err, buffer_x = cl::Buffer(context, CL_MEM_READ_ONLY, m*sizeof(float), nullptr, &err));
+    OCL_CHECK(err, buffer_y = cl::Buffer(context, CL_MEM_WRITE_ONLY, n*sizeof(float), nullptr, &err));
+    int narg=0;
+    OCL_CHECK(err, err = krnl_spmv.setArg(narg++,buffer_values));
+    OCL_CHECK(err, err = krnl_spmv.setArg(narg++,buffer_col_indices));
+    OCL_CHECK(err, err = krnl_spmv.setArg(narg++,buffer_row_indices));
+    OCL_CHECK(err, err = krnl_spmv.setArg(narg++,buffer_x));
+    OCL_CHECK(err, err = krnl_spmv.setArg(narg++,buffer_y));
+    OCL_CHECK(err, err = krnl_spmv.setArg(narg++,n));
+    OCL_CHECK(err, err = krnl_spmv.setArg(narg++,m));
+    float *ptr_values = (float *) queue.enqueueMapBuffer (buffer_values , CL_TRUE , CL_MAP_WRITE , 0, nnz*sizeof(float));
+    unsigned int *ptr_col_indices = (unsigned int *) queue.enqueueMapBuffer (buffer_col_indices , CL_TRUE , CL_MAP_WRITE , 0, nnz*sizeof(unsigned int));
+    unsigned int *ptr_row_indices = (unsigned int *) queue.enqueueMapBuffer (buffer_row_indices , CL_TRUE , CL_MAP_WRITE , 0, (n+1)*sizeof(unsigned int));
+    float *ptr_x = (float *) queue.enqueueMapBuffer (buffer_x , CL_TRUE , CL_MAP_WRITE , 0, m*sizeof(float));
+    float *ptr_y = (float *) queue.enqueueMapBuffer (buffer_y , CL_TRUE , CL_MAP_READ , 0, n*sizeof(float));
+    //setting input data
+    read_mtx_spm( inFilename, ptr_values, ptr_col_indices, ptr_row_indices);
+    for (unsigned int i = 0; i < m; i++) {
+    	ptr_x[i] = rand()/RAND_MAX;
+    }
+    hardware_start = getTimestamp();
+    OCL_CHECK(err, err = queue.enqueueMigrateMemObjects({buffer_values,buffer_col_indices, buffer_row_indices, buffer_x},0/* 0 means from host*/));
+    OCL_CHECK(err, err = queue.enqueueTask(krnl_spmv));
+    OCL_CHECK(err, err = queue.enqueueMigrateMemObjects({buffer_y},CL_MIGRATE_MEM_OBJECT_HOST));
+    queue.finish();
+    hardware_end = getTimestamp();
+    hardware_time = (hardware_end-hardware_start)/1000;
+	std::cout << "Exeution time running kernel in hardware: "
+        		    << hardware_time << " msec " << std::endl;
+    // GOLDEN model
+	software_start = getTimestamp();
+    unsigned int i=0, rowStart=0, rowEnd=n;
+    float *y_sw = (float *)malloc(n*sizeof(float));
+    float y0=0.0;
+    for (i = rowStart; i < rowEnd; ++i) {
+    	y0 = 0.0;
+    	for (unsigned int j=ptr_row_indices[i]; j<ptr_row_indices[i+1]; j++) {
+        	y0 += ptr_values[j] * ptr_x[ptr_col_indices[j]];
+        }
+        y_sw[i] = y0;
+    }
+    software_end = getTimestamp();
+    software_time = (software_end-software_start)/1000;
+	std::cout << "Exeution time running kernel in software 2: "
+        		    << software_time << " msec " << std::endl;
+    //Verify the result
+    int match = 0;
+    for (unsigned int i = 0; i < n; i++) {
+		float diff = fabs(y_sw[i]-ptr_y[i]);
+		if(diff > 0.0001 || diff != diff){
+			std::cout << "error occurs at " << i
+					  << " with value y_hw = " << ptr_y[i]
+					  << ", should be y_sw = " << y_sw[i]
+  					  << std::endl;
+            match = 1;
+            break;
+        }
+    }
+    queue.enqueueUnmapMemObject(buffer_values , ptr_values);
+    queue.enqueueUnmapMemObject(buffer_col_indices , ptr_col_indices);
+    queue.enqueueUnmapMemObject(buffer_row_indices , ptr_row_indices);
+    queue.enqueueUnmapMemObject(buffer_y , ptr_y);
+    queue.finish();
+    std::cout << "TEST " << (match ? "FAILED" : "PASSED") << std::endl;
+    return (match ? EXIT_FAILURE :  EXIT_SUCCESS);
+}
+```
+- read_spm.cpp
+```cpp
+#include <iostream>
+#include <fstream>
+#include <sstream>
+int spm_get_size(
+		char         *inFilename,
+		unsigned int &row_size,
+		unsigned int &col_size,
+		unsigned int &data_size) {
+	std::ifstream spm_file(inFilename);
+	if(spm_file.fail()){
+		std::cout << "Sparse matrix file " << inFilename << " doesn't exist!" << std::endl;
+		return -1;
+	}
+	std::string line;
+	std::stringstream tokenizer;
+	while (getline (spm_file, line)) {
+		if (line[0] != '%') {
+			unsigned int r, c, d;
+			tokenizer << line;
+			tokenizer >> r >>  c >> d;
+			row_size = r;
+			col_size = c;
+			data_size = d;
+			std::cout << "\r row_size = " <<  row_size << std::endl;
+			std::cout << "\r col_size = " <<  col_size << std::endl;
+			std::cout << "\r data_size = " << data_size << std::endl;
+			break;
+		}
+	}
+	spm_file.close();
+	return 0;
+}
+unsigned int  read_mtx_spm(
+		char  *inFilename,
+		float *values,
+		unsigned int    *colIndices,
+		unsigned int    *rowPtr) {
+	std::ifstream spm_file(inFilename);
+	if(spm_file.fail()){
+		std::cout << "Sparse matrix file " << inFilename << " doesn't exist!" << std::endl;
+		return -1;
+	}
+	std::string line;
+	unsigned int n;
+	unsigned int m;
+	unsigned int nnz;
+	while (getline (spm_file, line)) {
+		if (line[0] != '%') {
+			std::stringstream tokenizer;
+			tokenizer << line;
+			tokenizer >> n >>  m >> nnz;
+			unsigned int line_number = 0;
+			while (getline (spm_file, line)) {// read a line from a file
+				if ( line_number < nnz) {
+					float v;
+					unsigned int c;
+					std::stringstream tokenizer;
+					tokenizer << line;
+					tokenizer >> c >> v;
+					colIndices[line_number] = c;
+					values[line_number] = v;
+				} else {
+					unsigned int r;
+					std::stringstream tokenizer;
+					tokenizer << line;
+					tokenizer >> r;
+					rowPtr[line_number-nnz] = r;
+				}
+				line_number++;
+			}
+		}
+	}
+	spm_file.close();
+	return 0;
+}
+```
+- Create a new project from vitis
+  - Add all of kernel/host code, adding HW function
+  - Build SW emulation
+  - When successful, select kernel.prj in the explorer. In the menu of Hardware Functions, selec the name of kernel function then click the icon of Launch Vitis HLS
+    - Now we can see the report of kernel synthesis
+      - No test bench code required
+    - Get spmv_kernel.cpp from the Explorer in Vitis HLS GUI
+    - Run C Simulation/C Synthesis
+    ![spmv_kernel_00](./spmv_kernel_00.png)
+    - Console log:
+    ```
+    WARNING: [HLS 200-881] Unable to enforce a carried constraint (II = 1) between 'fadd' operation ('y0', ../../../../src/spmv_kernel.cpp:15) and 'fadd' operation ('y0', ../../../../src/spmv_kernel.cpp:15).
+    Resolution: For help on HLS 200-881 see www.xilinx.com/cgi-bin/docs/rdoc?v=2020.2;t=hls+guidance;d=200-881.html
+    WARNING: [HLS 200-881] Unable to enforce a carried constraint (II = 2) between 'fadd' operation ('y0', ../../../../src/spmv_kernel.cpp:15) and 'fadd' operation ('y0', ../../../../src/spmv_kernel.cpp:15).
+    Resolution: For help on HLS 200-881 see www.xilinx.com/cgi-bin/docs/rdoc?v=2020.2;t=hls+guidance;d=200-881.html
+    WARNING: [HLS 200-881] Unable to enforce a carried constraint (II = 3) between 'fadd' operation ('y0', ../../../../src/spmv_kernel.cpp:15) and 'fadd' operation ('y0', ../../../../src/spmv_kernel.cpp:15).
+    Resolution: For help on HLS 200-881 see www.xilinx.com/cgi-bin/docs/rdoc?v=2020.2;t=hls+guidance;d=200-881.html
+    WARNING: [HLS 200-881] Unable to enforce a carried constraint (II = 4) between 'fadd' operation ('y0', ../../../../src/spmv_kernel.cpp:15) and 'fadd' operation ('y0', ../../../../src/spmv_kernel.cpp:15).
+    Resolution: For help on HLS 200-881 see www.xilinx.com/cgi-bin/docs/rdoc?v=2020.2;t=hls+guidance;d=200-881.html
+    ```
+
+82. HSL code - 01
+- Use burst protocal for read/write memory
+- Read row_ptr then calculate the differences b/w two adjacent array
+- Then array of value/col_index can have same index
+- Using the number of elements in each row, we can usea single loop to describe spmv calculation
+![spmv_hls_01](./spmv_hls_01.png)
+
+83. HLS code - 01 lab
+```cpp
+#define DIM 60098
+extern "C" {
+void spmv_kernel(
+		float          *values,
+		unsigned int   *col_indices,
+		unsigned int   *row_indices,
+		float          *x,
+		float          *y,
+		unsigned int    n,
+		unsigned int    m) {
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=values
+#pragma HLS INTERFACE m_axi bundle=gmem_1 port=col_indices
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=x
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=y
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=row_indices
+	float x_local[DIM];
+	float y_local[DIM];
+	float row_indices_diff_local[DIM];
+	unsigned int nnz = 0;
+	for (unsigned int i =0; i < m; i++) {
+		x_local[i] = x[i];
+	}
+	unsigned int previous_row_index;
+	for (unsigned int i =0; i < n+1; i++) {
+		unsigned int row_index = row_indices[i];
+		if (i > 0) {
+			row_indices_diff_local[i-1] = row_index-previous_row_index;
+			nnz += row_index-previous_row_index;;
+		}
+		previous_row_index = row_index;
+	}
+	double y_tmp = 0.0;
+	unsigned int j = 0;
+	unsigned int remained_row_index = row_indices_diff_local[j++];
+	for (int i = 0; i < nnz; ++i) {
+		int k = col_indices[i];
+		float y_t = values[i] * x_local[k];
+		y_tmp += y_t;
+
+		remained_row_index--;
+		if (remained_row_index == 0) {
+			y_local[j-1] = y_tmp;
+			y_tmp = 0;
+			remained_row_index = row_indices_diff_local[j++];
+		}
+	}
+	for (unsigned int i =0; i < n; i++) {
+		y[i] = y_local[i];
+	}
+}
+}
+```
+![spmv_hls_01_lab](./spmv_hls_01_lab.png)
+- All memory use burst protocol
+- Console log: WARNING: [HLS 200-880] The II Violation in module 'spmv_kernel' (loop 'VITIS_LOOP_56_3'): Unable to enforce a carried dependence constraint (II = 1, distance = 1, offset = 0) between 'store' operation ('y_tmp_write_ln62', ../../../../src/spmv_kernel.cpp:62) of variable 'y_tmp', ../../../../src/spmv_kernel.cpp:59 on local variable 'y_tmp' and 'load' operation ('y_tmp_load', ../../../../src/spmv_kernel.cpp:59) on local variable 'y_tmp'.
+  - Issues of using y_tmp
+  ![y_tmp_schedule](./y_tmp_schedule.png)
+- Loop-carried dependency causes high-initiation interval in SpMV code
+
+84. HLS code - 02
+![II_violation_1](II_violation_1.png)
+![II_violation_2](II_violation_2.png)
+- Introducing two local variables
+  - There is a loop-carried depency in y_previous_break but this is very short - 1 cycle only
+  ![II_solution](II_solution.png)
+- The distance b/w read and write operations on a variable that causes loop-carried dependency defines the initiation interval
+- There are two potential solutions for solving a loop-carried dependency in a pipelined loop
+  - Utilizing parallel thread to compensate for the negative impact of the high-initiation interval on performance
+  - Resolving the dependency by introducing new variables and modifying the code
+
+85. HLS code - 02 lab
+- Updated kernel code:
+```cpp
+#define DIM 60098
+#include <ap_int.h>
+extern "C" {
+void spmv_kernel(
+		float          *values,
+		unsigned int   *col_indices,
+		unsigned int   *row_indices,
+		float          *x,
+		float          *y,
+		unsigned int    n,
+		unsigned int    m) {
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=values
+#pragma HLS INTERFACE m_axi bundle=gmem_1 port=col_indices
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=x
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=y
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=row_indices
+	unsigned int rowStart = 0, rowEnd = n;
+	float x_local[DIM];
+	float y_local[DIM];
+	float row_indices_diff_local[DIM];
+	unsigned int nnz = 0;
+	for (unsigned int i =0; i < m; i++) {
+		x_local[i] = x[i];
+	}
+	unsigned int previous_row_index;
+	for (unsigned int i =0; i < n+1; i++) {
+		unsigned int row_index = row_indices[i];
+		if (i > 0) {
+			row_indices_diff_local[i-1] = row_index-previous_row_index;
+			nnz += row_index-previous_row_index;;
+		}
+		previous_row_index = row_index;
+	}
+	double y_previous_break = 0.0;
+	double y_all_row = 0.0;
+	unsigned int j = 0;
+	unsigned int remained_row_index = row_indices_diff_local[j++];
+	for (int i = 0; i < nnz; ++i) {
+		int k = col_indices[i];
+		float y_t = values[i] * x_local[k];
+		y_all_row += y_t;
+		remained_row_index--;
+		if (remained_row_index == 0) {
+			y_local[j-1] = y_all_row - y_previous_break;
+			y_previous_break = y_all_row;
+			remained_row_index = row_indices_diff_local[j++];
+		}
+	}
+	for (unsigned int i =0; i < n; i++) {
+		y[i] = y_local[i];
+	}
+}
+}
+```
+![spmv_hls_02_lab](./spmv_hls_02_lab.png)
+
+86. Vitis lab
+
 ## Section 14: Project 2: Support Vector Mahcine (svm)
 
+87. Definition
+
+88. Software code
+
+89. Code structure
+![svc_q](./svc_q.png)
+
+90. HLS code
+- Kernel code: 
+```cpp
+#define DIM 10098
+extern "C" {
+	void spmv_kernel(
+		double* values,
+		int* col_indices,
+		int* row_indices,
+		double* x,
+		double* y,
+		int start,
+		int end,
+		int n,
+		int m) {
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=values
+#pragma HLS INTERFACE m_axi bundle=gmem_1 port=col_indices
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=x
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=y
+#pragma HLS INTERFACE m_axi bundle=gmem_0 port=row_indices
+		double x_local[DIM];
+		double y_local[DIM];
+		int row_indices_diff_local[DIM];
+		int nnz = 0;
+		for (int i = 0; i < m; i++) {
+			x_local[i] = x[i];
+		}
+		int previous_row_index;
+		for (int i = 0; i < n + 1; i++) {
+			 int row_index = row_indices[i];
+			if (i > 0) {
+				row_indices_diff_local[i - 1] = row_index - previous_row_index;
+				nnz += row_index - previous_row_index;;
+			}
+			previous_row_index = row_index;
+		}
+		double y_previous_break = 0.0;
+		double y_all_row = 0.0;
+		int j = 0;
+		int remained_row_index = row_indices_diff_local[j++];
+		for (int i = 0; i < nnz; ++i) {
+			int k = col_indices[i];
+			double y_t = values[i] * x_local[k];
+			y_all_row += y_t;
+			remained_row_index--;
+			if (remained_row_index == 0) {
+				y_local[j - 1] = y_all_row - y_previous_break;
+				y_previous_break = y_all_row;
+				remained_row_index = row_indices_diff_local[j++];
+			}
+		}
+		for (int i = 0; i < n; i++) {
+			y[i] = y_local[i];
+		}
+	}
+}
+```
+
+91. Lab
+
 ## Section 15: Appendix
+
+92. How to create zybo-z7-20 Hardware Vitis 2020.2 Platform
+- Vitis platform creation steps
+  - Hardware (Vivado): .XSA file
+  - Software (PetaLinux)
+  - Platform (Vitis)
+- Required SW
+  - Vitis unified software platform
+  - PetaLinux Tools: UG1144 document
+
+93. Vitis 2021.1 Embedded Platform for Zybo-Z7-20
 
 ## Xilinx product
 - Virtex: for DSP
