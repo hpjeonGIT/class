@@ -15,9 +15,13 @@
 
 6. How to succeed in this course
 
+7. Temporary 403 Errors
+
 ## Section 3: Vector Models and Text preprocessing
 
-8. Basic definitions in NLP
+8. Vector Models and Test preprocessing Intro
+
+9. Basic definitions in NLP
 - Tokens: words, punctation marks, question marks, ...
 - Character: a-z letters, white space, \n, ...
 - Vocabulary: set of all words. Reasonable subset of words
@@ -26,7 +30,9 @@
   - data: 1-gram (unigram)
   - hello world: 2-gram (bigram)
 
-10. Bag of words
+10. What is a Vector?
+
+11. Bag of words
 - Text is sequential
 - The specific sequence of words gives the meaning
 - But many NLP approaches do not consider the word order
@@ -36,12 +42,12 @@
   - In many cases, can yield good results still
 - In probabilistic model/deep learning, ordered text might be favored
 
-11. Count vectorizer (theory)
+12. Count vectorizer (theory)
 - Bag of words approach
 - No sequence but density of words
 - This will result in sparse matrices
 
-12. Tokenization
+13. Tokenization
 - More than split()
 - Punctuation
   - '.' vs '?'
@@ -59,14 +65,14 @@
   - Middle ground b/w word-based and character-based
   - "walking" -> "walk" + "ing"
 
-13. Stopwords
+14. Stopwords
 - How to avoid high dimensionality?
 - Stopwords are the words we wish to ignore
 - `CountVectorizer(stop_words=list_of_defined_words)`
   - None is the default
 - nltk has stopwords per each language
 
-14. Stemming and Lemmatization
+15. Stemming and Lemmatization
 - Handling walk, walking, walks separately will yield high dimensionality
 - Stemming & Lemmatization
   - Converts words to their root word
@@ -84,9 +90,9 @@
     - lemmmatizer.lemmatize("going") # returns "going"
     - lemmmatizer.lemmatize("going",pos=wordnet.VERB) # returns "go"
 
-15. Stemming and Lemmatization Demo
+16. Stemming and Lemmatization Demo
 
-16. Count Vectorizer(code)
+17. Count Vectorizer(code)
 - Xtrain is a sparse matrix
 ```python
 vectorizer = CountVectorizer(stop_words='english')
@@ -99,14 +105,14 @@ print("test score=",model.score(Xtest,Ytest))
 ```
 - Lemmatization is very expensive
 
-17. Vector Similarity
+18. Vector Similarity
 - How to find 'similar' documents
 - Metric b/w vectors
   - Distance
   - Angle
   - Cosine distance = 1 - Cosine similarity
 
-18. TF-IDF (theory)
+19. TF-IDF (theory)
 - How to improve the count vectorizer
 - TF-IDF is popular for document retrieval and text mining
 - What's wrong with the count vectorizer?
@@ -137,9 +143,9 @@ Xtest = tfidf.transform(test_texts)
   - tfidf(t,d) = tfidf(t,d)/|tfidf(*,d)|
   - L1 or L2 norm
 
-19. (Interactive) Recommender Exercise Prompt
+20. (Interactive) Recommender Exercise Prompt
 
-20. IF-IDF (Code)
+21. IF-IDF (Code)
 - Download from https://www.kaggle.com/datasets/tmdb/tmdb-movie-metadata?resource=download
 ```python
 #wget https://lazyprogrammer.me/course_files/nlp/tmdb_5000_movie.csv -> not working Feb 2023
@@ -184,7 +190,7 @@ def recommend(title):
 print("Recommendatino for Scream 3", recommend('Scream 3'))
 ```
 
-21. Word-to-Index Mapping
+22. Word-to-Index Mapping
 - Building document-term matrix
   - Row = document, column=term (size = #documents * #terms)
 - Eample
@@ -206,7 +212,7 @@ for doc in documents:
       current_idx += 1
 ```
 
-22. How to Build TF-IDF From scatch
+23. How to Build TF-IDF From scatch
 - Download bbc_text_cls.csv from https://storage.googleapis.com/dataset-uploader/bbc/bbc-text.csv 
 ```py
 import pandas as pd
@@ -255,7 +261,7 @@ for j in indices[:5]:
   print(idx2word[j])
 ```
 
-23. Neural Word Embeddings
+24. Neural Word Embeddings
 - Umbrella of vector models
 - A document becomes a sequence of vectors
   - Something more than 'bag of words'
@@ -275,7 +281,7 @@ for j in indices[:5]:
   - Can do arithemtic on vectors
   - King - Man ~ Queen - Woman
 
-24. Neural Word Embeddings Demo
+25. Neural Word Embeddings Demo
 - wget https://lazyprogrammer.me/course_files/nlp/GoogleNews-vectors-negative300.bin.gz
   - 1.5GB
 - Use pre-trained model as training from scratch is too expensive (~$Millions)
@@ -296,7 +302,7 @@ def nearest_neighbors(w):
 nearest_neighbors('king')
 ```
 
-25. Vector Models & Text Preprocessing Summary
+26. Vector Models & Text Preprocessing Summary
 - How to turn text into vectors
   - Counting
   - TF-IDF
@@ -310,10 +316,10 @@ nearest_neighbors('king')
   - Stopwords
   - Stemming and lemmatization
   
-26. Text Summarization Preview
+27. Text Summarization Preview
 - Text summarization is more than just TF-IDF
 
-27. How to do NLP in other languages
+28. How to do NLP in other languages
 - How to apply NLP into other languages or bioinformatics
 - Steps of a typical NLP analysis
   - Get the text (strings)
@@ -328,11 +334,11 @@ nearest_neighbors('king')
 - Scikit-Learn's count vectorizer won't tokenize Japanese
   - Build a tokenizer from scratch or use any existing library (JapaneseTokenizer)
 
-28. Suggestion Box
+29. Suggestion Box
 
 ## Section 4: Probablistic Models
 
-29. Probabilistic Models
+30. Probabilistic Models
 - Markov model/N-gram language model
 - Application: Article spineer (black hat SEO)
 - Application: Cipher decryption/code-breaking
@@ -340,7 +346,7 @@ nearest_neighbors('king')
 
 ## Section 5: Markov Models
 
-30. Markov models section introduction
+31. Markov models section introduction
 - Example
   - Finance: the basis for the Black-Scholes formula
   - Reinforcement learning: Markov Decision Process (MDP)
@@ -350,12 +356,12 @@ nearest_neighbors('king')
   - Building a text classifier using Bayes rule + Generating poetry
   - Supervised/unsupervised ML
 
-31. The Markov Property
+32. The Markov Property
 - A very restrictive assumption on the dependency structure of the join distribution
 - Markov assumption
   - We assume the Markov property holds, even when it does not
   
-32. The Markov model
+33. The Markov model
 - State distribution
   - p(s_t = 1), p(s_t = 2), ...
 - State transitions
@@ -372,7 +378,7 @@ nearest_neighbors('king')
     - Find the probability of a sequence
     - Given a dataset, find A and pi (learning or training)
 
-33. Probability smoothing and log-probabilities
+34. Probability smoothing and log-probabilities
 - Probability of sequence
   - Due to multiplication, any zero will nullify it
   - Add-one smoothing:
@@ -386,7 +392,7 @@ nearest_neighbors('king')
   - We don't need exact number as what we actually do is compare
   - A>B => log(A) > log(B)
 
-34. Building a text classifier (theory)
+35. Building a text classifier (theory)
 - Text classification is an example of **supervised learning** but Markov models are **unsupervised**
   - No label in Markov model
 - Bayes' Rule
@@ -399,7 +405,7 @@ nearest_neighbors('king')
   - Maximum a posteriori (MAP): k* = argmax_k log(p(x|class=k)) + log (p(class=k))
   - Maximum likelihood: k* = argmax_k log(p(x|class=k))
 
-35. Building a text classifier (exercise prompt)
+36. Building a text classifier (exercise prompt)
 - 2 poems by 2 authors
 - Build a classifier that can distinguish b/w 2 author
 - Compute train and test accuracy
@@ -422,7 +428,7 @@ nearest_neighbors('king')
   - Check for class imbalance
   - If imbalanced, check confusion matrix and F1-score
   
-36. Building a Text classifier (code pt 1)
+37. Building a Text classifier (code pt 1)
 - Input data at
   - wget -nc https://raw.githubusercontent.com/lazyprogrammer/machine_learning_examples/master/hmm_class/edgar_allan_poe.txt
   - wget -nc https://raw.githubusercontent.com/lazyprogrammer/machine_learning_examples/master/hmm_class/robert_frost.txt
@@ -539,9 +545,9 @@ print(f1_score(Ytrain,Ptrain))
 print(f1_score(Ytest, Ptest))
 ```
 
-37. Building a Text classifier (code pt 2)
+38. Building a Text classifier (code pt 2)
 
-38. Language Model (Theory)
+39. Language Model (Theory)
 - Using Markov models to generate text
   - Classifying text: supervised learning
   - Generating text: unsupervised learning
@@ -559,11 +565,11 @@ print(f1_score(Ytest, Ptest))
     - Instead of depending on only one past state, depends on two: MxMxM
     - Third order will be MxMxMxM matrices
 
-39. Language Model (Exercise Prompt)
+40. Language Model (Exercise Prompt)
 - Why use dictionary? Not numpy array?
   - Sparse matrix
 
-40. Language Model (Code pt 1)
+41. Language Model (Code pt 1)
 - Markov Models
   - Markov Model Classifier / Poetry Generator
   - wget -nc https://raw.githubusercontent.com/lazyprogrammer/machine_learning_examples/master/hmm_class/edgar_allan_poe.txt
@@ -651,11 +657,11 @@ but it isnt as if and thats not all the money goes so fast
 you couldnt call it living for it aint
 ```
 
-41. Language Model (code pt 2)
+42. Language Model (code pt 2)
 - How big the vocabulary size?
 - How many values are stored in the dictionaries?
 
-42. Markov Models Section Summary
+43. Markov Models Section Summary
 - Basic idea: predicts the future from the past
   - Predict x(t) using x(t-1)
   - But can add more t-2, t-3, ...
@@ -664,7 +670,7 @@ you couldnt call it living for it aint
 
 ## Section 6: Article Spinner
 
-43. Article Spinning - Problem Description
+44. Article Spinning - Problem Description
 - Ex: Blog
   - How to get readers?
   - Gets high ranks from search engine: search engine optimization
@@ -674,12 +680,12 @@ you couldnt call it living for it aint
       - Prior to ML advent: human intervention required
 - The goal isn't to build an ariticle spinning product
 
-44. Article Spinning - N-gram appraoch
+45. Article Spinning - N-gram appraoch
 - First order Markov model: p(w_t|w_t-1)
 - Second order Markov model: p(w_t|w_t-1, w_t-2)
 - Predicting the Middle word: p(w_t|w_t-1,w_t+1)
 
-45. Article Spinner Exercise Prompt
+46. Article Spinner Exercise Prompt
 - BBC News data
   - Business articles only
   - Wikipedia at https://dumps.wikimedia.org
@@ -689,7 +695,7 @@ you couldnt call it living for it aint
   - Every word or 2 words in a row?
   - How to find if a word can be replaced?
 
-46. Article Spinner in Python (pt 1)
+47. Article Spinner in Python (pt 1)
 ```py
 import numpy as np
 import pandas as pd
@@ -774,14 +780,14 @@ new_doc = spin_document(doc)
 print(textwrap.fill(new_doc,replace_whitespace=False, fix_sentence_endings=True))
 ```
 
-47. Article Spinner in Python (pt 2)
+48. Article Spinner in Python (pt 2)
 - Grammatical error, missing quotes, wrong period found
 
-48. Case Study: Article Spinning Gone Wrong
+49. Case Study: Article Spinning Gone Wrong
 
 ## Section 7: Cipher Decryption
 
-49. Section Introduction
+50. Section Introduction
 - Probabilistic language modeling
 - Genetic algorithm
 - What is a cipher?
@@ -791,11 +797,11 @@ print(textwrap.fill(new_doc,replace_whitespace=False, fix_sentence_endings=True)
 - Generic algorithm/evolutionary algorithm
   - Optimization based on biological evolution
   
-50. Ciphers
+51. Ciphers
 - Mapping alphabets in different order
   - Encryption/decryption
 
-51. Language Models (Review)
+52. Language Models (Review)
 - If decryption is done, the results will have very inappropriate form or have low probability
 - Bigram probability
   - p(A|C) = (# of times "CA" appears in the dataset) / (# of times "C" appears in the dataset)
@@ -810,7 +816,7 @@ print(textwrap.fill(new_doc,replace_whitespace=False, fix_sentence_endings=True)
   - Use Log-likelihood
     - log p(x1,x2) = log p(x1) + log p(x2|x1)
 
-52. Genetic Algorithms
+53. Genetic Algorithms
 - Brute force mapping counts = 26! = 4e26
 - Type of mutations
   - Substition
@@ -818,18 +824,18 @@ print(textwrap.fill(new_doc,replace_whitespace=False, fix_sentence_endings=True)
   - Deletion
   - But cannot be used for cypher decryption or character mapping 
 
-53. Code Preparation
+54. Code Preparation
 - Generate a random substitution cipher
 - Read in Moby Dick, create a character level language model
 - Encoding/decoding functions
 - Genetic algorithm
 
-54. Code pt 1
-55. Code pt 2
-56. Code pt 3
-57. Code pt 4
-58. Code pt 5
-59. Code pt 6
+55. Code pt 1
+56. Code pt 2
+57. Code pt 3
+58. Code pt 4
+59. Code pt 5
+60. Code pt 6
 - Download: https://lazyprogrammer.me/course_files/moby_dick.txt
 ```py
 import numpy as np
@@ -972,15 +978,15 @@ print("\nTrue message: \n", original_message)
 ```
 - Not exact. Run multiple times and analyze
 
-60. Cipher decryption - additional discussion
+61. Cipher decryption - additional discussion
 
-61. Section Conclusion
+62. Section Conclusion
 - Bisection model may work good but the uni-gram/bi-gram model may be inappropriate
   - Trigram?
 
 ## Section 8: Machine Learning Models
 
-62. Machine Learning Models (Introduction)
+63. Machine Learning Models (Introduction)
 - So far:
   - Vector based models
   - Probability based models
@@ -992,14 +998,375 @@ print("\nTrue message: \n", original_message)
 | Sentiment analysis | Latent semantic analysis|
 | | Text summarization (but can be supervised) |
 
+## Section 9: Spam Detection
 
+64. Spam Detection - Problem Description
 
+65. Naive Bayes Intuition
+- Bayes' rule:
+  - P(Y|X) = P(X|Y)P(Y)/\sum P(X|y)P(y) = P(X,Y)/P(X)
+  - Input X= email, Output Y= category (spam or not)
+- Naive Bayes
+  - Multiple inputs are indepedent each other
 
-## Section 9: Spam detection
+66. Spam Detection - Exercise Problem
+- wget https://lazyprogrammer.me/course_files/spam.csv
+
+67. Aside: Class Imbalance, ROC, AUC, and F1 Score (pt1)
+- Class Imbalance
+- Binary Classification
+  - TP: True Positive. Predicted Positive while actually Positive
+  - TN: True Negative. Predicted negative while actually Negative
+  - FP: False Positive. Predicted Positive while actually Negative
+  - FN: False Negative. Predicted Negative while actually Positive
+- In medical/life science
+  - Sensitivity = TP/(TP+FN), higher/better
+  - Specificity = TN/(TN+FP), higher/better
+- Recall = sensitivity = True Positive rate. Or # of docs found/# docs we must have found
+- Precision = Positive Predictive Value = TP/(TP+FP). Or # docs correctly retrieved/# docs retrieved
+- F1-score: Harmonic mean of precision and recall
+  - F1 = 2 (precsion*recall)/(precision + recall)
+
+68. Aside: Class Imbalance, ROC, AUC, and F1 Score (pt2)
+- ROC curve: TP vs FP
+  - AUC: Area under curve
+
+69. Spam Detection In Python
+```py
+import numpy as np
+import pandas as pd
+import seaborn as sn
+import matplotlib.pyplot as plt
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
+from sklearn.naive_bayes import MultinomialNB
+from wordcloud import WordCloud
+df = pd.read_csv('spam.csv', encoding='ISO-8859-1')
+df = df.drop(["Unnamed: 2", "Unnamed: 3", "Unnamed: 4"],axis=1)
+df.columns = ["labels","data"]
+df.head()
+df['labels'].hist() # compares histogram
+df['b_labels'] = df['labels'].map({'ham':0, 'spam':1})
+Y = df['b_labels'].to_numpy()
+df_train, df_test, Ytrain,Ytest = train_test_split(df['data'], Y, test_size=0.33)
+featurizer = CountVectorizer(decode_error='ignore')
+Xtrain = featurizer.fit_transform(df_train)
+Xtest = featurizer.transform(df_test)
+model = MultinomialNB()
+model.fit(Xtrain,Ytrain)
+print("train acc:", model.score(Xtrain,Ytrain))
+print("test acc:", model.score(Xtest,Ytest))
+Ptrain = model.predict(Xtrain)
+Ptest = model.predict(Xtest)
+print("train F1:", f1_score(Ytrain, Ptrain))
+print("test F1:", f1_score(Ytest, Ptest))
+cm = confusion_matrix(Ytrain,Ptrain)
+cm # array([[3211,   13],  [  14,  495]])
+def plot_cm(cm):
+    classes = ['ham','spam']
+    df_cm = pd.DataFrame(cm,index=classes,columns=classes)
+    ax = sn.heatmap(df_cm,annot=True,fmt='g')
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Target")
+plot_cm(cm) # visualization of confusion matrix
+def visualize(label):
+    words = ''
+    for msg in df[df['labels'] == label]  ['data']:
+        msg = msg.lower()
+        words += msg +' '
+    wordcloud = WordCloud(width=600,height=400).generate(words)
+    plt.imshow(wordcloud)
+    plt.axis('off')
+    plt.show()
+visualize('spam')
+visualize('ham')
+# Now see what went wrong
+X = featurizer.transform(df['data'])
+df['predictions']  = model.predict(X)
+# things that must be spam
+sneaky_spam = df[(df['predictions'] == 0) & (df['b_labels'] == 1)]['data']
+for msg in sneaky_spam:
+    print(msg)
+# things should not be spam
+not_actually_spam = df[(df['predictions'] == 1) & (df['b_labels'] == 0)]['data']
+for msg in sneaky_spam:
+    print(msg)
+```
 
 ## Section 10: Sentiment Analysis
 
+70. Sentiment Analysis - Problem Description
+- Unlike image classification, there is an ordering to the classes
+- Application
+  - Reputation management
+  - Customer support
+
+71. Logistic Regression Intuition (pt 1)
+- Logistic regression model is related into vector model instead of probability model
+- Activation: ax(x) = w1x1 + w2x2 + b
+  - w1,w2: weights
+  - b: bias
+  - a(x) = 0: on the line
+  - a(x) < 0: one side of the line
+  - a(x) > 0: other side of the line
+  - Vector notation: a(x) = \sum_i w_i x_i + b = w^T x + b
+- Sigmoid: logistic function
+  - \sigma(x) = 1/(1+\exp(-x)): b/w [0,1]
+  - p(y=1|x) = \sigma(w^T x + b)
+- Naive Bayes model is generative while Logistic Regression is discriminative  
+
+72. Multiclass Logistic Regression (pt 2)
+- Sometimes called as multinomial logistic regression or maximum entropy classifier
+- Multiclass logistic regression
+  - We have K classes
+    - K weight vectors: w1, w2, ... wk
+    - K bias: b1, b2, ... bk
+    - K activations: a1 = w1^T x + b1, a2 = w2^T x + b2, ... ak = wk^T x + bk
+  - For each of N samples, we get K probabilities that sum to 1
+  - The overall output is a matrix of NxK
+  - Class predictions using probabilities?
+    - Find the max
+
+73. Logisitc Regression Training and Interpretation (pt3)
+- For multiclass case
+  - Interpret the weight as a matrix
+  - a(x) = W^Tx + b
+  - If W[d,k] is large and positive, it makes the kth activation more positive
+  - if W[d,k] is large and negative, it makes the kth activation more negative
+
+74. Sentiment Analysis - Exercise Prompt
+- Use a vectorization strategy of your choice (counting, TF-IDF)
+- Options: Tokenization, lemmatization, normalization
+- Classifier: Use Logistic Regression
+- Score function returns accurayc
+- Check for class imbalance
+  - When unbalanced, check metrics like AUC/F1-score + plot confusion matrix
+
+75. Sentiment Analysis in Python (pt 1)
+- wget -nc https://lazyprogrammer.me/course_files/AirlineTweets.csv
+```py
+import numpy as np
+import pandas as pd
+import seaborn as sn
+import matplotlib.pyplot as plt
+np.random.seed(1)
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
+from sklearn.model_selection import train_test_split
+df_ = pd.read_csv('AirlineTweets.csv')
+df_.head()
+df = df_[['airline_sentiment','text']].copy()
+df['airline_sentiment'].hist() # too many negative. Imbalance found
+target_map = {'positive':1, 'negative':0, 'neutral':2}
+df['target'] = df['airline_sentiment'].map(target_map)
+df_train,df_test = train_test_split(df)
+vectorizer = TfidfVectorizer(max_features=2000)
+X_train = vectorizer.fit_transform(df_train['text'])
+X_test = vectorizer.transform(df_test['text'])
+Y_train = df_train['target']
+Y_test = df_test['target']
+model = LogisticRegression(max_iter=500)
+model.fit(X_train,Y_train)
+print("Train acc:", model.score(X_train, Y_train))
+print("Test acc:", model.score(X_test, Y_test))
+Pr_train = model.predict_proba(X_train)
+Pr_test = model.predict_proba(X_test)
+print("Train AUC:", roc_auc_score(Y_train, Pr_train, multi_class='ovo'))
+print("Test AUC:", roc_auc_score(Y_test, Pr_test, multi_class='ovo'))
+## plotting confusion matrix
+P_train = model.predict(X_train)
+P_test = model.predict(X_test)
+cm = confusion_matrix(Y_train, P_train, normalize='true')
+cm
+def plot_cm(cm):
+    classes = ['negative','positive','neutral' ]
+    df_cm = pd.DataFrame(cm,index=classes,columns=classes)
+    ax = sn.heatmap(df_cm,annot=True,fmt='g')
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Target")
+plot_cm(cm)
+```
+
+76. Sentiment Analysis in Python (pt 2)
+- How to improve the accuracy/AUC
+  - Using Positive and Negative only
+```py
+binary_target_list = [target_map['positive'],target_map['negative']]
+df_b_train = df_train[df_train['target'].isin(binary_target_list)]
+df_b_test = df_test[df_test['target'].isin(binary_target_list)]
+X_train = vectorizer.fit_transform(df_b_train['text'])
+X_test = vectorizer.transform(df_b_test['text'])
+Y_train = df_b_train['target']
+Y_test = df_b_test['target']
+model = LogisticRegression(max_iter=500)
+model.fit(X_train, Y_train)
+print("Train acc:", model.score(X_train,Y_train))
+print("Test acc:", model.score(X_test,Y_test))
+Pr_train=model.predict_proba(X_train)[:,1]
+Pr_test = model.predict_proba(X_test)[:,1]
+print("Train AUC:", roc_auc_score(Y_train, Pr_train))
+print("Test AUC:", roc_auc_score(Y_test, Pr_test))
+model.coef_
+plt.hist(model.coef_[0], bins=30)
+word_index_map = vectorizer.vocabulary_
+word_index_map
+threshold = 2
+# find extreme words
+print("Most positive words:")
+for word, index in word_index_map.items():
+    weight = model.coef_[0][index]
+    if weight > threshold:
+        print(word,weight)
+#southwestair 2.860075665821313
+#thank 8.070503978065155
+#great 5.208733896653555
+#best 3.6368642824846105
+print("Most negative words:")
+for word, index in word_index_map.items():
+    weight = model.coef_[0][index]
+    if weight < -threshold:
+        print(word,weight)
+#hours -3.180120172892713
+#not -4.237871164989555
+#delayed -2.7045270961885732
+#hour -2.069684629978255
+#but -2.2210484580160723
+#cancelled -2.6770621926840525
+```
+- Exercise: print the most-wrong tweets for both classes
+  - Find a negative review where p(y=1|x) is closest to 1
+  - Find a positive review where p(y=1|x) is closest to 0
+- Set class_weight = 'balanced'
+
 ## Section 11: Text Summarization
+
+77. Text Summarization Section Introduction
+- Ex: Summary from Search engine
+- 2 Types of summarization
+  - Extractive: text taken from the original document. Relatively easy
+  - Abstractive: may contain novel sequences of text not necessarily taken from the input. Hard
+- Section outline
+  - Method 1: Using the knowledge of vector-based methods (TF-IDF)
+  - Method 2: TextRank, based on Google's PageRank
+
+78. Text Summarization Using Vectors
+- Text summarization with TF-IDF
+  - Split the document into sentences
+  - Score each sentence
+  - Rank each sentence by those scores
+  - Summary = top scoring sentences
+  - This is an extractive method
+  - No training data required
+- Scoring each sentence
+  - Score = average (non-zero TF-IDF values)
+  - Important words will have a larger score
+  - Why mean, not sum?
+    - The sum would be biased toward longer sentences
+- What to do with the scores
+  - Sort the scores, pick the sentences with the highest score
+  - Multiple options
+    - Top N sentences
+    - Top N words
+    - Top N characters
+    - Mixing
+
+79. Text Summarization Exercise Prompt
+- BBC news data
+- Split the article into sentences (nltk.sent_tokenize)
+- Compute TF-IDF matrix from list of sentences
+- Score each sentence by taking the average of non-zero TF-IDF values
+- Sort each sentence by score
+- Print the top scoring sentences as the summary
+
+80. Text Summarization in Python
+- wget -nc https://lazyprogrammer.me/course_files/nlp/bbc_text_cls.csv
+```py
+import numpy as np
+import pandas as pd
+import textwrap
+import nltk
+from nltk.corpus import stopwords
+from nltk import word_tokenize
+from nltk.stem import WordNetLemmatizer, PorterStemmer
+from sklearn.feature_extraction.text import TfidfVectorizer
+nltk.download('punkt')
+nltk.download('stopwords')
+df = pd.read_csv('bbc_text_cls.csv')
+doc = df[df.labels == 'business']['text'].sample(random_state=42)
+def wrap(x):    
+    return textwrap.fill(x,replace_whitespace=False, fix_sentence_endings=True)
+print(wrap(doc.iloc[0]))
+## tokenizing sentences
+sents = nltk.sent_tokenize(doc.iloc[0].split("\n",1)[1])
+featurizer = TfidfVectorizer(stop_words=stopwords.words('english'),norm='l1',)
+X = featurizer.fit_transform(sents)
+def get_sentence_score(tfidf_row):
+    x = tfidf_row[tfidf_row != 0]
+    return x.mean()
+scores = np.zeros(len(sents))
+for i in range(len(sents)):
+    score = get_sentence_score(X[i,:])
+    scores[i] = score
+sort_idx = np.argsort(-scores)
+print("Generated_summary:")
+for i in sort_idx[:5]:
+    print(wrap("%.2f: %s"%(scores[i],sents[i])))
+# check the title of the document
+doc.iloc[0].split("\n",1)[0]
+#Generated_summary:
+#0.14: A number of retailers have already reported poor figures for December.
+#0.13: However, reports from some High Street retailers highlight the weakness of the sector.
+#0.12: The ONS revised the annual 2004 rate of growth down from the
+# Let's define a sinle function doing summary
+def summarize(text):
+    sents = nltk.sent_tokenize(text)
+    X = featurizer.fit_transform(sents)
+    scores = np.zeros(len(sents))
+    for i in range(len(sents)):
+        score = get_sentence_score(X[i,:])
+        scores[i] = score
+    sort_idx = np.argsort(-scores)
+    for i in sort_idx[:5]:
+        print(wrap("%.2f: %s"%(scores[i],sents[i])))
+doc = df[df.labels == 'entertainment']['text'].sample(random_state=123)
+summarize(doc.iloc[0].split("\n",1)[1])
+#0.11: The Black Eyed Peas won awards for best R 'n' B video and sexiest video, both for Hey Mama.
+#0.10: The ceremony was held at the Luna Park fairground in Sydney Harbour and was hosted by the Osbourne family.
+#0.10: Goodrem, Green Day and the Black Eyed Peas took home two awards each.
+#0.10: Other winners included Green Day, voted best group, and the Black Eyed Peas.
+#0.10: The VH1 First Music Award went to Cher honouring her achievements within the music industry.
+# check the title of the document
+doc.iloc[0].split("\n",1)[0]
+```
+
+81. TextRank Intuition
+- Recap of TF-IDF 
+  - Split document into sentences
+  - Compute TF-IDF matrix (sentences * terms)
+  - Score each sentence
+  - Take the top scoring sentences
+- TextRank is an alternative method of scoring each sentence
+- Google PageRank
+  - Random walk
+  - More linked webpage has higher probability
+  - Probabilities on each web page becomes stationary after long time
+  - More popular page has high score, less popular web site has low score
+- Applying PageRank to TextRank
+  - We want to score each sentence, as we score each webpage
+  - What's the equivalent of a link from one webpage to another?
+  - Number of links from one sentence to another is the **cosine similarty** b/w their TF-IDF vectors
+  
+82. TextRank - How it Really Works(Advanced)
+
+83. TextRank Exercise Prompt
+
+84. TextRank in Python (Advanced)
+
+85. Text Summarization in Python - The easy way (Beginner)
+
+86. Text Summarization Section Summary
 
 ## Section 12: Topic Modeling
 
