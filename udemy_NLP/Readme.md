@@ -1359,16 +1359,102 @@ doc.iloc[0].split("\n",1)[0]
   - Number of links from one sentence to another is the **cosine similarty** b/w their TF-IDF vectors
   
 82. TextRank - How it Really Works(Advanced)
-
+- Random walks and Markov chains
+- Probability of going from state i at time t, to state j at time t+1 = p(s_t+1=j|s_t=i) = A(i,j)
+  - A(i,j) is not dependent on time
+- The limiting distribution
+  - p(s_\inf) = p(s_0)AAA ... = lim_t->\inf p(s_0)A^t
+  - p(s_\inf) = p(s_\inf)A
+  - Ends as an eigenvalue problem where eigenvalue is one
+    - Av = \lambda v
+- Perron-Frobenius Theorem
+  - If A is a Markov matrix(aka stochastic matrix), and we can travel from any state to any other state with positive probability, then the previous assumptions are true
+  - Limiting distribution is smae to the stationary distribution
+- TextRank Matrix
+  - Compute TF-IDF vector for each sentence
+  - Compute Cosine similarity pairwise b/w all sentences, yielding MxM matrix
+  - Divide each row by its sum so that each row sums to 1 (G matrix is made)
+  - Smooth G to get A
+  
 83. TextRank Exercise Prompt
 
 84. TextRank in Python (Advanced)
+- Basically same as above but we calculate score differently
+```py
+def summarize(text, factor=0.15):
+  #extract sentences
+  sents = nltk.sent_tokenize(text)
+  # perform tf-idf
+  featureizer = TfidfVectorizer(stop_words=stopwords.words('english'), norm='l1')
+  X = featurizer.fit_transform(sents)
+  # compute similarity matrix
+  S = cosine_similarity(X)
+  # normalize similarity matrix
+  S /= S.sum(axis=1, keepdims=True)
+  # uniform transition matrix
+  U = np.ones_like(S)/len(S)
+  # smoothed similarity matrix
+  S = (1-factor)*S + factor*U
+  # find the limiting/stationary distribution
+  evals, evecs = np.linalg.eig(S.T)
+  # compute scores
+  scores = evecs[:,0]/evecs[:,0].sum()
+  # sort the scores
+  sort_idx = np.argsort(-scores)
+  # print the summary
+  for i in sort_idx[:5]:
+    print(wrap("%.2f: %s" %(scores[i],setns[i])))
+```
 
 85. Text Summarization in Python - The easy way (Beginner)
+- Using sumy, gensim packages
 
 86. Text Summarization Section Summary
 
 ## Section 12: Topic Modeling
+
+87. Topic modeling section introduction
+- Latent Dirichlet Allocation (LDA)
+  - Bayesian model
+  - The most complex model
+- Non-negative Matrix factorizatin (NMF)
+  - Originates from recommeder systems
+- Topic modeling
+  - Why useful?
+  - An example of unsupervised learning
+  - No labels required/used
+  - More powerful version of clustering
+  - Clusters are discrete objects, and topics are more richly expressed
+
+88. Latent Dirichlet Allocation (LDA) - Essentials
+- Unsupervised vs supervised learning
+- Clustering concepts
+- LDA from API perspective
+  - Inputs vs outputs
+  - How to use LDA with scikit-learn
+- Intuition behind LDA
+- Linear Discriminant Analysis
+  - Same name of LDA. 
+  - It was sklearn.lda.LDA => sklearn.discriminant_analysis.LinearDiscriminantAnalysis
+- Read paper by David Blei, Andrew Ng, and Michael Jordan if necessary
+- API perspective
+  - Inputs: count vectors (bag of words)
+    - Use sklearn.feature_extraction.text.CountVectorizer
+  - Inputs and Outputs
+    - words vs topics
+    - documents vs topics
+    - Probabilistic topic assignment
+
+89. LDA - code preparation
+- Actual API
+  - X = CountVectorizer().fit_transform(text)
+  - lda = LatentDirichletAllocation()
+  - lda.fit(X) # no target. not fit(X,Y)
+  - Z = lda.transform(X) # returns docs * topics matrix
+  - X: observed data, Z: unobserved variables
+- Inference
+  - In supervised training, prediction is inference
+  - In unsupervised, transform is inference
 
 ## Section 13: Latent Semantic Analysis
 
