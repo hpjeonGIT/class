@@ -1456,13 +1456,793 @@ def summarize(text, factor=0.15):
   - In supervised training, prediction is inference
   - In unsupervised, transform is inference
 
+90. LDA - May be useful picture
+- Topics are distributions over words
+- Documents are distributions over topics
+
+91. Latent Dirichlet Allocation (LDA) - Intuition (Advanced)
+- Clustering vs Classification
+  - Clustering/mixture model
+    - Cluster identity z -> x
+    - Note that z is NOT observed yet
+    - p(z|x) = p(x|z)p(z)/p(x)
+      - But z is not observed and we use expectation-maximization for p(z)
+  - Bayes Classifier
+    - Class label y -> x
+    - p(y|x) = p(x|y)p(y)/p(x)
+  - Model are same but different data
+- Summary
+  - Understand plate notation and data generating process - the assumption of LDA
+
+92. Topic Modeling with Latent Dirichlet Allocation (LDA) in Python
+- wget -nc https://lazyprogrammer.me/course_files/nlp/bbc_text_cls.csv
+```py
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import nltk
+import textwrap
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+nltk.download('stopwords')
+stops = set(stopwords.words('english'))
+stops = stops.union({'said','would','could','told','also','one','two','mr','new','year',})
+df = pd.read_csv('bbc_text_cls.csv')
+vectorizer = CountVectorizer(stop_words=stops)
+X= vectorizer.fit_transform(df['text'])
+lda = LatentDirichletAllocation(n_components=10, random_state=12345)
+lda.fit(X)
+def plot_top_words(model,feature_names, n_top_words=10):
+    fig,axes = plt.subplots(2,5,figsize=(30,15),sharex=True)
+    axes = axes.flatten()
+    for topic_idx, topic in enumerate(model.components_):
+        top_features_ind = topic.argsort()[: -n_top_words -1 : -1]        
+        top_features = [feature_names[i] for i in top_features_ind]
+        weights = topic[top_features_ind]
+        ax = axes[topic_idx]
+        ax.barh(top_features,weights,height=0.7)
+        ax.set_title(f"Topic {topic_idx + 1}",fontdict={"fontsize":30})
+        ax.invert_yaxis()
+        ax.tick_params(axis="both",which="major",labelsize=20)
+        for i in "top right left".split():
+            ax.spines[i].set_visible(False)
+        fig.suptitle('LDA',fontsize=40)
+    plt.subplots_adjust(top=0.90,bottom=0.05,wspace=0.90,hspace=0.3)
+    plt.show()
+feature_names=vectorizer.get_feature_names_out()
+plot_top_words(lda, feature_names);
+```
+![lda_plot](./lda_plot.png)
+```py
+Z = lda.transform(X)
+# pick a random document then check which topics are associated with it
+np.random.seed(0)
+i = np.random.choice(len(df))
+z = Z[i]
+topics = np.arange(10) + 1
+fig,ax = plt.subplots()
+ax.barh(topics,z)
+ax.set_yticks(topics)
+ax.set_title('True label: %s' % df.iloc[i]['labels']);
+def wrap(x):
+    return textwrap.fill(x,replace_whitespace=False,fix_sentence_endings=True)
+print(wrap(df.iloc[i]['text']))
+i = np.random.choice(len(df))
+z = Z[i]
+fig,ax = plt.subplots()
+ax.barh(topics,z)
+ax.set_yticks(topics)
+ax.set_title('True label: %s'%df.iloc[i]['labels'])
+print(wrap(df.iloc[i]['text']))
+```
+
+93. Non-Negative Matrix Factorization (NMF) Intuition
+- Outline
+  - Recommender system and how matrix factorization arises
+  - Connection to topic models
+- Recommender systems
+  - At netflix, you want to recommend movies to users
+  - Good recommendation is a movie that a user would rate highly
+  - task: predict movie rate
+  - Rating matrix
+    - How to store ratings in a useful way
+    - M user * N movie -> MxN matrix
+      - A sparse matrix: not zero but missing elements
+  - Matrix factorization
+    - Decompose matrix R (MxN) into W (MxK) and H(KxN)
+  - Why non-negative?
+    - Non-negative amount of documents/words
+
+94. Topic Modeling with Non-Negative Matrix Factorization (NMF) in Python
+```py
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import nltk
+import textwrap
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import NMF
+nltk.download('stopwords')
+stops = set(stopwords.words('english'))
+stops = stops.union({'said','would','could','told','also','one','two','mr','new','year'})
+df = pd.read_csv('bbc_text_cls.csv')
+vectorizer = TfidfVectorizer(stop_words=stops)
+X = vectorizer.fit_transform(df['text'])
+nmf = NMF( n_components=10, beta_loss='kullback-leibler', solver='mu',
+         # alpha_W = 0.1
+         # alpha_H=0.1,
+         #l1_ratio = 0.5,
+         random_state=0,)
+nmf.fit(X)
+def plot_top_words(model,feature_names, n_top_words=10):
+    fig,axes = plt.subplots(2,5,figsize=(30,15),sharex=True)
+    axes = axes.flatten()
+    for topic_idx, topic in enumerate(model.components_):
+        top_features_ind = topic.argsort()[: -n_top_words -1 : -1]
+        top_features = [feature_names[i] for i in top_features_ind]
+        weights = topic[top_features_ind]
+        ax = axes[topic_idx]
+        ax.barh(top_features,weights,height=0.7)
+        ax.set_title(f"Topic {topic_idx + 1}",fontdict={"fontsize":30})
+        ax.invert_yaxis()
+        ax.tick_params(axis="both",which="major",labelsize=20)
+        for i in "top right left".split():
+            ax.spines[i].set_visible(False)
+        fig.suptitle('NMF',fontsize=40)
+    plt.subplots_adjust(top=0.90,bottom=0.05,wspace=0.90,hspace=0.3)
+    plt.show()
+feature_names=vectorizer.get_feature_names_out()
+plot_top_words(nmf, feature_names)
+Z = nmf.transform(X)
+# pick a random document then check which topics are associated with it
+np.random.seed(0)
+i = np.random.choice(len(df))
+z = Z[i]
+topics = np.arange(10) + 1
+fig,ax = plt.subplots()
+ax.barh(topics,z)
+ax.set_yticks(topics)
+ax.set_title('True label: %s' % df.iloc[i]['labels']);
+def wrap(x):
+    return textwrap.fill(x,replace_whitespace=False,fix_sentence_endings=True)
+print(wrap(df.iloc[i]['text']))
+i = np.random.choice(len(df))
+z = Z[i]
+fig,ax = plt.subplots()
+ax.barh(topics,z)
+ax.set_yticks(topics)
+ax.set_title('True label: %s'%df.iloc[i]['labels'])
+print(wrap(df.iloc[i]['text']))
+```
+
+95. Topic Modeling Section Summary
+- Topic modeling is unsupervised, and conceptually similar to clustering
+- For LDA, a new topic is sampled for every word, but for mixture models (ie clustering) only one topic per document
+- NMF - derived from recommender systems
+
 ## Section 13: Latent Semantic Analysis
+
+96. LSA/LSI Section Introduction
+- Synonymy: multiple words mean the same thing: run vs sprint
+- Polysemy: one word means many things: bank
+- Synonymy and polysemy in NLP
+
+97. SVD(Singular Value Decomposition) Intuition
+- Basically it finds eigen values/vectors
+- Useful for
+  - Visualizing data
+  - Reducing dimensionality
+  - Finding the bet rotation of your data poitns
+
+98. LSA/LSI: Applying SVD to NLP
+- LSA/LSI is what we get when we apply SVD to a term-document or document-term matrix
+  - Also reduces redundant dimensions
+- Synonymy & Polysemy
+  - SVD appears to help
+```py
+from sklearn.decomposition import TruncatedSVD
+model = TruncatedSVD(n_components=2)
+model.fit(X) # train/fit the model
+model.fit(X.T) # may use term-document matrix if you want word vectors instead of document vectors
+Z = model.transform(X) # transform data
+Z = model.fit_transform(X)  # all in one step
+# Z is a NxK matrix
+```
+
+99. Latent Semantic Analysis/Latent Semantic Indexing in Python
+- wget -nc https://raw.githubusercontent.com/lazyprogrammer/machine_learning_examples/master/nlp_class/all_book_titles.txt
+```py
+import numpy as np
+import matplotlib.pyplot as plt
+import nltk
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import TruncatedSVD
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+wordnet_lemmatizer = WordNetLemmatizer()
+titles = [line.rstrip() for line in open('all_book_titles.txt')]
+stops = set(stopwords.words('english'))
+stops = stops.union({'introduction','edition', 'series', 'application', \
+                     'approach','card','access','package','plus','etext',\
+                    'brief', 'vold','fundamental','guide','essential','printed',\
+                    'third','second','fourth','volume'})
+vectorizer = CountVectorizer(binary=True, tokenizer=my_tokenizer)
+X = vectorizer.fit_transform(titles)
+index_word_map = vectorizer.get_feature_names_out()
+X = X.T
+svd = TruncatedSVD()
+Z = svd.fit_transform(X)
+!pip install plotly
+import plotly.express as px
+fig = px.scatter(x=Z[:,0], y=Z[:,1],text=index_word_map,size_max=60)
+fig.update_traces(textposition='top center')
+fig.show()
+```
+
+100. LSA/LSI Exercises
+- Recommender
+  - We built a recommender system using TF-IDF vectors
+  - We may reduce high dimensions using SVD
+    - Old: Text -> TFIDF -> NN Search
+    - New: Text -> TFIDF -> LSA -> NN Search
+  - From:
+  ```py
+  model.fit(Xtrain,Ytrain)
+  model.score(Xtest,Ytest)
+  ```
+  - To:
+  ```py
+  Ztrain = svd.fit_transform(Xtrain)
+  Ztest = svd.transform(Xtest)
+  model.fit(Ztrain, Ytrain)
+  model.score(Ztest, Ytest)
+  ```
+- Topic modeling
+  - NMF: X(NxD) = W(NxK) * H(KxD)
+    - Z = W = nmf.fit_transform(X)
+  - SVD: X(NxD) = U(NxK) * S(KxK) * V^T(KxD)
+    - Z = US = svd.fit_transform(X)
+- Text Summarization
+  - Generic text summarization using relevance measure and latent semantic analysis: https://www.cs.bham.ac.uk/~pxt/IDA/text_summary.pdf
+  - Using Latent Sematic Analysis in Text Summarization and Summary Evaluation: http://textmining.zcu.cz/publications/isim.pdf
 
 ## Section 14: Deep Learning 
 
+101. Deep Learning Introduction (Intermedate-Advanced)
+- Instead of bag-of-words(or TF_IDF) we'll use embeddings
+- Instead of Markov assumption, there is no limit on how much of the past can influence the future
+- Instead of linear models (eg SVD) to find hidden factors, we'll use nonlinear neural networks
+
 ## Section 15: The Neuron
 
-## Section 16: Forward Aritficial Neural Networks
+102. The neuron - Section Introduction
+
+103. Fitting a line
+```py
+import numpy as np
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from tensorflow.keras.layers import Dense,Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+N=100
+X = np.random.random(N)*6 - 3
+y = 0.5*X - 1 + np.random.randn(N)*0.5
+plt.scatter(X,y);
+# build model
+i = Input(shape=(1,))
+x = Dense(1)(i)
+model = Model(i,x)
+model.summary()
+```
+```bash
+Model: "model"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 1)]               0         
+                                                                 
+ dense (Dense)               (None, 1)                 2         
+                                                                 
+=================================================================
+Total params: 2
+Trainable params: 2
+Non-trainable params: 0
+```
+```py
+model.compile(loss='mse', # optimizer='adam',
+             optimizer=Adam(learning_rate=0.1), metrics=['mae'])
+r = model.fit(X.reshape(-1,1),y, epochs=200, batch_size=32,)
+plt.plot(r.history['loss'],label='loss')
+plt.legend()
+plt.plot(r.history['mae'],label='mae')
+plt.legend()
+# Make predictions
+Xtest = np.linspace(-3,3,20).reshape(-1,1)
+ptest = model.predict(Xtest)
+plt.scatter(X,y)
+plt.plot(Xtest,ptest);
+model.layers
+model.layers[1].get_weights()
+```
+
+104. Classification code preparation
+- Classification vs Regression
+  - Classification
+  ```py
+  i = Input(shape=(D,))
+  x = Dense(1, activation='sigmoid')(i)
+  model = Model(i,x)
+  model.compile( loss = 'binary_crossentropy',
+  optimizer='adam', metrics=['accuracy'])
+  ```
+  - Regression
+  ```py
+  i = Input(shape=(D,))
+  x = Dense(1)(i)
+  model = Model(i,x)
+  model.compile(loss='mse',optimizer='adam',
+  metrics=['mae'])
+  ```
+- Classification vs Regression (Better model)
+  - Classification
+  ```py
+  i = Input(shape=(D,))
+  x = Dense(1)(i)
+  model = Model(i,x) # logits
+  model.compile( loss = BinaryCrossentropy(from_logits=True),
+  optimizer='adam', metrics=['accuracy'])
+  ```
+    - When we call model.predict(x), we won't get probabilities, just logits
+  - Regression
+  ```py
+  i = Input(shape=(D,))
+  x = Dense(1)(i)
+  model = Model(i,x)
+  model.compile(loss='mse',optimizer='adam',
+  metrics=['mae'])
+  ```
+
+105. Text classification in Tensorflow
+- wget -nc https://lazyprogrammer.me/course_files/AirlineTweets.csv
+```py
+import numpy as np
+import pandas as pd
+import seaborn as sn
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.losses import BinaryCrossentropy
+from tensorflow.keras.optimizers import Adam
+np.random.seed(0)
+tf.random.set_seed(0)
+df = pd.read_csv('AirlineTweets.csv')
+df = df[['airline_sentiment','text']]
+df = df[df['airline_sentiment'] != 'neutral'].copy()
+# we ignore neutral. Only positive/negative
+target_map = {'positive':1, 'negative':0}
+df['target'] = df['airline_sentiment'].map(target_map)
+df_train, df_test = train_test_split(df, random_state=42)
+vectorizer = TfidfVectorizer(max_features=2000)
+X_train = vectorizer.fit_transform(df_train['text'])
+X_test = vectorizer.transform(df_test['text'])
+# data must not be a sparse matrix before passing into tensorflow
+X_train = X_train.toarray()
+X_test = X_test.toarray()
+Y_train = df_train['target']
+Y_test = df_test['target']
+# input dimension
+D = X_train.shape[1]
+# build model
+i = Input(shape=(D,))
+x = Dense(1)(i) # sigmoid included in loss
+model = Model(i,x)
+model.summary()
+```
+```bash
+Model: "model"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 2000)]            0         
+                                                                 
+ dense (Dense)               (None, 1)                 2001      
+                                                                 
+=================================================================
+Total params: 2,001
+Trainable params: 2,001
+Non-trainable params: 0
+```
+```py
+model.compile(loss=BinaryCrossentropy(from_logits=True),
+             optimizer=Adam(learning_rate=0.01),
+             metrics=['accuracy'])
+r = model.fit(X_train, Y_train, validation_data=(X_test,Y_test),
+             epochs=40, batch_size=128,)
+plt.plot(r.history['loss'],label='train loss')
+plt.plot(r.history['val_loss'],label='val loss')
+plt.legend()
+```
+- Loss in validation is higher than train data, mostly
+```py
+P_train = ((model.predict(X_train)>0)*1.0).flatten()
+P_test = ((model.predict(X_test)>0)*1.0).flatten()
+cm = confusion_matrix(Y_train,P_train, normalize='true')
+cm
+def plot_cm(cm):
+    classes = ['negative','positive']
+    df_cm = pd.DataFrame(cm,index=classes,columns=classes)
+    ax = sn.heatmap(df_cm,annot=True,fmt='g')
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Target")
+plot_cm(cm) # visualization of confusion matrix
+Pr_train = model.predict(X_train)
+Pr_test = model.predict(X_test)
+print("Train AUC:", roc_auc_score(Y_train, Pr_train))
+print("Test AUC:", roc_auc_score(Y_test, Pr_test))
+print("Train F1:", f1_score(Y_train,P_train))
+print("Test F1:", f1_score(Y_test, P_test))
+model.layers
+model.layers[1].get_weights()
+w = model.layers[1].get_weights()[0]
+word_index_map = vectorizer.vocabulary_
+word_index_map
+threshold = 2
+print("Most positive words:")
+word_weight_tuples = []
+for word, index in word_index_map.items():
+    weight = w[index,0]
+    if weight > threshold:
+        word_weight_tuples.append((word,weight))
+word_weight_tuples = sorted(word_weight_tuples, key=lambda x: -x[1])
+for i in range(10):
+    word, weight = word_weight_tuples[i]
+    print(word,weight)
+```
+```bash
+Most positive words:
+thank 9.758769
+thanks 9.350326
+worries 8.377552
+great 7.9241176
+awesome 7.3513083
+love 7.24788
+excellent 7.100903
+kudos 6.668351
+amazing 6.452141
+best 6.1277895
+```
+```py
+print("Most negative words:")
+word_weight_tuples = []
+for word, index in word_index_map.items():
+    weight = w[index,0]
+    if weight <- threshold:
+        word_weight_tuples.append((word,weight))
+word_weight_tuples = sorted(word_weight_tuples, key=lambda x: x[1])
+for i in range(10):
+    word, weight = word_weight_tuples[i]
+    print(word,weight)
+```
+```bash
+Most negative words:
+worst -9.336878
+paid -7.7332788
+not -7.647549
+rude -7.5337653
+disappointed -7.238078
+website -6.832616
+nothing -6.830954
+hung -6.7087426
+instead -6.569802
+weren -6.2182674
+```
+- Apply this method into spam detection data set
+
+106. The neuron
+- All or nothing principle
+
+107. How does a model learn?
+- Error = cost = loss
+- Gradient descent
+- How to choose learning rate?
+  - Hyperparameter
+  - Mostly trial and error
+
+108. The neuron - section summary
+
+## Section 16: Feedforward Aritficial Neural Networks
+
+109. ANN - Section Introduction
+- Basis for CNN/RNN
+- Model architecture
+  - How does a feedforward neural netowrk work?
+  - What is its equation?
+- The geometric picture
+  - How does this relate back to machine learning is nothing but a geometry problem?
+- Activation functions
+  - These are what make neural networks more powerful
+- Multiclass classification
+  - More than binary classification
+
+110. Forward propagation
+
+111. The Geometrical Picture
+- Automatic feature engineering
+
+112. Activation Functions
+- Sigmoid: sigma(a) = 1 /(1+ exp(-a))
+  - May not be efficient at some case
+  - Center is 0.5
+- tanh(a) = (exp(2a)-1) / (exp(2a)+1)
+  - Center is zero
+- Vanishing gradient problem
+  - The derivative of sigmoid is max 0.25
+  - In deep layers, many derivatives by chain-rules
+    - Update becomes slower for hundreds of layers
+    - Greedy layer-wise pretraining
+  - Use ReLU (Rectifier linear unit)
+     - Dead neuron problem
+     - It works though
+     - ELU, RELU, ... Softplus
+- Machine learning is experimentation, not philosophy
+
+113. Multiclass Classification
+- Probability distribution over K distinct values
+  - Probability must be >= 0
+  - Sum of probability must be 1.0
+- Softmax function instead of sigmoid
+
+| Task            | Activation function |
+|-----------------|---------------------|
+| Regression            | None/identity |
+| Binary classification | Sigmoid       |
+| Multiclass classification | Softmax   |
+
+- Softmax is more general - can be used in binary classification as well
+
+114. ANN Code Preparation
+```py
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras.models import Model
+df = pd.read_csv('bbc_text_cls.csv')
+# map classes into integers from 0...K-1
+df['labels'].astype("category").cat.codes
+df['targets'] = df['labels'].astype("category").cat.codes
+df_train,df_test = train_test_split(df,test_size=0.3)
+tfidf = TfidfVectorizer(stop_words='english')
+Xtrain = tfidf.fit_transform(df_train['text'])
+Xtest = tfidf.transform(df_test['text'])
+Ytrain = df_train['targets']
+Ytest = df_test['targets']
+# number of classes
+K = df['targets'].max() + 1
+K
+# input dimensions
+D = Xtrain.shape[1]
+# build model
+i = Input(shape=(D,))
+x = Dense(300,activation='relu')(i)
+x = Dense(K)(x) # softmax included in loss
+model = Model(i,x)
+model.summary()
+model.compile(
+  loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+  optimizer='adam',metrics=['accuracy'])
+# data must not be sparse matrix before passing into tf
+Xtrain = Xtrain.toarray()
+Xtest = Xtest.toarray()
+r = model.fit( Xtrain, Ytrain, validation_data=(Xtest,Ytest), epochs=7,
+             batch_size=128,)
+# Plot loss per iteration
+plt.plot(r.history['loss'],label='train_loss')
+plt.plot(r.history['val_loss'],label='val_loss')
+plt.legend()
+# Plot accuralcy per iteration
+plt.plot(r.history['accuracy'],label='train_accuracy')
+plt.plot(r.history['val_accuracy'],label='val_accuracy')
+plt.legend()
+df['labels'].hist()
+```
+- Exercise with Sentiment analysis
+
+115. Text Classification ANN in Tensorflow
+- Text preprocssing Keras API
+- Review of Text preprocessing steps
+  - Tokenize text
+  - Assign integer ID to each token
+  - We don't do stemming, lemmatization, stopwords in deep learning applications
+- Padding is necessary in TF to have same length of array
+  - Jagged arrays are not allowed
+  - Padding in the front is required for RNN as past is ignored
+
+116. Text Preprocessing Code Preparation
+
+117. Text Preprocessing in Tensorflow
+```py
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+sentences = [ "I like eggs and ham.", "I love chocolate and bunnies.",
+            "I hate onions."]
+MAX_VOCAB_SIZE=20000
+tokenizer = Tokenizer(num_words=MAX_VOCAB_SIZE)
+tokenizer.fit_on_texts(sentences)
+sequences = tokenizer.texts_to_sequences(sentences)
+print(sequences)
+tokenizer.word_index
+print(sequences) # 0 for padding
+tokenizer.word_index
+data = pad_sequences(sequences)
+print(data)
+MAX_SEQUENCE_LENGTH = 5
+data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
+print(data) #padding in the head
+data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH, padding='post')
+print(data) #padding in the end
+```
+
+118. Embeddings
+- Embedding layer is much more efficient than an entire dense layer (matrix) calculation
+
+119. CBOW(Advanced)
+- word2vec
+  - This allows us to use embeddings with ANNs
+- CBOW (Continuous bag of words) variant
+  - One sentence description: use surrounding words to predict middle word
+
+120. CBOW Exercise Prompt
+```py
+import gensim.downloader as api
+dataset=api.load("text8")
+```
+- Already tokenized dataset
+
+121. CBOW in Tensorflow(Advanced)
+```py
+import gensim.downloader as api
+dataset=api.load("text8")
+type(dataset)
+i=0
+for x in dataset:
+    i += 1
+print(i)    
+doc_lengths = []
+for x in dataset:
+    l = len(x)
+    doc_lengths.append(l)
+import matplotlib.pyplot as plt
+plt.hist(doc_lengths, bins=50)
+import numpy as np
+np.mean(doc_lengths), np.std(doc_lengths)
+from tensorflow.keras.preprocessing.text import Tokenizer
+vocab_size = 20_000
+tokenizer = Tokenizer(num_words=vocab_size)
+tokenizer.fit_on_texts(dataset)
+sequences = tokenizer.texts_to_sequences(dataset)
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from tensorflow.keras.layers import Dense, Input, Embedding, Lambda
+from tensorflow.keras.models import Model
+import random
+random.seed(1)
+np.random.seed(1)
+tf.random.set_seed(1)
+# build model
+context_size = 10
+embedding_dim = 50
+i = Input(shape=(context_size,))
+x = Embedding(vocab_size, embedding_dim)(i) # NxTxD
+x = Lambda(lambda t: tf.reduce_mean(t,axis=1))(x) # NxD
+x = Dense(vocab_size, use_bias=False)(x)
+model = Model(i,x)
+model.summary()
+```
+```bash
+Model: "model"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 10)]              0         
+                                                                 
+ embedding (Embedding)       (None, 10, 50)            1000000   
+                                                                 
+ lambda (Lambda)             (None, 50)                0         
+                                                                 
+ dense (Dense)               (None, 20000)             1000000   
+                                                                 
+=================================================================
+Total params: 2,000,000
+Trainable params: 2,000,000
+Non-trainable params: 0
+```
+```py
+half_context_size = context_size //2
+def data_generator(sequences, batch_size=128):
+    X_batch = np.zeros((batch_size, context_size))
+    Y_batch = np.zeros(batch_size)
+    n_batches = int(np.ceil(len(sequences)/batch_size))
+    while True:
+        random.shuffle(sequences)
+        for i in range(n_batches):
+            batch_sequences = sequences[i*batch_size:(i+1)*batch_size]
+            current_batch_size = len(batch_sequences)
+            for ii in range(current_batch_size):
+                seq = batch_sequences[ii]
+                j = np.random.randint(0, len(seq)-context_size-1)
+                x1 = seq[j:j+half_context_size]
+                x2 = seq[j+half_context_size +1:j+context_size+1]
+                X_batch[ii,: half_context_size] = x1
+                X_batch[ii, half_context_size:] = x2
+                y = seq[j+half_context_size]
+                Y_batch[ii] = y
+            yield X_batch[:current_batch_size], Y_batch[:current_batch_size]
+model.compile(
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+    optimizer='adam', metrics=['accuracy'])
+batch_size = 128
+# may take > 1hr for epochs=10000
+r = model.fit(
+    data_generator(sequences, batch_size),
+    epochs = 10,
+    steps_per_epoch=int(np.ceil(len(sequences)/batch_size)))
+plt.plot(r.history['loss'],label='train_loss')
+plt.legend()
+# Plot accuracy per iteration
+plt.plot(r.history['accuracy'],label='train_accuracy')
+plt.legend()
+embeddings = model.layers[1].get_weights()[0]
+embeddings
+from sklearn.neighbors import NearestNeighbors
+neighbors = NearestNeighbors(n_neighbors=5,algorithm='ball_tree')
+neighbors.fit(embeddings)
+queen_idx = tokenizer.word_index['queen']
+queen = embeddings[queen_idx:queen_idx+1]
+distances,indices = neighbors.kneighbors(queen)
+indices
+for idx in indices[0]:
+    word = tokenizer.index_word[idx]
+    print(word)
+#queen
+#career
+#sign
+#decided
+#allows
+# testing king - man == queen - woman ? => to get better results, increase epochs as 10,000
+def get_embedding(word):
+    idx = tokenizer.word_index[word]
+    return embeddings[idx:idx+1]
+king = get_embedding('king')
+man = get_embedding('man')
+woman = get_embedding('woman')
+query = king - man + woman
+distances, indices = neighbors.kneighbors(query)
+for idx in indices[0]:
+    word = tokenizer.index_word[idx]
+    print(word)
+
+```
+
+122. ANN - Section Summary
+
+123. Aside: How to Choose Hyperparameters (Optional)
 
 ## Section 17: Convolutional Neural Networks
 
