@@ -6,7 +6,6 @@
 
 1. About the course
 
-
 ## Section 2: Pointers - Introduction to Basics
 
 2. Introduction to Pointers + General Visualization
@@ -922,7 +921,6 @@ int main() {
 
 155. An array of Pointers to Functions
 ```c
-
 #include <stdio.h>
 void add(int x, int y) {
   printf("%d + %d = %d\n", x,y,x+y);
@@ -945,14 +943,285 @@ int main() {
 
 ## Section 17: Files - Advanced Content
 
+156. Functions for working and finding File's location
+- myFile.txt
+```bash
+Hello
+Welcome
+```
+- File pointer : H/e/l/l/o/\n/W/e/l/c/o/m/e
+- Working with File's location
+  - tell: current position of the file pointer
+  - seek: Moves the position to left or right
+  - rewind: moves the position to the beginning of the file
+
+157. Common things to note when working with Sequential (Textual) files
+```txt
+1 Mike US 21
+2 Christina Germany 35
+3 David Canada 28
+```
+- Change the coutry of Christina as US
+
+158. Introduction to Structured Files
+```c
+struct Point {
+  int x, y
+}
+```
+
+159. Writing a Structure Record to a File
+```c
+#include <stdio.h>
+typedef struct point {
+  int x;
+  int y;
+} Point;
+int main() {
+  Point p = {3,5};
+  FILE *fp = fopen("myfile.bin","wb");
+  if (fp != NULL) {
+    printf("File is opened\n");
+    fwrite(&p, sizeof(Point), 1, fp);
+    fclose(fp);
+  }
+  return 0;
+}
+```
+
+160. Writing 2 Points read from the user to a file
+```c
+#include <stdio.h>
+typedef struct point {
+  int x;
+  int y;
+} Point;
+int main() {
+  Point p1, p2;
+  FILE *fp = NULL;
+  printf("Enter x1: "); scanf("%d", &p1.x);
+  printf("Enter y1: "); scanf("%d", &p1.y);
+  printf("Enter x2: "); scanf("%d", &p2.x);
+  printf("Enter y2: "); scanf("%d", &p2.y);
+  fp = fopen("myFile2.bin","wb");
+  if (fp != NULL) {
+    printf("File is opened\n");
+    fwrite(&p1, sizeof(Point), 1, fp);
+    fwrite(&p2, sizeof(Point), 1, fp);
+    fclose(fp);
+  }
+  return 0;
+}
+```
+- For 1,2,3,4 inputs, ghex shows as '01 00 00 00 02 00 00 00 03 00 00 00 04 00 00 00'
+
+161. Writing an array of points to a file
+```c
+#include <stdio.h>
+typedef struct point {
+  int x;
+  int y;
+} Point;
+int main() {
+  Point pArr[5] = {{1,2},{3,4},{5,6},{7,8},{9,10}};
+  FILE *fp = NULL;
+  fp = fopen("myFile3.bin","wb");
+  if (fp != NULL) { 
+    printf("File is opened\n");
+    fwrite(&pArr, sizeof(Point), 5, fp);
+    fclose(fp);
+  }
+  return 0; 
+}
+```
+
+162. Search for a specific point in a file Reading
+```c
+#include <stdio.h>
+typedef struct point {
+  int x;
+  int y;
+} Point;
+int main() {
+  Point tP;
+  Point pFile;
+  FILE *fp = fopen("myFile3.bin","rb");
+  printf("What is the point you're looking for?\n");
+  printf("Enter x:");
+  scanf("%d", &tP.x);
+  printf("Enter y:");
+  scanf("%d", &tP.y);
+  if (fp != NULL) {
+    while (!feof(fp)) {
+      fread(&pFile, sizeof(Point), 1, fp);
+      if ((pFile.x == tP.x) && (pFile.y == tP.y)) printf("Found\n");
+    }
+    fclose(fp);
+  }
+  return 0;
+}
+```
+
+163. Edit a specific point in the file
+```c
+#include <stdio.h>
+typedef struct point {
+  int x;
+  int y;
+} Point;
+int main() {
+  Point m_p;
+  int choice;
+  printf("what is the point you would like to edit? (1-5)\n");
+  scanf("%d", &choice);
+  FILE *fp = fopen("myFile3.bin","rb+");
+  if (fp != NULL) {
+    fseek(fp, (choice-1)*sizeof(Point), SEEK_SET);
+    printf("Enter new x: ");
+    scanf("%d", &m_p.x);
+    printf("Enter new y: ");
+    scanf("%d", &m_p.y);
+    fwrite(&m_p, sizeof(Point), 1, fp);
+    fclose(fp);
+  }
+  return 0;
+}
+```
+
 ## Section 18: Enums
+
+164. Enums - Part 1
+```c
+#include <stdio.h>
+#define _CRT_SECURE_NO_WARNINGS
+enum workingDays
+{
+  MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY
+};
+int main() {
+  int userDay;
+  printf("Please enter the day you worked:");
+  scanf("%d", &userDay);
+  if (userDay == MONDAY) // instead of 0
+    printf("Monday ...\n");
+  else printf("other days\n");
+  return 0;
+}
+```
+
+165. Enums - Part 2
+```c
+#include <stdio.h>
+#define _CRT_SECURE_NO_WARNINGS
+enum months
+{
+  JAN=1, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEPT, OCT, NOV, DEC
+// now enum begins from 1, not zero
+};
+int main() {
+  enum months month;
+  char *monthsNames[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  int salaries[12] = {51,52,53,54,55,56,57,58,59,60,61,62};
+  for( month=JAN; month<=DEC; month++)
+  {
+    printf("%s%10d\n", monthsNames[month-1], salaries[month-1]);
+  }
+  return 0;
+}
+```
+- In Enums, same value for multiple keywords is allowed
+  - `enum months { JAN=0, FEB=0, MAR=1, APR=1, MAY=2, JUN=3, JUL=3, AUG=4, SEPT=4, OCT=5, NOV=6, DEC=6 };`
 
 ## Section 19: Constants & Pointers Masterclass
 
+166. Constants - General Intro + Usage
+- `const age = 35;` == `const int age = 35;`
+- `const int *ptr;`
+  - The value of ptr cannot be changed
+- `int *const ptr;`
+  - The pointer is constant while the value can be changed
+- `const int *const ptr;`
+  - The address/value cannot be changed
+
+167. Constants - Why & When + Example
+- Why do we need constants?
+  - Performance
+  - Defense from bug
+  - Code readability
+- When do we need constants?
+  - Whenever possible
+    - Compiler will optimize accordingly
+  - When further change in value is not expected
+- Why use constants, not literal numbers?
+  - Best practice for readability
+```c
+#include<stdio.h>
+void findAvg1(int *Arr, int size);
+void findAvg2(const int *Arr, const int size);
+int main()
+{
+  int Grades[3] = {80,90,85};
+  int n = 3;
+  findAvg1(Grades, n);
+  findAvg2(Grades, n);
+  return 0;
+}
+```
+- findAvg1() and findAvg2() yield following assembly
+```assembly
+ 43:	e8 00 00 00 00       	callq  48 <main+0x48>
+  48:	8b 55 e8             	mov    -0x18(%rbp),%edx
+  4b:	48 8d 45 ec          	lea    -0x14(%rbp),%rax
+  4f:	89 d6                	mov    %edx,%esi
+  51:	48 89 c7             	mov    %rax,%rdi
+  54:	e8 00 00 00 00       	callq  59 <main+0x59>
+  59:	b8 00 00 00 00       	mov    $0x0,%eax
+  5e:	48 8b 4d f8          	mov    -0x8(%rbp),%rcx
+```
+
 ## Section 20: Counting Arrays - Part #2 - Practice exercises functions
+
+168. Function - FreqAsValue - Question
+- Develop a function that receives an array of integers, its size, and some value k. The array consists of values b/w 0 and k (included)
+- The function should check and return 1, if the number of occurrence of any value in the array equals to the value itself. Otherwise, return 0
+- [1,2,2,1,4,3]: k=4, return 0
+- [3,2,2,1,3,3]: k=3, return 1
+
+169. Function - FreqAsValue - Solution
+```c
+int FreqAsValue(const int *Arr, const int N, const int k)
+{
+  int count[k]; // better to use dynamic memory as size k might be unknown at compile time
+  int j;
+  for (int i=0;i<k;i++) count[i] = 0;
+  for (int i=0;i<N;i++)
+  {
+    j = Arr[i];
+    count[j]++;
+  }
+  for (int i=0;i<k;i++)
+  {
+    if (count[i] != 0 && count[i] != i) return 0;
+    // if (count[i] != i) return 0; this is better
+  }
+  return 1;
+}
+```
+
+170. Function - FindDominantValue - Question
+171. Function - FindDominantValue - Solution
+
+172. Function - FindSpecificValueMaxSum - Question
+173. Function - FindSpecificValueMaxSum - Solution
+
+174. Function - FindLargestMissingValue - Question
+175. Function - FindLargestMissingValue - Solution
+
+176. Function - areAllCharactersIncluded - Question
+177. Function - areAllCharactersIncluded - Solution
 
 ## Section 21: Optional: Introduction to bitwise operations
 
-## Section 22: OPtional: Basic Algorithms
+## Section 22: Optional: Basic Algorithms
 
 ## Section 23: Congratulations! You've made it! What's next?
