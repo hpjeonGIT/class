@@ -1162,12 +1162,12 @@ int main()
 {
   int Grades[3] = {80,90,85};
   int n = 3;
-  findAvg1(Grades, n);
+  findAvg1(Grades, n); // see assembly below
   findAvg2(Grades, n);
   return 0;
 }
 ```
-- findAvg1() and findAvg2() yield following assembly
+- Calling findAvg1() and findAvg2() yields following assembly. Note that using const in findAvg2 use less instructions
 ```assembly
  43:	e8 00 00 00 00       	callq  48 <main+0x48>
   48:	8b 55 e8             	mov    -0x18(%rbp),%edx
@@ -1209,19 +1209,318 @@ int FreqAsValue(const int *Arr, const int N, const int k)
 ```
 
 170. Function - FindDominantValue - Question
+- From a sequence of natural numbers and the size of array.
+- The values b/w 0 and up to the size
+- May return a dominant value but if not existing, then return -1
+  - Dominant value: a value whose appearances in the array is more than the half of array size
+  - [5,3,4,3,3] returns 3
+  - [3,5,4,2,3] returns -1
+
 171. Function - FindDominantValue - Solution
+```c
+#include<stdio.h>
+#include<stdlib.h>
+int FindDominant(const int *Arr, const int N) 
+{
+  int *count;
+  int half = N/2;
+  count = (int*)malloc(sizeof(int)*N); // size must be N+1, including 0
+  // assert(count);// this is recommended
+  for (int i=0;i<N;i++) count[i] = 0;
+  for (int i=0;i<N;i++) count[Arr[i]]++; // actually this will violate the size of array due to '5'
+  for (int i=0;i<N;i++)  // N=> N+1 or i <=N 
+  {
+    if (count[i] > half) 
+      { free(count); return i;}
+  }
+  free(count);
+  return -1;
+}
+```
 
 172. Function - FindSpecificValueMaxSum - Question
+- Receives an array of integer and its size
+- Values are [0:size]
+- Returns a specific value max sum
+  - For a value, sum of all the same values in the array then the results will be the maximum among them. Return the corresponding value
+  - [2,1,3,2,4,2,1], sum of 2 = 6, sum of 1 = 2, sum of 3 =3, sum of 4= 4. Returns 2
+  - [2,1,3,2,4,2,7], returns 7
+
 173. Function - FindSpecificValueMaxSum - Solution
+```c
+#include<stdio.h>
+#include<stdlib.h>
+int FindSpecificValueMaxSum(const int *Arr, const int N) 
+{
+  int *sumArr;
+  sumArr = (int*)malloc(sizeof(int)*(N+1));
+  //assert(sumArr);
+  int rvalue = 0;
+  int maxSum = 0;
+  for (int i=0;i<(N+1);i++) sumArr[i] = 0;
+  for (int i=0;i<(N);i++) sumArr[Arr[i]] += Arr[i];
+  for (int i=0;i<(N+1);i++) 
+  {
+    if (sumArr[i] > maxSum)
+      { 
+        maxSum = sumArr[i];
+        rvalue = i; 
+        printf("%d %d\n",maxSum, rvalue);
+      }
+  }
+  free(sumArr);
+  return rvalue;
+}
+```
 
 174. Function - FindLargestMissingValue - Question
+- Receives an array and its size (=n)
+- Values are non-negative and not greater than the size (=n)
+- Find the largest missing value (<=n)
+  - [2,1,3,2,4,2,7] returns 6
+  - [2,1,2,4,5,6,7] returns 3
+
 175. Function - FindLargestMissingValue - Solution
+```c
+#include<stdio.h>
+#include<stdlib.h>
+#include<assert.h>
+int FindLargestMissingValue(const int *Arr, const int N) 
+{
+  int *cArr;
+  cArr = (int*)malloc(sizeof(int)*(N+1));
+  assert(cArr);
+  int maxIdx = 0;
+  for (int i=0;i<(N+1);i++) cArr[i] = 0;
+  for (int i=0;i<(N);i++) cArr[Arr[i]] ++;
+  for (int i=0;i<(N+1);i++) 
+  {
+    if (cArr[i] == 0) 
+      { 
+        if (i>maxIdx) maxIdx = i; // if we loop over (i=N;i>=0;i--) we don't need this if () statement
+      }
+  }
+  free(cArr);
+  return maxIdx;
+}
+```
 
 176. Function - areAllCharactersIncluded - Question
+- Receives 2 sequences of lower case letters and their sizes
+- Returns 1 if all the letters of the first sequence appear in the second sequence. Otherwise, returns 0
+- {'d','o','g'}, {'g','o','o','d'} returns 1
+- {'d','o','g'}, {'c','a','t'}  returns 0
+- {'l','o','l'}, {'l','o','r','d'} returns 0
+
 177. Function - areAllCharactersIncluded - Solution
+```c
+include<stdio.h>
+#include<stdlib.h>
+#include<assert.h>
+int areAllCharactersIncluded(const char *Arr1, const int n1, 
+                             const char *Arr2, const int n2) 
+{
+  int* cArr1 = malloc(sizeof(int)*n1); assert(cArr1);
+  int* cArr2 = malloc(sizeof(int)*n2); assert(cArr2);
+  for (int i=0;i<n1;i++) cArr1[i] = 0;
+  for (int i=0;i<n2;i++) cArr2[i] = 0;
+  for (int i=0;i<n1;i++) 
+  {
+    char a = Arr1[i];
+    for (int j=0;j<n2;j++)
+    {
+      char b = Arr2[j];
+      if (a == b && cArr2[j] == 0) {
+        cArr1[i]++;
+        cArr2[j]++;
+        break;
+      }
+    }
+  }
+  int csum = 0;
+  for (int j=0; j<n2;j++) 
+  {
+    if (cArr1[j] == 1) csum++;
+  }
+  if (csum == n1) return 1;
+  else return 0;
+}
+```
+- This requires NxM iterations, which is very expensive
+- Linearize using the ascii value wise
+  - Over 26 array of ascii value, ++ when found in array 1
+  - -- when found in array 2
+  - May check left-over to sort out which index is empty or redundant
 
 ## Section 21: Optional: Introduction to bitwise operations
 
+178. Introduction to Bitwise operations + NOT operator
+
+179. The AND bitwise operator
+
+| input1 | input 2 | output|
+|--------|---------|-------|
+|0       | 0       |0      |
+|0       | 1       |0      |
+|1       | 0       |0      |
+|1       | 1       |1      |
+
+180. The OR bitwise operator
+
+| input1 | input 2 | output|
+|--------|---------|-------|
+|0       | 0       |0      |
+|0       | 1       |1      |
+|1       | 0       |1      |
+|1       | 1       |1      |
+
+181. The XOR bitwise operator and its relation to TOGGLE
+
+| input1 | input 2 | output|
+|--------|---------|-------|
+|0       | 0       |0      |
+|0       | 1       |1      |
+|1       | 0       |1      |
+|1       | 1       |0      |
+
+182. Using NOT, AND, OR, XOR in your own programming language
+
+183. Demonstration in CC++ - Bitwise NOT, AND, OR, XOR
+```c
+#include <stdio.h>
+#include <stdlib.h>
+int main()
+{
+	char x = 5; // To represnt just 1 byte of information.  0101
+	char y = 7;                                             0111
+	char output1 = ~x;    // Bitwise NOT  1010
+	char output2 = x & y; // Bitwise AND  0101
+	char output3 = x | y; // Bitwise OR   0111
+	char output4 = x ^ y; // Bitwise XOR  0010
+	printf("%d\n", x); // => 5
+	printf("%d\n", y); // => 7
+	printf("%d\n", output1); // => -6
+	printf("%d\n", output2); // => 5
+	printf("%d\n", output3); // => 7
+	printf("%d\n", output4); // => 2
+}
+```
+
+184. Introduction to Bit Masks
+- Bitmask (masking): some number like 10011101
+- Masking: 
+  - Extracts/understands specific bits in the value (using bitwise AND)
+  - Sets specific bits in the value (using bitwise OR)
+  - Toggles specific bits in the value  (using bitwise XOR)
+
+185. Finding the rightmost digit using a masking bitwise AND
+- Value: 10110100 (<-rightmost bit)
+- Mask:  00000001
+- Value AND Mask = Right-most bit of the value decides the results
+  - Zero or not
+
+186. Finding the leftmost digit usinga  masking bitwise AND
+- Value: (leftmost digit->) 10110100 
+- Mask:                     10000000
+- Value AND Mask = Left-most bit of the value decides the results
+  - Zero or not
+
+187. Finding specific combinations of bits in a value - using bit masking
+- Multiple locations of bits to compare
+- Need to compare (Value AND Mask) == (Mask)
+
+188. Introducing the Masking Process to Set Specific bits using bitwise OR operator
+
+189. Practicing Setting specific bits
+
+190. Masking Process to Turn-off Specific Bits using the AND bitwise operator
+
+191. Introducing the XOR operator for Toggle Functionality
+- Toggle:
+  - 0 => 1
+  - 1 => 0
+  - Bit XOR 1 => Toggle
+    - 0 XOR 1 => 1
+    - 1 XOR 1 => 0
+- Example
+  - Value: 10011010. We want to toggle 2nd bit only
+  - Mask:  01000000
+  - Value ^ Mask = 11011010
+
+192. Shift Left & Shift Right Operators
+- Bitwise left/right shift operators
+  - value0:  10110010
+- Left shift bitwise operator: `<<`
+  - Fill the end-bit with 0
+  - value = value0 << 1
+    - 01100100
+  - value = value0 << 3
+    - 10010000
+- Right shift bitwise operator: `>>`
+  - First bit is filled with 0 or 1 depending on machine
+
+193. Displaying a number in binary (using Bitwise Shift Operators) 
+
+194. Implementing Bitwise Right Rotation
+- Pseudo-code:
+```
+mask = 00000001
+right_most_bit = value & mask
+value = value >> 1
+if right_most_bit == 1:
+  mask = mask << 7
+  value = value | mask
+```
+
+195. Implementing Bitwise Left Rotation
+- Pseudo-code:
+```
+mask = 10000000 (or 1 << 7)
+left_most_bit = value & mask
+value = value << 1
+if left_most_bit == 1:
+  value = value | 00000001
+```
+
+196. Ingterview Level questions: Exercise - Implement Swap using Bitwise Operations
+- Swapping a=0101 and b=0111
+- c = a; a=b; b=c
+  - How can we swap without c?
+
+197. Solution - Implement Swap using Bitwise Operations - without Third Variable
+- AND: turn OFF (1->0)
+- OR: turn ON (0->1)
+- XOR: toggle
+- a = a XOR b = 0010
+- b = b XOR a = 0101
+- a = b XOR a = 0111
+  - We don't need 3rd variable like c
+```c
+#include <stdio.h>
+int main() 
+{ int a= 2,b=7;
+  printf("a = %d b = %d\n", a, b);
+  a = a^b;
+  b = b^a;
+  a = b^a;
+  printf("a = %d b = %d\n", a, b);
+  return 0; 
+}
+```
+
 ## Section 22: Optional: Basic Algorithms
 
+198. Merge Functionality - General Introduction
+- Input A: 1,3,4,7
+- Input B: 2,5,8
+- Output C: 1,2,3,4,5,7,8
+
+199. Merge Functionality in C
+
+200. Merge in Place - General Introduction - Basis for Merge Sort
+
+201. Merge in Place - Practical Implementation - Part A
+
 ## Section 23: Congratulations! You've made it! What's next?
+
+202. Bonus Lecture
