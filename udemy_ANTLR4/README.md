@@ -274,6 +274,8 @@ ANS= 2
 ```
 13. Introduction to Labels
 - Labels are mechanisms that help us to clarify the code
+- Must be the first character as Capital and the others are small
+- Must be consistent through visitor function names
 ```
 expr : expr PLUS expr
     | NUM
@@ -420,11 +422,327 @@ ANS= 3
 ```
 
 16. Interpreter for the Division
+- MUL and DIV have higher priorties than PLUS and SUB
+  - Make sure the order in the rule 2
+- Expr.g
+```g4
+grammar Expr;
+root: expr EOF ;
+expr: expr MUL expr  # Mul
+    | expr DIV expr  # Div
+    | expr PLUS expr # Sum
+    | expr SUB expr  # Sub
+    | NUM            # Value
+    ;
+NUM : [0-9]+ ;
+PLUS: '+' ;
+SUB : '-' ;
+MUL : '*' ;
+DIV : '/' ;
+WS  : [ \n]+ -> skip ;
+```
+- visitor.py
+```py
+if __name__ is not None and "." in __name__:
+  from .ExprParser import ExprParser
+  from .ExprVisitor import ExprVisitor
+else:
+  from ExprParser import ExprParser
+  from ExprVisitor import ExprVisitor
+class ElementalVisitor(ExprVisitor):
+  def visitRoot(self,ctx):
+    print("Root Visited")
+    l = list(ctx.getChildren())
+    print("ANS=",self.visit(l[0]))
+  def visitValue(self,ctx):
+    print("NUM found")
+    l = list(ctx.getChildren())
+    return int(l[0].getText())
+    l = list(ctx.getChildren())
+  def visitMul(self,ctx):
+    print("MUL found")
+    l = list(ctx.getChildren())
+    return self.visit(l[0]) * self.visit(l[2])
+  def visitDiv(self,ctx):
+    print("DIV found")
+    l = list(ctx.getChildren())
+    return self.visit(l[0]) / self.visit(l[2])
+  def visitSum(self,ctx):
+    print("PLUS found")
+    l = list(ctx.getChildren())
+    return self.visit(l[0]) + self.visit(l[2])
+  def visitSub(self,ctx):
+    print("SUB found")
+    l = list(ctx.getChildren())
+    return self.visit(l[0]) - self.visit(l[2])
+```
+- test.py is same above
+- Testing:
+```bash
+$ python3 test.py 
+? 1 + 2*6/3 - 2
+Root Visited
+SUB found
+PLUS found
+NUM found
+DIV found
+MUL found
+NUM found
+NUM found
+NUM found
+NUM found
+ANS= 3.0
+```
 
 ## Section 6: Interpreter with Variables
 
+17. Initial Interpreter - Grammar
+- We want a folling evaluation/execution mechanism
+```
+x := 3 + 5
+write x
+y := 6 - 4
+write y
+```
+  - Assignment or print command
+  - Use a dictionary as a symbol table 
+```py
+import opertor
+ops = {'+': operator.add, '-': operator.sub, \
+       '*': operator.mul, \
+       '/': operator.truediv, '^': operator.pow }
+```
+  - [a-z]+ : positive Kleene's Closure. 1 or more
+  - [a-z]* : 0 or more
+- Expr.g
+```g4
+grammar Expr;
+root: action+ EOF;
+action: NAME ':=' expr
+      | 'write' NAME
+      ;
+expr: <assoc=right> expr '^' expr
+    | expr ('*'|'/') expr
+    | expr ('+'|'-') expr  
+    | NUM
+    ;
+NUM:  [0-9]+;
+NAME: [a-z]+;
+WS  : [ \n]+ -> skip ;
+```
+- `antlr4 -Dlanguage=Python3 -no-listener -visitor Expr.g`
+
+18. Initial Interpreter - Vistor
+- Define a visitor for the evaluation/execution mechanism above
+- VarVisitor.py
+```py
+import operator
+ops = {'+': operator.add, '-': operator.sub,'*': operator.mul, '/': operator.truediv, '^': operator.pow }
+if __name__ is not None and "." in __name__:
+  from .ExprParser import ExprParser
+  from .ExprVisitor import ExprVisitor
+else:
+  from ExprParser import ExprParser
+  from ExprVisitor import ExprVisitor
+class VarVisitor(ExprVisitor):
+  def __init__(self):
+    self.myvars = {}
+  def visitRoot(self,ctx):
+    print("Root Visited")
+    l = list(ctx.getChildren())
+    for a in l:
+      print(self.visit(a))
+  def visitExpr(self,ctx):
+    print("Expr found")
+    l = list(ctx.getChildren())
+    if len(l) == 1: # when NUM
+      return int(l[0].getText())
+    else:
+      return (ops[l[1].getText()](self.visit(l[0]),self.visit(l[2])))
+  def visitAction(self,ctx):
+    l = list(ctx.getChildren())
+    if len(l) == 3: # assignment =>  Name := expr
+      if (l[1].getText() == ':='):
+        self.myvars[l[0].getText()] = self.visit(l[2])
+        return 'assignment to ' + l[0].getText()
+      else:
+        return 'ERROR'
+    else: # when len(l) == 2, PRINT
+      if (l[0].getText() == 'write'):
+        return str(self.myvars[l[1].getText()])
+      else:
+        return 'ERROR'
+```
+
+19. Initial Interpreter - Python script
+- A file passed as a paramter: 
+  - `input_stream = FileStream(sys.argv[1])`
+- script.py
+```py
+from antlr4     import *
+from ExprLexer  import ExprLexer
+from ExprParser import ExprParser
+from VarVisitor import VarVisitor
+import sys
+input_stream = FileStream(sys.argv[1])
+lexer = ExprLexer(input_stream)
+token_stream = CommonTokenStream(lexer)
+parser = ExprParser(token_stream)
+tree = parser.root()
+visitor = VarVisitor()
+visitor.visit(tree)
+```
+- input.txt
+```
+a := 3 + 8
+write a
+b := 4*7
+write b
+```
+- Testing:
+```bash
+$ python3 script.py input.txt 
+Root Visited
+Expr found
+Expr found
+Expr found
+assignment to a
+11
+Expr found
+Expr found
+Expr found
+assignment to b
+28
+None
+```
+
 ## Section 7: Interpreters with Conditional Recognition
+
+20. Interpreter 1 - Grammar
+- Define the grammar of an interpreter to evaluate the conditional structure if-else with the less strict (<) and greater strict (>) operators
+- Also the interpreter must be able to print
+```
+if 2 < 3
+print 8
+else print 5
+```
+- Condition.g
+```g4
+grammar Condition;
+root: action+ EOF;
+action: 'if' expr action ('else' action)? # Condition
+     | 'print' expr                       # Print
+     ;
+expr: expr GT expr  # Gt
+    | expr LT expr  # Lt
+    | NUM           # Value
+    ;
+GT: '>' ;
+LT: '<' ;
+NUM: [0-9]+ ;
+WS: [ \t\r\n]+ -> skip;
+```
+
+21. Interpreter 1 - Visitor
+- `antlr4 -Dlanguage=Python3 -no-listener -visitor Condition.g`
+- Visitor.py
+```py
+if __name__ is not None and "." in __name__:
+  from .ConditionParser import ConditionParser
+  from .ConditionVisitor import ConditionVisitor
+else:
+  from ConditionParser import ConditionParser
+  from ConditionVisitor import ConditionVisitor
+class Visitor(ConditionVisitor):
+  def visitRoot(self,ctx):
+    print("Root Visited")
+    l = list(ctx.getChildren())
+    for a in l:
+      self.visit(a)
+  def visitCondition(self,ctx):
+    l = list(ctx.getChildren())
+    if self.visit(l[1]) == 1: # if true
+      self.visit(ctx.action(0))
+    elif len(l) > 3: # having else condition
+      if ctx.getChild(3).getText() == 'else':
+        self.visit(ctx.action(1))
+  def visitPrint(self,ctx):
+    l = list(ctx.getChildren())
+    print(self.visit(l[1])) # Need to visit expr
+  def visitGt(self,ctx):
+    l = list(ctx.getChildren())
+    return int(self.visit(l[0]) > self.visit(l[2]))
+  def visitLt(self,ctx):
+    l = list(ctx.getChildren())
+    return int(self.visit(l[0]) < self.visit(l[2]))
+  def visitValue(self,ctx):
+    print("Value = ", ctx.NUM().getText())
+    return int(ctx.NUM().getText())
+```
+- script.py
+```py
+import sys
+from antlr4     import *
+from ConditionLexer  import ConditionLexer
+from ConditionParser import ConditionParser
+from Visitor         import Visitor
+input_stream = FileStream(sys.argv[1])
+lexer = ConditionLexer(input_stream)
+token_stream = CommonTokenStream(lexer)
+parser = ConditionParser(token_stream)
+tree = parser.root()
+visitor = Visitor()
+visitor.visit(tree)
+```
+- input.txt
+```
+if 2 < 3
+print 8
+else print 5
+if 7 > 9
+print 7
+else print 9
+```
+- Testing:
+```bash
+$ python3 script.py input.txt 
+Root Visited
+Value =  2
+Value =  3
+Value =  8
+8
+Value =  7
+Value =  9
+Value =  9
+9
+```
+
+22. Interpreter 2 - Grammar
+- Define the grammar of an interpreter to evalulate the conditional structure if-else with the operators less strict (<), greater strict (>), (==) equality and non equality (!=)
+- There are two existing instructions: write and next
+```
+iff 2==3
+write 8
+otherwise
+write 5
+```
+- write prints a given expression
+- next prints the next number after evaluating the expression
+
+23. Interpreter 2 - Visitor
 
 ## Section 8: Interpreters with While
 
+24. Loop Recognition - Grammar
+
+25. Loop Recognition - Visitor
+
 ## Section 9: Final Programming Language
+
+26. Introduction to the Project
+
+27. Bazilio Program Example
+
+28. Presentation of the Bazilio Programming Language
+
+29. Specification of Bazilio Programming Language
