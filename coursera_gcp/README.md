@@ -1,5 +1,8 @@
 # Google Cloud Fundamentals:  Core Infrastructure training course. 
 
+# Week 1
+
+## Course Introduction
 - In the end of training,
 1. Identify the purpose and value of Google Cloud products and services
 2. Choose among and use application deployement environments on Goolge Cloud
@@ -7,15 +10,15 @@
 4. Interact with Google Cloud Services
 5. Describe ways in which customers have used Google Cloud
 
+# Week 2
+
 ### Cloud Computing Overview
-
 - Cloud computing definitinos by NIST
-1. Customers get computing resources that are on-demand and self-service
-2. Customers get access to those resources over the internet, from anywhere
-3. The provide of those resources allocates them to users out of that pool
-4. Resources are elastic-which means that they're flexible, so customers can be
-5. Customers pay only for what they use, or reserve as they go
-
+  1. Customers get computing resources that are on-demand and self-service
+  2. Customers get access to those resources over the internet, from anywhere
+  3. The provide of those resources allocates them to users out of that pool
+  4. Resources are elastic-which means that they're flexible, so customers can be
+  5. Customers pay only for what they use, or reserve as they go
 - Why cloud?
   1. Colocation
   2. Virtualized data center
@@ -39,12 +42,11 @@
 2. Lowest possible latencies
 3. 100+ content caching nodes worldwide
 4. High demand content is cached for quicker access
-
-Google cloud 5 geological locations
-- US, South America, Europe, Asia, Australia
-- Locations -> Regions -> Zones
-- Multi-region applications 
-- 103 zones over 34 Regions
+- Google cloud 5 geological locations
+  - US, South America, Europe, Asia, Australia
+  - Locations -> Regions -> Zones
+  - Multi-region applications 
+  - 103 zones over 34 Regions
 
 ## Environmental Impact
 - 2% of world's electricity
@@ -437,6 +439,151 @@ Google cloud 5 geological locations
 - Container based workflow vs source-based workflow
   - Cloud run can remove the headache regarding the building containers
 
-  # Week 8
+# Week 8
 
-  ## Development in the cloud
+## Development in the cloud
+- Google Cloud methods for development
+  - Cloud source repositories
+    - Run own git instances
+    - Use a hosted git provider
+    - Or cloud source repo using App Engine and Compute Engine
+      - Diagnostics tools such as debugger/error reporting
+  - Cloud functions
+    - Example: uploaded images might converted into different formats, generating thumbnails
+    - Lightweight, event-based, async compute solution
+    - Create small, single-purpose functions that respond to cloud events
+  - Terraform
+
+## Development: Infrastructure as code
+- Creating environment
+  - Time consuming and labor-intensive
+  - Use template (Terraform)
+- Create a template file using HashiCorp Configuration Language (HCL) that describes what the components of the environment must look like
+- Terraform uses that template to determine the actions needed to create the environment you template describes
+
+# Week 9
+
+## The importance of monitoring
+- Monitoring is the foundation of product reliability
+  - Reveals what needs urgent attention
+  - Shows trends in application usage patterns
+  - Helps improve an application experience
+
+## Measuring performance and reliability
+- Four golden signals
+  - Latency
+    - Directly affects the user experience
+    - Indicates emerging issues
+    - Tied to capacity demands
+    - Measures system improvements
+    - How to measure?
+      - Page load latency
+      - Query duration
+      - Service response time
+      - Transaction duration
+      - Time to first response
+  - Traffic
+    - Indicates the system demand
+    - Historic trends for capacity planning
+    - Core measure for calculating infrastructure spend
+    - Measurement
+      - N. of HTTP requests per second
+      - N. of requests for static/dynamic content
+      - Network IO
+      - N. of concurrent sessions
+      - N. of transactions per second
+      - N. of retrievals per second
+      - N. of active requests
+      - N. of write/read ops
+      - N. of active connections
+  - Saturation
+    - Indicates how full the service is
+    - Focuses on the most constrained resources
+    - Tied to degrading performance as capacity is reached
+    - Metric
+      - % memory utilization
+      - % thread pool utilization
+      - % cache utilization
+      - % disk utilization
+      - % CPU utilization
+      - Disk quota
+      - Memory quota
+      - N. of available connections
+      - N. of users on the system
+  - Error
+    - Indicates that something is failing
+    - Indicates confugraion/capacity issues
+    - Indicates service level objective violations
+    - May mean that it is time to send an alert
+    - Metric
+      - Wrong answers or incorrect content
+      - N. of 400/500 HTTP codes
+      - N. of failed requests
+      - N. of exceptions
+      - N. of stack traces
+      - Servers that fail liveness checks
+      - N. of dropped connections
+
+## Understanding SLIs, SLOs, and SLAs
+- SLI (Service Level Indicator)
+  - Metrics for service reliability
+  - N. of good events / count of all valid events
+- SLO (Service Level Objective)
+  - Metrics for target reliability
+  - Specific
+  - Measurable
+  - Achievable
+  - Relavant
+  - Time-bound
+- SLA (Service Level Agreement)
+  - Commitments made to your customers that your systems and applications will have only a certain amount of down time
+  - The minimum levels of service that you promise to provide to your customers
+  - What happens when you break that promise
+    - Ex: Refund at longer outage
+
+## Integrated observability tools
+- Monitoring
+- Logging
+- Error reporting
+- Debugging
+
+## Monitoring tools
+- A thousand of streams of metric data in Google cloud
+- Cloud monitoring
+  - Provides visibility into the performance, uptime, and overall health of cloud powered applications
+  - Collects metrics, events, and metadata from projects, logs, services, systems, agents, custom code, and various applications like Cassandra, Nginx, Apach web server, ...
+  - Ingests data and generates insights
+
+## Logging tools
+- Cloud logging
+  - Collect
+  - Store
+  - Search
+  - Analyze
+  - Monitor
+  - Alert
+- Type of logs
+  - Cloud audit logs
+    - Who did what, where?
+    - Admin activity
+    - Data access
+    - System event
+    - Access transparency
+  - Agent logs
+    - Fluentd agent: Compute Engine, ...
+  - Network logs
+    - VPC flow
+    - Firewall rules
+    - NAT gateway
+  - Service logs
+    - Standard Out/Error
+
+## Error reporting and debugging tools
+- Error reporting
+  - Counts, analyzes, and aggregates the crashes in your running cloud services
+  - Time chart, occurences, affected user acount, ...
+- Cloud profiler
+
+# Week 10
+
+## Course summary
