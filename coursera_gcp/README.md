@@ -20,12 +20,12 @@
   4. Resources are elastic-which means that they're flexible, so customers can be
   5. Customers pay only for what they use, or reserve as they go
 - Why cloud?
-  1. Colocation
-  2. Virtualized data center
-  3. Container based architecture
+  1. Colocation: finance the rent service
+  2. Virtualized data center: user configure/controlled environment
+  3. Container based architecture: now available to GCP customers
 - Every company will be a data company eventually
 
-### IAAS/PAAS
+### IaaS/PaaS
 - IaaS offers
   1. Raw Compute
   2. Storage
@@ -34,6 +34,10 @@
 - PaaS offers
   1. Library
   - Customers pay for what they use
+- Serverless cloud service
+  - Developers focus on code
+- Cloud functions
+- Cloud run
 - SaaS
   - Runs on cloud like gmail/google doc
 
@@ -43,7 +47,8 @@
 3. 100+ content caching nodes worldwide
 4. High demand content is cached for quicker access
 - Google cloud 5 geological locations
-  - US, South America, Europe, Asia, Australia
+  - North America, South America, Europe, Asia, Australia
+    - Availability, durability, latency
   - Locations -> Regions -> Zones
   - Multi-region applications 
   - 103 zones over 34 Regions
@@ -75,9 +80,13 @@
     - SW development practices
 
 ## Open source ecosystems 
+- Google publishes key elements of technology using open source licenses to create ecosystems
+  - Tensorflow
+  - Kubernetes
 
 ## Pricing and Billing 
 - Per-second billing
+  - cloud.google.com/products/calculator
 - Can create alerts per Budgets
 - Reports/quotas available
   - Rate or allocation quota
@@ -91,12 +100,13 @@
 | Level 4 | Organization node |
 | Level 3 | Folder |
 | Level 2 |  Project |
-| Level 1 | Resoruces (table, bucket, ...) |
+| Level 1 | Resources (table, bucket, ...) |
 
+- Policy is inherited from top to bottom
 - Each project is billed separately
-- Project ID cannot be changed
-- Project Name is user-created
-- Project number is globally unique and used internally
+  - Project ID cannot be changed
+  - Project Name is user-created
+  - Project number is globally unique and used internally
 - Resource management tool
   - Gather a list of projects
   - Create/Update/delete projects
@@ -110,15 +120,25 @@
 - IAM role
   - Basic: owner, editor, viewier, billing admin
     - Might be too broad for sensitive data sharing
-  - Predefined
-  - Custom
-    - Least privilege model
+  - Predefined: specific gcp service such as instance admin
+  - Custom: more specific
+    - Least privilege model in many companies
+    - Instance operator role: only runs but cannot configure
+      - Create custom permission
+      - Apply project or organization level
 
 ## Service accounts
+- Role to VM, not account
+  - Named with an email address
+  - Use cryptographic keys
 
 ## Cloud Identity
 - Gmail account -> Google cloud console -> Google Groups
+  - When one person leaves the company, how do you disable that account?
+    - Lots of complexity
 - With Cloud Identity, organizations can define policies and manage their users and groups using the Google Admin console
+  - Can use the same credentials of existing LDAP or active directory
+  - Can disable any account when necessary
 
 ## Interacting with Google Cloud
 - Google cloud console
@@ -132,22 +152,20 @@
   - Debian based VM with a persistent 5GB home directory
 - APIs
   - Goole APIs Explorer shows what APIs are available
-  - Java, Python, PHP, C#, GO, Node.js, Ruby, C++
+  - Allows code to be written to control
+    - Java, Python, PHP, C#, GO, Node.js, Ruby, C++
 - Cloud Mobile app
   - Start, stop and use SSH to connect into compute engine instances
   - Stop and start Cloud SQL instances
   - Up to date billing information
   - Alerts and incidence management
 
-## Coursera: Getting started with Google Cloud platform and Qwiklabs
-
 # Week 4
 
 ## Virtual Private Cloud networking
 - Virtual Private Cloud (VPC)
   - Can run code, store data, host websites, ...
-- VPC networks connect Google Cloud resources to each other and to the internet
-- Example
+- Google VPC networks are global and can have subnets in any GCP region worldwide
   - Over two zones in a single region
     - Can be resilient to disruptions
 
@@ -172,6 +190,9 @@
   - Built in
   - No router provisioning or managing
   - Forward traffic from one instance to another
+- Firewall
+- VPC peering can be built b/w two VPCs allowing exchange traffics
+- Shared VPC can be configured to allow IAM to control VPC
 
 ## Cloud Load Balancing
 - Cloud load balancing
@@ -182,8 +203,8 @@
 
 ## Cloud DNS and Cloud CDN
 - 8.8.8.8: public DNS
-- Edge caches: 
-- Cloud CDN
+- Edge caches: caching service
+  - Can accelerate Cloud CDN
   - Low network latency
 
 ## Connecting networks to Google VPC
@@ -254,7 +275,8 @@
 - Unlimited storage
 - Worldwide accessibility and location
 - Low latency and high durability
-- GEo redundancy
+- A uniform experience
+- Geo redundancy
 - No minimum fee
 - Pay only for what you use
 - Encrypts data on the server side
@@ -287,6 +309,7 @@
 - Flexible
 - Horizontally scalable
 - NoSQL cloud database
+  - Data -> Documents -> Collection
 
 ## Cloud Bigtable
 - NoSQL big data database service
@@ -298,7 +321,7 @@
   - NoSQL data
 
 ## Comparing storage options
-- Cloud storage: image, movies, ...
+- Cloud storage: image, movies, ... of PBytes
 - Cloud SQL: Up to 64TB, customer order, ...
 - Spanner: Petabytes
 - Firestore: Terabytes
@@ -324,8 +347,11 @@
 ## Kubernetes
 - Kubernetes
   - Open source platform for managing containerized workloads and services
+  - Makes it easy to orchestrate many containers on many hosts, scale them as microservices, and deploy rollouts and rollbacks
   - A set of APIs to deploy containers on a set of nodes called a cluster
 - A pod: smallest unit in Kubernetes
+  - Unique IP
+  - May have multiple containers
 
 ## Google Kubernetes Engine (GKE)
 - GKE 
@@ -337,6 +363,13 @@
   - Monitor workload health
 
 ## Hybrid and multi-cloud
+- Typical on-premises architecture
+  - Systems and workloads are housed on-premises
+  - Lots of steps to upgrade on-premises systems
+  - Lifespan would be 3-5 years
+- How to relocate some workload?, not moving entire?
+- How to adopt service from cloud?
+  - Modern hybrid or multi-cloud architecture
 
 ## Anthos
 - A hybrid and multi-cloud solution
@@ -362,10 +395,11 @@
   - Health checks
   - Application logging
   - User authentication API
-- Provides SD
+- Provides SDK
   - APIs and libraries
   - Sandbox environment on your local computer
   - Deployment tools
+  - SDK manages your application locally, and the Google Cloud Console manages your application in production
 - Use Cloud console's web-based interface
   - Create new applications
   - Configure domain names
@@ -587,3 +621,49 @@
 # Week 10
 
 ## Course summary
+
+
+# Other notes
+
+## NFS at GCP
+- https://medium.com/scientific-breakthrough-of-the-afternoon/set-up-your-own-private-cloud-storage-with-nfs-and-google-compute-engine-c67ab9667b5b
+- Cloud storage FUSE
+  - https://cloud.google.com/storage/docs/gcs-fuse
+- Use Filestore
+  - NAS/shared file system
+  - For HPC
+  - Not FIRESTORE
+
+
+## Microservices vs. monolithic architecture
+- https://www.atlassian.com/microservices/microservices-architecture/microservices-vs-monolith
+- Monolithic architecture: traditional model of a SW program
+  - Easy deployment
+  - Easy to develop
+  - Easy/simple testing/debugging
+  - Hard to scale
+  - Lack of flexibility
+- Microservices architecture: Relies on a series of independently deployable services
+  - Decouples major business, domain specific concerns into separate, independent code bases
+  - Agile
+  - Flexible scaling
+  - Continuous deployment
+  - Exponential infrastructure cost due to complexity of each component
+  - Additional organization overhead
+  - Lack of standardization
+  - Lack of clear ownership
+
+## Iaas vs Paas vs Saas
+- https://www.bigcommerce.com/articles/ecommerce/saas-vs-paas-vs-iaas/
+- IaaS
+  - Ex: AWS EC2, GCP Compute engine
+  - Pro: Pay as much as you allocate.
+  - Con: Legacy system might not be compatible. Might be complicated
+- PaaS
+  - Ex: AWS elastic beanstalk, Google App engine
+  - Pro: Platform is available instantaneously. Can be customized.
+  - Con: Might be hard to integrate, runtime might not be optimized
+- SaaS
+  - Ex: gmail, google calendar
+  - Pro: Service is available instantaneously, scalable
+  - Con: Might be hard to integrate/customize
