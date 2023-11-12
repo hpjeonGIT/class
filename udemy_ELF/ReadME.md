@@ -469,13 +469,336 @@ $ hexdump -C ./a.out |grep -A7 42d0
 00004360  38 03 00 00 00 00 00 00  38 03 00 00 00 00 00 00  |8.......8.......|
 ```
 
-
 23. What is a program header?
+- Program header: chunk of segments containing section in a segmented way
+  - Used by OS and dynamic linker
+- Sections are for static linking purpose
+```bash
+$ readelf --wide -l ./a.out
+Elf file type is DYN (Shared object file)
+Entry point 0x1080
+There are 13 program headers, starting at offset 64
+Program Headers:
+  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+  PHDR           0x000040 0x0000000000000040 0x0000000000000040 0x0002d8 0x0002d8 R   0x8
+  INTERP         0x000318 0x0000000000000318 0x0000000000000318 0x00001c 0x00001c R   0x1
+      [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]
+  LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x000658 0x000658 R   0x1000
+  LOAD           0x001000 0x0000000000001000 0x0000000000001000 0x000245 0x000245 R E 0x1000
+...
+  GNU_RELRO      0x002db0 0x0000000000003db0 0x0000000000003db0 0x000250 0x000250 R   0x1
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     
+   01     .interp 
+   02     .interp .note.gnu.property .note.gnu.build-id .note.ABI-tag .gnu.hash .dynsym .dynstr .gnu.version .gnu.version_r .rela.dyn .rela.plt 
+   03     .init .plt .plt.got .plt.sec .text .fini 
+   04     .rodata .eh_frame_hdr .eh_frame 
+   05     .init_array .fini_array .dynamic .got
+...
+   09     .note.gnu.property 
+   10     .eh_frame_hdr 
+   11     
+   12     .init_array .fini_array .dynamic .got 
+```
+- 13 segments contain section data
+- Flg shows Read/Write/Executable
+- 03rd segment contains .init .plt .plt.got .plt.sec .text .fini, which are executed
+- DYNAMIC section is RW
 
 ## Section 4: Binary (ELF) analysis tools and techniques
 
 24. Identifying hidden identity of files
+- A challenge scenario: figure out and analyze a given file
+```bash
+$ file TOP_secret 
+TOP_secret: ASCII text
+```
+- Let's decode: `base64 -d TOP_secret > decoded_file`
+```bash
+$ file decoded_file 
+decoded_file: Zip archive data, at least v1.0 to extract
+```
+- This is a zip file
+```bash
+$ unzip decoded_file
+Archive:  decoded_file
+ extracting: 8754657                 
+  inflating: top_secret              
+$ file top_secret 
+top_secret: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=ab009d7ad57bb8c013279dbc4b9e3a4c03e524d4, for GNU/Linux 3.2.0, not stripped
+$ file 8754657
+8754657: PNG image data, 206 x 24, 8-bit/color RGB, non-interlaced
+```
+- In this example, the image contains the passwd which is necessary to execute ./top_secret
+- Lessons: 
+  - Use `file` command to figure out the type of files
 
 25. Investigating library files of the ELF
+```bash
+$ file Challenge2 
+Challenge2: ASCII text
+$ base64 -d Challenge2 > decoded_file
+$ file decoded_file 
+decoded_file: Zip archive data, at least v2.0 to extract
+$ unzip decoded_file
+Archive:  decoded_file
+  inflating: test                    
+  inflating: b1                      
+$ file test
+test: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=01636c6f2307f167ecc588431e2e5db1bbd42463, for GNU/Linux 3.2.0, not stripped
+$ file b1
+b1: PNG image data, 132 x 24, 8-bit/color RGB, non-interlaced
+$ ldd test
+./test: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by ./test)
+	linux-vdso.so.1 (0x00007ffd88ae1000)
+	libconfidential.so => not found
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f841e40a000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f841e62b000)
+```
+- libconfidential.so is missing to run test executable
+- Let's check hexdump: `hexdump -C b1| less`
+- Check any contents of ELF:
+```bash
+$ hexdump -C b1| grep ELF
+000006a0  7f 45 4c 46 02 01 01 00  00 00 00 00 00 00 00 00  |.ELF............|
+``` 
+  - ELF is found. Let's extract those portions
+```bash  
+$ printf "%d\n" 0x6a0 # from hexdump of ELF portion
+1696
+$ dd skip=1696 if=b1 of=b2 bs=1
+15578+0 records in
+15578+0 records out
+15578 bytes (16 kB, 15 KiB) copied, 0.0309297 s, 504 kB/s
+$ file b2
+b2: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, BuildID[sha1]=0e66249c30b7b1cd2d24dab275bdc220f57866f1, not stripped
+$ readelf -h b2
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              DYN (Shared object file)
+  Machine:                           Advanced Micro Devices X86-64
+  Version:                           0x1
+  Entry point address:               0x0
+  Start of program headers:          64 (bytes into file)
+  Start of section headers:          13656 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               64 (bytes)
+  Size of program headers:           56 (bytes)
+  Number of program headers:         11
+  Size of section headers:           64 (bytes)
+  Number of section headers:         30
+  Section header string table index: 29
+```
+- Now rename b2 as libconfidential.so
+- `echo "__bitcode__" | base64 -d` to decode at CLI
 
 26. Hidden identification and extraction of ELF
+- Hidden binary inside of a binary
+```bash
+$ hexdump -C HelloWorld  | grep ELF
+00000000  7f 45 4c 46 02 01 01 00  00 00 00 00 00 00 00 00  |.ELF............|
+00003e60  00 00 00 42 58 3e 00 00  7f 45 4c 46 02 01 01 00  |...BX>...ELF....|
+00007cd0  00 00 7f 45 4c 46 02 01  01 00 00 00 00 00 00 00  |...ELF..........|
+```
+- 3 ELF's are found
+  - `.ELF` is magic 4bytes
+  - 2nd ELF begins at 3e60+8 bytes. We need to convert to decimal
+```bash
+$ printf "%d\n" 0x3e68 # 3e60 + 8 bytes
+15976
+$ dd skip=15976 if=HelloWorld of=f1 bs=1
+31940+0 records in
+31940+0 records out
+31940 bytes (32 kB, 31 KiB) copied, 0.0543647 s, 588 kB/s
+$ readelf -h f1
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  ...
+```
+- To make sure of the validity of the produced binary, run `readelf -h`
+
+27. Correct byte order extraction from the ELF
+- How to extract exact bytes from a given file?
+  - HelloHuman was 15960 bytes but now it shows 15962 bytes
+- `readelf -h HelloHuman` and check the details
+  - Size of section headers \* Number of section  headers = 64bytes \* 31 = 1984 bytes
+  - Add this to start of section headers (13976 bytes) = 13976+ 1984 = 15960 bytes
+  - This is the exact size of the file
+- `dd skip=0 count=15960 if=HelloHuman of=original_HH bs=1`
+  - Now the size matches and md5sum yields the same hash numbers
+
+28. Identification of printable characters in ELF
+```c
+#include<stdio.h>
+#include<string.h>
+int main() {
+  char pass[10]="P@ssWord";
+  char input[10];
+  int result;
+  printf("Input the password:");
+  scanf("%s",input);
+  result = strcmp(pass,input);
+  if (result ==0) printf("Correct\n");
+  else printf("Wrong\n");
+  return 0;
+}
+```
+- We use `strings` command
+  - Prints the sequences of printable characters in files
+```bash
+$ strings ./a.out
+/lib64/ld-linux-x86-64.so.2
+libc.so.6
+__isoc99_scanf
+...
+_ITM_registerTMCloneTable
+u+UH
+P@ssWordH ## <---------- Found !!!
+[]A\A]A^A_
+```
+
+29. Tracing Sys calls of an ELF
+- Sample assembly file
+```assembly
+.text
+.global _start
+_start:
+  mov $1, %rax
+  mov $1, %rdi
+  mov $msg, %rsi
+  mov $len, %rdx
+  syscall  # write syscall
+
+  mov $60, %rax
+  mov $0, %rdi
+  syscall  # exit syscall
+msg:
+  .ascii "Hello World from write syscall\n"
+len = . - msg
+```
+- Compiling:
+```bash
+$ as chap28.s -o h.o
+$ ld h.o -o h.exe
+$ ./h.exe 
+Hello World from write syscall
+```
+- Using strace:
+```bash
+$ strace ./h.exe
+execve("./h.exe", ["./h.exe"], 0x7fffd299c780 /* 62 vars */) = 0
+write(1, "Hello World from write syscall\n", 31Hello World from write syscall
+) = 31
+exit(0)                                 = ?
++++ exited with 0 +++
+$ strace -c ./h.exe  ## counts the number of syscalls (exit is not counted)
+Hello World from write syscall
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+  0.00    0.000000           0         1           write
+  0.00    0.000000           0         1           execve
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.000000                     2           total
+$ strace -e write ./h.exe  ## extracts write syscall only
+write(1, "Hello World from write syscall\n", 31Hello World from write syscall
+) = 31
++++ exited with 0 +++
+```
+
+30. Analysing instructions from disassembly of a binary
+- Analyzing the results of objdump
+  - Password inside of the executable
+- objdump -d a.exe
+  - From main:
+```as
+  401295:       e8 26 fe ff ff          callq  4010c0 <__isoc99_scanf@plt>
+  40129a:       48 8d 45 90             lea    -0x70(%rbp),%rax  ## result of scan
+  40129e:       48 89 c6                mov    %rax,%rsi
+  4012a1:       48 8d 05 7d 0d 00 00    lea    0xd7d(%rip),%rax        # 402025 <_IO_stdin_used+0x25>
+  4012a8:       48 89 c7                mov    %rax,%rdi
+```
+- Let's trace \%rax
+```as
+  4011d4:       48 b8 49 74 73 54 6f    movabs $0x6145306f54737449,%rax
+  4011db:       30 45 61
+  4011de:       48 ba 73 79 54 30 63    movabs $0x6361726330547973,%rdx
+  4011e5:       72 61 63
+```
+- As this is Little Endian, we need to change the position of hexa number
+  - `echo -e "\x49\x74\x73\x54\x6f\x30\x45\x61"`
+  - Using this way, we can deduce the password
+
+31. Dynamic analysis of Strings in ELF
+
+32. Dynamic disassembly vs static disassembly
+- Using gdb
+  - info file: find the Entry point
+    - Put a break point at the entry point
+  - set pagination off
+  - set logging on
+  - diplay /i $pc
+  - run
+  - while 1
+    - si
+    - end
+  - q
+- Check gdb.txt -> dynamic disassembly analysis
+- Using objdump is static disassembly analysis
+
+## Section 5: Code injection techniques in ELF
+
+33. Static code injectin in ELF
+- sample.c:
+```c
+#include <stdio.h>
+void abc() { printf("Hello from abc\n"); }
+int main() { printf("Hello from main\n"); return 0; }
+```
+- How to run abc()?
+- In hexa code, _start -> main
+```as
+0000000000001060 <_start>:
+    1060:	f3 0f 1e fa          	endbr64 
+    1064:	31 ed                	xor    %ebp,%ebp
+    1066:	49 89 d1             	mov    %rdx,%r9
+    1069:	5e                   	pop    %rsi
+    106a:	48 89 e2             	mov    %rsp,%rdx
+    106d:	48 83 e4 f0          	and    $0xfffffffffffffff0,%rsp
+    1071:	50                   	push   %rax
+    1072:	54                   	push   %rsp
+    1073:	4c 8d 05 76 01 00 00 	lea    0x176(%rip),%r8        # 11f0 <__libc_csu_fini>
+    107a:	48 8d 0d ff 00 00 00 	lea    0xff(%rip),%rcx        # 1180 <__libc_csu_init>
+    1081:	48 8d 3d d8 00 00 00 	lea    0xd8(%rip),%rdi        # 1160 <main>
+    1088:	ff 15 52 2f 00 00    	callq  *0x2f52(%rip)        # 3fe0 <__libc_start_main@GLIBC_2.2.5>
+    108e:	f4                   	hlt    
+    108f:	90                   	nop
+0000000000001160 <main>:
+    1160:	f3 0f 1e fa          	endbr64 
+    1164:	55                   	push   %rbp
+    1165:	48 89 e5             	mov    %rsp,%rbp
+    1168:	48 8d 3d a4 0e 00 00 	lea    0xea4(%rip),%rdi  
+$ hexdump -C ./a.out |grep "48 8d 3d d8"
+00001080  00 48 8d 3d d8 00 00 00  ff 15 52 2f 00 00 f4 90  |.H.=......R/....|
+Go to 1080 in hexedit
+0000000000001149 <abc>:
+    1149:	f3 0f 1e fa          	endbr64 
+    114d:	55                   	push   %rbp
+    114e:	48 89 e5             	mov    %rsp,%rbp
+    1151:	48 8d 3d ac 0e 00 00 	lea    0xeac(%rip),%rdi        # 2004 <_IO_stdin_used+0x4>
+    1158:	e8 f3 fe ff f
+```
+- Not working in 64bit
+    
+34. Understanding code injection technique inside the ELF
+- push point of the assembly is the entry point of the executable
+
