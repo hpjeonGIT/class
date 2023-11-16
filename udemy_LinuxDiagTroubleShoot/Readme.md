@@ -240,6 +240,8 @@ To free reclaimable slab objects (includes dentries and inodes):
 To free slab objects and pagecache:
 	echo 3 > /proc/sys/vm/drop_caches
 ```
+  - Dropping caches after slum job completion: https://lists.openhpc.community/g/users/topic/drop_caches_in_slurm_epilog/92634068?p=,,,20,0,0,0::recentpostdate/sticky,,,20,0,20,92634068,previd%3D1660875192566568171,nextid%3D1655315606927954914&previd=1660875192566568171&nextid=1655315606927954914
+  - Add `echo 3 > /proc/sys/vm/drop_caches` into /etc/slurm/slurm.epilog.clean script
 
 26. File system and Device mapper
 - Device mapper: create 1:1 mapping of blocks in one block device to blocks in another, logical block device
