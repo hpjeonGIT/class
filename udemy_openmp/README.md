@@ -651,9 +651,10 @@ int main() {
         fprintf(fpy, " %f ", fy[k]);
     free(fx); fclose(fpx);
     free(fy); fclose(fpy);
-}``` 
-![TDB](./46_TDG.png)
- 
+}
+``` 
+![TDG](./46_TDG.png)
+
 47. Problem 5 - Question A
 - Parallelization of FindBounds in histogram computation
 ```c
