@@ -17,13 +17,13 @@
 
 5. Task Dependency Graph
 - Task dependency graph:
-                - directed acyclic graph (no cycle. tree)
-                - node=task, its weight represents the amount of work to be done
-                - Edge=dependence, ie successor node can only execute after predecessor node has completed
+  - directed acyclic graph (no cycle. tree)
+  - node=task, its weight represents the amount of work to be done
+  - Edge=dependence, ie successor node can only execute after predecessor node has completed
 - Parallel machine abstraction
-                - P identical processors
-                - Each processor executes a node at a time
-                - T = \sum_nodes(work_node_i)
+  - P identical processors
+  - Each processor executes a node at a time
+  - T = \sum_nodes(work_node_i)
 - Critical path: path in the task graph with the highest accumulated work
 - Parallelism - T_1/T_inf, if sufficient processors are available
 - P_min is the minimum number of processors necessary to achieve parallelism
@@ -346,10 +346,65 @@ reduction(operator:list)
 ## Section 6: Solved Problems - OpenMP
 
 40. Problem 1 - Question A
-- Parallelize count_key()
+- Parallelize a following function
+```c
+long count_key(long Nlen, long *a, long key) {
+    long count = 0;
+    for (int i=0; i<Nlen; i++)
+      if (a[i] == key) count ++;
+    return count;
+}
+```
+- Datasharing
+```c
+long count_share(long Nlen, long *a, long key) {
+    long count = 0;
+    #pragma omp parallel reduction(+:count)
+    {
+    for (int i=0; i<Nlen; i++)
+      if (a[i] == key) count ++;
+    }
+    return count;
+}
+```
+- Iterative task decomposition
+```c
+long count_iter(long Nlen, long *a, long key) {
+    long count = 0;
+    #pragma omp taskloop num_tasks(omp_get_num_threads()) reduction(+:count)
+    for (int i=0; i<Nlen; i++)
+      if (a[i] == key) count ++;   
+    return count;
+}
+```
+41. Problem 1 - Question B
+- Recursive task decomposition (divide and conquer)
+```c
+long count_recur(long Nlen, long *a, long key, int depth) {
+    long tmp1=0, tmp2=0;
+    if (Nlen==1) {
+        if (a[0] == key) ++tmp1;
+    } else {
+        if (depth <3) { // CUTOFF depth = 3
+            #pragma omp task shared(tmp1)
+            tmp1 = count_recur(Nlen/2, a, key,depth+1);
+            #pragma omp task shared(tmp2)
+            tmp2 = count_recur(Nlen-Nlen/2, a+Nlen/2, key,depth+1);
+            #pragma omp taskwait
+        }
+        else {
+            tmp1 = count_recur(Nlen/2, a, key, depth+1);
+            tmp2 = count_recur(Nlen-Nlen/2, a+Nlen/2, key, depth+1);
+        }
+    }
+    return tmp1+tmp2;
+}
+```
+- Entire code:
 ```c
 #include <omp.h>
 #include <stdio.h>
+#include <stdlib.h>
 #define N 131072
 long count_key(long Nlen, long *a, long key) {
     long count = 0;
@@ -357,67 +412,338 @@ long count_key(long Nlen, long *a, long key) {
       if (a[i] == key) count ++;
     return count;
 }
+long count_share(long Nlen, long *a, long key) {
+    long count = 0;
+    #pragma omp parallel reduction(+:count)
+    {
+    for (int i=0; i<Nlen; i++)
+      if (a[i] == key) count ++;
+    }
+    return count;
+}
 long count_iter(long Nlen, long *a, long key) {
     long count = 0;
-    #pragma omp parallel reduction(+:count)
-    {
+    #pragma omp taskloop num_tasks(omp_get_num_threads()) reduction(+:count)
     for (int i=0; i<Nlen; i++)
-      if (a[i] == key) count ++;
-    }
+      if (a[i] == key) count ++;   
     return count;
 }
-long count_task(long Nlen, long *a, long key) {
-    long count = 0;
+long count_recur(long Nlen, long *a, long key, int depth) {
     long tmp1=0, tmp2=0;
-    if (Nlen>1000) {
-      #pragma omp task shared(tmp1)
-      tmp1 = count_task(Nlen/2, a, key);
-      #pragma omp task shared(tmp2)
-      tmp2 = count_task(Nlen/2, a+Nlen/2, key);
-      #pragma omp taskwait
-    } else tmp1 = count_key(Nlen,a,key);
+    if (Nlen==1) {
+        if (a[0] == key) ++tmp1;
+    } else {
+        if (depth <4) { // CUTOFF depth = 4
+            #pragma omp task shared(tmp1)
+            tmp1 = count_recur(Nlen/2, a, key,depth+1);
+            #pragma omp task shared(tmp2)
+            tmp2 = count_recur(Nlen-Nlen/2, a+Nlen/2, key,depth+1);
+            #pragma omp taskwait
+        }
+        else {
+            tmp1 = count_recur(Nlen/2, a, key, depth+1);
+            tmp2 = count_recur(Nlen-Nlen/2, a+Nlen/2, key, depth+1);
+        }
+    }
     return tmp1+tmp2;
 }
-long count_recur(long Nlen, long *a, long key) {
-    long count = 0;
-    #pragma omp parallel reduction(+:count)
-    {
-    for (int i=0; i<Nlen; i++)
-      if (a[i] == key) count ++;
-    }
-    return count;
-}
 int main() {
-    long a[N], key = 42, nkey = 0;
-    for (long i=0; i<N; i++) a[i] = random()*N;
+    long *a, key = 42, nkey = 0;
+    a = (long *) malloc(N*sizeof(long));
+    for (long i=0; i<N; i++) a[i] = random()%N;
     a[N%43] = key; a[N%73] = key; a[N%3] = key;
     #pragma omp parallel
-    {
-        #pragma omp single // prints only once
-        printf("Number of threads = %d\n", omp_get_num_threads());
-    }
+    #pragma omp single // prints only once
+    printf("Number of threads = %d\n", omp_get_num_threads());
     //
     double c0 = omp_get_wtime();
     nkey = count_key(N, a, key); // count key by sequentially
     printf("serial nkey = %d wall time = %f sec\n", nkey, omp_get_wtime() - c0);
     double c1 = omp_get_wtime();
     #pragma omp parallel
-    {
-       #pragma omp simgle
-       {
-         nkey = count_iter(N, a, key); // using iterative decomposition
-       }
-    }
-    printf("omp iter nkey = %d wall time = %f sec\n", nkey, omp_get_wtime() - c1);
+        #pragma omp simgle
+       nkey = count_share(N, a, key); // using iterative decomposition
+    printf("omp shared nkey = %d wall time = %f sec\n", nkey, omp_get_wtime() - c1);
     double c2 = omp_get_wtime();
     #pragma omp parallel
-    {
        #pragma omp simgle
-       {
-         nkey = count_task(N, a, key); // using iterative decomposition
-      }
+       nkey = count_iter(N, a, key); // using iterative decomposition
+    printf("omp iter nkey = %d wall time = %f sec\n", nkey, omp_get_wtime() - c2);
+    double c3 = omp_get_wtime();
+    #pragma omp parallel
+       #pragma omp simgle
+       nkey = count_recur(N, a, key,0); // using iterative decomposition
+    printf("omp recur nkey = %d wall time = %f sec\n", nkey, omp_get_wtime() - c3);
+    free(a);
+    return 0;
+}
+```
+- Comparison
+```
+$ ./a.out
+Number of threads = 4
+serial nkey = 3 wall time = 0.000298 sec
+omp shared nkey = 3 wall time = 0.000402 sec
+omp iter nkey = 3 wall time = 0.000256 sec
+omp recur nkey = 3 wall time = 0.001005 sec
+```
+ 
+42. Problem2 - Question A
+- Base code:
+```c
+for (i=0; i< DBsize; i++)
+  for (k=0; k< nkeys; k++)
+    if (DBin[i] == keys[k]) DBout[k][counter[k]++] = i;
+```
+- Write OMP parallel code using iterative task decomposition of the outermost loop i
+```c
+omp_lock_t locks[nkeys];
+#pragma omp parallel
+#pragma omp single
+#pragma omp taskloop num_tasks(omp_num_threads()) private(k)
+for (i=0; i< DBsize; i++)
+  for (k=0; k< nkeys; k++)
+    if (DBin[i] == keys[k]) {
+        omp_set_lock(&locks[k])
+        DBout[k][counter[k]++] = i;
+        omp_unset_lock(&locks[k])
     }
-    printf("omp task nkey = %d wall time = %f sec\n", nkey, omp_get_wtime() - c2);
-    //neky = count_recur(N, a, key); // using divide and conquer
+```
+ 
+43. Problem2 - Question B
+- Write OMP parallel code using iterative task decomposition of the innermost loop k
+```c
+#pragma omp parallel
+#pragma omp single
+omp_lock_t locks[nkeys];
+for(i=0;i<nkeys;++i) omp_init_lock(&locks[i]);
+for (i=0; i< DBsize; i++)
+  #pragma omp taskloop firstprivate(i) num_tasks(omp_num_threads()) nogroup
+  for (k=0; k< nkeys; k++)
+    omp_set_lock(&locks[k])
+    DBout[k][counter[k]++] = i;
+    omp_unset_lock(&locks[k])
+for(i=0;i<nkeys;++i) omp_destory_lock(&locks[i]);            
+```
+ 
+44. Problem2 - Question C
+- Task based recursive divide and conquer decomposition strategy 1) the recursion splits the input vector DBin in two almost identical halves, with a base case that corresponds to checking a single element of DBin 2) uses a cut-off strategy based on the size of input vector.            
+```c
+#include <omp.h>
+#define DBsize 1048576
+#define nkeys 16 // the number of processors can be larger than the number of keys
+#define CUT_SIZE 3
+omp_lock_t locks[nkeys]
+int main() {
+double keys[nkeys], DBin[DBsize], DBout[nkeys][DBsize];
+unsigned int i, k, counter[nkeys];
+getkeys(keys, nkeys); // get keys
+init_DBin(DBin, DBsize); // initialize elements in DBin
+clear_DBout(DBout, nkeys, DBsize); // initialize elements in DBout
+clear_counter(counter, nkeys); // initialize counter to zero
+#pragma omp parallel
+#pragma omp single
+for (i = 0; i < nkeys; ++i) omp_init_lock(&locks[i]);
+rec_keys(DBin,DBout,0,DBsize-1,counter);
+for (i = 0; i < nkeys; ++i) omp_destroy_lock(&locks[i]);	
+}
+void rec_keys(double *DBin, double *DBout, int ini, int end,
+	unsigned int *counter) {
+	if (end - ini + 1) <= 1) { // Base Case
+		for (unsigned int k = 0; k < nkeys; ++k) {
+			if (DBin[ini] == keys[k]){
+				omp_set_lock(&locks[k]);
+				DBout[k][counter[k]++] = i;
+				omp_unset_lock(&locks[k]);
+		}
+	}
+	else { // Recursive Case  ( Size of the Vector > 1 )
+		int half = (end - ini + 1)/2;
+		if (!omp_in_final()) { // If task is not final:
+			#pragma omp task final (half <= CUT_SIZE)
+			rec_keys(DBin,DBout,ini,half,counter);
+			#pragma omp task final (half <= CUT_SIZE)
+			rec_keys(DBin,DBout,half+1,end,counter);
+		}
+		else { // Task is Final
+			rec_keys(DBin,DBout,ini,half,counter);
+			rec_keys(DBin,DBout,half+1,end,counter);
+		}
+	}
+}
+```
+ 
+45. Problem3
+- Producer-consumer execution model. They must be in different tasks
+```c
+float sample[INPUT_SIZE+TAP1];
+float coeff1[TAP1], coeff2[TAP2];
+float data_out[INPUT_SIZE], final[INPUT_SIZE]
+void main() {
+  float sum;
+  for(int i=0; i<INPUT_SIZE;i++) {
+    //Producer
+    sum = 0.0;
+    for (int j=0; j<TAP1;j++)
+      sum += sample[i+j] + coeff1[j];
+    data_out[i] - sum;
+    //Consumer
+    for (int j=0; j<TAP2; j++)
+      final[i] += correction(data_out[i],coeff2[j]);
+   }
+}
+```
+- OpenMP parallel version:
+```c
+#include <omp.h>
+float sample[INPUT_SIZE+TAP1];
+float coeff1[TAP1], coeff2[TAP2];
+float data_out[INPUT_SIZE], final[INPUT_SIZE]
+void main() {
+  #pragma omp parallel
+  #pragma omp single
+  float sum;
+  for(int i=0; i<INPUT_SIZE;i++) {
+    #pragma omp task private(sum) depend(out: data_out[i])
+    //Producer
+    sum = 0.0;
+    for (int j=0; j<TAP1;j++)
+      sum += sample[i+j] + coeff1[j];
+    data_out[i] = sum;
+    #pragma omp task depend(in: data_out[i])
+    //Consumer
+    for (int j=0; j<TAP2; j++)
+      final[i] += correction(data_out[i],coeff2[j]);
+   }
+}
+```
+ 
+46. Problem 4
+- SAXYPY
+```c
+#include <omp.h>
+int main() {
+    int N = 1 << 20; /* 1 million floats */
+    float *fx = (float *) malloc(N * sizeof(float));
+    float *fy = (float *) malloc(N * sizeof(float));
+    FILE *fpx = fopen("fx.out", "w");
+    FILE *fpy = fopen("fy.out", "w");
+    /* simple initialization just for testing */
+    #pragma omp parallel
+    #pragma omp single    
+    #pragma omp task depend(out: fx) // Task 1
+    for (int k = 0; k < N; ++k)
+        fx[k] = 2.0f + (float) k;
+    #pragma omp task depend(out: fy) // Task 2
+    for (int k = 0; k < N; ++k)
+        fy[k] = 1.0f + (float) k;
+    /* Run SAXPY TWICE */
+	#pragma omp task depend(in:fx) depend(inout: fy) // Task 3
+    saxpy(N, 3.0f, fx, fy);
+	#pragma omp task depend(in:fy) depend(inout: fx) // Task 4
+    saxpy(N, 5.0f, fy, fx);
+    /* Save results */
+	#pragma omp task depend(in: fx) // Task 5
+    for (int k = 0; k < N; ++k)
+        fprintf(fpx, " %f ", fx[k]);
+	#pragma omp task depend(in: fy) // Task 6
+    for (int k = 0; k < N; ++k)
+        fprintf(fpy, " %f ", fy[k]);
+    free(fx); fclose(fpx);
+    free(fy); fclose(fpy);
+}``` 
+![TDB](./46_TDG.png)
+ 
+47. Problem 5 - Question A
+- Parallelization of FindBounds in histogram computation
+```c
+#include <omp.h>
+void FindBounds(int *input, int size, int *min, int *max) {    
+    int chunk_size = (size + omp_get_max_threads()-1)/ omp_get_max_threads();
+    int local_min = input[0], local_max = input[0];    
+    #pragma omp parallel num_threads(omp_get_max_threads())    
+    int tid = omp_get_thread_num();
+    int start = tid * chunk_size;
+    int end = (tid+1) * chunk_size;
+    if (end > size) end = size;    
+    for (int i = start; i < end; ++i) {
+        if (input[i] > local_max) local_max = input[i];
+        if (input[i] < local_min) local_min = input[i];    
+    }
+    // To avoid race conditions when updating the global minimum and maximum values, we use a critical section (#pragma omp critical) to ensure mutual exclusion.    
+    #pragma omp critical {    
+    if (local_max > *max) *max = local_max;
+    if (local_min < *min) *min = local_min;
+    }    
+}
+```
+
+48. Problem 5 - Question B
+- Parallel implementation of FindFrequency
+```c
+#include <omp.h>
+void FindFrequency(int *input, int size,int *histogram, int min, int max) {
+    int chunk_size = (size + omp_get_max_threads() -1) / omp_get_max_threads();    
+    # pragma omp parallel num_threads(omp_get_max_threads())
+    {
+        int tid = omp_get_thread_num();
+        int start = tid * chunk_size;
+        int end = (tid + 1) * chunk_size;
+        if (end > size) end = size;        
+        int tmp;        
+        for (int i = start; i < end; ++i) {
+            tmp = (input[i] - min) * (HIST_SIZE / (max - min - 1));
+            #pragma omp atomic
+            histogram[tmp]++;
+        }
+    }
+}
+```
+
+49. Problem 6 - Question A
+- Sum of vector elements, using iterative task decomposition
+```c
+#include <omp.h>
+int sum_vector(int *X, int n) {
+    int sum = 0;    
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            #pragma omp taskloop grainsize(1)
+            for (int i = 0; i < n; i++) {
+                #pragma omp task shared(sum)
+                {
+                    #pragma omp atomic
+                    sum += X[i];
+                }
+            }
+        }
+    }
+    return sum;
+}
+```
+
+50. Problem 6 - Question B
+- Divide and conquer recursive strategy over vector v
+```c
+#include <omp.h>
+int recursive_sum_vector(int *X, int n) {
+    int sum = 0;
+    if (n == 1) { return X[0]; } // Base Case
+    else {
+        #pragma omp parallel
+        {
+            #pragma omp single
+            {
+                #pragma omp task shared(sum)
+                {
+                    int half = n / 2;
+                    sum = recursive_sum_vector(X,half) + recursive_sum_vector(X + half,n-half);
+                }
+            }
+        }
+    }
+    return sum;
 }
 ```
