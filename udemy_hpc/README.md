@@ -356,3 +356,8 @@ $ trace-cmd report
 ## Section 6: Course Material
 
 20. Course Material
+
+
+## Extras
+- Find cache miss using perf tools
+  - `perf stat -B -e cache-references,cache-misses,cycles,instructions ./a.out`
