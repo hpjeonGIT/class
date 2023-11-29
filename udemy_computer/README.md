@@ -98,7 +98,7 @@
 25. How to access memory - memory grid
 - For 256 memory cells, we may not need 256 input/output wires
   - Can reduce the requirement using row/columns
-    - Reduce more voltage combination (decoder)
+    - Reduce more using the combination of voltage (decoder)
 
 26. How to decode memory addresses - decoder
 
@@ -147,11 +147,14 @@
 ## Section 5: What is programming
 
 36. What is programming - Introduction
+- Fibonacci sequence for demonstration
 
 37. How to write programs
 
 38. How to reuse programs -JMP instruction
-
+- Re-use the same instructions again and again
+  - Looping
+  
 39. How to get out of a loop I - CMP instruction
 
 40. How to get out of a loop II - JCON instruction
