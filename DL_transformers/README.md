@@ -1045,13 +1045,13 @@ plot_cm(cm)
 - Skip connections (aka residual connections)
   - More layers degrade performance
 
-93. Positional Encodings (07:16)
+93. Positional Encodings
 - Does order matter in attention? No!
 
-94. Encoder Architecture (06:23)
+94. Encoder Architecture
 - BERT is an example of an encoder-only network
 
-95. Decoder Architecture (10:58)
+95. Decoder Architecture
 - Decoder pretraining objective: predict next token in a sequence
 - Architecture is almost the same as encoder
 - Main challenge is how we make the decoder predict the next token
@@ -1061,13 +1061,1071 @@ plot_cm(cm)
   - Every token will attend to every other token
   - Masking the attention weights ensures that each output only pays attention to the past
 
-96. Encoder-Decoder Architecture (08:31)
-97. BERT (04:52)
-98. GPT (06:45)
-99. GPT-2 (06:30)
-100. GPT-3 (05:14)
-101. ChatGPT (06:33)
-102. GPT-4 (03:00)
-103. Theory Section Summary (04:50)
+96. Encoder-Decoder Architecture
+- V, K from encoder, Q from decoder
+- V is size of T_input x d_v, K is size of T_input x d_k
+- Q has size T_output x d_k
+- Attention weights have shape of T_output x T_input
+- Training now involves 2 inputs (each for encoder/decoder)
+- One training sample is now a triple: encoder input, decoder input, decoder target
+  - Teacher forcing: true target is passed in
+
+97. BERT
+- Bidirectional Encoder Representations from Transformers
+- BERT-base: 12 blocks, 768 hidden size, 12 attention heads
+- BERT-large: 24 blocks, 1024 hidden size, 16 attention heads
+- Unsupervised pretraining + fine-tuning
+- Pretraining tasks: masked language modeling + next sentence prediction
+
+98. GPT
+- Generative Pretrained Transformer
+- Decoder only
+- Pretrain with unsupervised task
+- Reads documents from left to right, not 'bidrectional'
+- All transfomer blocks use causal self-attention
+- Fine-tuning with Auxiliary Language Model
+  - L3(C) = L2(C) + \Lambda \* L1(C)
+  - Overall Loss = Task-specific loss +  Balancing constant \* Language model loss
+- 110 million parameters
+
+99. GPT-2
+- Surface level: more data, more parameters
+- No fine tuning for downstream tasks
+- Prompting
+  - GPT-2 simply tries to guess "what comes next"
+  - Prompt engineering: how to talk to an AI
+- 1.5 billion parameters
+- 1024 context size
+- Still left-to-right
+
+100. GPT-3
+- More data/more parameters
+- 176B parameters
+- Doubles context size (1024 -> 2048)
+- No fine-tuning
+  - Inner loop
+- GPT-2 primarily used zero-shot 
+- GPT-3 uses zero-shot, one-host, few-shot
+
+101. ChatGPT
+- Based on GPT-3.5
+- Used human trainer
+  - Reinforcement learning from human feedback (RLHF)
+  - Reward model comprised of ranked responses
+  - Proximal Policy Optimization (PPO)
+- Limitations
+  - Can still make stuff up
+  - Can decline to answer
+  - Sensitive to input phrasing
+  - Does not clarify ambiguous queries
+  - DAN jailbreak - Do Anything Now
+- Parameter count:1.3B, 6B, 175B
+- Context size: 4096
+
+102. GPT-4
+- Multimodal: text and images
+- Context size: 8192 tokens
+  - Another version has 32k tokens
+- Alignment and AI safety
+  - Improved factuality and adherence to the desired behavior
+
+103. Theory Section Summary
+- 2 key components
+  - Self-attention for capturing long-range dependencies
+  - Unsupervised pretraining to leverage massive amounts of data
+- Extend your knowledge
+  - Longformer
+  - Sparse transformer
 
 ## Implement Transformers From Scratch (Advanced) 
+
+104. Implementation Section Introduction
+- No numpy
+- Will use PyTorch
+- Will not implement tokenizer from scratch
+  - We use HuggingFace
+- No premade layers
+- Section outline
+  - 3 models: encoder, decoder, encoder-decoder
+
+105. Encoder Implementation Plan & Outline
+- Building modules in PyTorch
+- HuggingFace tokenizer API
+
+106. How to Implement Multihead Attention From Scratch
+```py
+import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import dataset
+import numpy as np
+import matplotlib.pyplot as plt
+class MultiHeadAttention(nn.Module):
+  def __init__(self, d_k, d_model, n_heads):
+    super().__init__()
+    # Assume d_v = d_k
+    self.d_k = d_k
+    self.n_heads = n_heads
+    self.key = nn.Linear(d_model, d_k * n_heads)
+    self.query = nn.Linear(d_model, d_k * n_heads)
+    self.value = nn.Linear(d_model, d_k * n_heads)
+    # final linear layer
+    self.fc = nn.Linear(d_k * n_heads, d_model)
+  def forward(self, q, k, v, mask=None):
+    q = self.query(q) # N x T x (hd_k)
+    k = self.key(k)   # N x T x (hd_k)
+    v = self.value(v) # N x T x (hd_v)
+    # Attention(Q,K,V) = softmax(QK^T/\sqrt(d_k))V
+    N = q.shape[0]
+    T = q.shape[1]
+    # change the shape to: # instead of 3D tensor, we make 4D
+    # (N, T, h, d_k) -> (N, h, T, d_k)
+    # in order for matrix multiply to work properly
+    q = q.view(N, T, self.n_heads, self.d_k).transpose(1, 2)
+    k = k.view(N, T, self.n_heads, self.d_k).transpose(1, 2)
+    v = v.view(N, T, self.n_heads, self.d_k).transpose(1, 2)
+    # compute attention weights
+    # (N, h, T, d_k) x (N, h, d_k, T) --> (N, h, T, T)
+    attn_scores = q @ k.transpose(-2, -1) / math.sqrt(self.d_k)
+    if mask is not None:
+      attn_scores = attn_scores.masked_fill(
+          mask[:, None, None, :] == 0, float('-inf'))
+    attn_weights = F.softmax(attn_scores, dim=-1)    
+    # compute attention-weighted values
+    # (N, h, T, T) x (N, h, T, d_k) --> (N, h, T, d_k)
+    A = attn_weights @ v
+    # reshape it back before final linear layer
+    A = A.transpose(1, 2) # (N, T, h, d_k)
+    A = A.contiguous().view(N, T, self.d_k * self.n_heads) # (N, T, h*d_k)
+    # projection
+    return self.fc(A)
+```    
+
+107. How to Implement the Transformer Block From Scratch
+```py
+class TransformerBlock(nn.Module):
+  def __init__(self, d_k, d_model, n_heads, dropout_prob=0.1):
+    super().__init__()
+    self.ln1 = nn.LayerNorm(d_model)
+    self.ln2 = nn.LayerNorm(d_model)
+    self.mha = MultiHeadAttention(d_k, d_model, n_heads)
+    self.ann = nn.Sequential(
+        nn.Linear(d_model, d_model * 4),
+        nn.GELU(),
+        nn.Linear(d_model * 4, d_model),
+        nn.Dropout(dropout_prob),
+    )
+    self.dropout = nn.Dropout(p=dropout_prob)
+  def forward(self, x, mask=None):
+    x = self.ln1(x + self.mha(x, x, x, mask))
+    x = self.ln2(x + self.ann(x))
+    x = self.dropout(x)
+    return x
+```    
+
+108. How to Implement Positional Encoding From Scratch
+```py
+class PositionalEncoding(nn.Module):
+  def __init__(self, d_model, max_len=2048, dropout_prob=0.1):
+    super().__init__()
+    self.dropout = nn.Dropout(p=dropout_prob)
+    position = torch.arange(max_len).unsqueeze(1)
+    exp_term = torch.arange(0, d_model, 2) # damping solutions
+    div_term = torch.exp(exp_term * (-math.log(10000.0) / d_model))
+    pe = torch.zeros(1, max_len, d_model)
+    pe[0, :, 0::2] = torch.sin(position * div_term)
+    pe[0, :, 1::2] = torch.cos(position * div_term)
+    self.register_buffer('pe', pe)
+  def forward(self, x):
+    # x.shape: N x T x D
+    x = x + self.pe[:, :x.size(1), :]
+    return self.dropout(x)
+```    
+
+109. How to Implement Transformer Encoder From Scratch
+```py
+class Encoder(nn.Module):
+  def __init__(self,
+               vocab_size,
+               max_len,
+               d_k,
+               d_model,
+               n_heads,
+               n_layers,
+               n_classes,
+               dropout_prob):
+    super().__init__()
+    self.embedding = nn.Embedding(vocab_size, d_model)
+    self.pos_encoding = PositionalEncoding(d_model, max_len, dropout_prob)
+    transformer_blocks = [
+        TransformerBlock(
+            d_k,
+            d_model,
+            n_heads,
+            dropout_prob) for _ in range(n_layers)]
+    self.transformer_blocks = nn.Sequential(*transformer_blocks)
+    self.ln = nn.LayerNorm(d_model)
+    self.fc = nn.Linear(d_model, n_classes)  
+  def forward(self, x, mask=None):
+    x = self.embedding(x)
+    x = self.pos_encoding(x)
+    for block in self.transformer_blocks:
+      x = block(x, mask)
+    # many-to-one (x has the shape N x T x D)
+    x = x[:, 0, :]
+    x = self.ln(x)
+    x = self.fc(x)
+    return x
+model = Encoder(20_000, 1024, 16, 64, 4, 2, 5, 0.1)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
+model.to(device)
+x = np.random.randint(0, 20_000, size=(8, 512))
+x_t = torch.tensor(x).to(device)
+
+mask = np.ones((8, 512))
+mask[:, 256:] = 0
+mask_t = torch.tensor(mask).to(device)
+y = model(x_t, mask_t)
+y.shape
+```
+110. Train and Evaluate Encoder From Scratch
+- pip install transformers datasets
+```py
+from transformers import AutoTokenizer, DataCollatorWithPadding
+checkpoint = 'distilbert-base-cased' # no-segment embedding
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+from datasets import load_dataset
+raw_datasets = load_dataset("glue", "sst2")
+def tokenize_fn(batch):
+  return tokenizer(batch['sentence'], truncation=True)
+tokenized_datasets = raw_datasets.map(tokenize_fn, batched=True)
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+tokenized_datasets = tokenized_datasets.remove_columns(["sentence", "idx"])
+tokenized_datasets = tokenized_datasets.rename_column("label", "labels")
+from torch.utils.data import DataLoader
+train_loader = DataLoader(
+    tokenized_datasets["train"],
+    shuffle=True,  # for train only, not for validation
+    batch_size=32,
+    collate_fn=data_collator
+)
+valid_loader = DataLoader(
+    tokenized_datasets["validation"],
+    batch_size=32,
+    collate_fn=data_collator
+)
+# check how it works
+for batch in train_loader:
+  for k, v in batch.items():
+    print("k:", k, "v.shape:", v.shape)
+  break
+set(tokenized_datasets['train']['labels'])
+tokenizer.vocab_size
+# 28996
+model = Encoder(
+    vocab_size=tokenizer.vocab_size,
+    max_len=tokenizer.max_model_input_sizes[checkpoint],
+    d_k=16,
+    d_model=64,
+    n_heads=4,
+    n_layers=2,
+    n_classes=2,
+    dropout_prob=0.1,
+)
+model.to(device)
+# Loss and optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters())
+from datetime import datetime
+# A function to encapsulate the training loop
+def train(model, criterion, optimizer, train_loader, valid_loader, epochs):
+  train_losses = np.zeros(epochs)
+  test_losses = np.zeros(epochs)
+  for it in range(epochs):
+    model.train()
+    t0 = datetime.now()
+    train_loss = 0
+    n_train = 0
+    for batch in train_loader:
+      # move data to GPU
+      batch = {k: v.to(device) for k, v in batch.items()}
+      # zero the parameter gradients
+      optimizer.zero_grad()
+      # Forward pass
+      outputs = model(batch['input_ids'], batch['attention_mask'])
+      loss = criterion(outputs, batch['labels'])      
+      # Backward and optimize
+      loss.backward()
+      optimizer.step()
+      train_loss += loss.item()*batch['input_ids'].size(0)
+      n_train += batch['input_ids'].size(0)
+    # Get average train loss
+    train_loss = train_loss / n_train    
+    model.eval()
+    test_loss = 0
+    n_test = 0
+    for batch in valid_loader:
+      batch = {k: v.to(device) for k, v in batch.items()}
+      outputs = model(batch['input_ids'], batch['attention_mask'])
+      loss = criterion(outputs, batch['labels'])
+      test_loss += loss.item()*batch['input_ids'].size(0)
+      n_test += batch['input_ids'].size(0)
+    test_loss = test_loss / n_test
+    # Save losses
+    train_losses[it] = train_loss
+    test_losses[it] = test_loss    
+    dt = datetime.now() - t0
+    print(f'Epoch {it+1}/{epochs}, Train Loss: {train_loss:.4f}, \
+      Test Loss: {test_loss:.4f}, Duration: {dt}')  
+  return train_losses, test_losses
+train_losses, test_losses = train(
+    model, criterion, optimizer, train_loader, valid_loader, epochs=4)
+# Accuracy
+model.eval()
+n_correct = 0.
+n_total = 0.
+for batch in train_loader:
+  # Move to GPU
+  batch = {k: v.to(device) for k, v in batch.items()}
+  # Forward pass
+  outputs = model(batch['input_ids'], batch['attention_mask'])
+  # Get prediction
+  # torch.max returns both max and argmax
+  _, predictions = torch.max(outputs, 1)
+  # update counts
+  n_correct += (predictions == batch['labels']).sum().item()
+  n_total += batch['labels'].shape[0]
+train_acc = n_correct / n_total
+n_correct = 0.
+n_total = 0.
+for batch in valid_loader:
+  # Move to GPU
+  batch = {k: v.to(device) for k, v in batch.items()}
+  # Forward pass
+  outputs = model(batch['input_ids'], batch['attention_mask'])
+  # Get prediction
+  # torch.max returns both max and argmax
+  _, predictions = torch.max(outputs, 1)
+  # update counts
+  n_correct += (predictions == batch['labels']).sum().item()
+  n_total += batch['labels'].shape[0]
+test_acc = n_correct / n_total
+print(f"Train acc: {train_acc:.4f}, Test acc: {test_acc:.4f}")
+```
+
+111. How to Implement Causal Self-Attention From Scratch
+```py
+import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import dataset
+import numpy as np
+import matplotlib.pyplot as plt
+class CausalSelfAttention(nn.Module):
+  # similar to multihead attention loop but we need masks
+  def __init__(self, d_k, d_model, n_heads, max_len):
+    super().__init__()
+    # Assume d_v = d_k
+    self.d_k = d_k
+    self.n_heads = n_heads
+    self.key = nn.Linear(d_model, d_k * n_heads)
+    self.query = nn.Linear(d_model, d_k * n_heads)
+    self.value = nn.Linear(d_model, d_k * n_heads)
+    # final linear layer
+    self.fc = nn.Linear(d_k * n_heads, d_model)
+    # causal mask
+    # make it so that diagonal is 0 too
+    # this way we don't have to shift the inputs to make targets
+    # Lower Triangle along diagonal component is 1
+    cm = torch.tril(torch.ones(max_len, max_len))
+    self.register_buffer(
+        "causal_mask",
+        cm.view(1, 1, max_len, max_len)
+    )
+  def forward(self, q, k, v, pad_mask=None):
+    q = self.query(q) # N x T x (hd_k)
+    k = self.key(k)   # N x T x (hd_k)
+    v = self.value(v) # N x T x (hd_v)
+    N = q.shape[0]
+    T = q.shape[1]
+    # change the shape to:
+    # (N, T, h, d_k) -> (N, h, T, d_k)
+    # in order for matrix multiply to work properly
+    q = q.view(N, T, self.n_heads, self.d_k).transpose(1, 2)
+    k = k.view(N, T, self.n_heads, self.d_k).transpose(1, 2)
+    v = v.view(N, T, self.n_heads, self.d_k).transpose(1, 2)
+    # compute attention weights
+    # (N, h, T, d_k) x (N, h, d_k, T) --> (N, h, T, T)
+    attn_scores = q @ k.transpose(-2, -1) / math.sqrt(self.d_k)
+    if pad_mask is not None:
+      attn_scores = attn_scores.masked_fill(
+          pad_mask[:, None, None, :] == 0, float('-inf'))
+    attn_scores = attn_scores.masked_fill(
+        self.causal_mask[:, :, :T, :T] == 0, float('-inf'))
+    attn_weights = F.softmax(attn_scores, dim=-1)
+    # compute attention-weighted values
+    # (N, h, T, T) x (N, h, T, d_k) --> (N, h, T, d_k)
+    A = attn_weights @ v
+    # reshape it back before final linear layer
+    A = A.transpose(1, 2) # (N, T, h, d_k)
+    A = A.contiguous().view(N, T, self.d_k * self.n_heads) # (N, T, h*d_k)
+    # projection
+    return self.fc(A)
+class TransformerBlock(nn.Module):
+  def __init__(self, d_k, d_model, n_heads, max_len, dropout_prob=0.1):
+    super().__init__()
+    self.ln1 = nn.LayerNorm(d_model)
+    self.ln2 = nn.LayerNorm(d_model)
+    self.mha = CausalSelfAttention(d_k, d_model, n_heads, max_len)
+    self.ann = nn.Sequential(
+        nn.Linear(d_model, d_model * 4),
+        nn.GELU(),
+        nn.Linear(d_model * 4, d_model),
+        nn.Dropout(dropout_prob),
+    )
+    self.dropout = nn.Dropout(p=dropout_prob)
+  def forward(self, x, pad_mask=None):
+    x = self.ln1(x + self.mha(x, x, x, pad_mask))
+    x = self.ln2(x + self.ann(x))
+    x = self.dropout(x)
+    return x
+class PositionalEncoding(nn.Module):
+  def __init__(self, d_model, max_len=2048, dropout_prob=0.1):
+    super().__init__()
+    self.dropout = nn.Dropout(p=dropout_prob)
+
+    position = torch.arange(max_len).unsqueeze(1)
+    exp_term = torch.arange(0, d_model, 2)
+    div_term = torch.exp(exp_term * (-math.log(10000.0) / d_model))
+    pe = torch.zeros(1, max_len, d_model)
+    pe[0, :, 0::2] = torch.sin(position * div_term)
+    pe[0, :, 1::2] = torch.cos(position * div_term)
+    self.register_buffer('pe', pe)
+  def forward(self, x):
+    # x.shape: N x T x D
+    x = x + self.pe[:, :x.size(1), :]
+    return self.dropout(x)
+```
+
+112. How to Implement a Transformer Decoder (GPT) From Scratch 
+```py
+class Decoder(nn.Module):
+  def __init__(self,
+               vocab_size,
+               max_len,
+               d_k,
+               d_model,
+               n_heads,
+               n_layers,
+               dropout_prob):
+    super().__init__()
+    self.embedding = nn.Embedding(vocab_size, d_model)
+    self.pos_encoding = PositionalEncoding(d_model, max_len, dropout_prob)
+    transformer_blocks = [
+        TransformerBlock(
+            d_k,
+            d_model,
+            n_heads,
+            max_len,
+            dropout_prob) for _ in range(n_layers)]
+    self.transformer_blocks = nn.Sequential(*transformer_blocks)
+    self.ln = nn.LayerNorm(d_model)
+    self.fc = nn.Linear(d_model, vocab_size)  
+  def forward(self, x, pad_mask=None):
+    x = self.embedding(x)
+    x = self.pos_encoding(x)
+    for block in self.transformer_blocks:
+      x = block(x, pad_mask)
+    x = self.ln(x)
+    x = self.fc(x) # many-to-many
+    return x
+model = Decoder(20_000, 1024, 16, 64, 4, 2, 0.1)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
+model.to(device)
+x = np.random.randint(0, 20_000, size=(8, 512)) # random mask
+x_t = torch.tensor(x).to(device)
+y = model(x_t)
+y.shape
+mask = np.ones((8, 512))
+mask[:, 256:] = 0
+mask_t = torch.tensor(mask).to(device)
+y = model(x_t, mask_t)
+y.shape
+```
+
+113. How to Train a Causal Language Model From Scratch
+- pip install transformers datasets
+```py
+from transformers import AutoTokenizer, DataCollatorWithPadding
+checkpoint = 'distilbert-base-cased'
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+from datasets import load_dataset
+# we'll use the same dataset, just ignore the labels
+raw_datasets = load_dataset("glue", "sst2")
+def tokenize_fn(batch):
+  return tokenizer(batch['sentence'], truncation=True)
+tokenized_datasets = raw_datasets.map(tokenize_fn, batched=True)
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+tokenized_datasets = tokenized_datasets.remove_columns(
+    ["sentence", "idx", "label"])
+from torch.utils.data import DataLoader
+train_loader = DataLoader(
+    tokenized_datasets["train"],
+    shuffle=True,
+    batch_size=32,
+    collate_fn=data_collator
+)
+# HW: write valid_loader
+# check how it works
+for batch in train_loader:
+  for k, v in batch.items():
+    print("k:", k, "v.shape:", v.shape)
+  break
+model = Decoder(
+    vocab_size=tokenizer.vocab_size,
+    max_len=tokenizer.max_model_input_sizes[checkpoint],
+    d_k=16,
+    d_model=64,
+    n_heads=4,
+    n_layers=2,
+    dropout_prob=0.1,
+)
+model.to(device)
+# Loss and optimizer
+criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id) # why ignore_index? To ignore padding tokens
+optimizer = torch.optim.Adam(model.parameters())
+from datetime import datetime
+# A function to encapsulate the training loop
+def train(model, criterion, optimizer, train_loader, epochs):
+  train_losses = np.zeros(epochs)
+  for it in range(epochs):
+    model.train()
+    t0 = datetime.now()
+    train_loss = []
+    for batch in train_loader:
+      # move data to GPU
+      batch = {k: v.to(device) for k, v in batch.items()}
+      # zero the parameter gradients
+      optimizer.zero_grad()
+      # shift targets backwards
+      targets = batch['input_ids'].clone().detach()
+      targets = torch.roll(targets, shifts=-1, dims=1) # removes CLS token (?)
+      targets[:, -1] = tokenizer.pad_token_id 
+      # Forward pass
+      outputs = model(batch['input_ids'], batch['attention_mask'])
+      # outputs are N x T x V
+      # but PyTorch expects N x V x T
+      # print("outputs:", outputs)
+      # print("targets:", targets)
+      loss = criterion(outputs.transpose(2, 1), targets)
+      # N, T, V = outputs.shape
+      # loss = criterion(outputs.view(N * T, V), targets.view(N * T))        
+      # Backward and optimize
+      loss.backward()
+      optimizer.step()
+      train_loss.append(loss.item())
+    # Get train loss and test loss
+    train_loss = np.mean(train_loss)
+    # Save losses
+    train_losses[it] = train_loss    
+    dt = datetime.now() - t0
+    print(f'Epoch {it+1}/{epochs}, Train Loss: {train_loss:.4f}, Duration: {dt}')  
+  return train_losses
+train_losses = train(
+    model, criterion, optimizer, train_loader, epochs=15)
+valid_loader = DataLoader(
+    tokenized_datasets["validation"],
+    batch_size=1,
+    collate_fn=data_collator
+)
+model.eval()
+for batch in valid_loader:
+  # move data to GPU
+  batch = {k: v.to(device) for k, v in batch.items()}
+  outputs = model(batch['input_ids'], batch['attention_mask'])
+  break
+outputs.shape
+prediction_ids = torch.argmax(outputs, axis=-1)
+tokenizer.decode(prediction_ids[0])
+tokenizer.decode(torch.concat((batch['input_ids'][0, :5], prediction_ids[:, 4])))
+# generate something
+prompt = "it's"
+tokenized_prompt = tokenizer(prompt, return_tensors='pt')
+tokenized_prompt
+outputs = model(
+    tokenized_prompt['input_ids'][:, :-1].to(device),
+    tokenized_prompt['attention_mask'][:, :-1].to(device))
+outputs.shape
+prediction_ids = torch.argmax(outputs[:, -1, :], axis=-1)
+tokenizer.decode(prediction_ids[0])
+# generate something
+prompt = "it's a"
+tokenized_prompt = tokenizer(prompt, return_tensors='pt')
+# prepare inputs + get rid of SEP token at the end
+input_ids = tokenized_prompt['input_ids'][:, :-1].to(device)
+mask = tokenized_prompt['attention_mask'][:, :-1].to(device)
+for _ in range(20):
+  outputs = model(input_ids, mask)
+  prediction_id = torch.argmax(outputs[:, -1, :], axis=-1)
+  input_ids = torch.hstack((input_ids, prediction_id.view(1, 1)))
+  mask = torch.ones_like(input_ids)
+  if prediction_id == tokenizer.sep_token_id:
+    break
+tokenizer.decode(input_ids[0])
+# reults will be different at everytime
+```
+
+114. Implement a Seq2Seq Transformer From Scratch for Language Translation (pt 1)
+```py
+import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import dataset
+import numpy as np
+import matplotlib.pyplot as plt
+class MultiHeadAttention(nn.Module):
+  def __init__(self, d_k, d_model, n_heads, max_len, causal=False):
+    super().__init__()
+    # Assume d_v = d_k
+    self.d_k = d_k
+    self.n_heads = n_heads
+    self.key = nn.Linear(d_model, d_k * n_heads)
+    self.query = nn.Linear(d_model, d_k * n_heads)
+    self.value = nn.Linear(d_model, d_k * n_heads)
+    # final linear layer
+    self.fc = nn.Linear(d_k * n_heads, d_model)
+    # causal mask
+    # make it so that diagonal is 0 too
+    # this way we don't have to shift the inputs to make targets
+    self.causal = causal
+    if causal:
+      cm = torch.tril(torch.ones(max_len, max_len))
+      self.register_buffer(
+          "causal_mask",
+          cm.view(1, 1, max_len, max_len)
+      )
+  def forward(self, q, k, v, pad_mask=None):
+    q = self.query(q) # N x T x (hd_k)
+    k = self.key(k)   # N x T x (hd_k)
+    v = self.value(v) # N x T x (hd_v)
+    N = q.shape[0]
+    T_output = q.shape[1]
+    T_input = k.shape[1]
+    # change the shape to:
+    # (N, T, h, d_k) -> (N, h, T, d_k)
+    # in order for matrix multiply to work properly
+    q = q.view(N, T_output, self.n_heads, self.d_k).transpose(1, 2)
+    k = k.view(N, T_input, self.n_heads, self.d_k).transpose(1, 2)
+    v = v.view(N, T_input, self.n_heads, self.d_k).transpose(1, 2)
+    # compute attention weights
+    # (N, h, T, d_k) x (N, h, d_k, T) --> (N, h, T, T)
+    attn_scores = q @ k.transpose(-2, -1) / math.sqrt(self.d_k)
+    if pad_mask is not None:
+      attn_scores = attn_scores.masked_fill(
+          pad_mask[:, None, None, :] == 0, float('-inf'))
+    if self.causal:
+      attn_scores = attn_scores.masked_fill(
+          self.causal_mask[:, :, :T_output, :T_input] == 0, float('-inf'))
+    attn_weights = F.softmax(attn_scores, dim=-1)    
+    # compute attention-weighted values
+    # (N, h, T, T) x (N, h, T, d_k) --> (N, h, T, d_k)
+    A = attn_weights @ v
+    # reshape it back before final linear layer
+    A = A.transpose(1, 2) # (N, T, h, d_k)
+    A = A.contiguous().view(N, T_output, self.d_k * self.n_heads) # (N, T, h*d_k)
+    # projection
+    return self.fc(A)
+class EncoderBlock(nn.Module):
+  def __init__(self, d_k, d_model, n_heads, max_len, dropout_prob=0.1):
+    super().__init__()
+    self.ln1 = nn.LayerNorm(d_model)
+    self.ln2 = nn.LayerNorm(d_model)
+    self.mha = MultiHeadAttention(d_k, d_model, n_heads, max_len, causal=False) # note that causal is False
+    self.ann = nn.Sequential(
+        nn.Linear(d_model, d_model * 4),
+        nn.GELU(),
+        nn.Linear(d_model * 4, d_model),
+        nn.Dropout(dropout_prob),
+    )
+    self.dropout = nn.Dropout(p=dropout_prob)  
+  def forward(self, x, pad_mask=None):
+    x = self.ln1(x + self.mha(x, x, x, pad_mask))
+    x = self.ln2(x + self.ann(x))
+    x = self.dropout(x)
+    return x
+class DecoderBlock(nn.Module):
+  def __init__(self, d_k, d_model, n_heads, max_len, dropout_prob=0.1):
+    super().__init__()
+    self.ln1 = nn.LayerNorm(d_model)
+    self.ln2 = nn.LayerNorm(d_model)
+    self.ln3 = nn.LayerNorm(d_model)
+    self.mha1 = MultiHeadAttention(d_k, d_model, n_heads, max_len, causal=True)
+    self.mha2 = MultiHeadAttention(d_k, d_model, n_heads, max_len, causal=False)
+    self.ann = nn.Sequential(
+        nn.Linear(d_model, d_model * 4),
+        nn.GELU(),
+        nn.Linear(d_model * 4, d_model),
+        nn.Dropout(dropout_prob),
+    )
+    self.dropout = nn.Dropout(p=dropout_prob)  
+  def forward(self, enc_output, dec_input, enc_mask=None, dec_mask=None):
+    # self-attention on decoder input
+    x = self.ln1(
+        dec_input + self.mha1(dec_input, dec_input, dec_input, dec_mask))
+    # multi-head attention including encoder output
+    x = self.ln2(x + self.mha2(x, enc_output, enc_output, enc_mask))
+    x = self.ln3(x + self.ann(x))
+    x = self.dropout(x)
+    return x
+class PositionalEncoding(nn.Module):
+  def __init__(self, d_model, max_len=2048, dropout_prob=0.1):
+    super().__init__()
+    self.dropout = nn.Dropout(p=dropout_prob)
+    position = torch.arange(max_len).unsqueeze(1)
+    exp_term = torch.arange(0, d_model, 2)
+    div_term = torch.exp(exp_term * (-math.log(10000.0) / d_model))
+    pe = torch.zeros(1, max_len, d_model)
+    pe[0, :, 0::2] = torch.sin(position * div_term)
+    pe[0, :, 1::2] = torch.cos(position * div_term)
+    self.register_buffer('pe', pe)
+  def forward(self, x):
+    # x.shape: N x T x D
+    x = x + self.pe[:, :x.size(1), :]
+    return self.dropout(x)
+class Encoder(nn.Module):
+  def __init__(self,
+               vocab_size,
+               max_len,
+               d_k,
+               d_model,
+               n_heads,
+               n_layers,
+              #  n_classes,
+               dropout_prob):
+    super().__init__()
+    self.embedding = nn.Embedding(vocab_size, d_model)
+    self.pos_encoding = PositionalEncoding(d_model, max_len, dropout_prob)
+    transformer_blocks = [
+        EncoderBlock(
+            d_k,
+            d_model,
+            n_heads,
+            max_len,
+            dropout_prob) for _ in range(n_layers)]
+    self.transformer_blocks = nn.Sequential(*transformer_blocks)
+    self.ln = nn.LayerNorm(d_model)
+    # self.fc = nn.Linear(d_model, n_classes)  
+  def forward(self, x, pad_mask=None):
+    x = self.embedding(x)
+    x = self.pos_encoding(x)
+    for block in self.transformer_blocks:
+      x = block(x, pad_mask)
+    # many-to-one (x has the shape N x T x D)
+    # x = x[:, 0, :]
+    x = self.ln(x)
+    # x = self.fc(x)
+    return x
+class Decoder(nn.Module):
+  def __init__(self,
+               vocab_size,
+               max_len,
+               d_k,
+               d_model,
+               n_heads,
+               n_layers,
+               dropout_prob):
+    super().__init__()
+    self.embedding = nn.Embedding(vocab_size, d_model)
+    self.pos_encoding = PositionalEncoding(d_model, max_len, dropout_prob)
+    transformer_blocks = [
+        DecoderBlock(
+            d_k,
+            d_model,
+            n_heads,
+            max_len,
+            dropout_prob) for _ in range(n_layers)]
+    self.transformer_blocks = nn.Sequential(*transformer_blocks)
+    self.ln = nn.LayerNorm(d_model)
+    self.fc = nn.Linear(d_model, vocab_size)  
+  def forward(self, enc_output, dec_input, enc_mask=None, dec_mask=None):
+    x = self.embedding(dec_input)
+    x = self.pos_encoding(x)
+    for block in self.transformer_blocks:
+      x = block(enc_output, x, enc_mask, dec_mask)
+    x = self.ln(x)
+    x = self.fc(x) # many-to-many
+    return x
+class Transformer(nn.Module):
+  def __init__(self, encoder, decoder):
+    super().__init__()
+    self.encoder = encoder
+    self.decoder = decoder
+  def forward(self, enc_input, dec_input, enc_mask, dec_mask):
+    enc_output = self.encoder(enc_input, enc_mask)
+    dec_output = self.decoder(enc_output, dec_input, enc_mask, dec_mask)
+    return dec_output
+# test it
+encoder = Encoder(vocab_size=20_000,
+                  max_len=512,
+                  d_k=16,
+                  d_model=64,
+                  n_heads=4,
+                  n_layers=2,
+                  dropout_prob=0.1)
+decoder = Decoder(vocab_size=10_000,
+                  max_len=512,
+                  d_k=16,
+                  d_model=64,
+                  n_heads=4,
+                  n_layers=2,
+                  dropout_prob=0.1)
+transformer = Transformer(encoder, decoder)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
+encoder.to(device)
+decoder.to(device)
+xe = np.random.randint(0, 20_000, size=(8, 512))
+xe_t = torch.tensor(xe).to(device)
+xd = np.random.randint(0, 10_000, size=(8, 256))
+xd_t = torch.tensor(xd).to(device)
+maske = np.ones((8, 512))
+maske[:, 256:] = 0
+maske_t = torch.tensor(maske).to(device)
+maskd = np.ones((8, 256))
+maskd[:, 128:] = 0
+maskd_t = torch.tensor(maskd).to(device)
+out = transformer(xe_t, xd_t, maske_t, maskd_t)
+out.shape
+```
+
+115. Implement a Seq2Seq Transformer From Scratch for Language Translation (pt 2)
+- wget -nc https://lazyprogrammer.me/course_files/nlp3/spa.txt
+- pip install transformers datasets sentencepiece sacremoses
+```py
+import pandas as pd
+df = pd.read_csv('spa.txt', sep="\t", header=None)
+df.head()
+df = df.iloc[:30_000] # full data takes too long. Cost increases as quadratic
+df.columns = ['en', 'es']
+df.to_csv('spa.csv', index=None)
+from datasets import load_dataset
+raw_dataset = load_dataset('csv', data_files='spa.csv')
+split = raw_dataset['train'].train_test_split(test_size=0.3, seed=42)
+from transformers import AutoTokenizer
+model_checkpoint = "Helsinki-NLP/opus-mt-en-es"
+tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+en_sentence = split["train"][0]["en"]
+es_sentence = split["train"][0]["es"]
+inputs = tokenizer(en_sentence)
+targets = tokenizer(text_target=es_sentence)
+tokenizer.convert_ids_to_tokens(targets['input_ids'])
+max_input_length = 128
+max_target_length = 128
+def preprocess_function(batch):
+  model_inputs = tokenizer(
+    batch['en'], max_length=max_input_length, truncation=True)
+  # Set up the tokenizer for targets
+  labels = tokenizer(
+    text_target=batch['es'], max_length=max_target_length, truncation=True)
+  model_inputs["labels"] = labels["input_ids"]
+  return model_inputs
+tokenized_datasets = split.map(
+  preprocess_function,
+  batched=True,
+  remove_columns=split["train"].column_names,
+) # mask is missing. We will add it later
+from transformers import DataCollatorForSeq2Seq
+data_collator = DataCollatorForSeq2Seq(tokenizer)
+batch = data_collator([tokenized_datasets["train"][i] for i in range(0, 5)])
+batch.keys()
+# check values of attention_mask, input_ids, labels
+from torch.utils.data import DataLoader
+train_loader = DataLoader(
+  tokenized_datasets["train"],
+  shuffle=True,
+  batch_size=32,
+  collate_fn=data_collator
+)
+valid_loader = DataLoader(
+  tokenized_datasets["test"],
+  batch_size=32,
+  collate_fn=data_collator
+)
+# check how it works
+for batch in train_loader:
+  for k, v in batch.items():
+    print("k:", k, "v.shape:", v.shape)
+  break
+encoder = Encoder(vocab_size=tokenizer.vocab_size + 1,
+                  max_len=512,
+                  d_k=16,
+                  d_model=64,
+                  n_heads=4,
+                  n_layers=2,
+                  dropout_prob=0.1)
+decoder = Decoder(vocab_size=tokenizer.vocab_size + 1,
+                  max_len=512,
+                  d_k=16,
+                  d_model=64,
+                  n_heads=4,
+                  n_layers=2,
+                  dropout_prob=0.1)
+transformer = Transformer(encoder, decoder)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
+encoder.to(device)
+decoder.to(device)
+# Loss and optimizer
+criterion = nn.CrossEntropyLoss(ignore_index=-100)
+optimizer = torch.optim.Adam(transformer.parameters())
+```
+
+116. Implement a Seq2Seq Transformer From Scratch for Language Translation (pt 3)
+```py
+from datetime import datetime
+# A function to encapsulate the training loop
+def train(model, criterion, optimizer, train_loader, valid_loader, epochs):
+  train_losses = np.zeros(epochs)
+  test_losses = np.zeros(epochs)
+  for it in range(epochs):
+    model.train()
+    t0 = datetime.now()
+    train_loss = []
+    for batch in train_loader:
+      # move data to GPU (enc_input, enc_mask, translation)
+      batch = {k: v.to(device) for k, v in batch.items()}
+      # zero the parameter gradients
+      optimizer.zero_grad()
+      enc_input = batch['input_ids']
+      enc_mask = batch['attention_mask']
+      targets = batch['labels']
+      # shift targets forwards to get decoder_input
+      dec_input = targets.clone().detach()
+      dec_input = torch.roll(dec_input, shifts=1, dims=1)
+      dec_input[:, 0] = 65_001
+      # also convert all -100 to pad token id
+      dec_input = dec_input.masked_fill(
+          dec_input == -100, tokenizer.pad_token_id)
+      # make decoder input mask
+      dec_mask = torch.ones_like(dec_input)
+      dec_mask = dec_mask.masked_fill(dec_input == tokenizer.pad_token_id, 0)
+      # Forward pass
+      outputs = model(enc_input, dec_input, enc_mask, dec_mask)
+      loss = criterion(outputs.transpose(2, 1), targets)        
+      # Backward and optimize
+      loss.backward()
+      optimizer.step()
+      train_loss.append(loss.item())
+    # Get train loss and test loss
+    train_loss = np.mean(train_loss)
+    model.eval()
+    test_loss = []
+    for batch in valid_loader:
+      batch = {k: v.to(device) for k, v in batch.items()}
+      enc_input = batch['input_ids']
+      enc_mask = batch['attention_mask']
+      targets = batch['labels']
+      # shift targets forwards to get decoder_input
+      dec_input = targets.clone().detach()
+      dec_input = torch.roll(dec_input, shifts=1, dims=1)
+      dec_input[:, 0] = 65_001
+      # change -100s to regular padding
+      dec_input = dec_input.masked_fill(
+          dec_input == -100, tokenizer.pad_token_id)
+      # make decoder input mask
+      dec_mask = torch.ones_like(dec_input)
+      dec_mask = dec_mask.masked_fill(dec_input == tokenizer.pad_token_id, 0)
+      outputs = model(enc_input, dec_input, enc_mask, dec_mask)
+      loss = criterion(outputs.transpose(2, 1), targets)
+      test_loss.append(loss.item())
+    test_loss = np.mean(test_loss)
+    # Save losses
+    train_losses[it] = train_loss
+    test_losses[it] = test_loss    
+    dt = datetime.now() - t0
+    print(f'Epoch {it+1}/{epochs}, Train Loss: {train_loss:.4f}, \
+      Test Loss: {test_loss:.4f}, Duration: {dt}')  
+  return train_losses, test_losses
+train_losses, test_losses = train(
+    transformer, criterion, optimizer, train_loader, valid_loader, epochs=15)
+# try it out
+input_sentence = split['test'][10]['en']
+input_sentence
+dec_input_str = '<s>'
+dec_input = tokenizer(text_target=dec_input_str, return_tensors='pt')
+dec_input
+# We'll ignore the final 0 ( </s> )
+enc_input.to(device)
+dec_input.to(device)
+output = transformer(
+    enc_input['input_ids'],
+    dec_input['input_ids'][:, :-1],
+    enc_input['attention_mask'],
+    dec_input['attention_mask'][:, :-1],
+)
+enc_output = encoder(enc_input['input_ids'], enc_input['attention_mask'])
+enc_output.shape
+dec_output = decoder(
+    enc_output,
+    dec_input['input_ids'][:, :-1],
+    enc_input['attention_mask'],
+    dec_input['attention_mask'][:, :-1],
+)
+dec_output.shape
+torch.allclose(output, dec_output)
+dec_input_ids = dec_input['input_ids'][:, :-1]
+dec_attn_mask = dec_input['attention_mask'][:, :-1]
+for _ in range(32):
+  dec_output = decoder(
+      enc_output,
+      dec_input_ids,
+      enc_input['attention_mask'],
+      dec_attn_mask,
+  )
+  # choose the best value (or sample)
+  prediction_id = torch.argmax(dec_output[:, -1, :], axis=-1)
+  # append to decoder input
+  dec_input_ids = torch.hstack((dec_input_ids, prediction_id.view(1, 1)))
+  # recreate mask
+  dec_attn_mask = torch.ones_like(dec_input_ids)
+  # exit when reach </s>
+  if prediction_id == 0:
+    break
+tokenizer.decode(dec_input_ids[0])
+def translate(input_sentence):
+  # get encoder output first
+  enc_input = tokenizer(input_sentence, return_tensors='pt').to(device)
+  enc_output = encoder(enc_input['input_ids'], enc_input['attention_mask'])
+  # setup initial decoder input
+  dec_input_ids = torch.tensor([[65_001]], device=device)
+  dec_attn_mask = torch.ones_like(dec_input_ids, device=device)
+  # now do the decoder loop
+  for _ in range(32):
+    dec_output = decoder(
+        enc_output,
+        dec_input_ids,
+        enc_input['attention_mask'],
+        dec_attn_mask,
+    )
+    # choose the best value (or sample)
+    prediction_id = torch.argmax(dec_output[:, -1, :], axis=-1)
+    # append to decoder input
+    dec_input_ids = torch.hstack((dec_input_ids, prediction_id.view(1, 1)))
+    # recreate mask
+    dec_attn_mask = torch.ones_like(dec_input_ids)
+    # exit when reach </s>
+    if prediction_id == 0:
+      break  
+  translation = tokenizer.decode(dec_input_ids[0, 1:])
+  print(translation)
+translate("How are you?")
+# ¿Cómo estáis?
+```
+
+117. Implementation Section Summary
+
