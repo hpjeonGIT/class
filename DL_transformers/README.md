@@ -972,18 +972,755 @@ plot_cm(cm)
 ```
 
 37. Hugging Face AutoConfig
+- pip install transformers datasets
+- wget -nc https://lazyprogrammer.me/course_files/AirlineTweets.csv
+```py
+import numpy as np
+import pandas as pd
+import seaborn as sn
+import matplotlib.pyplot as plt
+import torch
+from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
+from sklearn.model_selection import train_test_split
+df_ = pd.read_csv('AirlineTweets.csv')
+df_.head()
+df = df_[['airline_sentiment', 'text']].copy()
+df.head()
+df['airline_sentiment'].hist()
+target_map = {'positive': 1, 'negative': 0, 'neutral': 2}
+df['target'] = df['airline_sentiment'].map(target_map)
+df2 = df[['text', 'target']]
+df2.columns = ['sentence', 'label']
+df2.to_csv('data.csv', index=None)
+from datasets import load_dataset
+raw_dataset = load_dataset('csv', data_files='data.csv')
+split = raw_dataset['train'].train_test_split(test_size=0.3, seed=42)
+checkpoint = 'distilbert-base-cased'
+from transformers import AutoTokenizer
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+def tokenize_fn(batch):
+  return tokenizer(batch['sentence'], truncation=True)
+tokenized_datasets = split.map(tokenize_fn, batched=True)
+from transformers import AutoModelForSequenceClassification, AutoConfig, \
+  Trainer, TrainingArguments
+config = AutoConfig.from_pretrained(checkpoint)
+config.id2label = {v:k for k, v in target_map.items()}
+config.label2id = target_map
+model = AutoModelForSequenceClassification.from_pretrained(
+    checkpoint, config=config) # config option is now afrom AutoConfig
+from torchinfo import summary
+training_args = TrainingArguments(
+  output_dir='training_dir',
+  evaluation_strategy='epoch',
+  save_strategy='epoch',
+  num_train_epochs=3,
+  per_device_train_batch_size=16,
+  per_device_eval_batch_size=64,
+)
+def compute_metrics(logits_and_labels):
+  logits, labels = logits_and_labels
+  predictions = np.argmax(logits, axis=-1)
+  acc = np.mean(predictions == labels)
+  f1 = f1_score(labels, predictions, average='macro')
+  return {'accuracy': acc, 'f1': f1}
+trainer = Trainer(
+    model,
+    training_args,
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["test"],
+    tokenizer=tokenizer,
+    compute_metrics=compute_metrics,
+)
+trainer.train()
+from transformers import pipeline
+savedmodel = pipeline('text-classification',
+                      model='training_dir/checkpoint-1282',
+                      device=0)
+s = split['test']['sentence'][0]
+print(s)
+savedmodel(s)
+```
 
 38. Fine-Tuning With Multiple Inputs (Textual Entailment)
+- Next exercise: Text classification with 2 input sequence
+- Applications
+  - Answering multiple choice questions
+  - Chatbots with past context
+  - Questino-answering
+- How can we change the number of inputs?
+  - With transfer learning, we only change the head of the neural network, keeping the inputs + middle layers the same
+- Textual entailment
+  - 'Bob buys cheese' -> 'Bob owns a house'
 
 39. Fine-Tuning transformers with Multiple Inputs in Python
+- pip install transformers datasets
+```py
+from datasets import load_dataset
+import numpy as np
+raw_datasets['train'].features
+checkpoint = 'distilbert-base-cased'
+# checkpoint = 'bert-base-cased'
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, \
+  Trainer, TrainingArguments
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+tokenizer(
+    raw_datasets['train']['sentence1'][0],
+    raw_datasets['train']['sentence2'][0])
+ distilbert doesn't use token_type_ids
+result.keys()
+# dict_keys(['input_ids', 'attention_mask'])
+model = AutoModelForSequenceClassification.from_pretrained(
+    checkpoint, num_labels=2)
+training_args = TrainingArguments(
+  output_dir='training_dir',
+  evaluation_strategy='epoch',
+  save_strategy='epoch',
+  num_train_epochs=5,
+  per_device_train_batch_size=16,
+  per_device_eval_batch_size=64,
+  logging_steps=150, # otherwise, 'no log' will appear under training loss
+)
+from datasets import load_metric
+metric = load_metric("glue", "rte")
+metric.compute(predictions=[1, 0, 1], references=[1, 0, 0])
+{'accuracy': 0.6666666666666666}
+from sklearn.metrics import f1_score
+def compute_metrics(logits_and_labels):
+  logits, labels = logits_and_labels
+  predictions = np.argmax(logits, axis=-1)
+  acc = np.mean(predictions == labels)
+  f1 = f1_score(labels, predictions)
+  return {'accuracy': acc, 'f1': f1}
+def tokenize_fn(batch):
+  return tokenizer(batch['sentence1'], batch['sentence2'], truncation=True)
+tokenized_datasets = raw_datasets.map(tokenize_fn, batched=True)
+trainer = Trainer(
+    model,
+    training_args,
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["validation"],
+    tokenizer=tokenizer,
+    compute_metrics=compute_metrics,
+)
+trainer.train()
+# distilbert train_steps_per_second': 1.91
+# bert 'train_steps_per_second': 1.042
+trainer.save_model('my_saved_model')
+from transformers import pipeline
+p = pipeline('text-classification', model='my_saved_model', device=0)
+p({'text': 'I went to the store', 'text_pair': 'I am a bird'})
+```
 
 40. Fine-Tuning Section Summary
+- Review of text processing and fine-tuning/transfer learning
+- Tokenizer - does all the text preprocessing steps
+- Transfer learning - we apply the parameters from one task to another task
 
 ## Named Entity Recognition (NER) and POS Tagging (Intermediate)
 
+41. Token Classification Section Introduction
+- Previous section: many to one
+  - a/great/movie -> positive
+- This section: many to many
+  - a/great/movie -> determiner/adjective/nown
+- Token classification
+  - Using HuggingFace library, we predict a class of each token in the input
+
+42. Data & Tokenizer (Code Preparation)
+- 3 Possible tasks
+  - NER (named entity recognition)
+  - POS (parts of speech) tagging
+  - Chunking
+
+43. Data & Tokenizer (Code)
+- pip install transformers datasets
+```py
+from datasets import load_dataset
+data = load_dataset("conll2003")
+# save for later
+label_names = data["train"].features['ner_tags'].feature.names
+from transformers import AutoTokenizer
+# also try using bert
+# we'll discuss why bert-like models are appropriate for this task later
+checkpoint = "distilbert-base-cased"
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+idx = 0
+t = tokenizer(data["train"][idx]["tokens"], is_split_into_words=True)
+```
+
+44. Target Alignment (Code Preparation)
+- Aligning targets to tokens
+  - For any word split into multiple tokens, we assign the same target
+- Word IDs list
+  - For the word split to tokens, they have same word IDs
+
+45. Create Tokenized Dataset (Code Preparation)
+
+46. Target Alignment (Code)
+- pip install seqeval
+```py
+t.tokens()
+'''
+['[CLS]',
+ 'EU',
+ 'rejects',
+ 'German',
+ 'call',
+ 'to',
+ 'boycott',
+ 'British',
+ 'la',
+ '##mb',
+ '.',
+ '[SEP]']
+'''
+# value of i indicates it is the i'th word
+# in the input sentence (counting from 0)
+t.word_ids()
+#[None, 0, 1, 2, 3, 4, 5, 6, 7, 7, 8, None]
+#['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-MISC', 'I-MISC']
+begin2inside = {
+  1: 2,
+  3: 4,
+  5: 6,
+  7: 8,
+}
+def align_targets(labels, word_ids):
+  aligned_labels = []
+  last_word = None
+  for word in word_ids:
+    if word is None:
+      # it's a token like [CLS]
+      label = -100
+    elif word != last_word:
+      # it's a new word!
+      label = labels[word]
+    else:
+      # it's the same word as before
+      label = labels[word]
+      # change B-<tag> to I-<tag> if necessary
+      if label in begin2inside:
+        label = begin2inside[label]
+    # add the label 
+    aligned_labels.append(label)
+    # update last word
+    last_word = word
+  return aligned_labels
+# try our function
+labels = data['train'][idx]['ner_tags']
+word_ids = t.word_ids()
+aligned_targets = align_targets(labels, word_ids)
+aligned_targets
+aligned_labels = [label_names[t] if t >= 0 else None for t in aligned_targets]
+for x, y in zip(t.tokens(), aligned_labels):
+  print(f"{x}\t{y}")
+# make up a fake input just to test it
+words = [
+  '[CLS]', 'Ger', '##man', 'call', 'to', 'boycott', 'Micro', '##soft', '[SEP]']
+word_ids = [None, 0, 0, 1, 2, 3, 4, 4, None]
+labels = [7, 0, 0, 0, 3]
+aligned_targets = align_targets(labels, word_ids)
+aligned_labels = [label_names[t] if t >= 0 else None for t in aligned_targets]
+for x, y in zip(words, aligned_labels):
+  print(f"{x}\t{y}")
+# tokenize both inputs and targets
+def tokenize_fn(batch):
+  # tokenize the input sequence first
+  # this populates input_ids, attention_mask, etc.
+  tokenized_inputs = tokenizer(
+    batch['tokens'], truncation=True, is_split_into_words=True
+  )
+  labels_batch = batch['ner_tags'] # original targets
+  aligned_labels_batch = []
+  for i, labels in enumerate(labels_batch):
+    word_ids = tokenized_inputs.word_ids(i)
+    aligned_labels_batch.append(align_targets(labels, word_ids)) 
+  # recall: the 'target' must be stored in key called 'labels'
+  tokenized_inputs['labels'] = aligned_labels_batch
+  return tokenized_inputs
+# want to remove these from model inputs - they are neither inputs nor targets
+data["train"].column_names
+#['id', 'tokens', 'pos_tags', 'chunk_tags', 'ner_tags']
+tokenized_datasets = data.map(
+  tokenize_fn,
+  batched=True,
+  remove_columns=data["train"].column_names,
+)
+```
+
+47. Data Collator (Code Preparation)
+- Data Collator
+  - Text preprocessing review: pad, truncate, Torch tensors
+  - All of these are done by data collator
+- We need to define Data Collator explicitly for this section
+
+48. Data Collator (Code)
+```py
+from transformers import DataCollatorForTokenClassification
+data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
+batch = data_collator([tokenized_datasets["train"][i] for i in range(2)])
+batch["labels"]
+```
+
+49. Metrics (Code Preparation)
+- What happens when we have multiple targets per sample?
+- seqeval: Standard method in Hugging Face
+  - Compute metrics for NLP tasks with sequence targets
+  - pip install seqeval
+- Suppose sequence has length T
+  - Labels are NxT (2D)
+  - Logits are NxTxK (3D)
+    - After argmax, predictions are NxT
+
+50. Metrics (Code)
+```py
+from datasets import load_metric
+metric = load_metric("seqeval")
+# test it out - no longer works, now it looks for actual NE tags
+#metric.compute(
+#    predictions=[0, 0, 0],
+#    references=[0, 0, 1]) # will not wokr. We need a list of lists
+# test it out
+metric.compute(
+    predictions=[[0, 0, 0]],
+    references=[[0, 0, 1]]) # not work well as they are integers
+# test it out - again: now it looks for actual NE tags
+metric.compute(
+    predictions=[['A', 'A', 'A']],
+    references=[['A', 'B', 'A']])
+# test it out
+metric.compute(
+    predictions=[['O', 'O', 'I-ORG', 'B-MISC']],
+    references=[['O', 'B-ORG', 'I-ORG', 'B-MISC']])
+import numpy as np
+def compute_metrics(logits_and_labels):
+  logits, labels = logits_and_labels
+  preds = np.argmax(logits, axis=-1)
+  # remove -100 from labels and predictions
+  # and convert the label_ids to label names
+  str_labels = [
+    [label_names[t] for t in label if t != -100] for label in labels
+  ]
+  # do the same for predictions whenever true label is -100
+  str_preds = [
+    [label_names[p] for p, t in zip(pred, targ) if t != -100] \
+      for pred, targ in zip(preds, labels)
+  ]
+  the_metrics = metric.compute(predictions=str_preds, references=str_labels)
+  return {
+    'precision': the_metrics['overall_precision'],
+    'recall': the_metrics['overall_recall'],
+    'f1': the_metrics['overall_f1'],
+    'accuracy': the_metrics['overall_accuracy'],
+  }
+```
+
+51. Model and Trainer (Code Preparation)
+
+52. Model and Trainer (Code)
+```py
+id2label = {k: v for k, v in enumerate(label_names)}
+label2id = {v: k for k, v in id2label.items()}
+from transformers import AutoModelForTokenClassification
+model = AutoModelForTokenClassification.from_pretrained(
+    checkpoint,
+    id2label=id2label,
+    label2id=label2id,
+)
+from transformers import TrainingArguments
+training_args = TrainingArguments(
+    "distilbert-finetuned-ner",
+    evaluation_strategy="epoch",
+    save_strategy="epoch",
+    learning_rate=2e-5,
+    num_train_epochs=3,
+    weight_decay=0.01,
+)
+from transformers import Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["validation"],
+    data_collator=data_collator,
+    compute_metrics=compute_metrics,
+    tokenizer=tokenizer,
+)
+trainer.train()
+trainer.save_model('my_saved_model')
+from transformers import pipeline
+ner = pipeline(
+  "token-classification",
+  model='my_saved_model',
+  aggregation_strategy="simple",
+  device=0,
+)
+s = "Bill Gates was the CEO of Microsoft in Seattle, Washington."
+ner(s)
+```
+
+53. POS Tagging & Custom Datasets (Exercise Prompt)
+- How we can do tokenization for customized data?
+- Similar to NER but no IOB format
+- We do parts-of-speech (POS) tagging
+- Exercise
+  - Load in the Brown corpus
+  - Convert it to JSON format
+  - Modify previous NER
+
+54. POS Tagging & Custom Datasets (Solution)
+- pip install transformers datasets
+```py
+import nltk
+from nltk.corpus import brown
+nltk.download('brown')
+nltk.download('universal_tagset')
+corpus = brown.tagged_sents(tagset='universal')
+corpus
+inputs = []
+targets = []
+for sentence_tag_pairs in corpus:
+  tokens = []
+  target = []
+  for token, tag in sentence_tag_pairs:
+    tokens.append(token)
+    target.append(tag)
+  inputs.append(tokens)
+  targets.append(target)
+# save data to json format
+import json
+with open('data.json', 'w') as f:
+  for x, y in zip(inputs, targets):
+    j = {'inputs': x, 'targets': y}
+    s = json.dumps(j)
+    f.write(f"{s}\n")
+from datasets import load_dataset
+data = load_dataset("json", data_files='data.json')
+small = data["train"].shuffle(seed=42).select(range(20_000)) # random 20,000 as full data is too big
+small
+data = small.train_test_split(seed=42)
+data["train"][0]
+data["train"].features
+# map targets to ints
+target_set = set()
+for target in targets:
+  target_set = target_set.union(target)
+target_set
+target_list = list(target_set)
+id2label = {k: v for k, v in enumerate(target_list)}
+label2id = {v: k for k, v in id2label.items()}
+from transformers import AutoTokenizer
+# also try using bert
+checkpoint = "distilbert-base-cased"
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+idx = 0
+t = tokenizer(data["train"][idx]["inputs"], is_split_into_words=True)
+t
+type(t)
+#transformers.tokenization_utils_base.BatchEncoding
+t.tokens()
+def align_targets(labels, word_ids):
+  aligned_labels = []
+  for word in word_ids:
+    if word is None:
+      # it's a token like [CLS]
+      label = -100
+    else:
+      # it's a real word
+      label = label2id[labels[word]]
+    # add the label 
+    aligned_labels.append(label)
+  return aligned_labels
+# try our function
+labels = data['train'][idx]['targets']
+word_ids = t.word_ids()
+aligned_targets = align_targets(labels, word_ids)
+aligned_targets
+aligned_labels = [id2label[i] if i >= 0 else None for i in aligned_targets]
+for x, y in zip(t.tokens(), aligned_labels):
+  print(f"{x}\t{y}")
+# tokenize both inputs and targets
+def tokenize_fn(batch):
+  # tokenize the input sequence first
+  # this populates input_ids, attention_mask, etc.
+  tokenized_inputs = tokenizer(
+    batch['inputs'], truncation=True, is_split_into_words=True
+  )
+  labels_batch = batch['targets'] # original targets
+  aligned_labels_batch = []
+  for i, labels in enumerate(labels_batch):
+    word_ids = tokenized_inputs.word_ids(i)
+    aligned_labels_batch.append(align_targets(labels, word_ids)) 
+  # recall: the 'target' must be stored in key called 'labels'
+  tokenized_inputs['labels'] = aligned_labels_batch
+  return tokenized_inputs
+# want to remove these from model inputs - they are neither inputs nor targets
+data["train"].column_names
+# ['inputs', 'targets']
+tokenized_datasets = data.map(
+  tokenize_fn,
+  batched=True,
+  remove_columns=data["train"].column_names,
+)
+from transformers import DataCollatorForTokenClassification
+data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
+# https://stackoverflow.com/questions/11264684/flatten-list-of-lists
+def flatten(list_of_lists):
+  flattened = [val for sublist in list_of_lists for val in sublist]
+  return flattened
+import numpy as np
+from sklearn.metrics import f1_score, accuracy_score
+def compute_metrics(logits_and_labels):
+  logits, labels = logits_and_labels
+  preds = np.argmax(logits, axis=-1)
+  # remove -100 from labels and predictions
+  labels_jagged = [[t for t in label if t != -100] for label in labels]
+  # do the same for predictions whenever true label is -100
+  preds_jagged = [[p for p, t in zip(ps, ts) if t != -100] \
+      for ps, ts in zip(preds, labels)
+  ]
+  # flatten labels and preds
+  labels_flat = flatten(labels_jagged)
+  preds_flat = flatten(preds_jagged)
+  acc = accuracy_score(labels_flat, preds_flat)
+  f1 = f1_score(labels_flat, preds_flat, average='macro')
+  return {
+    'f1': f1,
+    'accuracy': acc,
+  }
+labels = [[-100, 0, 0, 1, 2, 1, -100]]
+logits = np.array([[
+  [0.8, 0.1, 0.1],
+  [0.8, 0.1, 0.1],
+  [0.8, 0.1, 0.1],
+  [0.1, 0.8, 0.1],
+  [0.1, 0.8, 0.1],
+  [0.1, 0.8, 0.1],
+  [0.1, 0.8, 0.1],
+]])
+compute_metrics((logits, labels))
+{'accuracy': 0.8, 'f1': 0.6}
+from transformers import AutoModelForTokenClassification
+model = AutoModelForTokenClassification.from_pretrained(
+    checkpoint,
+    id2label=id2label,
+    label2id=label2id,
+)
+from transformers import TrainingArguments
+training_args = TrainingArguments(
+    "distilbert-finetuned-ner",
+    evaluation_strategy="epoch",
+    save_strategy="epoch",
+    num_train_epochs=2,
+)
+from transformers import Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["test"],
+    data_collator=data_collator,
+    compute_metrics=compute_metrics,
+    tokenizer=tokenizer,
+)
+trainer.train()
+trainer.save_model('my_saved_model')
+from transformers import pipeline
+pipe = pipeline(
+  "token-classification",
+  model='my_saved_model',
+  device=0,
+)
+s = "Bill Gates was the CEO of Microsoft in Seattle, Washington."
+pipe(s)
+```
+
+55. Token Classification Section Summary
+- Instead of classifying a document, we classify each token
+- Applications: NER, POS tagging, chunking
+- Same steps of: dataset, tokenizer, checkpoint, fine-tune, pipeline
+  - New steps: data collator, target alignment
+
 ## Seq2Seq and Neural Machine Translation (Intermediate) 
 
+56. Translation Section Introduction
+- Continuation of "fine-tuning"
+- Similar to NER/POS tags but they are 1:1 with the inputs
+- Translation may yield different lengths
+- New task, new classes
+  - AutoModelForSequenceClassification -> AutoModelForSeq2SeqLM
+  - DataCollatorWithPadding -> DataCollatorForSeq2Seq
+  - TrainingArguments -> Seq2SeqTrainingArguments
+  - Trainer -> Seq2SeqTrainer
+- Seq2seq is useful not not required
+
+57. Data & Tokenizer (Code Preparation)
+- Using KDE4, english -> french
+- Instead of 200,000 samples, we use random 1000 pairs
+- How to tokenizer the target?
+- No CLS/SEP
+  - Each new word starts with '_'
+
+58. Things Move Fast
+- Updated grammar of tokenizer
+
+59. Data & Tokenizer (Code) 
+- pip install transformers datasets sentencepiece
+```py
+from datasets import load_dataset
+# possible language pairs: https://opus.nlpl.eu/KDE4.php
+data = load_dataset("kde4", lang1="en", lang2="fr")
+data
+small = data["train"].shuffle(seed=42).select(range(1_000))
+split = small.train_test_split(seed=42)
+split["train"][0]
+from transformers import AutoTokenizer
+checkpoint = "Helsinki-NLP/opus-mt-en-fr"
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+en = split['train'][5]['translation']['en']
+fr = split['train'][5]['translation']['fr']
+en, fr
+inputs = tokenizer(en) # updated grammar
+inputs
+targets = tokenizer(text_target=fr)
+targets
+tokenizer.convert_ids_to_tokens(targets['input_ids'])
+# wrong language
+bad_targets = tokenizer(fr)
+tokenizer.convert_ids_to_tokens(bad_targets['input_ids'])
+```
+
+60. Aside: Seq2Seq Basics (Optional)
+61. Model Inputs (Code Preparation) 
+62. Model Inputs (Code) 
+```py
+import matplotlib.pyplot as plt
+train = split['train']['translation']
+input_lens = [len(tr['en']) for tr in train]
+plt.hist(input_lens, bins=50);
+max_input_len = 128
+max_target_len = 128
+def tokenizer_fn(batch):
+  inputs = [x['en'] for x in batch['translation']]
+  targets = [x['fr'] for x in batch['translation']]
+  tokenized_inputs = tokenizer(
+    inputs, max_length=max_input_len, truncation=True)
+  tokenized_targets = tokenizer(
+    text_target=targets, max_length=max_target_len, truncation=True) 
+  tokenized_inputs['labels'] = tokenized_targets['input_ids']
+  return tokenized_inputs
+tokenized_datasets = split.map(
+    tokenizer_fn,
+    batched=True,
+    remove_columns=split['train'].column_names,
+)
+```
+
+63. Translation Metrics (BLEU Score & BERT Score) (Code Preparation) 
+
+64. Translation Metrics (BLEU Score & BERT Score) (Code) 
+- pip install sacrebleu bert-score
+```py
+from datasets import load_metric
+bleu_metric = load_metric("sacrebleu")
+bert_metric = load_metric("bertscore")
+# targets must be in a list - as you recall, for bleu there can be multiple
+# acceptable reference translations
+bleu_metric.compute(predictions=["I love cats"], references=[["I love cats"]])
+s = "Marian is an efficient NMT framework written in pure C++"
+bleu_metric.compute(predictions=[s], references=[[s]])
+bert_metric.compute(
+    predictions=["I love cats"], references=[["I like cats"]], lang='en')
+import numpy as np
+def compute_metrics(preds_and_labels):
+  # preds are not logits, but token ids
+  preds, labels = preds_and_labels
+  # convert predictions into words
+  decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+  # for any -100 label, replace with pad token id
+  labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+  # convert labels into words
+  decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+  # get rid of extraneous whitespace
+  # and also, put targets into lists
+  decoded_preds = [pred.strip() for pred in decoded_preds]
+  decoded_labels = [[label.strip()] for label in decoded_labels]
+  bleu = bleu_metric.compute(
+      predictions=decoded_preds, references=decoded_labels)
+  bert_score = bert_metric.compute(
+      predictions=decoded_preds, references=decoded_labels, lang='fr')
+  return {"bleu": bleu["score"], 'bert_score': np.mean(bert_score['f1'])}
+```  
+
+65. Train & Evaluate (Code Preparation) 
+
+66. Train & Evaluate (Code) 
+```py
+from transformers import Seq2SeqTrainingArguments
+training_args = Seq2SeqTrainingArguments(
+  "finetuned-model",
+  evaluation_strategy="no",
+  save_strategy="epoch",
+  learning_rate=2e-5,
+  per_device_train_batch_size=32,
+  per_device_eval_batch_size=64,
+  weight_decay=0.01,
+  save_total_limit=3,
+  num_train_epochs=3,
+  predict_with_generate=True,
+  fp16=True,
+)
+from transformers import Seq2SeqTrainer
+trainer = Seq2SeqTrainer(
+    model,
+    training_args,
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["test"],
+    data_collator=data_collator,
+    tokenizer=tokenizer,
+    compute_metrics=compute_metrics,
+)
+# let's check our metrics before we start!
+trainer.evaluate(max_length=max_target_len)
+# may run out of gpu memory - try to restart runtime
+# or get a more powerful gpu!
+trainer.train()
+# let's check our metrics again
+trainer.evaluate(max_length=max_target_len)
+trainer.save_model("my_saved_model")
+from transformers import pipeline
+translator = pipeline("translation", model='my_saved_model', device=0)
+translator("I hope this course has helped you on your data science journey!")
+```
+
+67. Translation Section Summary 
+- Dataset and tokenizer
+  - New: tokenizing the target
+- Preparing model inputs, data collator
+- Decoder input and seq2seq architecture
+- Metrics: BLEU score and BERT score (vector similartiy vs exact match)
+- Train, evaluate, pipeline
+
 ## Question-Answering (Advanced) 
+
+68. Question-Answering Section Introduction 
+69. Exploring the Dataset (SQuAD) 
+70. Exploring the Dataset (SQuAD) in Python 
+71. Using the Tokenizer 
+72. Using the Tokenizer in Python 
+73. Aligning the Targets 
+74. Aligning the Targets in Python 
+75. Applying the Tokenizer 
+76. Applying the Tokenizer in Python 
+77. Question-Answering Metrics 
+78. Question-Answering Metrics in Python 
+79. From Logits to Answers 
+80. From Logits to Answers in Python 
+81. Computing Metrics 
+82. Computing Metrics in Python 
+83. Train and Evaluate 
+84. Train and Evaluate in Python 
+85. Question-Answering Section Summary 
 
 ## Transformers and Attention Theory (Advanced) 
 
