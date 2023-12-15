@@ -1459,6 +1459,8 @@ PING 192.168.1.1 (192.168.1.1) 56(84) bytes of data.
 147. Unified communication networks
 
 148. Quality of Service (QoS)
+- For higher priority service, faster transmission. For intermediate/low priority service, less fast transmission
+  - So there must be methods to recognize the priority then provide different service per priority
 -  A feature set used to engineer or prioritize various traffic types based on classifications marked in traffic
 - When there is congestion in network
 - Buffer (aka Queue)
