@@ -1704,23 +1704,580 @@ translator("I hope this course has helped you on your data science journey!")
 ## Question-Answering (Advanced) 
 
 68. Question-Answering Section Introduction 
+- How to fine-tune a transformer for Q/A
+- Extractive QA
+  - Input: context + question
+  - Output: answer (=substring of context)
+- Contexts can be very long - how do we handle this?
+- How to convert neural network outputs (numbers) into answer (text) ?
+
 69. Exploring the Dataset (SQuAD) 
+- SQuAD: Standford Question Answering Dataset
+- Input = (context, question)
+- Answer = substring of the context
+- There could be multiple answers
+  - Stored in lists
+  - For train set, there is only one answer per sample
+
 70. Exploring the Dataset (SQuAD) in Python 
+- pip install transformers datasets
+```py
+from datasets import load_dataset
+raw_datasets = load_dataset("squad")
+raw_datasets
+# for train set, ensure that there's always 1 answer
+# not multiple answers, or no answers
+raw_datasets["train"].filter(lambda x: len(x["answers"]["text"]) != 1)
+```
+
 71. Using the Tokenizer 
+- model_inputs = tokenizer(questions, contexts)
+- Long contexts
+  - BERT can only handle a limited number of tokens
+  - Split the context into multiple windows
+    - Overlapping (stride) window to avoid complete separation
+
 72. Using the Tokenizer in Python 
+```py
+from transformers import AutoTokenizer
+model_checkpoint = "distilbert-base-cased"
+# model_checkpoint = "bert-base-cased" # try it yourself
+tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+context = raw_datasets["train"][1]["context"]
+question = raw_datasets["train"][1]["question"]
+inputs = tokenizer(question, context)
+tokenizer.decode(inputs["input_ids"])
+# what if the context is really long?
+# split it into multiple samples
+inputs = tokenizer(
+  question,
+  context,
+  max_length=100,
+  truncation="only_second",
+  stride=50,
+  return_overflowing_tokens=True,
+)
+for ids in inputs["input_ids"]:
+  print(tokenizer.decode(ids))
+inputs = tokenizer(
+    raw_datasets["train"][:3]["question"],
+    raw_datasets["train"][:3]["context"],
+    max_length=100,
+    truncation="only_second",
+    stride=50,
+    return_overflowing_tokens=True,
+    return_offsets_mapping=True,
+)
+inputs['overflow_to_sample_mapping']
+# recreate inputs for just a single context-question pair
+inputs = tokenizer(
+    question,
+    context,
+    max_length=100,
+    truncation="only_second",
+    stride=50,
+    return_overflowing_tokens=True,
+    return_offsets_mapping=True,
+)
+inputs.keys()
+# what is this (weirdly named) offset_mapping?
+# it tells us the location of each token
+# notes:
+# special tokens take up 0 space - (0, 0)
+# the question portion is the same for each sample
+# the context portion starting point inceases in each sample
+inputs['offset_mapping']
+```
+
 73. Aligning the Targets 
+- Answer in the dataset comes with a start position (within context)
+- Splitting window, this position is not valid anymore
+- Randomizing the position
+- Finding the answer
+  - Assuming that we have a context window, not full context
+  - When the answer is not contained in the window
+    - Offset mapping
+    - Context start + context end
+
 74. Aligning the Targets in Python 
+```py
+# problem: the position of the answer will change in each
+# window of the context
+# the answer is also the target for the neural network
+# how can we recompute the targets for each context window?
+# since we took the question and context from this sample earlier
+answer = raw_datasets["train"][1]["answers"]
+answer
+type(inputs.sequence_ids(0))
+# find the start and end of the context (the first and last '1')
+sequence_ids = inputs.sequence_ids(0)
+ctx_start = sequence_ids.index(1) # first occurrence
+ctx_end = len(sequence_ids) - sequence_ids[::-1].index(1) - 1 # last occurrence
+ctx_start, ctx_end
+# check whether or not the answer is fully contained within the context
+# if not, target is (start, end) = (0, 0)
+ans_start_char = answer['answer_start'][0]
+ans_end_char = ans_start_char + len(answer['text'][0])
+offset = inputs['offset_mapping'][0]
+start_idx = 0
+end_idx = 0
+if offset[ctx_start][0] > ans_start_char or offset[ctx_end][1] < ans_end_char:
+  print("target is (0, 0)")
+  # nothing else to do
+else:
+  # find the start and end TOKEN positions
+  # the 'trick' is knowing what is in units of tokens and what is in
+  # units of characters
+  # recall: the offset_mapping contains the character positions of each token
+  i = ctx_start
+  for start_end_char in offset[ctx_start:]:
+    start, end = start_end_char
+    if start == ans_start_char:
+      start_idx = i
+      # don't break yet   
+    if end == ans_end_char:
+      end_idx = i
+      break
+    i += 1
+start_idx, end_idx
+# check
+input_ids = inputs['input_ids'][0]
+input_ids[start_idx : end_idx + 1]
+#[170, 7335, 5921, 1104, 4028]
+tokenizer.decode(input_ids[start_idx : end_idx + 1])
+def find_answer_token_idx(
+    ctx_start,
+    ctx_end,
+    ans_start_char,
+    ans_end_char,
+    offset): 
+  start_idx = 0
+  end_idx = 0
+  if offset[ctx_start][0] > ans_start_char or offset[ctx_end][1] < ans_end_char:
+    pass
+    # print("target is (0, 0)")
+    # nothing else to do
+  else:
+    # find the start and end TOKEN positions
+    # the 'trick' is knowing what is in units of tokens and what is in
+    # units of characters
+    # recall: the offset_mapping contains the character positions of each token
+    i = ctx_start
+    for start_end_char in offset[ctx_start:]:
+      start, end = start_end_char
+      if start == ans_start_char:
+        start_idx = i
+        # don't break yet      
+      if end == ans_end_char:
+        end_idx = i
+        break
+      i += 1
+  return start_idx, end_idx
+# try it on all context windows
+# sometimes, the answer won't appear!
+start_idxs = []
+end_idxs = []
+for i, offset in enumerate(inputs['offset_mapping']):
+  # the final window may not be full size - can't assume 100
+  sequence_ids = inputs.sequence_ids(i)
+  # find start + end of context (first 1 and last 1)
+  ctx_start = sequence_ids.index(1)
+  ctx_end = len(sequence_ids) - sequence_ids[::-1].index(1) - 1
+  start_idx, end_idx = find_answer_token_idx(
+    ctx_start,
+    ctx_end,
+    ans_start_char,
+    ans_end_char,
+    offset)
+  start_idxs.append(start_idx)
+  end_idxs.append(end_idx)
+start_idxs, end_idxs
+```
+
 75. Applying the Tokenizer 
+- Now we want to use the tokenizer to get model inputs
+
 76. Applying the Tokenizer in Python 
+```py
+# some questions have leading and/or trailing whitespace
+for q in raw_datasets["train"]["question"][:1000]:
+  if q.strip() != q:
+    print(q)
+# Showing extra whitespaces
+#
+# now we are ready to process (tokenize) the training data
+# (i.e. expand question+context pairs into question+smaller context windows)
+# Google used 384 for SQuAD
+max_length = 384
+stride = 128
+def tokenize_fn_train(batch):
+  # some questions have leading and/or trailing whitespace
+  questions = [q.strip() for q in batch["question"]]
+  # tokenize the data (with padding this time)
+  # since most contexts are long, we won't bother to pad per-minibatch
+  inputs = tokenizer(
+    questions,
+    batch["context"],
+    max_length=max_length,
+    truncation="only_second",
+    stride=stride,
+    return_overflowing_tokens=True,
+    return_offsets_mapping=True,
+    padding="max_length",
+  )
+  # we don't need these later so remove them
+  offset_mapping = inputs.pop("offset_mapping")
+  orig_sample_idxs = inputs.pop("overflow_to_sample_mapping")
+  answers = batch['answers']
+  start_idxs, end_idxs = [], []
+  # same loop as above
+  for i, offset in enumerate(offset_mapping):
+    sample_idx = orig_sample_idxs[i]
+    answer = answers[sample_idx]
+    ans_start_char = answer['answer_start'][0]
+    ans_end_char = ans_start_char + len(answer['text'][0])
+    sequence_ids = inputs.sequence_ids(i)
+    # find start + end of context (first 1 and last 1)
+    ctx_start = sequence_ids.index(1)
+    ctx_end = len(sequence_ids) - sequence_ids[::-1].index(1) - 1
+    start_idx, end_idx = find_answer_token_idx(
+      ctx_start,
+      ctx_end,
+      ans_start_char,
+      ans_end_char,
+      offset)
+    start_idxs.append(start_idx)
+    end_idxs.append(end_idx) 
+  inputs["start_positions"] = start_idxs
+  inputs["end_positions"] = end_idxs
+  return inputs
+train_dataset = raw_datasets["train"].map(
+  tokenize_fn_train,
+  batched=True,
+  remove_columns=raw_datasets["train"].column_names,
+)
+len(raw_datasets["train"]), len(train_dataset)
+# (87599, 88729)
+# note: we'll keep these IDs for later
+raw_datasets["validation"][0]
+#{'answers': ...
+# 'context': ...
+# 'id': '56be4db0acb8001400a502ec', <------- ID
+# 'question': ...
+# 'title': 'Super_Bowl_50'}
+# 
+# tokenize the validation set differently
+# we won't need the targets since we will just compare with the original answer
+# also: overwrite offset_mapping with Nones in place of question
+def tokenize_fn_validation(batch):
+  # some questions have leading and/or trailing whitespace
+  questions = [q.strip() for q in batch["question"]]
+  # tokenize the data (with padding this time)
+  # since most contexts are long, we won't bother to pad per-minibatch
+  inputs = tokenizer(
+    questions,
+    batch["context"],
+    max_length=max_length,
+    truncation="only_second",
+    stride=stride,
+    return_overflowing_tokens=True,
+    return_offsets_mapping=True,
+    padding="max_length",
+  )
+  # we don't need these later so remove them
+  orig_sample_idxs = inputs.pop("overflow_to_sample_mapping")
+  sample_ids = []
+  # rewrite offset mapping by replacing question tuples with None
+  # this will be helpful later on when we compute metrics
+  for i in range(len(inputs["input_ids"])):
+    sample_idx = orig_sample_idxs[i]
+    sample_ids.append(batch['id'][sample_idx])
+    sequence_ids = inputs.sequence_ids(i)
+    offset = inputs["offset_mapping"][i]
+    inputs["offset_mapping"][i] = [
+      x if sequence_ids[j] == 1 else None for j, x in enumerate(offset)]   
+  inputs['sample_id'] = sample_ids
+  return inputs
+validation_dataset = raw_datasets["validation"].map(
+  tokenize_fn_validation,
+  batched=True,
+    remove_columns=raw_datasets["validation"].column_names,
+)
+len(raw_datasets["validation"]), len(validation_dataset)
+```
+
 77. Question-Answering Metrics 
+- Metric does not involve low-level quantities like token positions
+- Compare actual string answers
+- We use metric.compute
+  - `exact_match` and `f1` (more lenient)
+
 78. Question-Answering Metrics in Python 
+```py
+from datasets import load_metric
+metric = load_metric("squad")
+predicted_answers = [
+  {'id': '1', 'prediction_text': 'Albert Einstein'},
+  {'id': '2', 'prediction_text': 'physicist'},
+  {'id': '3', 'prediction_text': 'general relativity'},
+]
+true_answers = [
+  {'id': '1', 'answers': {'text': ['Albert Einstein'], 'answer_start': [100]}},
+  {'id': '2', 'answers': {'text': ['physicist'], 'answer_start': [100]}},
+  {'id': '3', 'answers': {'text': ['special relativity'], 'answer_start': [100]}},
+]
+# id and answer_start seem superfluous but you'll get an error if not included
+# exercise: remove them (one at a time) and see!
+metric.compute(predictions=predicted_answers, references=true_answers)
+#{'exact_match': 66.66666666666667, 'f1': 83.33333333333333}
+```
+
 79. From Logits to Answers 
+- `metric.compute` takes in string answers
+  - Must convert logits to answers
+- Our model is not trained yet
+  - We may use pretrained model
+  - Then convert its predictions (logits) to strings
+- Converting logits to answers
+  - Probabilities of start tokens: p(s1), p(s2), ...
+  - Probabilities of end tokens: p(e1), p(e2), ...
+  - p(si,ej)=p(si)\*p(ej)
+- Instead of full search, we find top 20 p(si) and p(ej)
+- Invalid answers
+  - i or j outside of context
+  - i > j
+  - Too long answer
+
 80. From Logits to Answers in Python 
+```py
+# next problem: how to go from logits to prediction text?
+# to make it easier, let's work on an already-trained question-answering model
+small_validation_dataset = raw_datasets["validation"].select(range(100)) # 100 set, not full data
+trained_checkpoint = "distilbert-base-cased-distilled-squad"
+tokenizer2 = AutoTokenizer.from_pretrained(trained_checkpoint)
+# temporarily assign tokenizer2 to tokenizer since it's used as a global
+# in tokenize_fn_validation
+old_tokenizer = tokenizer
+tokenizer = tokenizer2
+small_validation_processed = small_validation_dataset.map(
+    tokenize_fn_validation,
+    batched=True,
+    remove_columns=raw_datasets["validation"].column_names,
+)
+# change it back
+tokenizer = old_tokenizer
+# get the model outputs
+import torch
+from transformers import AutoModelForQuestionAnswering
+# the trained model doesn't use these columns
+small_model_inputs = small_validation_processed.remove_columns(
+  ["sample_id", "offset_mapping"])
+small_model_inputs.set_format("torch")
+# get gpu device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# move tensors to gpu device
+small_model_inputs_gpu = {
+  k: small_model_inputs[k].to(device) for k in small_model_inputs.column_names
+}
+# download the model
+trained_model = AutoModelForQuestionAnswering.from_pretrained(
+  trained_checkpoint).to(device)
+# get the model outputs
+with torch.no_grad():
+  outputs = trained_model(**small_model_inputs_gpu)
+start_logits = outputs.start_logits.cpu().numpy()
+end_logits = outputs.end_logits.cpu().numpy()
+# example: {'56be4db0acb8001400a502ec': [0, 1, 2, 3], ...}
+sample_id2idxs = {}
+for i, id_ in enumerate(small_validation_processed['sample_id']):
+  if id_ not in sample_id2idxs:
+    sample_id2idxs[id_] = [i]
+  else:
+    print("here")
+    sample_id2idxs[id_].append(i)
+start_logits.shape, end_logits.shape
+#((100, 384), (100, 384))
+n_largest = 20
+max_answer_length = 30
+predicted_answers = []
+# we are looping through the original (untokenized) dataset
+# because we need to grab the answer from the original string context
+for sample in small_validation_dataset:
+  sample_id = sample['id']
+  context = sample['context']
+  # update these as we loop through candidate answers
+  best_score = float('-inf')
+  best_answer = None
+  # now loop through the *expanded* input samples (fixed size context windows)
+  # from here we will pick the highest probability start/end combination
+  for idx in sample_id2idxs[sample_id]:
+    start_logit = start_logits[idx] # (384,) vector
+    end_logit = end_logits[idx] # (384,) vector
+    offsets = small_validation_processed[idx]['offset_mapping']
+    start_indices = (-start_logit).argsort()
+    end_indices = (-end_logit).argsort()
+    for start_idx in start_indices[:n_largest]:
+      for end_idx in end_indices[:n_largest]:
+        # skip answers not contained in context window
+        # recall: we set entries not pertaining to context to None earlier
+        if offsets[start_idx] is None or offsets[end_idx] is None:
+          continue       
+        # skip answers where end < start
+        if end_idx < start_idx:
+          continue        
+        # skip answers that are too long
+        if end_idx - start_idx + 1 > max_answer_length:
+          continue        
+        # see theory lecture for score calculation
+        score = start_logit[start_idx] + end_logit[end_idx]
+        if score > best_score:
+          best_score = score
+          # find positions of start and end characters
+          # recall: offsets contains tuples for each token:
+          # (start_char, end_char)
+          first_ch = offsets[start_idx][0]
+          last_ch = offsets[end_idx][1]
+          best_answer = context[first_ch:last_ch]
+  # save best answer
+  predicted_answers.append({'id': sample_id, 'prediction_text': best_answer})
+small_validation_dataset['answers'][0]
+# now test it!
+true_answers = [
+  {'id': x['id'], 'answers': x['answers']} for x in small_validation_dataset
+]
+metric.compute(predictions=predicted_answers, references=true_answers)
+```
+
 81. Computing Metrics 
+
 82. Computing Metrics in Python 
+```py
+# now let's define a full compute_metrics function
+# note: this will NOT be called from the trainer
+from tqdm.autonotebook import tqdm
+def compute_metrics(start_logits, end_logits, processed_dataset, orig_dataset):
+  # map sample_id ('56be4db0acb8001400a502ec') to row indices of processed data
+  sample_id2idxs = {}
+  for i, id_ in enumerate(processed_dataset['sample_id']):
+    if id_ not in sample_id2idxs:
+      sample_id2idxs[id_] = [i]
+    else:
+      sample_id2idxs[id_].append(i)
+  predicted_answers = []
+  for sample in tqdm(orig_dataset):
+    sample_id = sample['id']
+    context = sample['context']
+    # update these as we loop through candidate answers
+    best_score = float('-inf')
+    best_answer = None
+    # now loop through the *expanded* input samples (fixed size context windows)
+    # from here we will pick the highest probability start/end combination
+    for idx in sample_id2idxs[sample_id]:
+      start_logit = start_logits[idx] # (T,) vector
+      end_logit = end_logits[idx] # (T,) vector
+      # note: do NOT do the reverse: ['offset_mapping'][idx]
+      offsets = processed_dataset[idx]['offset_mapping']
+      start_indices = (-start_logit).argsort()
+      end_indices = (-end_logit).argsort()
+      for start_idx in start_indices[:n_largest]:
+        for end_idx in end_indices[:n_largest]:
+          # skip answers not contained in context window
+          # recall: we set entries not pertaining to context to None earlier
+          if offsets[start_idx] is None or offsets[end_idx] is None:
+            continue         
+          # skip answers where end < start
+          if end_idx < start_idx:
+            continue          
+          # skip answers that are too long
+          if end_idx - start_idx + 1 > max_answer_length:
+            continue          
+          # see theory lecture for score calculation
+          score = start_logit[start_idx] + end_logit[end_idx]
+          if score > best_score:
+            best_score = score
+            # find positions of start and end characters
+            # recall: offsets contains tuples for each token:
+            # (start_char, end_char)
+            first_ch = offsets[start_idx][0]
+            last_ch = offsets[end_idx][1]
+            best_answer = context[first_ch:last_ch]
+    # save best answer
+    predicted_answers.append({'id': sample_id, 'prediction_text': best_answer})  
+  # compute the metrics
+  true_answers = [
+    {'id': x['id'], 'answers': x['answers']} for x in orig_dataset
+  ]
+  return metric.compute(predictions=predicted_answers, references=true_answers)
+# run our function on the same mini dataset as before
+compute_metrics(
+    start_logits,
+    end_logits,
+    small_validation_processed,
+    small_validation_dataset,
+)
+```
+
 83. Train and Evaluate 
+
 84. Train and Evaluate in Python 
+```py
+# now load the model we want to fine-tune
+model = AutoModelForQuestionAnswering.from_pretrained(model_checkpoint)
+from transformers import TrainingArguments
+args = TrainingArguments(
+    "finetuned-squad",
+    evaluation_strategy="no",
+    save_strategy="epoch",
+    learning_rate=2e-5,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    fp16=True,
+)
+from transformers import Trainer
+# takes ~2.5h with bert on full dataset
+# ~1h 15min with distilbert
+trainer = Trainer(
+    model=model,
+    args=args,
+    train_dataset=train_dataset,
+    # train_dataset=train_dataset.shuffle(seed=42).select(range(1_000)),
+    eval_dataset=validation_dataset,
+    tokenizer=tokenizer,
+)
+trainer.train()
+trainer_output = trainer.predict(validation_dataset)
+type(trainer_output)
+trainer_output
+predictions, _, _ = trainer_output
+predictions
+start_logits, end_logits = predictions
+compute_metrics(
+    start_logits,
+    end_logits,
+    validation_dataset, # processed
+    raw_datasets["validation"], # orig
+)
+trainer.save_model('my_saved_model')
+from transformers import pipeline
+qa = pipeline(
+  "question-answering",
+  model='my_saved_model',
+  device=0,
+)
+context = "Today I went to the store to purchase a carton of milk."
+question = "What did I buy?"
+qa(context=context, question=question)
+# exercise: try it with bert instead of distilbert for an even higher score!
+```
+
 85. Question-Answering Section Summary 
+- Fine-tune BERT-like model for QA
+- Usual steps: tokenizer, metrics, trainer, pipeline, etc
+- Challenge
+  - Long contexts
+  - Computing metrics: how to convert outputs into correct format
+- Your own QA system for biology, legal documents, and history
+  - Lab data and TAX documents?
 
 ## Transformers and Attention Theory (Advanced) 
 
@@ -2865,4 +3422,3 @@ translate("How are you?")
 ```
 
 117. Implementation Section Summary
-
