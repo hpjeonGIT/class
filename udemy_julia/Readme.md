@@ -1877,21 +1877,526 @@ julia> methods(f) # <------ shows the list of function defintions
  [3] f(x, y)
      @ REPL[25]:1
 
-
 ```
 
 55. Parametric Methods
+```julia
+julia> f(x::T, y::Q) where {T, Q} = "Dummy function with argument template"
+f (generic function with 1 method)
+ 
+julia> f(1, 2)
+"Dummy function with argument template"
+ 
+julia> f(1.0, "str")
+"Dummy function with argument template"
+ 
+julia> f(x::T, y::Q) where {T, Q} = println("$x is type of $T while $y is  type of $Q")
+f (generic function with 1 method)
+ 
+julia> f(1,2.0)
+1 is type of Int64 while 2.0 is  type of Float64
+ 
+julia> g(x::Vararg{T,2}) where {T} = maximum(x) # <---- limits the number of args.
+g (generic function with 1 method)
+ 
+julia> g(1,2)
+2
+ 
+julia> g(3.1, 2.1)
+3.1
+ 
+julia> g(3.1) # <---- one argument is not allowed
+ERROR: MethodError: no method matching g(::Float64)
+julia> g(3.1, 2.1, 3) # <---- 3 arguments are not allowed
+ERROR: MethodError: no method matching g(::Float64, ::Float64, ::Int64)
+```
 
 56. Function Like Objects
+- Callable objects or Functors
+- A struct made callable like a function
+![functor](./ch56_functor.png)
+```julia
+ 
+julia> mutable struct mymodel{T}
+         coeff::Vector{T}
+       end
+ 
+julia> function (m::mymodel)(x) # Note that there is no function name
+         coeff = m.coeff
+         s = 0
+         for i in 1:length(x)
+           s += x[i]*coeff[i]
+         end
+         return s
+       end
+ 
+julia> m1= mymodel([1,2,4])
+mymodel{Int64}([1, 2, 4])
+ 
+julia> m1([1,1,1]) # [1,2,4]\dot[1,1,1]
+7
+```
 
 57. Constructors
+- Function with the same name of struct. Return struct objects
+```julia
+julia> mutable struct ScoreDB
+         name::String
+         score::Int64
+         function ScoreDB(name,score)
+           score < 0 ? throw("Negative score") : new(name,score) #<--- Note that we use new(). We may setup any default values if necessary
+         end
+       end
+ 
+julia> s1 = ScoreDB("Jane", 25)
+ScoreDB("Jane", 25)
+ 
+julia> s2 = ScoreDB("John", -25)
+ERROR: "Negative score"
+Stacktrace:
+[1] ScoreDB(name::String, score::Int64)
+   @ Main ./REPL[48]:5
+[2] top-level scope
+   @ REPL[50]:1
+```  
 
 58. Neural Network Demo
 
 ## Section 8: Modules and Packages
 
+59. Introduction
+- Separate code vs variables/types/functions
+- Sample module: MyModule.jl
+```julia
+module MyModule
+export myfunc
+myvar
+mystruct
+myfunc
+end
+```
+- This can be used as:
+```julia
+using MyModule
+myfunc()         # no name space required as exported
+MyModule.mystruct # name space is required
+```
+- Or
+```julia
+import MyModule
+Mymodule.mystruct
+```
+- Or
+```julia
+import MyModule: myfunc
+using MyModule: mystruct
+```
+- Or `include("MyModule.jl")`
+
+60. Writing and Using Modules
+
+61. Revise Package
+- Instead of restart julia, Use Revise packge
+```julia
+add Revise
+push!(LOAD_PATH,pwd())
+using Revise
+Using MyModule
+m1 = MyModule.mystruct
+... # some change in the module file
+m1 # change in the module file works immediately
+```
+
+62. Package Development
+- Press ']' to activate Pkg REPL
+
 ## Section 9: Metaprogramming
+
+63. Introduction
+- Lisp: code is data, data is code
+- In Julia, code is represented as Abstract Syntax Tree (AST)
+- Why metaprogramming?
+                - Ref: Tom Kwong, Hands on Design Patterns and Best Practices with Julia
+                - May allow a solution to be more concise/easier to understand
+                - May reduce the development time as source code is generated rather than  written out
+                - May improve performance
+```julia
+julia> function gettime(myf)
+         t0 = Dates.now()
+         result = myf()
+         t1 = Dates.now()
+         println(t1-t0, " sec")
+       end
+gettime (generic function with 1 method)
+ 
+julia> gettime(rand(1_000_1000))  #<-------- This crashes
+ERROR: MethodError: objects of type Vector{Float64} are not callable
+ 
+julia> gettime( () -> rand(1_000_000)) # using anonymous function
+2 milliseconds sec
+ 
+julia> f() = rand(1_000_000)  # Or link as a new function f(). Note that it doesn't have any argument
+f (generic function with 2 methods)
+ 
+julia> gettime(f)
+2 milliseconds sec
+```
+
+64. Symbols and Expressions
+- Symbol: Use colon (:) operator
+```julia
+julia> num = 7+8
+15
+ 
+julia> s = :num
+:num
+ 
+julia> typeof(s)
+Symbol
+ 
+julia> s
+:num
+ 
+julia> eval(s)
+15
+ 
+julia> Symbol("num")
+:num
+ 
+julia> ex = :(a+b)
+:(a + b)
+ 
+julia> typeof(ex)
+Expr
+ 
+julia> a=7; b=3;
+ 
+julia> eval(ex)
+10
+ 
+julia> propertynames(ex)
+(:head, :args)
+ 
+julia> ex.head
+:call
+ 
+julia> ex.args
+3-element Vector{Any}:
+:+
+:a
+:b
+ julia> dump(ex)
+Expr
+  head: Symbol call
+  args: Array{Any}((3,))
+    1: Symbol +
+    2: Symbol a
+    3: Symbol b
+```
+
+65. Writing Macros
+- Function vs Macro
+    - Input: Data vs Expression,, Symbol or Literal
+    - Output: Data vs Expression
+    - Runtime vs Expaned during compilation
+```julia
+julia> macro hello(exp)
+         print("Hello", exp)
+       end
+@hello (macro with 1 method)
+ 
+julia> @hello 1+1
+Hello1 + 1
+julia> @hello("world")
+Helloworld
+julia> @hello world  # world is as an expression, not data
+Helloworld
+```
 
 ## Section 10: Streams and Networking
 
+66. Introduction
+
+67. Basic Input & Output
+```julia
+julia> typeof(stdin)
+Base.TTY
+ 
+julia> typeof(stdout)
+Base.TTY
+ 
+julia> read(stdin,Char)
+a
+'a': ASCII/Unicode U+0061 (category Ll: Letter, lowercase)
+ 
+julia> write(stdout, "hello world");
+hello world
+ 
+julia> a = readline(stdin)
+hello world
+"hello world"
+ 
+julia> a
+"hello world"
+ 
+```
+
+68. File Input & Output
+```julia
+ 
+julia> f = open("./sample.txt")
+IOStream(<file ./sample.txt>)
+ 
+julia> txt = readlines(f)
+2-element Vector{String}:
+"Hello world"
+"December 2023"
+ 
+julia> close(f)
+ 
+julia> f = open("./sample.txt")
+IOStream(<file ./sample.txt>)
+ 
+julia> txt = readlines(f)
+2-element Vector{String}:
+"Hello world"
+"December 2023"
+ 
+julia> close(f)
+ 
+julia> open("./sample.txt") do file
+         global txt=readlines(file)
+       end
+2-element Vector{String}:
+"Hello world"
+"December 2023"
+ 
+julia> open("./sample.txt") do file
+         for line in eachline(file)
+           println(line)
+         end
+       end
+Hello world
+December 2023
+ 
+julia> vec = 1:10
+1:10
+ 
+julia> map(x->x^3, vec)
+10-element Vector{Int64}:
+    1
+    8
+   27
+   64
+  125
+  216
+  343
+  512
+  729
+1000
+ 
+julia> map(vec) do x  #<------ Using do block
+       x^3
+       end
+10-element Vector{Int64}:
+    1
+    8
+   27
+   64
+  125
+  216
+  343
+  512
+  729
+1000
+ 
+julia> fname = "./new.txt"
+"./new.txt"
+ 
+julia> f2 = open(fname,"w") # <----- 'w' is not alloed. Only ""
+IOStream(<file ./new.txt>)
+ 
+julia> write(f2,"Hello world\n")
+12
+ 
+julia> close(f2)
+ 
+julia> open("./new.txt", "a") do f  # <---- using do block
+         write(f, "\nAdding lines...\n")
+         close(f)
+       end
+```
+- touch(), readdir(), mkdir(), ...
+
+69. TCP/IP
+- https://nmap.org/ncat
+```julia
+using Sockets
+server = listen(8000)
+conn = accept(server)
+line = readline(conn)
+close(conn)
+```
+
 ## Section 11: Parallel Programming
+
+70. Introduction
+- Parallel programming in Julia
+    - Asynchronous tsks or coroutines
+    - Multi-threading
+    - Distributed computiong
+    - GPU
+
+71. Asynchronous Programming
+```julia
+julia> @time for i in 1:3
+         sleep(1)
+       end
+  3.006383 seconds (15 allocations: 432 bytes) #<--- sequential
+ 
+julia> @time for i in 1:3
+         @async sleep(1)
+       end
+  0.011988 seconds (10.24 k allocations: 676.597 KiB, 55.36% compilation time) #<--- out of sync
+ 
+julia> @time @sync for i in 1:3
+         @async sleep(1)
+       end
+  1.022187 seconds (8.22 k allocations: 562.910 KiB, 1.95% compilation time) #<--- sync after sleep
+```
+- Tasks
+    - Tasks can be interrupted and start whre they are left off. They can be switched at any order
+    - Switching b/w tasks doesn't hurt performance
+    - Create/start/run/finish
+- Channels
+    - A pipeline which can read data from tasks and writes data to tasks
+    - First in first out
+```julia
+ 
+julia>  t1 = @task begin         #<---- creation of task 1. Not started yet
+             println("begin t1")
+             sleep(3)
+             println("finish t1")
+       end
+Task (runnable) @0x00007f4cf6aaddc0
+ 
+julia> t2 = Task( ()->         #<---- creation of task 2. Not started yet
+            begin
+              println("begin t2")
+              sleep(3)
+              println("finish t2")
+           end
+       )
+Task (runnable) @0x00007f4cf6c181a0
+ 
+julia> istaskstarted(t1)
+false
+ 
+julia> istaskdone(t1)
+false
+ 
+julia> schedule(t1)
+begin t1
+Task (runnable) @0x00007f4cf6aaddc0
+ 
+julia> finish t1  # After 3 seconds passed
+ 
+julia> schedule(t2); wait(t2)
+begin t2
+finish t2
+ 
+julia> istaskstarted(t1)
+true
+ 
+julia> istaskdone(t1)
+true
+```
+
+72. Multi-Threaded Programming
+- At bash, `export JULIA_NUM_THREADS=4`
+```julia
+julia> Threads.nthreads()
+4
+```
+- Or `julia --threads 4` at CLI
+```julia
+ 
+julia> mysum = Ref(0)
+Base.RefValue{Int64}(0)
+ 
+julia> mysum[]
+0
+ 
+julia> @time Threads.@threads for i in 1:1000
+         mysum[] += 1
+       end
+  0.037156 seconds (24.76 k allocations: 1.649 MiB, 213.42% compilation time)
+ 
+julia> mysum[]
+738          #<------- Race condition!
+ 
+julia> mysum = Threads.Atomic{Int64}(0)
+Base.Threads.Atomic{Int64}(0)
+ 
+julia> Threads.@threads for i in 1:1000
+         Threads.atomic_add!(mysum,1)
+       end
+ 
+julia> mysum[]
+1000           #<------- Correct result from atomic operation
+ 
+ 
+julia> function vecmean(vec)
+         s = 0
+         for el in vec
+           s += el
+         end
+         avg = s / length(vec)
+         return avg
+       end
+vecmean (generic function with 1 method)
+ 
+julia> function serial_mean(vect)
+         sums = zeros(length(vect))
+         for i in eachindex(vect)
+           sums[i] = vecmean(vect[i])
+         end
+         return sums
+       end
+serial_mean (generic function with 1 method)
+ 
+julia> function threaded_mean(vect)
+         sums = zeros(length(vect))
+         Threads.@threads for i in eachindex(vect)
+           sums[i] = vecmean(vect[i])
+         end
+         return sums
+       end
+threaded_mean (generic function with 1 method)
+ 
+julia> function spawn_mean(vect)
+         tasks = [Threads.@spawn vecmean(vect[i]) for i in 1:length(vect)]
+         sums = [fetch(t) for t in tasks]
+         return sums
+       end
+spawn_mean (generic function with 1 method)
+ 
+julia> v1 =  rand(20_000);
+ 
+julia> v2 = [rand(1000) for i in 1:143];
+ 
+julia> v = [v1,v2...];
+ 
+julia> size(v) # variable sizes of vectors
+(144,)
+ 
+julia> @time serial_mean(v);
+  0.016553 seconds (14.96 k allocations: 1.022 MiB, 98.86% compilation time)
+ 
+julia> @time threaded_mean(v);
+  0.042949 seconds (25.53 k allocations: 1.746 MiB, 208.74% compilation time) #<--- slower?
+ 
+julia> @time spawn_mean(v);
+  0.064123 seconds (103.90 k allocations: 7.226 MiB, 122.54% compilation time) #<--- much slower?
+ 
+```
