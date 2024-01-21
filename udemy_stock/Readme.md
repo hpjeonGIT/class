@@ -248,3 +248,98 @@
 - https://www.tradingview.com/
 
 41. Bonus Lecture
+
+## Title: Investing In Stocks The Complete Course! (17+ Hours)
+- Instructor: Steve Ballinger, MBA
+
+## Section 1: Stock Market Investing and Trading Foundation
+
+1. Welcome and Getting the most out of the course
+
+2. Glossary of stock market terms, curriculum overview, and udemy support
+- https://www.nasdaq.com/glossary
+- https://www.mercer.com/content/dam/mercer/attachments/europe/Netherlands/ic-dictionary-mercer.pdf
+
+3. Stock market Returns and worst case scenario
+
+4. Quick look at a stock you may like with a few items you will learn in the course
+- Ex: Wipro
+- Resources:
+  - yahoo finance: 
+    - Summary: PE ratio (TTM) 19.72 (< 25 then good)
+    - Statistics: Price/Sales 2.55 (< 2.5 then excellent)
+  - investing.com:
+      - Ratios: Price to Sales
+
+## Section 2: Key Concepts when investing and trading in the stock market
+
+5. The 2 ways investors make money in stocks
+- Capital appreciation: buy/sell
+- Dividends: passive income
+
+6. What is a stock really
+
+7. Stocks and the law of supply & demand
+- More buyers than sellers = price goes up
+- More sellers than buyers = price goes down
+
+8. Where do stocks fit in a diversified portfolio
+- Consider:
+  - How far away is the goal
+  - Your risk tolerance
+  - Need (income/growth/combo)
+
+9. Sample portfolio allocation based on historical risk and return
+- Bonds: Average annual return 6.3%, years with a loss: 20/96
+- 20% stocks/80% bonds: Average annual return 7.5%, years with a loss : 16/96
+- 100% stocks: average annual return 12.3%, years with a loss: 25/96
+
+10. Stock Quote and Stock chart Demo note
+
+11. Demo: How to read a stock quote
+- Using Yahoo finance
+- General mills (GIS)
+  - Bid: the price buyers want to buy at
+  - Ask: the price sellers want to sell at
+  - Market cap: size of the business
+  - Beta: measure of risk. 
+    - 1.0: same movement as the wider market
+    - `> 1.0`: Swings wider up/down than the market
+    - `< 1.0`: Swings less up/down than the market
+  - PE Ratio (TTM): lower, better
+  - EPS (TTM): Earnings per share. 
+- Hubspot (HUBS)
+
+12. Demo: How to read a stock chart
+- Technical analysis == charting
+
+13. Special note for active traders. What kind of trader do you want to be?
+- Timeframes
+  - Scalper (arbitrage): minutes
+  - Day trading: minutes to hour
+  - Swing drading: Hours to Days
+  - Position Trading: Days to Weeks
+  - Part time invesiting: weeks to Months
+  - Buy and Hold: Entry with fewer exits
+
+14. How to pick a stock broker
+
+## Section 3:Type of Stocks (Growth Stocks, Dividend Stocks, & Value Stocks) + Market cap
+
+15. Diversification inside the stock category
+
+16. Size: Large, Mid, and Small Cap Stocks
+
+17. Style: Growth Stocks
+
+18. Style: Dividend (Income Stocks)
+
+19. Style: Value Stocks
+
+20. Stock Sectors
+
+## Section 4: What to Buy: Individual stock, stock mutual funds, & ETF
+
+## Section 5: Strategies: Investign and Trading Strategies in the Stock Market
+
+## Section 6: Picking Stocks: Qualitative Company Evaluation
