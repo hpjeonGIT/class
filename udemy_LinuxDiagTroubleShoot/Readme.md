@@ -240,8 +240,6 @@ To free reclaimable slab objects (includes dentries and inodes):
 To free slab objects and pagecache:
 	echo 3 > /proc/sys/vm/drop_caches
 ```
-  - Dropping caches after slum job completion: https://lists.openhpc.community/g/users/topic/drop_caches_in_slurm_epilog/92634068?p=,,,20,0,0,0::recentpostdate/sticky,,,20,0,20,92634068,previd%3D1660875192566568171,nextid%3D1655315606927954914&previd=1660875192566568171&nextid=1655315606927954914
-  - Add `echo 3 > /proc/sys/vm/drop_caches` into /etc/slurm/slurm.epilog.clean script
 
 26. File system and Device mapper
 - Device mapper: create 1:1 mapping of blocks in one block device to blocks in another, logical block device
@@ -754,3 +752,107 @@ auth sufficient pam_ldap.so
   - Use this module in the beginning then service will be disabled
   
 84. Last Lecture
+
+## Section 20: Kicstart Server - Automating Installation
+
+154. Overview of Kicstart Server
+
+155. Features of Kicstart Server
+- Kickstart config file
+- Protocols to use
+    - NFS
+    - HTTP
+    - FTP
+
+156. Theoretical Steps to configure Kickstart Server
+- Step 1: Mount ISO and dump Media source file
+    - mount /dev/sr0 /mnt
+    -cp -rfv /mnt/* /var/ftp/pub # we use tFTP   
+- Step 2: Installation and generate Kicstart file
+    - yum install system-config-kickstart
+- Step 3: Generate kickstart config file
+    - system-cofnig-kickstart
+        - Default language
+        - keyboard
+        - time zone
+        - Root passwd/confirm
+        - Target architecture
+        - Reboot after installation
+
+157. Graphical Mode to configure kickstart config file
+
+158. Kicstart config file - 1
+- No LVM creation at partition menu
+- Authentication for NIS, LDAP, ...
+- We will add LVM configuration and packages to the config file
+
+159. Kicstart config file - 2
+- Copy kickstartt file and media files to /var/ftp/pub
+- boot: linux ks=ftp://192.168.0.109/pub/ks.cfg
+
+160. Lab1
+- How to configure each IP? From DHCP server
+- At the server:
+    - yum install dhcp tftp-server syslinux vsftpd system-config-kickstart
+
+161. Lab2
+- Activating dhcp server
+- vi /etc/dhcp/dhcpd.conf
+```
+Allow booting;
+Allow bootp;
+```
+- We provide pxelinux.0 file
+- systemctl start dhcpd
+- systemctl enable dhcpd
+
+162. Lab3
+- Activating tFTP server
+- vi /etc/xinetd.d/tftp
+```
+disable=no
+```
+- systemctl restart xinetd
+- cd /var/lib/tftpboot/; mkdir netboot; cp /mnt/images/pxebookt/{initrd.img,vmlinuz} .
+- cd /usr/share/syslinux; cp {menu.c32,chain.c32,memdisk,mboot.c32,pxelinux.0} /var/lib/tftpboot
+- mkdir /var/lib/tftpboot/pxelinux.cfg; cd /var/lib/tftpboot/pxelinux.cfg
+- vi default
+```
+default menu.c32
+prompt 0
+timeout 20
+Menu Title PXE Menus
+LABEL RHEL7_x64
+MENU LABEL RHEL7 X64
+KERNEL /netboot/vmlinuz
+APPEND initrd=/netboot/initrd.img linux ks=ftp://192.168.0.105/pub/ks.cfg
+```
+
+163. Lab4
+- cd /var/ftp/pub
+- cp -vr /mnt/* /var/ftp/pub
+- systemctl start vsftpd
+- systemctl enable vsftpd
+
+164. Lab5
+- Generate config script using GUI
+- Add package at `%packages` section
+
+165. Lab6
+
+## Section 25: Samba Server
+
+207. Overview of Samba Server
+- Sharing resources over Linux and Windows
+- Controlled by cifs (common internet file system) and smb (server message block) and nmb (netbios message block)
+
+208. How Samba Works?
+- Packges: samba*.rpm
+- Port numbers:
+    - 137: NetBios Name service
+    - 138: NetBios Datagram service
+    - 139: NetBios Session service
+- Configuration file : /etc/samba/smb.conf
+- Service daemon: smb
+
+Classification: Public Information
