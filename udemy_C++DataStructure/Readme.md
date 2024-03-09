@@ -1,4 +1,4 @@
-## Title: C++ Data Structures & Algorithms + LEETCODE Exercises
+## Title: C++ Data Structures & Algorithms Made Visual
 - Instructor: Scott Barrett
 
 ## Section 1: Introduction
@@ -929,30 +929,420 @@ int main() {
   - Weighted edges show which edge will be preferred
 
 76. Graph: Adjacency Matrix
+![matrix](./ch76_matrix.png)
 
 77. Graph: Adjacency List
+![adjacency](./ch77_adjacency.png)
 
 78. Graph: Unordered Sets
+- Similar to unordered map but no values. Only keys
+- No duplicates
+- Used to store adjacency list 
 
 79. Graph: Big O
+- Adjacency Matrix: O(V^2)
+- Adjacency List: O(V+E)
 
 80. Graph: Add Vertex
+- O(1)
+```cpp
+  bool addVertex(string vertex) {
+    if (adjList.count(vertex) == 0) {
+      adjList[vertex];
+      return true;
+    }
+    return false;
+  }
+```
 
 81. Graph Add Edge
+```cpp
+  bool addEdge(string vertex1, string vertex2){
+    if (adjList.count(vertex1) !=0 && adjList.count(vertex2) != 0){
+      adjList.at(vertex1).insert(vertex2);
+      adjList.at(vertex2).insert(vertex1);
+      return true;
+    }    
+    return false;
+  }
+```
 
 82. Graph: Remove Edge
+```cpp
+  bool removeEdge(string vertex1, string vertex2) {
+    if (adjList.count(vertex1) !=0 && adjList.count(vertex2) != 0){
+      adjList.at(vertex1).erase(vertex2);
+      adjList.at(vertex2).erase(vertex1);
+      return true;
+    }
+    return false;
+  }
+```
 
 83. Graph: Remove Vertex
+- Looping over the adjacent list of the removing vertex, we can find which vertices contain the removing vertex
+  - O(V+E)
+```cpp
+  bool removeVertex(string vertex) {
+    if (adjList.count(vertex) ==0) return false;
+    for (auto otherVertex: adjList.at(vertex)) {
+      adjList.at(otherVertex).erase(vertex);
+    }
+    adjList.erase(vertex);
+    return true;
+  }
+```
 
 ## Section 20: Graph: Coding Exercises
+```cpp
+#include <iostream>
+#include <unordered_map>
+#include <unordered_set>
+using namespace std;
+class Graph {
+private:
+  unordered_map<string, unordered_set<string> > adjList;
+public:
+  bool addVertex(string vertex) {
+    if (adjList.count(vertex) == 0) {
+      adjList[vertex];
+      return true;
+    }
+    return false;
+  }
+  bool addEdge(string vertex1, string vertex2){
+    if (adjList.count(vertex1) !=0 && adjList.count(vertex2) != 0){
+      adjList.at(vertex1).insert(vertex2);
+      adjList.at(vertex2).insert(vertex1);
+      return true;
+    }    
+    return false;
+  }
+  bool removeEdge(string vertex1, string vertex2) {
+    if (adjList.count(vertex1) !=0 && adjList.count(vertex2) != 0){
+      adjList.at(vertex1).erase(vertex2);
+      adjList.at(vertex2).erase(vertex1);
+      return true;
+    }
+    return false;
+  }
+  bool removeVertex(string vertex) {
+    if (adjList.count(vertex) ==0) return false;
+    for (auto otherVertex: adjList.at(vertex)) {
+      adjList.at(otherVertex).erase(vertex);
+    }
+    adjList.erase(vertex);
+    return true;
+  }
+  void printGraph() {
+    unordered_map<string, unordered_set<string>>::iterator kvPair = adjList.begin();
+    while (kvPair != adjList.end()) {
+      cout  << kvPair->first << ": [ ";  // this prints out the vertex
+      unordered_set<string>::iterator edge = kvPair->second.begin();
+      while (edge != kvPair->second.end()) {
+          cout  << edge->data() << " ";  // this prints out edges
+          edge++;
+      }
+      cout << "]" << endl;
+      kvPair++;
+    }
+  }
+};
+int main() {
+    Graph* myGraph = new Graph();
+    myGraph->addVertex("A");
+    myGraph->addVertex("B");
+    myGraph->addVertex("C");
+    myGraph->addEdge("A", "B");
+    myGraph->addEdge("C", "B");
+    myGraph->addEdge("A", "C");
+    cout << "Graph:\n";
+    myGraph->printGraph();    
+    //myGraph->removeEdge("A", "B");
+    myGraph->removeVertex("C");
+    myGraph->printGraph();    
+}
+```
 
 ## Section 21: Recursion
 
+84. Recursion: intro
+
+85. Call Stack
+- When function A calls function B inside while function B calls function C inside ...
+- Those calls are stacked in the call stack (can be viewed from debugger)
+
+86. Factorial
+
 ## Section 22: Tree Traversal
+
+87. Tree Traversal: Intro
+- Breadth first search and Depth first search
+
+88. BFS(Breadth First Search): Intro
+- Start from the root, and go each row one by one
+
+89. BFS: Code
+```cpp
+#include <iostream>
+#include <queue>
+using namespace std;
+class Node { 
+  public: 
+    int value;
+    Node* left;
+    Node* right;
+    Node(int value) {
+      this->value = value;
+      left = nullptr;
+      right = nullptr;
+    }
+};
+class BinarySearchTree {
+public:
+  Node* root;
+public:
+  BinarySearchTree() { root = nullptr; }
+  // ---------------------------------------------------
+  //  Helper function used by destructor
+  //  Deletes all nodes in BST
+  //  Similar to DFS PostOrder in Tree Traversal section
+  // ---------------------------------------------------
+  void destroy(Node* currentNode) {
+      if (currentNode) {
+          destroy(currentNode->left);
+          destroy(currentNode->right);
+          delete currentNode;
+      }
+  }
+  ~BinarySearchTree() { destroy(root); }
+  void insert(int value) {
+    Node* newNode = new Node(value);
+    if (root == nullptr) {
+      root = newNode;
+      return;
+    }
+    Node* temp = root;
+    while(true) {
+      if (newNode->value == temp->value) return;
+      if (newNode->value < temp->value) {
+        if (temp->left == nullptr) {
+            temp->left = newNode;
+            return;
+        }
+        temp = temp->left;
+      } else {
+        if (temp->right == nullptr) {
+            temp->right = newNode;
+            return;
+        }
+        temp = temp->right;
+      }
+    }
+  }
+  bool contains(int value) {
+    if (root == nullptr) return false;
+    Node* temp = root;
+    while(temp) {
+      if (value < temp->value) {
+          temp = temp->left;
+      } else if (value > temp->value) {
+          temp = temp->right;
+      } else {
+          return true;
+      }
+    }
+    return false;
+  }
+  void BFS() {
+    queue<Node*> myQueue;
+    myQueue.push(root);
+    while(myQueue.size() >0) {
+      Node* currentNode = myQueue.front();
+      myQueue.pop();
+      cout << currentNode->value << " ";
+      if (currentNode->left != nullptr) {
+        myQueue.push(currentNode->left);
+      }
+      if (currentNode->right != nullptr) {
+        myQueue.push(currentNode->right);
+      }
+    }
+  }
+};
+int main() {        
+    BinarySearchTree* myBST = new BinarySearchTree();
+    myBST->insert(47);
+    myBST->insert(21);
+    myBST->insert(76);
+    myBST->insert(18);
+    myBST->insert(27);
+    myBST->insert(52);
+    myBST->insert(82);
+    cout << "Breadth First Search:\n";
+    myBST->BFS();
+    /*
+        EXPECTED OUTPUT:
+        ----------------
+        Breadth First Search:
+        47 21 76 18 27 52 82 
+
+    */        
+}
+```
+![BFS](./ch89_BFS.png)
+- Q: Why use queue? not vector? not list?
+
+90. DFS(Depth First Search): PreOrder - Intro
+- Ref: https://www.geeksforgeeks.org/tree-traversals-inorder-preorder-and-postorder/
+- Algorithm Preorder(tree)
+  - Visit the root.
+  - Traverse the left subtree, i.e., call Preorder(left->subtree)
+  - Traverse the right subtree, i.e., call Preorder(right->subtree) 
+
+91. DFS: PreOrder - Code
+```cpp
+void DFSPreOrder(Node* currentNode) {
+  cout << currentNode->value << " ";
+  if (currentNode->left != nullptr) {
+    DFSPreOrder(currentNode->left);
+  }
+  if (currentNode->right != nullptr) {
+    DFSPreOrder(currentNode->right);
+  }
+}
+void DFSPreOrder() { DFSPreOrder(root); }
+```
+![DFS_preorder](./ch91_DFS_preorder.png)
+
+92. DFS: PostOrder - Intro
+- Ref: https://www.geeksforgeeks.org/tree-traversals-inorder-preorder-and-postorder/
+- Algorithm Postorder(tree)
+  - Traverse the left subtree, i.e., call Postorder(left->subtree)
+  - Traverse the right subtree, i.e., call Postorder(right->subtree)
+  - Visit the root
+
+93. DFS: PostOrder - Code
+```cpp
+void DFSPostOrder(Node* currentNode) {
+  if (currentNode->left != nullptr) {
+    DFSPostOrder(currentNode->left);
+  }
+  if (currentNode->right != nullptr) {
+    DFSPostOrder(currentNode->right);
+  }
+ cout << currentNode->value << " ";
+}
+void DFSPostOrder() { DFSPostOrder(root); }
+```
+![DFS_postorder](./ch93_DFS_postorder.png)
+
+94. DFS: InOrder - Intro
+- Algorithm Inorder(tree)
+  - Traverse the left subtree, i.e., call Inorder(left->subtree)
+  - Visit the root.
+  - Traverse the right subtree, i.e., call Inorder(right->subtree)
+
+95. DFS: InOrder - Code
+```cpp
+void DFSInOrder(Node* currentNode) {
+  if (currentNode->left != nullptr) {
+    DFSInOrder(currentNode->left);
+  }
+  cout << currentNode->value << " ";
+  if (currentNode->right != nullptr) {
+    DFSInOrder(currentNode->right);
+  }
+}
+void DFSInOrder() { DFSInOrder(root); }
+```
+![DFS_inorder](./ch95_DFS_inorder.png)
 
 ## Section 23: BST Traversal: Coding Exercises
 
 ## Section 24: Basic Sorts
+
+96. Bubble Sort: Intro
+
+97. Bubble Sort: Code
+```cpp
+#include<iostream>
+void bubbleSort(int array[], int size, int &n) {
+  n = 0;
+  for (int i= size-1; i> 0; i--) {
+    for (int j= 0; j < i; j++) {
+      if (array[j] > array[j+1]) {
+        int temp = array[j];
+        array[j] = array[j+1];
+        array[j+1] = temp;
+        n++;
+      }
+    }
+  }
+}
+int main() {
+  int n = 0;
+  int myA[] = {6,4,2,5,1,3};
+  int size = sizeof(myA) / sizeof(myA[0]);
+  bubbleSort(myA, size, n);
+  for (auto v : myA) {
+    std::cout << v << " ";
+  }
+  std::cout << std::endl;
+  std::cout << "N. of investigation = " << n << std::endl;
+}
+```
+- Took 11 swaps
+
+98. Selection Sort: Intro
+
+99. Selection Sort: Code
+```cpp
+void selectionSort(int array[], int size, int &n) {
+  n = 0;
+  for (int i=0; i< size; i++) {
+    int minIndx=i;
+    for (int j=i+1;j<size; j++) {
+      if (array[j] < array[minIndx]) {
+        minIndx = j;
+      }
+    }
+    if (i != minIndx) {
+      int temp = array[i];
+      array[i] = array[minIndx];
+      array[minIndx] = temp;
+      n++;
+    }
+  }
+}
+```
+- Took 5 swaps
+
+100. Insertion Sort: Intro
+
+101. Insertion Sort: Code
+```cpp
+void insertionSort(int array[], int size, int &n) {
+  n = 0;
+  for (int i=1; i< size; i++) {
+    int temp = array[i];
+    int j = i-1;
+    while (j> -1 && temp < array[j]) { // order matters
+      array[j+1] = array[j];
+      array[j] = temp;
+      j--;
+      n++;
+    }
+  }
+}
+```
+- Took 11 swaps
+
+102. Insertion Sort: Big O
+- O(N^2) as worst
+- O(N) as best
+  - When **almost** sorted
+- In terms of space complexity (memory consumption), those sorting methods are of O(N)
 
 ## Section 25: Basic Sorts: Coding Exercises
 
@@ -960,16 +1350,244 @@ int main() {
 
 ## Section 27: Merge Sort
 
+103. Merge Sort: Overview
+- Ref: https://www.geeksforgeeks.org/merge-sort/
+- Merge sort is a recursive algorithm that continuously splits the array in half until it cannot be further divided i.e., the array has only one element left (an array with one element is always sorted). Then the sorted subarrays are merged into one sorted array.
+
+104. Merge: Intro (1)
+
+105. Merge: Intro (2)
+
+106. Merge: Code (1)
+
+107. Merge: Code (2)
+```cpp
+
+void merge(int array[], int leftIndex, int midIndex, int rightIndex) {
+  int leftArraySize = midIndex - leftIndex + 1;
+  int rightArraySize = rightIndex - midIndex;
+  int leftArray[leftArraySize];
+  int rightArray[rightArraySize];
+  for (int i=0; i< leftArraySize; i++)
+    leftArray[i] = array[leftIndex + i];
+  for (int j=0; j< rightArraySize; j++)
+    rightArray[j] = array[midIndex + 1 + j];
+  int index = leftIndex;
+  int i=0;
+  int j=0;
+  while (i <leftArraySize && j< rightArraySize) {
+    if (leftArray[i] <= rightArray[j]){
+      array[index] = leftArray[i];
+      index++;
+      i++;
+    } else {
+      array[index] = rightArray[j];
+      index++;
+      j++;
+    }
+  }
+  while (i<leftArraySize) {
+    array[index] = leftArray[i];
+    index++;
+    i++;
+  }
+  while (j<rightArraySize) {
+    array[index] = rightArray[j];
+    index++;
+    j++;
+  }
+}
+```
+- This code segment runs OK when the left/right halves are sorted respectively
+  - {1,3,7,9,2,4,6,8} is OK
+  - {3,1,7,9,8,4,2,6} not OK
+
+108. Merge Sort: Intro
+- Breaks arrays in half
+- Base case: when sub-array size is 1
+- Calls merge() to pu sub-arrays together
+
+109. Merge Sort: Code
+```cpp
+#include<iostream>
+void merge(int array[], int leftIndex, int midIndex, int rightIndex) {
+  int leftArraySize = midIndex - leftIndex + 1;
+  int rightArraySize = rightIndex - midIndex;
+  int leftArray[leftArraySize];
+  int rightArray[rightArraySize];
+  for (int i=0; i< leftArraySize; i++)
+    leftArray[i] = array[leftIndex + i];
+  for (int j=0; j< rightArraySize; j++)
+    rightArray[j] = array[midIndex + 1 + j];
+  int index = leftIndex;
+  int i=0;
+  int j=0;
+  while (i <leftArraySize && j< rightArraySize) {
+    if (leftArray[i] <= rightArray[j]){
+      array[index] = leftArray[i];
+      index++;
+      i++;
+    } else {
+      array[index] = rightArray[j];
+      index++;
+      j++;
+    }
+  }
+  while (i<leftArraySize) {
+    array[index] = leftArray[i];
+    index++;
+    i++;
+  }
+  while (j<rightArraySize) {
+    array[index] = rightArray[j];
+    index++;
+    j++;
+  }
+}
+void mergeSort(int array[], int leftIndex, int rightIndex) {
+  if (leftIndex >= rightIndex) return;
+  int midIndex = leftIndex + (rightIndex - leftIndex)/2;
+  mergeSort(array, leftIndex, midIndex);
+  mergeSort(array, midIndex+1, rightIndex);
+  merge(array, leftIndex, midIndex, rightIndex);
+}
+int main() {
+  int n = 0;
+  int myA[] = {1,8,7,3,6,4,5,2}; //
+  int size = sizeof(myA) / sizeof(myA[0]);
+  int leftIndex = 0;
+  int rightIndex = size - 1;
+  mergeSort(myA, leftIndex, rightIndex);
+  for (auto v : myA) {
+    std::cout << v << " ";
+  }
+  std::cout << std::endl;
+  std::cout << "N. of investigation = " << n << std::endl;
+}
+```
+
+110. Merge Sort: Big O
+- Space complexity: O(n)
+- Time complexity: O(n log n)
+
 ## Section 28: Merge Sort: Coding Exercises
 
 ## Section 29: Merge: Interview/Leetcode Exercise
 
 ## Section 30: Quick Sort
 
+111. Quick Sort: Intro
+- Ref: https://www.geeksforgeeks.org/quick-sort/
+- QuickSort is a sorting algorithm based on the Divide and Conquer algorithm that picks an element as a pivot and partitions the given array around the picked pivot by placing the pivot in its correct position in the sorted array.
+
+112. Pivot: Intro
+
+113. Pivot: Code
+
+114. Quick Sort: Code
+```cpp
+#include <iostream>
+using namespace std;
+void swap(int array[], int firstIndex, int secondIndex) {
+    int temp = array[firstIndex];
+    array[firstIndex] = array[secondIndex];
+    array[secondIndex] = temp;
+}
+int pivot(int array[], int pivotIndex, int endIndex) {
+    int swapIndex = pivotIndex;
+    for (int i = pivotIndex + 1; i <= endIndex; i++) {
+        if (array[i] < array[pivotIndex]) {
+            swapIndex++;
+            swap(array, swapIndex, i);
+        }
+    }
+    swap(array, pivotIndex, swapIndex);
+    return swapIndex;
+}
+void quickSort(int array[], int leftIndex, int rightIndex) {
+    if (leftIndex >= rightIndex) return; 
+    int pivotIndex = pivot(array, leftIndex, rightIndex);
+    quickSort(array, leftIndex, pivotIndex-1);
+    quickSort(array, pivotIndex+1, rightIndex);
+}
+int main() {    
+    int myArray[] = {4,6,1,7,3,2,5};
+    int size = sizeof(myArray) / sizeof(myArray[0]);
+    quickSort(myArray, 0, size-1);
+    for (auto value : myArray) {  
+        cout << value << " ";
+    }    
+    /*
+        EXPECTED OUTPUT:
+        ----------------
+        1 2 3 4 5 6 7         
+     */
+}
+```
+
+115. Quick Sort: Big O
+- Pivot: O(n)
+  - Recurisve part: log n
+- Total cost: O (n log n)
+  - Best/average
+- Worst case would be O (n^2)
+  - When already sorted
+
 ## Section 31: Quick Sort: Coding Exercises
 
 ## Section 32: Dynamic Programming
 
+116. Overlapping Subproblems
+- Memoization
+  - Solve each sub problem and store results. Then just lookup table when same problem is met
+
+117. Optimized Substructure
+
+118. Fibonacci Sequence
+- Redundancy in Fibonacci function calls
+```cpp
+int fib(int n) {
+  if (n==0 || n==1) {
+    return n;
+  }
+  return fib(n-1) + fib(n-2);
+}
+```
+  - O(2^n)
+  - Can be reduced into O(n) using memoization
+
+119. Memoization
+```cpp
+std::vector<int> memo(100,-1);
+int fib(int n) {
+  if (memo[n] != -1) {
+    return memo[n];
+  }
+  if (n==0 || n==1) {
+    return n;
+  }
+  memo[n] = fib(n-1) + fib(n-2);
+  return memo[n];
+}
+```
+  - O(n)
+
+120. Bottom Up
+- Those above mentioned methods are top-down. Let's write bottom-up Fibonacci code
+```cpp
+int fib(int n) {
+  vector<int> fibList;
+  fibList.push_back(0);
+  fibList.push_back(1);
+  for (int index=2; index <=n; index++) {
+    fibList[index] = fibList[index-1] + fibList[index-2];
+  }
+  return fibList[n];
+}
+```
+  - O(n-1)
+  - No memoization here
+  
 ## Section 33: Vector: Interview/Leetcode Exercises
 
 ## Sectino 34: Coding Exercises
