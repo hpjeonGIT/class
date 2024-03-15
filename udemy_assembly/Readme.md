@@ -106,7 +106,7 @@ $ cat /proc/88419/maps |grep stack
 
 10. Structure of the assembly program
 - Basic assembly code structure
-```as
+```asm
 .section .data
 
 .section .bss
@@ -196,7 +196,7 @@ __SYSCALL(__NR_write, sys_write)
 ```
   - In 32bit OS, the call number of write() is 4 
 - ch12.s
-```assem
+```asm
 .section .data
        msg: 
             .ascii "Hello world\n"
@@ -220,7 +220,7 @@ Hello world
 ```
 - This runs as 32bit mode as it uses `int $0x80` for interrupt
 - Following is the 64bit version
-```assembly
+```asm
 .section .data
        msg: 
             .ascii "Hello world\n"
@@ -441,7 +441,7 @@ SYNOPSIS
        ssize_t read(int fd, void *buf, size_t count);
 ```
 - A sample assembly code with 32bit:
-```assem
+```asm
 .section .bss
         .comm buffer,15 # common memory
 .section .text
@@ -470,7 +470,7 @@ _start:
   - Enter: Hello Udemy
   - Shows: Hello Udemy
 - A following is the 64bit version
-```assem
+```asm
 section .bss
         .comm buffer,15 # common memory
 .section .text
@@ -504,22 +504,378 @@ _start:
   - movb: 8bit byte data
 
 20. Practical Demonstration of moving data in assembly
+```asm
+.section .text
+.globl _start
+_start:
+  movl $25, %eax
+  movw $4, %bx
+  movb $1, %cl
+  movl $1, %eax
+  movl $0, %ebx
+  int $0x80
+```
+- Demo:
+```bash
+$ as as20.s -o as20.o
+$ ld as20.o -o as20.exe
+$ gdb -q as20.exe
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+=> 0x0000000000401000 <+0>:	mov    eax,0x19
+   0x0000000000401005 <+5>:	mov    bx,0x4
+   0x0000000000401009 <+9>:	mov    cl,0x1
+   0x000000000040100b <+11>:	mov    eax,0x1
+   0x0000000000401010 <+16>:	mov    ebx,0x0
+   0x0000000000401015 <+21>:	int    0x80
+End of assembler dump.
+gdb-peda$ b * _start
+gdb-peda$ run
+gdb-peda$ ni # run ni 3 times
+gdb-peda$ info registers
+rax            0x19                0x19
+rbx            0x4                 0x4
+rcx            0x1                 0x1
+...
+```
+- 64bit [rcx] => 34bit [ecx] => 16bit [cx] = 16bit [ch][cl]
+- If the `movb $1, %cl` is replaced with `movb $1, %ch`, $rcx becomes [01][00], which becomes 256 in decimal
+```bash
+gdb-peda$ p $rcx
+$1 = 0x100
+```
 
 21. More advanced data movements in assembly
+```asm
+.section .bss
+   .comm mydata,4  # assigns 4 bytes into mydata (address might be 0x402000)
+.section .text
+.globl _start
+_start:
+       nop
+       movl $100, mydata     # mydata is now 100
+       movl mydata,%ecx      # 100 into %ecx
+       movl $mydata, %edx    # move the address of mydata into edx
+       movl $500, %eax       # move 500 into eax
+       movl %eax,(%edx)      # move eax value to the content of the address
+       movl $1, %eax
+       movl $0, %ebx
+       int $0x80
+```
+- In GDB,
+  - To see the variable: x/d &mydata
+- Q: after 500->eax->(edx), edx becomes -12. Any overflow?
+  - 200 works OK. 300 not.
 
 22. Accessing and moving indexed values in assembly
+```asm
+.section .data
+  Numbers:
+    .int 10,20,30,40,50,60
+.section .text
+.globl _start
+_start:
+  # base_address(offset_address,index,size) index begins from 0
+  # Number(,2,4) when offset is 0
+  movl $2, %edi
+  movl Numbers(,%edi,4), %eax
+  #movl Numbers(,2,4), %eax # this doesn't work. index must be given from register
+  movl $1,%eax
+  movl $0,%ebx
+  int $0x80
+```
+- In gdb, disassemble the code
+- Make sure $eax has 30 when done
 
 23. Direct and indirect addressing in assembly
+- Direct memory addressing
+  - `movl $5, 0xAAAA`: put value 5 into 0xAAAA
+- Indirect memory addressing
+  - When we cannot access the memory address
+  - `movl 0xAAAA,eax`: put the address into a register
+  - `movl $5,(eax)`: put 5 into the address which eax points to
 
 24. Practical example of direct and indirect addressing in assembly
+```asm
+.section .data
+  Number:
+    .int 0
+.section .text
+.globl _start
+_start:
+  nop
+  #direct addressing
+  movl $5, Number
+  #indirect addressing
+  movl $Number, %eax # move the address of Number into eax
+  movl $10,(%eax)    # move 10 into the what eax points to
+  movl $1,%eax
+  movl $0,%ebx
+  int $0x80
+```
+- Demo:
+```bash
+$ as as24.s -o as24.o
+$ ld as24.o -o as24.exe
+$ gdb -q as24.exe
+Reading symbols from as24.exe...
+(No debugging symbols found in as24.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	nop
+   0x0000000000401001 <+1>:	mov    DWORD PTR ds:0x402000,0x5
+   0x000000000040100c <+12>:	mov    eax,0x402000
+   0x0000000000401011 <+17>:	mov    DWORD PTR [eax],0xa
+   0x0000000000401018 <+24>:	mov    eax,0x1
+   0x000000000040101d <+29>:	mov    ebx,0x0
+   0x0000000000401022 <+34>:	int    0x80
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+gdb-peda$ ni 
+gdb-peda$ ni 
+gdb-peda$ x/d &Number
+0x402000:	5
+gdb-peda$ ni 
+gdb-peda$ ni 
+gdb-peda$ x/d &Number
+0x402000:	10
+```
 
 25. Concept of indirect address pointer
+```asm
+.section .data
+  MyNumber:
+    .int 4,8  # 8 byte memory space is made
+    #  |0 0 0 8| 0 0 0 4| value
+    #  |7 6 5 4| 3 2 1 0| index
+.section .text
+.globl _start
+_start:
+  nop
+  nop
+  movl $MyNumber, %eax
+  movl $2,  (%eax)  # |0 0 0 8| 0 0 0 2| at [eax]
+  movb $7, 1(%eax)  # |0 0 0 8| 0 0 7 2| at [eax +0x1]
+  movb $9, 2(%eax) # |0 0 0 8| 0 9 0 2| at [eax +0x2]
+  movw $3, 6(%eax) # |0 3 0 8| 0 9 0 2| at [eax +0x6]
+  movl $1,%eax
+  movl $0,%ebx
+  int $0x80
+```
+- Note that **(%eax) and 1(%eax) are not same**
+- Demo:
+```bash
+$ as as25.s -o as25.o
+$ ld as25.o -o as25.exe
+$ gdb -q as25.exe
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+gdb-peda$ ni
+gdb-peda$ ni
+gdb-peda$ ni
+gdb-peda$ x/8d $eax
+0x402000:	4	0	0	0	8	0	0	0  # MyNumber, as it is
+gdb-peda$ ni
+gdb-peda$ x/8d $eax
+0x402000:	2	0	0	0	8	0	0	0  # 2 is located in the 0th index
+gdb-peda$ ni
+gdb-peda$ x/8d $eax
+0x402000:	2	7	0	0	8	0	0	0  # 7 is at 1st index 
+gdb-peda$ ni
+gdb-peda$ x/8d $eax
+0x402000:	2	7	9	0	8	0	0	0  # 9 is at 2nd index
+gdb-peda$ ni
+gdb-peda$ x/8d $eax
+0x402000:	2	7	9	0	8	0	3	0  # 3 is at 6th index
+```
 
 26. Accessing indexed memory locations in assembly
+```asm
+.section .data
+  my_list:
+    .int 11,22,33
+.section .text
+.globl _start
+_start:
+  nop
+  nop
+  # base_address (offset_address, index, size)
+  movl $2, %edi
+  movl  my_list(,%edi,4), %eax # zero-offset, 2nd index, size of 4 bytes
+  movl $1,%eax
+  movl $0,%ebx
+  int $0x80
+```
+- 0 offset must be empty or use register
+```asm
+movl $0, %ebx
+movl my_lsit(%ebx, %edi,4), %eax
+```
+- Results:
+```bash
+$gdb-peda$ info registers
+rax            0x21                0x21
+```
+- Hexa 21 is 33 in decimal
 
 27. How to create a stack frame in assembly
+```asm
+.section .text
+.globl _start
+_start:
+   nop
+   nop
+   # copy the esp address to ebp
+   movl %esp, %ebp
+   # create some memory space in stack frame
+   subl $8, %esp # from esp, subtract 8 bytes
+   # exit
+   movl $1,%eax
+   movl $0,%ebx
+   int $0x80
+```
+- %esp is the stack pointer
+  - subtracting 8 bytes will move the esp to 8 bytes above
+- At _start(), a stack frame is created
+```bash
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+=> 0x0000000000401000 <+0>:	nop
+   0x0000000000401001 <+1>:	nop
+   0x0000000000401002 <+2>:	mov    ebp,esp
+   0x0000000000401004 <+4>:	sub    esp,0x8
+   0x0000000000401007 <+7>:	mov    eax,0x1
+   0x000000000040100c <+12>:	mov    ebx,0x0
+   0x0000000000401011 <+17>:	int    0x80
+```
+- Initially, ebp is empty
+```bash
+rbp            0x0                 0x0
+rsp            0x7fffffffd630      0x7fffffffd630
+```
+- After esp moves to ebp:
+```bash
+rbp            0xffffd630          0xffffd630
+rsp            0x7fffffffd630      0x7fffffffd630
+gdb-peda$ p $ebp
+$2 = 0xffffd630
+gdb-peda$ p $esp
+$4 = 0xffffd630
+gdb-peda$ p/d $ebp-$esp
+$6 = 0  # same address
+```
+  - Now ebp and esp are same
+- After subtracting 8 bytes from esp:
+```bash
+gdb-peda$ p/d $ebp-$esp
+$7 = 8
+gdb-peda$ p $esp
+$8 = 0xffffd628
+gdb-peda$ p $ebp
+$9 = 0xffffd630
+```
 
 28. Adding and removing data on stack in assembly
+- Scenario
+  - push A
+  - push B
+    - esp points the latest data pushed (B now)
+  - ebp is the bottom of the stack
+  - pop (remove)
+  - Now esp points A
+- 32bit code:
+```asm
+.section .text
+.globl _start
+_start:
+  nop
+  nop
+  # copy the data address to ebp
+  movl %esp, %ebp
+  # create some memory space in stack frame
+  subl $8, %esp
+  # adding the data in stack frame
+  movl $100, %eax
+  pushl %eax
+  movl $200, %ebx
+  pushl %ebx
+  # removing data from stack
+  popl %ebx
+  popl %eax
+  # exit
+  movl $1, %eax
+  movl $0, %ebx
+  int $0x80
+```
+- 64bit code
+```asm
+.section .text
+.globl _start
+_start:
+  nop
+  nop
+  # copy the data address to ebp
+  mov %rsp, %rbp
+  # create some memory space in stack frame
+  sub $8, %rsp
+  # adding the data in stack frame
+  mov $100, %rax
+  push %rax
+  mov $200, %rbx
+  push %rbx
+  # removing data from stack
+  pop %rbx
+  pop %rax
+  # exit
+  syscall
+
+```
+- Demo:
+```bash
+$ as as28.as -o as28.o
+$ ld as28.o -o as28.exe
+$ gdb -q as28.exe
+Reading symbols from as28.exe...
+(No debugging symbols found in as28.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	nop
+   0x0000000000401001 <+1>:	nop
+   0x0000000000401002 <+2>:	mov    rbp,rsp
+   0x0000000000401005 <+5>:	sub    rsp,0x8
+   0x0000000000401009 <+9>:	mov    rax,0x64
+   0x0000000000401010 <+16>:	push   rax
+   0x0000000000401011 <+17>:	mov    rbx,0xc8
+   0x0000000000401018 <+24>:	push   rbx
+   0x0000000000401019 <+25>:	pop    rbx
+   0x000000000040101a <+26>:	pop    rax
+   0x000000000040101b <+27>:	syscall 
+End of assembler dump.
+...
+# running <+5>
+gdb-peda$ x/3wx $rsp
+0x7fffffffd628:	0x00000000	0x00000000	0x00000001
+#---------------^rsp--------------------^rbp
+# running <+16>
+gdb-peda$ x/3wx $rsp
+0x7fffffffd620:	0x00000064	0x00000000	0x00000000
+#---------------^ value from rax. Note that rsp has shifted 8byte above
+# running <+24>
+gdb-peda$ x/3wx $rsp
+0x7fffffffd618:	0x000000c8	0x00000000	0x00000064
+#---------------^ value from rbx. rsp has shifted another 8 bytes
+# running <+25>
+gdb-peda$ x/3wx $rsp
+0x7fffffffd620:	0x00000064	0x00000000	0x00000000
+#---------------^ value from rbx is gone
+# running <+26>
+gdb-peda$ x/3wx $rsp
+0x7fffffffd628:	0x00000000	0x00000000	0x00000001
+#---------------^ value from rax is gone 
+```
 
 29. Data exchange instructions in assembly
 
