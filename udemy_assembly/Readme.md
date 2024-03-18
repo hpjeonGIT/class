@@ -1986,41 +1986,574 @@ gdb-peda$ p/d $ebx
 $10 = 70
 ```
 
-61. Concept of detecting crayyin addition operation
+61. Concept of detecting carry in addition operation
+- `jc`: jump when Carry Flag is set
+- Ex:
+  - No Carry Flag
+    - 100 => 01100100
+    - 128 => 10000000
+    - 100+128 => 11100100 
+  - Carry Flag
+    - 128 => 10000000
+    - 128 => 10000000
+    - 128+128 => 0000000 with CF
 
 62. Writing assembly program for detecting carry flag in addition operation
+```asm
+.section .text
+.globl _start
+_start: 
+  movb $128,%al
+  movb $128,%bl
+  addb %al,%bl  # causes CF
+  jc jump_here
+  #exit
+  movl $1,%eax
+  movl $0,%ebx  # return 0 when reaching here
+  int  $0x80
+jump_here:
+  #exit
+  movl $1,%eax
+  movl $99,%ebx  # return 99 when CF is set
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as61.s -o as61.o
+$ ld as61.o -o as61.exe
+$ ./as61.exe
+$ echo $?
+99
+```
 
 63. Understanding overflow concept in addition arithmetic
+- In 8bit register (-128...0...127)
+  - -120 + -10 = -130
+    - But underflows (< -128) and becomes 126
+    - Overflow Flag is set
 
 64. Practical demonstration of overflow in addition to instruction in assembly
+```asm
+.section .text
+.globl _start
+_start:
+  movb $-120,%al
+  movb $-10, %bl
+  addb %al,  %bl
+  #exit
+  movl $1, %eax
+  movl $0, %ebx
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as64.s -o as64.o
+$ ld as64.o -o as64.exe
+$ gdb -q as64.exe
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    al,0x88
+   0x0000000000401002 <+2>:	mov    bl,0xf6
+   0x0000000000401004 <+4>:	add    bl,al
+   0x0000000000401006 <+6>:	mov    eax,0x1
+   0x000000000040100b <+11>:	mov    ebx,0x0
+   0x0000000000401010 <+16>:	int    0x80
+End of assembler dump.
+gdb-peda$ display / $eflags
+1: $eflags = <error: No registers.>
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+gdb-peda$ ni # x2
+gdb-peda$ p/d $al
+$1 = -120
+gdb-peda$ p/d $bl
+$2 = -10
+gdb-peda$ ni # running <+4>
+0x0000000000401006 in _start ()
+1: $eflags = [ CF PF IF OF ] # CF is found
+gdb-peda$ p/d $bl
+$1 = 126
+```
 
 65. Detecting oveflow in signed integers addition in assembly
+- `jo`: jump when Overflow Flag is set
+```asm
+.section .data
+  msg: .ascii "There is an overflow\n"
+.section .text
+.globl _start
+_start:
+  movb $-120,%al
+  movb $-10, %bl
+  addb %al,  %bl
+  jo jump_here
+  #exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+jump_here:
+  movl $4,%eax
+  movl $1,%ebx
+  movl $msg,%ecx
+  movl $21,%edx
+  int  $0x80
+  movl $1,%eax
+  movl $99,%ebx
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as65.s -o as65.o
+$ ld as65.o -o as65.exe
+$ ./as65.exe 
+There is an overflow
+$ echo $?
+99
+$ gdb -q .as65.exe
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    al,0x88
+   0x0000000000401002 <+2>:	mov    bl,0xf6
+   0x0000000000401004 <+4>:	add    bl,al
+   0x0000000000401006 <+6>:	jo     0x401014 <jump_here>
+   0x0000000000401008 <+8>:	mov    eax,0x1
+   0x000000000040100d <+13>:	mov    ebx,0x0
+   0x0000000000401012 <+18>:	int    0x80
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ display / $eflags
+1: $eflags = <error: No registers.>
+gdb-peda$ run
+gdb-peda$ ni # x3, running <+4>
+1: $eflags = [ CF PF IF OF ] # OF is found
+```
 
 66. Concept of add carry instruction in assembly
+- ADC (Add Carry Instruction)
+  - Adding n1 + n2 yields CF
+  - As next operation, adding n3+n4 may use the CF from previous operation
+- Ex:
+  - 314/d = [00000001] [10000000]
+  - 416/d = [00000001] [10100000]
+  - When we add 314+416
+    - In first eight bits, CF is produced
+      - [...] [00100000] + CF
+    - We move this CF into second eight bit operation
+      - [00000010] + CF + [00100000] = [00000011] [00100000]
 
 67. Using ADC instruction in assembly
+```asm
+.section .data
+  data1: .word 384 #x01 80
+  data2: .word 416 #x01 A0
+.section .text
+.globl _start
+_start:
+  movb data1+1,%al # from x01_80, 01 to al
+  movb data1,  %bl # from x01_80, 80 to bl
+  movb data2+1,%cl # from x01_A0, 01 to al
+  movb data2,  %dl # from x01_A0, A0 to bl
+  addb %bl,%dl     # 80+A0
+  adcb %al,%cl     # 01+01+CF
+  #exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- `data+1`: we will acces the second byte
+- `adcb`: byte add when CF is set
+- Demo:
+```bash
+$ as as67.s -o as67.o
+$ ld as67.o -o as67.exe
+$ gdb -q as67.exe
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    al,BYTE PTR ds:0x402001
+   0x0000000000401007 <+7>:	mov    bl,BYTE PTR ds:0x402000
+   0x000000000040100e <+14>:	mov    cl,BYTE PTR ds:0x402003
+   0x0000000000401015 <+21>:	mov    dl,BYTE PTR ds:0x402002
+   0x000000000040101c <+28>:	add    dl,bl
+   0x000000000040101e <+30>:	adc    cl,al
+   0x0000000000401020 <+32>:	mov    eax,0x1
+   0x0000000000401025 <+37>:	mov    ebx,0x0
+   0x000000000040102a <+42>:	int    0x80
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ display / $eflags
+1: $eflags = <error: No registers.>
+# running <+21>
+1: $eflags = [ IF ]
+gdb-peda$ i r $al
+al             0x1                 0x1
+gdb-peda$ i r $bl
+bl             0x80                0x80
+gdb-peda$ i r $cl
+cl             0x1                 0x1
+gdb-peda$ i r $dl
+dl             0xa0                0xa0
+# running <+28>
+0x000000000040101e in _start ()
+1: $eflags = [ CF IF OF ]
+gdb-peda$ i r $dl
+dl             0x20                0x20
+# running <+30>
+1: $eflags = [ PF IF ]
+gdb-peda$ i r $cl
+cl             0x3                 0x3 # = 1 + 1 + CF
+```
 
 68. How binary subtraction works
+- Rules for binary subtraction
+  - Flip all bits of the number to be subtracted
+  - Add the numbers
+  - If the final carry is 1 (positive number) then add this carry to the final result
+  - If the final carry is 0 (negative number) then flip all the bits of the results to get the infal result
+- Ex:
+  - 12 - 5 = [1100] - [0101]
+    - Flip all bits of 5 and now [1010]
+    - [1100] + [1010] = [0110] with carry = 1
+    - Final result = [0110] + 1 = [0111] = 7 in decimal
+  - 5 - 12 = [0101] - [1100]
+    - Flip all bits of 12 and now [0011]
+    - [0101] + [0011] = [1000] with carry = 0
+    - Final result = [0111] = -7 in decimal as carry = 0
 
 69. Using sub instruction in assembly program
 
 70. Increment and decrement instruction in assembly
+- `inc destination`
+- `dec destination`
+```asm
+.section .text
+.globl _start
+_start:
+  movl $3, %eax
+  inc %eax
+  movl $7,%ebx
+  dec %ebx
+  #exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```  
+- Demo:
+```bash
+$ as as70.s -o as70.o
+$ ld as70.o -o as70.exe
+$ gdb -q as70.exe
+Reading symbols from as70.exe...
+(No debugging symbols found in as70.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    eax,0x3
+   0x0000000000401005 <+5>:	inc    eax
+   0x0000000000401007 <+7>:	mov    ebx,0x7
+   0x000000000040100c <+12>:	dec    ebx
+   0x000000000040100e <+14>:	mov    eax,0x1
+   0x0000000000401013 <+19>:	mov    ebx,0x0
+   0x0000000000401018 <+24>:	int    0x80
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+# running <+0>
+gdb-peda$ i r $eax
+eax            0x3                 0x3
+# running <+5>
+gdb-peda$ i r $eax
+eax            0x4                 0x4
+# running <+7>
+gdb-peda$ i r $ebx
+ebx            0x7                 0x7
+# running <+12>
+gdb-peda$ i r $ebx
+ebx            0x6                 0x6
+```
 
 71. Multiplication of two unsigned numbers in assembly
+- Multiplication of unsigned numbers: `mul source`
+  - Target is defined in eax prior to `mul source`
+  - Result is stored in eax
+```asm
+.section .text
+.globl _start
+_start: 
+  # 12 * 5 = 60 
+  movl $12,%eax
+  movl $5, %ebx  
+  mul %ebx # result in eax. mul $5 doesn't work
+  #exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```  
+- Demo:
+```bash
+$ as as71.s -o as71.o
+$ ld as71.o -o as71.exe
+$ gdb -q as71.exe
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+gdb-peda$ ni
+gdb-peda$ ni
+gdb-peda$ p/d $eax
+$3 = 12
+gdb-peda$ p/d $ebx
+$4 = 5
+gdb-peda$ ni
+gdb-peda$ p/d $eax
+$5 = 60
+gdb-peda$ p/d $ebx
+$6 = 5
+```
 
 72. Different ways of multiplications of signed numbers in assembly
+- Multiplication of signed numbers
+  - `imul source`
+    - Target is from eax
+  - `imul source,destination`
+    - Target is the destination as well
+  - `imul multiplier,source,destination`: multiplier must be a number, not register
+```asm
+.section .text
+.globl _start
+_start:
+  movl $-12,%eax
+  movl $4  ,%ebx
+  movl $5  ,%ecx
+  imul %ebx  # result in eax. -12*4 = -48
+  imul %ebx,%ecx  # result in ecx = 4*5 = 20
+  imul $2,%ecx,%edx # result in edx = 2 * 20 = 40
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```  
+- Demo:
+```bash
+$ as as72.s -o as72.o
+$ ld as72.o -o as72.exe
+$ gdb -q as72.exe
+Reading symbols from as72.exe...
+(No debugging symbols found in as72.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    eax,0xfffffff4
+   0x0000000000401005 <+5>:	mov    ebx,0x4
+   0x000000000040100a <+10>:	mov    ecx,0x5
+   0x000000000040100f <+15>:	imul   ebx
+   0x0000000000401011 <+17>:	imul   ecx,ebx
+   0x0000000000401014 <+20>:	imul   edx,ecx,0x2
+   0x0000000000401017 <+23>:	mov    eax,0x1
+   0x000000000040101c <+28>:	mov    ebx,0x0
+   0x0000000000401021 <+33>:	int    0x80
+End of assembler dump.
+# running <+15>
+gdb-peda$ p/d $eax
+$6 = -48
+gdb-peda$ p/d $ebx
+$7 = 4
+# running <+17>
+gdb-peda$ p/d $ecx
+$9 = 20
+gdb-peda$ p/d $ebx
+$10 = 4
+# running <+20>
+gdb-peda$ p/d $ecx
+$12 = 20
+gdb-peda$ p/d $edx
+$13 = 40
+```
 
 73. How division works in assembly
+- `div source`: source is the divisor
+  - Dividend is at EAX
+  - Quotient is stored at EAX
+  - Remainder is to EDX
+```asm
+.section .text
+.globl _start
+_start:
+  # 10/3, q=3, r=1
+  movl $10, %eax
+  movl $3,  %ebx
+  div  %ebx
+  # exit
+  movl $1, %eax
+  movl $0, %ebx
+  int  $0x80
+```  
+- Demo:
+```bash
+$ as as73.s -o as73.o
+$ ld as73.o -o as73.exe
+$ gdb -q as73.exe
+Reading symbols from as73.exe...
+(No debugging symbols found in as73.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    eax,0xa
+   0x0000000000401005 <+5>:	mov    ebx,0x3
+   0x000000000040100a <+10>:	div    ebx
+   0x000000000040100c <+12>:	mov    eax,0x1
+   0x0000000000401011 <+17>:	mov    ebx,0x0
+   0x0000000000401016 <+22>:	int    0x80
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+# running <+10>
+gdb-peda$ p/d $eax # quotient now
+$1 = 3
+gdb-peda$ p/d $ebx # divisor 
+$2 = 3
+gdb-peda$ p/d $edx # remainder
+$3 = 1
+```
 
 74. Bit shifting in assembly programming
+- `shl destination`: shift left
+- `shr destination`: shift right
+```asm
+.section .text
+.globl _start
+_start:
+  movb $255,%al # 255 = 0b11111111
+  shl  %al      # 0b111111110
+  shr  %al      # 0b01111111 -> gdb shows 1111111 (leading zero is not shown)
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
 
 75. Rotating bits in assembly programming
+- `rol destination`: rotation to left
+- `ror destination`: rotation to right
+```asm
+.section .text
+.globl _start
+_start:
+  movb $220,%al # 11011100
+  rol %al       # 10111001
+  ror %al       # 11011100
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
 
 76. Logical operations in assembly
 
 77. Using OR, AND, and XOR logical operations in assembly programming
+```asm
+.section .text
+.globl _start
+_start:
+  movb $85,%al  # 1010101
+  movb $90,%bl  # 1011010
+  or  %al,%bl # result at bl - 1011111
+  and %al,%bl # result at bl - 1010101
+  xor %al,%bl # result at bl - 0000000
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
 
 ## Section 8: Working with Strings
+
+78. How strings are moved in assembly?
+- movsb/w/l: byte/word/long
+- Regarding a sample string "This is a test"
+  - movsb: 'T'
+  - movsw: 'Th'
+  - movsl: 'This'
+- Moving a string from source to destination
+  - Sample string T/e/s/t
+  - Link source string memory location pointer to ESI register
+  - Link destination string memory location pointer to EDI register
+  - ESI->EDI by movsb/movsw/movsl
+```asm
+.section .data
+  string: .ascii "Test"  
+.section .bss
+  .lcomm output,4 # define as an uninitialized data
+.section .text
+.globl _start
+_start:
+  movl $string,%esi
+  movl $output,%edi
+  movsl              # Note that there is no argument
+  #exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as78.s -o as78.o
+$ ld as78.o -o as78.exe
+$ gdb -q as78.exe
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    esi,0x402000
+   0x0000000000401005 <+5>:	mov    edi,0x402004
+   0x000000000040100a <+10>:	movs   DWORD PTR es:[rdi],DWORD PTR ds:[rsi]
+   0x000000000040100b <+11>:	mov    eax,0x1
+   0x0000000000401010 <+16>:	mov    ebx,0x0
+   0x0000000000401015 <+21>:	int    0x80
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+gdb-peda$ x &string
+0x402000:	"Test"
+gdb-peda$ x &output
+0x402004 <output>:	""
+gdb-peda$ ni # running <+0>
+1: $esi = 0x402000
+2: $edi = 0x0
+gdb-peda$ x/s 0x402000
+0x402000:	"Test"
+gdb-peda$ ni # running <+5>
+1: $esi = 0x402000
+2: $edi = 0x402004
+gdb-peda$ x 0x402004
+0x402004 <output>:	""
+gdb-peda$ ni # running <+10>
+1: $esi = 0x402004
+2: $edi = 0x402008
+gdb-peda$ x &output
+0x402004 <output>:	"Test"
+gdb-peda$ x/s 0x402004
+0x402004 <output>:	"Test"
+```
+
+79. Direction flag in string movement in assembly
+- Direction Flag: controls the left-to-right or right-to-left direction of string processing
+  - Ref: https://en.wikipedia.org/wiki/Direction_flag
+
+80. Movement of ESI and EDI pointers when DF flag is set in assembly program
+
+81. How REP instruction works in strings in assembly program
+
+82. Basics of comparing strings in assembly
+
+83. How big strings are compared with REP instruction in assembly
+
+84. LODS and STOS instructions in string movement in assembly programming
+
+85. Basic concept of how we can encrypt a string in assembly
+
+86. Encrypting a string in assembly program
+
+87. How to decrypt the encrypted string in assembly
 
 ## Section 9: Using functions in assembly programming
 
