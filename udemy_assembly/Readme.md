@@ -2540,23 +2540,1265 @@ gdb-peda$ x/s 0x402004
   - Ref: https://en.wikipedia.org/wiki/Direction_flag
 
 80. Movement of ESI and EDI pointers when DF flag is set in assembly program
+- Ref: https://stackoverflow.com/questions/9636691/what-are-cld-and-std-for-in-x86-assembly-language-what-does-df-do
+  - cld: clears the Direction Flag, data goes forward
+  - std: sets the Direction Flag, data goes backward
+```asm
+.section .data
+  source_string: .ascii "Test"
+.section .bss
+.lcomm output,4 # 4byte, uninitialized data
+
+.section .text
+.globl _start
+_start:
+  # step1: move source pointer to esi
+  movl $source_string, %esi
+  # step2: move destination pointer to edi
+  movl $output, %edi
+  std # to set direction flag
+  movsb # moving 1 byte
+  movsw
+  movsl
+  #exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```  
+- Demo:
+```bash
+$ as as80.s -o as80.o
+$ ld as80.o -o as80.exe
+$ gdb -q as80.exe
+Reading symbols from as80.exe...
+(No debugging symbols found in as80.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    esi,0x402000
+   0x0000000000401005 <+5>:	mov    edi,0x402004
+   0x000000000040100a <+10>:	std    
+   0x000000000040100b <+11>:	movs   BYTE PTR es:[rdi],BYTE PTR ds:[rsi]
+   0x000000000040100c <+12>:	movs   WORD PTR es:[rdi],WORD PTR ds:[rsi]
+   0x000000000040100e <+14>:	movs   DWORD PTR es:[rdi],DWORD PTR ds:[rsi]
+   0x000000000040100f <+15>:	mov    eax,0x1
+   0x0000000000401014 <+20>:	mov    ebx,0x0
+   0x0000000000401019 <+25>:	int    0x80
+End of assembler dump.
+gdb-peda$ display $rsi
+1: $rsi = <error: No registers.>
+gdb-peda$ display $rdi
+2: $rdi = <error: No registers.>
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+# running <+10>
+1: $rsi = 0x402000
+2: $rdi = 0x402004
+3: /x $esi = 0x402000
+4: /x $edi = 0x402004
+5: $eflags = [ IF DF ]
+# running <+11>
+3: /x $esi = 0x401fff  # 1byte back from <+10>
+4: /x $edi = 0x402003
+6: x/s &source_string  0x402000:	"TestT"
+7: x/s &output  0x402004 <output>:	"T"
+# running <+12>
+3: /x $esi = 0x401ffd  # 2byte back from <+11>
+4: /x $edi = 0x402001
+6: x/s &source_string  0x402000:	"Tes"
+7: x/s &output  0x402004 <output>:	"T"
+# running <+14>
+3: /x $esi = 0x401ff9  # 4byte back from <+12>
+4: /x $edi = 0x401ffd
+6: x/s &source_string  0x402000:	"T"
+7: x/s &output  0x402004 <output>:	"T"
+```
+- ? Why do this?
 
 81. How REP instruction works in strings in assembly program
+- `rep`: repeat string-operation until tested-condition 
+  - Source pointer to ESI
+  - Destination pointer to EDI
+  - Size of string to ECX
+  - `rep movsb`: repeat moving of bytes until ECX is 0
+```asm
+.section .data
+  source_string: .ascii "This is a test"
+.section .bss
+.lcomm output,14
+.section .text
+.globl _start
+_start:
+  # step 1: setup source pointer in ESI
+  movl $source_string,%esi
+  # step 2: setup dest pointer in EDI
+  movl $output,%edi
+  # step 3: size of string in ECX
+  movl $14,%ecx
+  # step 4: Clear DF
+  cld
+  # step 5: use rep to move string
+  rep movsb
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as81.s -o as81.o
+$ ld as81.o -o as81.exe
+$ gdb -q as81.exe
+Reading symbols from as81.exe...
+(No debugging symbols found in as81.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    esi,0x402000
+   0x0000000000401005 <+5>:	mov    edi,0x402010
+   0x000000000040100a <+10>:	mov    ecx,0xe
+   0x000000000040100f <+15>:	cld    
+   0x0000000000401010 <+16>:	rep movs BYTE PTR es:[rdi],BYTE PTR ds:[rsi]
+   0x0000000000401012 <+18>:	mov    eax,0x1
+   0x0000000000401017 <+23>:	mov    ebx,0x0
+   0x000000000040101c <+28>:	int    0x80
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+gdb-peda$ display /3i $eip
+1: x/3i $eip
+gdb-peda$ display/s &output
+2: x/s &output  0x402010 <output>:	""
+gdb-peda$ display  $ecx
+3: $ecx = 0x0
+# Keep executing ni
+2: x/s &output  0x402010 <output>:	"This"
+3: $ecx = 0xa
+4: /d $ecx = 10
+...
+2: x/s &output  0x402010 <output>:	"This i"
+3: $ecx = 0x8
+4: /d $ecx = 8
+...
+2: x/s &output  0x402010 <output>:	"This is a test"
+3: $ecx = 0x0
+4: /d $ecx = 0
+...
+```
 
 82. Basics of comparing strings in assembly
+- `cmps`: compare strings of ESI from EDI register
+  - If same, Zero Flag is set
+  - `cmpsb`: a single byte
+  - `cmpsw`: two bytes
+  - `cmpsl`: four bytes
+```asm
+.section .data
+  string1: .ascii "Test"
+  string2: .ascii "Test"
+  eq_msg:  .ascii "Matching\n"
+  ne_msg:  .ascii "Different\n"
+.section .text
+.globl _start
+_start: 
+  movl $string1,%esi
+  movl $string2,%edi
+  cld
+  cmpsl 
+  jz success
+  jmp nonsuccess # not necessary. Will go to nonsuccess: anyway
+nonsuccess:  
+  movl $4,%eax
+  movl $1,%ebx
+  movl $ne_msg,%ecx
+  movl $10,%edx
+  int  $0x80
+  jmp exit # not necessary. Will go to exit: anyway
+exit: 
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+success:
+  movl $4,%eax
+  movl $1,%ebx
+  movl $eq_msg,%ecx
+  movl $9,%edx
+  int  $0x80
+  jmp exit
+```
+- Demo:
+```bash
+$ as as82.as -o as82.o
+$ ld as82.o -o as82.exe
+$ ./as82.exe 
+Matching
+$ gdb -q as82.exe
+Reading symbols from as82.exe...
+(No debugging symbols found in as82.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    esi,0x402000
+   0x0000000000401005 <+5>:	mov    edi,0x402004
+   0x000000000040100a <+10>:	cld    
+   0x000000000040100b <+11>:	cmps   DWORD PTR ds:[rsi],DWORD PTR es:[rdi]
+   0x000000000040100c <+12>:	je     0x401034 <success>
+   0x000000000040100e <+14>:	jmp    0x401010 <nonsuccess>
+gdb-peda$ disassemble success
+Dump of assembler code for function success:
+   0x0000000000401034 <+0>:	mov    eax,0x4
+   0x0000000000401039 <+5>:	mov    ebx,0x1
+   0x000000000040103e <+10>:	mov    ecx,0x402008
+   0x0000000000401043 <+15>:	mov    edx,0x9
+   0x0000000000401048 <+20>:	int    0x80
+   0x000000000040104a <+22>:	jmp    0x401028 <exit>
+End of assembler dump.
+gdb-peda$ p 0x402008
+$2 = 0x402008
+gdb-peda$ x 0x402008
+0x402008:	"Matching\nDifferent\n"
+gdb-peda$ disassemble nonsuccess
+Dump of assembler code for function nonsuccess:
+   0x0000000000401010 <+0>:	mov    eax,0x4
+   0x0000000000401015 <+5>:	mov    ebx,0x1
+   0x000000000040101a <+10>:	mov    ecx,0x402011
+   0x000000000040101f <+15>:	mov    edx,0xa
+   0x0000000000401024 <+20>:	int    0x80
+   0x0000000000401026 <+22>:	jmp    0x401028 <exit>
+End of assembler dump.
+gdb-peda$ x 0x402011
+0x402011:	"Different\n"
+```
 
 83. How big strings are compared with REP instruction in assembly
+- What if a string is larger than 4 bytes?
+- `repe cmpsb`: repeats comps in bytes, until ECX becomes zero or ZF is unset
+```asm
+.section .data
+  string1: .ascii "Test 01"
+  string2: .ascii "Test 01"
+  eq_msg:  .ascii "Matching\n"
+  ne_msg:  .ascii "Different\n"
+.section .text
+.globl _start
+_start: 
+  movl $string1,%esi
+  movl $string2,%edi
+  movl $7,%ecx
+  cld
+  repe cmpsb # comparing each byte. Will yield ZF when each byte matches
+  jz success
+  jmp nonsuccess # not necessary. Will go to nonsuccess: anyway
+nonsuccess:  
+  movl $4,%eax
+  movl $1,%ebx
+  movl $ne_msg,%ecx
+  movl $10,%edx
+  int  $0x80
+  jmp exit # not necessary. Will go to exit: anyway
+exit: 
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+success:
+  movl $4,%eax
+  movl $1,%ebx
+  movl $eq_msg,%ecx
+  movl $9,%edx
+  int  $0x80
+  jmp exit
+```
+- ? `repe cmpsb` doesn't yield ZF in Ubuntu20. RF is found
 
 84. LODS and STOS instructions in string movement in assembly programming
+- `lods`: load string from ESI to EAX 
+  - `lodsb`: will load to AL
+  - `lodsw`: will load to AX
+- `stos`: store string from EAX to EDI
+  - `stosb`: store byte from AL to EDI
+  - `stosw`: store word from AX to EDI
+```asm
+.section .data
+  string: .ascii "This is a test"
+.section .bss
+.lcomm output,14
+.section .text
+.globl _start
+_start: 
+  movl $string,%esi
+  movl $output,%edi
+  movl $14,%ecx  
+  cld
+Loop_it:
+  lodsb  # each byte from ESI to AL  
+  stosb  # from AL to EDI
+  loop  Loop_it # will loop as many as in ECX. The value in ECX will decrease
+exit: 
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as84.as -o as84.o
+$ ld as84.o -o as84.exe
+$ gdb -q as84.exe
+Reading symbols from as84.exe...
+(No debugging symbols found in as84.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    esi,0x402000
+   0x0000000000401005 <+5>:	mov    edi,0x402010
+   0x000000000040100a <+10>:	mov    ecx,0xe
+   0x000000000040100f <+15>:	cld    
+End of assembler dump.
+gdb-peda$ disassemble Loop_it
+Dump of assembler code for function Loop_it:
+   0x0000000000401010 <+0>:	lods   al,BYTE PTR ds:[rsi]
+   0x0000000000401011 <+1>:	stos   BYTE PTR es:[rdi],al
+   0x0000000000401012 <+2>:	loop   0x401010 <Loop_it>
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ display /d $ecx
+1: /d $ecx = <error: No registers.>
+gdb-peda$ display /x $edi
+2: /x $edi = <error: No registers.>
+gdb-peda$ display /x $esi
+3: /x $esi = <error: No registers.>
+gdb-peda$ display /3i $rip
+gdb-peda$ run
+... # ni x1
+1: $edi = 0x0
+2: $ecx = 0x0
+3: $esi = 0x402000
+gdb-peda$ x $esi
+0x402000:	"This is a test"
+...
+0x000000000040100f in _start ()
+1: /d $ecx = 14
+2: /x $edi = 0x402010
+3: /x $esi = 0x402000
+4: x/s &output  0x402010 <output>:	""
+5: x/s &string  0x402000:	"This is a test"
+...
+1: /d $ecx = 13  # reduced from 13
+2: /x $edi = 0x402011
+3: /x $esi = 0x402002
+4: x/s &output  0x402010 <output>:	"T"
+5: x/s &string  0x402000:	"This is a test"
+...
+1: /d $ecx = 8
+2: /x $edi = 0x402017
+3: /x $esi = 0x402007
+4: x/s &output  0x402010 <output>:	"This is"
+5: x/s &string  0x402000:	"This is a test"
+```
 
 85. Basic concept of how we can encrypt a string in assembly
+- ESI has the source string pointer
+- EDI has the destination string pointer
+- ECX has the size of string
+- lodsb copies one byte from ESI to AL
+- Apply xor with KEY (=3 here) with AL, AL is encrypted
+- stosb will copy the encrypted AL to EDI
 
 86. Encrypting a string in assembly program
+```asm
+.section .data
+  string: .ascii "Test"
+.section .bss
+.lcomm encrypted,4
+.section .text
+.globl _start
+_start:
+    # setup source/destination pointers at ESI/EDI
+    movl $string,%esi
+    movl $encrypted,%edi
+    # mention the loop count in ECX
+    movl $4,%ecx
+    # define a key (=3)
+    movb $3,%bl
+    # loop
+loop_it:
+    lodsb # will load one byte into AL
+    xor %bl,%al # result will be stored at AL
+    stosb # store encrypted AL into EDI
+    loop loop_it
+exit:
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as86.as -o as86.o
+$ ld as86.o -o as86.exe
+$ gdb -q as86.exe
+Reading symbols from as86.exe...
+(No debugging symbols found in as86.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    esi,0x402000
+   0x0000000000401005 <+5>:	mov    edi,0x402004
+   0x000000000040100a <+10>:	mov    ecx,0x4
+   0x000000000040100f <+15>:	mov    bl,0x3
+End of assembler dump.
+gdb-peda$ disassemble loop_it
+Dump of assembler code for function loop_it:
+   0x0000000000401011 <+0>:	lods   al,BYTE PTR ds:[rsi]
+   0x0000000000401012 <+1>:	xor    al,bl
+   0x0000000000401014 <+3>:	stos   BYTE PTR es:[rdi],al
+   0x0000000000401015 <+4>:	loop   0x401011 <loop_it>
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ display /d $ecx
+gdb-peda$ display /3i $rip
+<error: No registers.>
+gdb-peda$ display /s &encrypted
+gdb-peda$ display/x $al
+gdb-peda$ display/x $bl
+gdb-peda$ run
+gdb-peda$ ni
+0x0000000000401005 in _start ()
+1: x/3i $rip
+=> 0x401005 <_start+5>:	mov    edi,0x402004
+   0x40100a <_start+10>:	mov    ecx,0x4
+   0x40100f <_start+15>:	mov    bl,0x3
+2: x/s &encrypted  0x402004 <encrypted>:	""
+3: /x $al = 0x0
+4: /x $bl = 0x0
+5: /d $ecx = 0
+...
+0x0000000000401012 in loop_it ()
+1: x/3i $rip
+=> 0x401012 <loop_it+1>:	xor    al,bl
+   0x401014 <loop_it+3>:	stos   BYTE PTR es:[rdi],al
+   0x401015 <loop_it+4>:	loop   0x401011 <loop_it>
+2: x/s &encrypted  0x402004 <encrypted>:	""
+3: /x $al = 0x54
+4: /x $bl = 0x3
+5: /d $ecx = 4
+...
+1: x/3i $rip
+=> 0x401015 <loop_it+4>:	loop   0x401011 <loop_it>
+   0x401017 <exit>:	mov    eax,0x1
+   0x40101c <exit+5>:	mov    ebx,0x0
+2: x/s &encrypted  0x402004 <encrypted>:	"W" # this is an encrypted byte
+3: /x $al = 0x57
+4: /x $bl = 0x3
+5: /d $ecx = 4
+...
+1: x/3i $rip
+=> 0x401011 <loop_it>:	lods   al,BYTE PTR ds:[rsi]
+   0x401012 <loop_it+1>:	xor    al,bl
+   0x401014 <loop_it+3>:	stos   BYTE PTR es:[rdi],al
+2: x/s &encrypted  0x402004 <encrypted>:	"Wfp"
+3: /x $al = 0x70
+4: /x $bl = 0x3
+5: /d $ecx = 1
+```
 
 87. How to decrypt the encrypted string in assembly
+```asm
+.section .data
+  string: .ascii "Test"
+.section .bss
+.lcomm encrypted,4
+.lcomm decrypted,4
+.section .text
+.globl _start
+_start:
+    # setup source/destination pointers at ESI/EDI
+    movl $string,%esi
+    movl $encrypted,%edi
+    # mention the loop count in ECX
+    movl $4,%ecx
+    # define a key (=3)
+    movb $3,%bl
+    # loop
+loop_it:
+    lodsb # will load one byte into AL
+    xor %bl,%al # result will be stored at AL
+    stosb # store encrypted AL into EDI
+    loop loop_it
+    # setup source/destination pointer at ESI/EDI
+    movl $encrypted,%esi
+    movl $decrypted,%edi
+    movl $4,%ecx # previous ECX has been consumed (=0)    
+loop_de:
+    lodsb
+    xor %bl,%al
+    stosb
+    loop loop_de    
+    # write decrypted text
+    movl $4, %eax
+    movl $1,  %ebx
+    movl $decrypted,%ecx
+    movl $4, %edx
+    int  $0x80
+exit:
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as87.as -o as87.o
+$ ld as87.o -o as87.exe
+$ ./as87.exe
+Test
+```
+- If we print the encrypted in the middle of code, it will change the register data and will not be decrypted correctly
 
 ## Section 9: Using functions in assembly programming
 
+88. How to define a function in assembly programming
+```asm
+.type func_name, @function
+fun_name:
+...
+...
+ret # to return to the main program or where it is called from
+```
+
+89. Using a function in assembly programming
+```asm
+.section .text
+.globl _start
+_start:
+  call myFunc
+  #exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+# define a function here
+.type myFunc @function
+myFunc:
+  movl $7,%eax
+  movl $2,%ebx
+  addl %eax,%ebx
+  ret
+```
+- Demo:
+```bash
+$ as as89.as -o as89.o
+$ ld as89.o -o as89.exe
+$ gdb -q as89.exe
+Reading symbols from as89.exe...
+(No debugging symbols found in as89.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	call   0x401011 <myFunc>
+   0x0000000000401005 <+5>:	mov    eax,0x1
+   0x000000000040100a <+10>:	mov    ebx,0x0
+   0x000000000040100f <+15>:	int    0x80
+End of assembler dump.
+gdb-peda$ disassemble myFunc
+Dump of assembler code for function myFunc:
+   0x0000000000401011 <+0>:	mov    eax,0x7
+   0x0000000000401016 <+5>:	mov    ebx,0x2
+   0x000000000040101b <+10>:	add    ebx,eax
+   0x000000000040101d <+12>:	ret    
+End of assembler dump.
+gdb-peda$ b * _start
+Note: breakpoint 1 also set at pc 0x401000.
+Breakpoint 2 at 0x401000
+gdb-peda$ b * myFunc
+Breakpoint 3 at 0x401011
+...
+0x000000000040101b in myFunc ()
+1: x/3i $rip
+=> 0x40101b <myFunc+10>:	add    ebx,eax
+   0x40101d <myFunc+12>:	ret    
+   0x40101e:	add    BYTE PTR [rax],al
+2: /d $eax = 7
+3: /d $ebx = 2
+gdb-peda$ ni
+=> 0x40101d <myFunc+12>:	ret    
+   0x40101e:	add    BYTE PTR [rax],al
+   0x401020:	add    BYTE PTR [rax],al
+2: /d $eax = 7
+3: /d $ebx = 9
+```
+
+90. Passing input values to functions in assembly
+```asm
+.section .text
+.globl _start
+_start:
+  movl $10,%eax
+  movl $20,%ebx
+  call add_ftn
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+.type add_ftn,@function
+add_ftn:
+  addl %eax,%ebx
+  ret
+```
+- In gdb:
+```bash
+gdb-peda$ display/3i $rip
+3: x/3i $rip
+=> 0x40101b <add_ftn>:	add    ebx,eax
+   0x40101d <add_ftn+2>:	ret    
+   0x40101e:	add    BYTE PTR [rax],al
+gdb-peda$ p/d $eax
+$2 = 10
+gdb-peda$ p/d $ebx
+$3 = 20
+```
+- In a function, same register can be used which are defined from _start
+
+91. What are function prolog and epilog with stack frame?
+- In 32bit OS
+  - Prolog: creates stack frame
+  ```asm
+  pushl %ebp       # pushes the bottom of stack
+  movl  %esp,%ebp  # assigns the stack pointer to the bottom of stack. The addres of ESP will overwrite EBP
+  ```
+  - During the operation, ESP will increase
+  - Epilog: Removes stack frame
+  ```asm
+  movl %ebp,%esp  # assigns EBP address to ESP, removing the stack created in the operation. The address of EBP will overwrite ESP
+  popl %ebp
+  ret
+  ```
+- In 64bit OS
+  - Prolog: creates stack frame
+  ```asm
+  push %rbp       # pushes the bottom of stack
+  mov  %rsp,%rbp  # The addres of RSP will overwrite RBP
+  ```
+  - During the operation, ESP will increase
+  - Epilog: Removes stack frame
+  ```asm
+  mov %rbp,%rsp  # The address of RBP will overwrite RSP
+  pop %rbp
+  ret
+  ```
+
+92. Creating function prolog and epilog in assembly programming
+```asm
+.section .text
+.globl _start
+_start:
+  # prolog
+  push %rbp
+  mov  %rsp,%rbp
+  # some operation
+  push $4  # adding 4 to stack. Can be found from $rsp
+  push $5  # adding 5 to stack. Can be viewed from $rsp
+  call add_ftn
+  #epilog
+  mov %rbp,%rsp
+  pop %rbp
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+.type add_ftn, @function
+add_ftn:
+  # prolog
+  push %rbp
+  mov  %rsp,%rbp
+  # operation
+  movl $1,%eax
+  movl $2,%ebx
+  addl %eax,%ebx
+  push %rbx
+  #epilog
+  mov %rbp,%rsp
+  pop %rbp
+  ret
+```
+- Demo:
+```bash
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	push   rbp
+   0x0000000000401001 <+1>:	mov    rbp,rsp
+   0x0000000000401004 <+4>:	push   0x4
+   0x0000000000401006 <+6>:	push   0x5
+   0x0000000000401008 <+8>:	call   0x40101d <add_ftn>
+   0x000000000040100d <+13>:	mov    rsp,rbp
+   0x0000000000401010 <+16>:	pop    rbp
+   0x0000000000401011 <+17>:	mov    eax,0x1
+   0x0000000000401016 <+22>:	mov    ebx,0x0
+   0x000000000040101b <+27>:	int    0x80
+End of assembler dump.
+gdb-peda$ disassemble add_ftn
+Dump of assembler code for function add_ftn:
+   0x000000000040101d <+0>:	push   rbp
+   0x000000000040101e <+1>:	mov    rbp,rsp
+   0x0000000000401021 <+4>:	mov    eax,0x1
+   0x0000000000401026 <+9>:	mov    ebx,0x2
+   0x000000000040102b <+14>:	add    ebx,eax
+   0x000000000040102d <+16>:	push   rbx
+   0x000000000040102e <+17>:	mov    rsp,rbp
+   0x0000000000401031 <+20>:	pop    rbp
+   0x0000000000401032 <+21>:	ret    
+End of assembler dump.
+gdb-peda$ display /3i $rip
+1: x/3i $rip
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+1: x/3i $rip
+=> 0x401000 <_start>:	push   rbp
+   0x401001 <_start+1>:	mov    rbp,rsp
+   0x401004 <_start+4>:	push   0x4
+gdb-peda$ x/5xw $rsp
+0x7fffffffd630:	0x00000001	0x00000000	0xffffd9c7	0x00007fff
+0x7fffffffd640:	0x00000000
+gdb-peda$ ni
+1: x/3i $rip
+=> 0x401001 <_start+1>:	mov    rbp,rsp
+   0x401004 <_start+4>:	push   0x4
+   0x401006 <_start+6>:	push   0x5
+gdb-peda$ x/5xw $rsp
+0x7fffffffd628:	0x00000000	0x00000000	0x00000001	0x00000000
+0x7fffffffd638:	0xffffd9c7
+# At <+6> of _start, stack becomes:
+gdb-peda$ x/5xw $rsp
+0x7fffffffd618:	0x00000005	0x00000000	0x00000004	0x00000000
+0x7fffffffd628:	0x00000000
+# At <+0> of add_function
+1: x/3i $rip
+=> 0x40101d <add_ftn>:	push   rbp
+   0x40101e <add_ftn+1>:	mov    rbp,rsp
+   0x401021 <add_ftn+4>:	mov    eax,0x1
+gdb-peda$ x/5xw $rsp
+0x7fffffffd610:	0x0040100d	0x00000000	0x00000005	0x00000000
+0x7fffffffd620:	0x00000004
+# At <+16> of add_function
+0x000000000040102e in add_ftn ()
+1: x/3i $rip
+=> 0x40102e <add_ftn+17>:	mov    rsp,rbp
+   0x401031 <add_ftn+20>:	pop    rbp
+   0x401032 <add_ftn+21>:	ret    
+gdb-peda$ x/5xw $rsp
+0x7fffffffd600:	0x00000003	0x00000000	0xffffd628	0x00007fff  # stack value shows 3 = 1+2
+0x7fffffffd610:	0x0040100d
+gdb-peda$ ni
+0x0000000000401031 in add_ftn ()
+1: x/3i $rip
+=> 0x401031 <add_ftn+20>:	pop    rbp
+   0x401032 <add_ftn+21>:	ret    
+   0x401033:	add    BYTE PTR [rax],al
+gdb-peda$ x/5xw $rsp
+0x7fffffffd608:	0xffffd628	0x00007fff	0x0040100d	0x00000000 # now rsp to rbp
+0x7fffffffd618:	0x00000005
+...
+# returning to _start
+1: x/3i $rip
+=> 0x40100d <_start+13>:	mov    rsp,rbp
+   0x401010 <_start+16>:	pop    rbp
+   0x401011 <_start+17>:	mov    eax,0x1
+gdb-peda$ x/5xw $rsp
+0x7fffffffd618:	0x00000005	0x00000000	0x00000004	0x00000000 # stack values are still existing
+0x7fffffffd628:	0x00000000
+gdb-peda$ ni
+0x0000000000401010 in _start ()
+1: x/3i $rip
+=> 0x401010 <_start+16>:	pop    rbp
+   0x401011 <_start+17>:	mov    eax,0x1
+   0x401016 <_start+22>:	mov    ebx,0x0
+gdb-peda$ x/5xw $rsp
+0x7fffffffd628:	0x00000000	0x00000000	0x00000001	0x00000000 # now stack values of 4 & 5 are gone
+0x7fffffffd638:	0xffffd9c7
+```
+
+93. Accessing function parameters using stack data
+- Push data into stack in _start
+- In a function, we can access those data wrt EBP or RBP 
+
+94. Accessing stack data in our functions in assembly
+
+```asm
+.section .text
+.globl _start
+_start:
+  push %rbp
+  mov  %rsp,%rbp
+  push $4 # in 64bit os, push not pushl into stack
+  push $5
+  call add_ftn
+  mov %rbp,%rsp
+  pop %rbp
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+.type add_ftn, @function
+add_ftn:
+  push %rbp
+  mov  %rsp,%rbp
+  movl 16(%rbp),%eax
+  movl 24(%rbp),%ebx
+  addl %eax,%ebx
+  mov %rbp,%rsp
+  pop %rbp
+  ret
+```
+- Demo:
+```bash
+gdb -q as94.exe
+Reading symbols from as94.exe...
+(No debugging symbols found in as94.exe)
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	push   rbp
+   0x0000000000401001 <+1>:	mov    rbp,rsp
+   0x0000000000401004 <+4>:	push   0x4
+   0x0000000000401006 <+6>:	push   0x5
+   0x0000000000401008 <+8>:	call   0x40101d <add_ftn>
+   0x000000000040100d <+13>:	mov    rsp,rbp
+   0x0000000000401010 <+16>:	pop    rbp
+   0x0000000000401011 <+17>:	mov    eax,0x1
+   0x0000000000401016 <+22>:	mov    ebx,0x0
+   0x000000000040101b <+27>:	int    0x80
+End of assembler dump.
+gdb-peda$ disassemlbe add_ftn
+Undefined command: "disassemlbe".  Try "help".
+gdb-peda$ disassemble add_ftn
+Dump of assembler code for function add_ftn:
+   0x000000000040101d <+0>:	push   rbp
+   0x000000000040101e <+1>:	mov    rbp,rsp
+   0x0000000000401021 <+4>:	mov    eax,DWORD PTR [rbp+0x10]
+   0x0000000000401024 <+7>:	mov    ebx,DWORD PTR [rbp+0x18]
+   0x0000000000401027 <+10>:	add    ebx,eax
+   0x0000000000401029 <+12>:	mov    rsp,rbp
+   0x000000000040102c <+15>:	pop    rbp
+   0x000000000040102d <+16>:	ret    
+End of assembler dump.
+# after <+7> in add_ftn
+gdb-peda$ p $ebx
+$3 = 0x4  # now EBX got data from 24 stripe from RBP
+gdb-peda$ x/10xw $rbp
+0x7fffffffd608:	0xffffd628	0x00007fff	0x0040100d	0x00000000
+0x7fffffffd618:	0x00000005	0x00000000	0x00000004	0x00000000
+0x7fffffffd628:	0x00000000	0x00000000
+gdb-peda$ x/10xw $rsp
+0x7fffffffd608:	0xffffd628	0x00007fff	0x0040100d	0x00000000
+0x7fffffffd618:	0x00000005	0x00000000	0x00000004	0x00000000
+0x7fffffffd628:	0x00000000	0x00000000
+```
+
+95. How to use separate function files in assembly
+- f_file.s:
+```asm
+.section .text
+.type add_ftn,@function
+.globl add_ftn
+add_ftn:
+  addl %eax,%ebx
+  ret
+```
+- `as f_file.s -o f_file.o`
+- as94.s:
+```asm
+.section .text
+.globl _start
+_start:
+  movl $4,%eax
+  movl $5,%ebx
+  call add_ftn # calling a function
+  #exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```  
+- `as as94.s -o as95.o`
+- `ld as95.o f_file.o -o as95.exe`
+- In gdb:
+```bash
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    eax,0x4
+   0x0000000000401005 <+5>:	mov    ebx,0x5
+   0x000000000040100a <+10>:	call   0x40101b <add_ftn>
+   0x000000000040100f <+15>:	mov    eax,0x1
+   0x0000000000401014 <+20>:	mov    ebx,0x0
+   0x0000000000401019 <+25>:	int    0x80
+End of assembler dump.
+gdb-peda$ disassemble add_ftn 
+Dump of assembler code for function add_ftn:
+   0x000000000040101b <+0>:	add    ebx,eax
+   0x000000000040101d <+2>:	ret    
+End of assembler dump.
+```
+
+96. Finding program input parameters on stack
+- Command line parameters on stack
+- When `a.exe` runs
+  - As there is no argument, N. of arg is 1 (including the executable name)
+  - ESP -> | 1 | /tmp/a.exe |
+- When `a.exe input1 input2` runs:  
+  - ESP -> | 3 | /tmp/a.exe | input1 | input2 |
+```asm
+.section .text
+.globl _start
+_start:
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- Demo
+```bash
+$ as as96.s -o as96.o
+$ ld as96.o -o as96.exe
+$ gdb -q as95.exe
+gdb-peda$ display/3i $rip
+1: x/3i $rip
+gdb-peda$ display/7xg $rsp
+2: x/7xg $rsp
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ run
+Breakpoint 1, 0x0000000000401000 in _start ()
+1: x/3i $rip
+=> 0x401000 <_start>:	mov    eax,0x1
+   0x401005 <_start+5>:	mov    ebx,0x0
+   0x40100a <_start+10>:	int    0x80
+2: x/7xg $rsp
+0x7fffffffd630:	0x0000000000000001	0x00007fffffffd9c7
+0x7fffffffd640:	0x0000000000000000	0x00007fffffffd9fb
+0x7fffffffd650:	0x00007fffffffda0b	0x00007fffffffda5d
+0x7fffffffd660:	0x00007fffffffda70
+# first stack data 1 is the num. of argv (exe itself)
+gdb-peda$ x/s 0x00007fffffffd9c7
+0x7fffffffd9c7:	"/home/.../as96.exe" # 2nd stack data shows the exec name
+# re-run with an argument
+gdb-peda$ run anyinput
+Breakpoint 1, 0x0000000000401000 in _start ()
+1: x/3i $rip
+=> 0x401000 <_start>:	mov    eax,0x1
+   0x401005 <_start+5>:	mov    ebx,0x0
+   0x40100a <_start+10>:	int    0x80
+2: x/7xg $rsp
+0x7fffffffd620:	0x0000000000000002	0x00007fffffffd9be
+0x7fffffffd630:	0x00007fffffffd9f2	0x0000000000000000
+0x7fffffffd640:	0x00007fffffffd9fb	0x00007fffffffda0b
+0x7fffffffd650:	0x00007fffffffda5d
+# Note that first stack data is 2 now
+gdb-peda$ x/s 0x00007fffffffd9be
+0x7fffffffd9be:	"/home/.../as96.exe"
+gdb-peda$ x/s 0x00007fffffffd9f2
+0x7fffffffd9f2:	"anyinput"
+```
+
 ## Section 10: Using system calls in assembly programming
 
+97. How to use system calls in assembly - the basics
+- We need 1. system call number and 2. input parameters
+  - For the number, use /usr/include/x86_64-linux-gnu/asm/unistd_64.h
+    - Not /usr/include/asm-generic/unistd.h
+    - Ref: https://stackoverflow.com/questions/53122539/which-header-file-of-system-call-numbers-is-correct
+  - For the input parameter, use `man` in Linux
+
+98. Rules for using system calls in assembly
+- System call number must be in EAX
+- Input of the system call will be in EBX, ECX, EDX, ESI, EDI, ...
+- Finally, `int $0x80` will execute the system call by the OS
+
+99. Using write and exit system calls in assembly
+
+100. Return value of a system call
+- After systemcall is made, the return value is stored in EAX
+- Ex:
+  - write(input1,input2,input3) will return value of no. bytes written as the return value to EAX
+```asm
+.section .data
+  msg: .ascii "Hello world\n"
+.section .text
+.globl _start
+_start
+  # use write syscall
+  movl $4,%eax
+  movl $1,%ebx
+  movl &msg,%ecx
+  movl $12,%edx
+  int  $0x80
+  # check EAX at this stage
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as100.as -o as100.o
+$ ld as100.o -o as100.exe
+$ gdb -q as100.exe
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+=> 0x0000000000401000 <+0>:	mov    eax,0x4
+   0x0000000000401005 <+5>:	mov    ebx,0x1
+   0x000000000040100a <+10>:	mov    ecx,0x402000
+   0x000000000040100f <+15>:	mov    edx,0xc
+   0x0000000000401014 <+20>:	int    0x80
+   0x0000000000401016 <+22>:	mov    eax,0x1
+   0x000000000040101b <+27>:	mov    ebx,0x0
+   0x0000000000401020 <+32>:	int    0x80
+End of assembler dump.
+# Running <+15>
+gdb-peda$ p/d $eax
+$1 = 4
+# Running <+20>
+gdb-peda$ p/d $eax
+$2 = 12 # This is the return value from write() systemcall
+``` 
+
+101. Finding exit system call return value
+```bash
+$ ./as100.exe 
+Hello world
+$ echo $?
+0
+```
+
+102. Using getpid system call in assembly to get the process id of program
+- In 32bit, getpid is 20 while 39 in 64bit
+- `man pid` shows: `pid_t getpid(void);`
+  - Therefore, no argument necessary
+```asm
+.section .text
+.globl _start
+_start:
+  movl $20,%eax
+  int  $0x80
+  # check EAX for the return value
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- Demo:
+```bash
+$ as as102.as -o as102.o
+$ ld as102.o -o as102.exe
+$ gdb -q as102.exe
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    eax,0x14
+   0x0000000000401005 <+5>:	int    0x80
+   0x0000000000401007 <+7>:	mov    eax,0x1
+   0x000000000040100c <+12>:	mov    ebx,0x0
+   0x0000000000401011 <+17>:	int    0x80
+End of assembler dump.
+gdb-peda$ display/d $eax
+gdb-peda$ b * _start
+gdb-peda$ run
+1: /d $eax = 0
+gdb-peda$ ni
+1: /d $eax = 20
+gdb-peda$ ni
+1: /d $eax = 984341 # this is the return value, which is pid
+gdb-peda$ ni
+gdb-peda$ ni
+gdb-peda$ ni
+[Inferior 1 (process 984341) exited normally] # the same pid is found here
+Warning: not running
+```
+
+103. Using getuid system call in assembly to get the current user id of a user
+- In 32bit, getuid is 24 while 102 in 64bit
+- From `man getuid`:  `uid_t getuid(void);`
+```asm
+.section .text
+.globl _start
+_start:
+  movl $24,%eax
+  int  $0x80
+  # check EAX for the return value
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- In gdb:
+```bash
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    eax,0x18
+   0x0000000000401005 <+5>:	int    0x80
+   0x0000000000401007 <+7>:	mov    eax,0x1
+   0x000000000040100c <+12>:	mov    ebx,0x0
+   0x0000000000401011 <+17>:	int    0x80
+End of assembler dump.
+gdb-peda$ b * _start
+Breakpoint 1 at 0x401000
+gdb-peda$ display/d $eax
+gdb-peda$ run
+1: /d $eax = 0
+gdb-peda$ ni
+1: /d $eax = 24
+gdb-peda$ ni
+1: /d $eax = 1000 # matches from id command in CLI (uid=1000)
+```
+
+104. How to handle advanced return values of a system call
+- What if there are multiple return values?
+- Ex: sysinfo systemcall
+  - From uninstd_32.h: `#define __NR_sysinfo 116`
+```bash
+       int sysinfo(struct sysinfo *info);
+...
+       structure:
+        struct sysinfo {
+               long uptime;             /* Seconds since boot */
+               unsigned long loads[3];  /* 1, 5, and 15 minute load averages */
+               unsigned long totalram;  /* Total usable main memory size */
+               unsigned long freeram;   /* Available memory size */
+               unsigned long sharedram; /* Amount of shared memory */
+               unsigned long bufferram; /* Memory used by buffers */
+               unsigned long totalswap; /* Total swap space size */
+               unsigned long freeswap;  /* Swap space still available */
+               unsigned short procs;    /* Number of current processes */
+               char _f[22];             /* Pads structure to 64 bytes */
+           };
+```
+```asm
+.section .data
+sysinfo:
+  uptime: .int 0
+  loads1: .int 0
+  loads5: .int 0
+  loads15: .int 0
+  totalram: .int 0
+  freeram: .int 0
+  sharedram: .int 0
+  bufferran: .int 0
+  totalswap: .int 0
+  procs: .short 0
+  totalhigh: .int 0
+  mem_unit: .int 0
+.section .text
+.globl _start
+_start:
+  movl $116,%eax
+  movl $sysinfo,%ebx
+  int $0x80
+  # exit
+  movl $1,%eax
+  movl $0,%ebx
+  int  $0x80
+```
+- In gdb:
+```bash
+gdb-peda$ disassemble _start
+Dump of assembler code for function _start:
+   0x0000000000401000 <+0>:	mov    eax,0x74
+   0x0000000000401005 <+5>:	mov    ebx,0x402000
+   0x000000000040100a <+10>:	int    0x80
+   0x000000000040100c <+12>:	mov    eax,0x1
+   0x0000000000401011 <+17>:	mov    ebx,0x0
+   0x0000000000401016 <+22>:	int    0x80
+End of assembler dump.
+# after running <+10>
+1: $eax = 0x0
+All defined variables:
+Non-debugging symbols:
+0x0000000000402000  sysinfo
+0x0000000000402000  uptime
+0x0000000000402004  loads1
+0x0000000000402008  loads5
+0x000000000040200c  loads15
+...
+```
+- ? Seems not correct values are found
+
 ## Section 11: Inline assembly programming
+
+105. What is an inline assembly programming
+- Assembly code inside of C-code
+```c
+#include <stdio.h>
+int main()
+{
+  asm("movl $4,%eax\n");
+  asm("movl $5,%ebx\n");
+  return 0;
+}
+```
+- Demo:
+```bash
+$ gcc ch105.c 
+$ gdb -q a.out
+Reading symbols from a.out...
+(No debugging symbols found in a.out)
+gdb-peda$ disassemble _main
+No symbol table is loaded.  Use the "file" command.
+gdb-peda$ disassemble main
+Dump of assembler code for function main:
+   0x0000000000001129 <+0>:	endbr64 
+   0x000000000000112d <+4>:	push   rbp
+   0x000000000000112e <+5>:	mov    rbp,rsp
+   0x0000000000001131 <+8>:	mov    eax,0x4
+   0x0000000000001136 <+13>:	mov    ebx,0x5
+   0x000000000000113b <+18>:	mov    eax,0x0
+   0x0000000000001140 <+23>:	pop    rbp
+   0x0000000000001141 <+24>:	ret    
+End of assembler dump.
+```
+
+106. Using write syscall to print using inline assembly
+```c
+#include <stdio.h>
+char str[12] = "Hello World\n";
+int main()
+{
+  asm("movl $4,%eax\n");
+  asm("movl $1,%ebx\n");
+  asm("movl $str,%ecx\n");
+  asm("movl $12,%edx\n");  
+  return 0;
+}
+```
+- Demo:
+  - In X86_64, array name in asm is not allowed in C
+  - https://stackoverflow.com/questions/49091798/inline-assembly-returns-relocation-r-x86-64-32s-against-undefined-symbol-can-no
+  - https://github.com/stanford-mast/Grazelle-PPoPP18/issues/3
+  - Use `-no-pie`
+```bash
+$ gcc -no-pie ch106.c 
+$ gdb -q ./a.out
+Reading symbols from ./a.out...
+(No debugging symbols found in ./a.out)
+gdb-peda$ disassemble main
+Dump of assembler code for function main:
+   0x0000000000401106 <+0>:	endbr64 
+   0x000000000040110a <+4>:	push   rbp
+   0x000000000040110b <+5>:	mov    rbp,rsp
+   0x000000000040110e <+8>:	mov    eax,0x4
+   0x0000000000401113 <+13>:	mov    ebx,0x1
+   0x0000000000401118 <+18>:	mov    ecx,0x404028
+   0x000000000040111d <+23>:	mov    edx,0xc
+   0x0000000000401122 <+28>:	mov    eax,0x0
+   0x0000000000401127 <+33>:	pop    rbp
+   0x0000000000401128 <+34>:	ret    
+End of assembler dump.
+gdb-peda$ x/s &str
+0x404028 <str>:	"Hello World\n"
+```
+
+107. Printing register values using inline assembly programming
+```c
+#include <stdio.h>
+unsigned long int esp_reg;
+int main()
+{
+  asm("movl %esp,esp_reg\n");
+  printf("ESP : 0x%lx\n",esp_reg);
+  return 0;
+}
+```
+- Demo:
+```bash
+$ gcc -no-pie ch107.c
+$ ./a.out 
+ESP : 0x713d3200
+```
