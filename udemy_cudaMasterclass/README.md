@@ -1,23 +1,108 @@
 ## CUDA Programming Masterclass with C++
-- By Kasun Liyanage
-- PPT slides are enclosed in each class
-- So far, the best Udemy class
+- Instructor: Kasun Liyanage
 
-## 5. Basic of CUDA program
+## Section 1: Introduction to CUDA programming and CUDA programming model
+
+### 1. Very very important
+
+### 2. Introduction to Parallel Programming
+- Thread
+  - Thread of execution is the smallest sequence of programmed instructions that can be managed independent by a scheduler
+  - Thread is component of a process. Every process has at least on thread called main thread which is th entry point for the program
+
+### 3. Parallel computing and super computing
+
+### 4. How to install CUDA toolkit and first look at CUDA program
+- Installing Nvidia driver at ubuntu20
+- https://forums.developer.nvidia.com/t/nvidia-smi-has-failed-because-it-couldnt-communicate-with-the-nvidia-driver-make-sure-that-the-latest-nvidia-driver-is-installed-and-running/197141/2
+
+### 5. Basic elements of CUDA program
 - Steps of CUDA apps
   - Initialization of data from CPU
   - Transfer data from CPU to GPU
   - Kernel launch with needed grid/block size
   - Transfer results back to CPU
   - Reclaim the memory from both of CPU/GPU
+- Elements of a CUDA program
+  - Host code (main function): runs in CPU
+  - Device code: runs in GPU
+- ch5.cu: 
+```c
+#include <cuda_runtime.h>  
+#include "device_launch_parameters.h"
+#include <stdio.h>
+__global__ void hello_cuda()
+{
+  printf("Hello CUDA world\n");
+}
+int main () 
+{
+  hello_cuda << <1,1 >> > ();
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```
+- Demo:
+```bash
+$ nvcc ch5.cu # the file extension must be *.cu, not *.c
+$ ./a.out 
+Hello CUDA world
+```
 - Grid: a collection of all threads launch for a kernel
 - Block: Threads in a grid is organized in to groups called thread blocks
 - `kernel_name <<< n_of_blocks, threads_per_block >>> (arguments)`
+- Ex:
+  - When there are 32 threads while they are grouped every four, making each block
+  - dim3 block(4,1,1)
+  - dim3 grid(8,1,1)
+  - kernel_name <<< grid, block >>> ()
+  - ch5_1.cu
+```c
+#include <cuda_runtime.h>  
+#include "device_launch_parameters.h"
+#include <stdio.h>
+__global__ void hello_cuda()
+{
+  printf("Hello CUDA world\n");
+}
+int main () 
+{
+  dim3 block(4);
+  dim3 grid(8);
+  hello_cuda <<<grid,block >>>();
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```
+  - This will print Hello ... 32 times
+```c
+  #include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+__global__ void hello_cuda()
+{
+  printf("Hello CUDA world\n");
+}
+int main ()
+{
+  int nx, ny;
+  nx = 16; // total number of threads = 16*4 = 64
+  ny = 4;
+  dim3 block(8, 2);
+  dim3 grid(nx/block.x, ny/block.y); // may couple with block data
+  hello_cuda <<<grid,block >>>();
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```
 - Q: How to optimize 1) N. of blocks (grids) and 2) threads per block (blocks) ?
-  - Max threads per block size: x&y<=1024, z <=64, and x*y*z <=1024
+  - Max threads per block size: x&y<=1024, z <=64, and x\*y\*z <=1024
   - Max N. blocks : x <=2**32-1, y&z <=65536
   - In many cases, grids >> threads per block
-```
+```bash
   Total amount of constant memory:               65536 bytes
   Total amount of shared memory per block:       49152 bytes
   Total number of registers available per block: 65536
@@ -28,37 +113,266 @@
   Max dimension size of a grid size    (x,y,z): (2147483647, 65535, 65535)
 ```
 
-## 6. Organizations of threads in CUDA
+### 6. Organizations of threads in CUDA
 - threadIdx
-- Same threadIdx will exist for multiple blocks (or grids)
-- blockDim = number of threads in each block along x/y/z
-- GridDim = number of blocks in x/y/z
+  - Determined by blocks (not grid)
+  - Same threadIdx will exist for multiple blocks (or grids)
+  - Ex:
+    - |ABCDEFGH| threads
+      - threadIdx.x = 0 1 2 3 4 5 6 7
+      - threadIdx.y = 0 0 0 0 0 0 0 0
+      - threadIdx.z = 0 0 0 0 0 0 0 0
+    - |ABCD| |EFGH| threads
+      - threadIdx.x = 0 1 2 3 0 1 2 3
+      - threadIdx.y = 0 0 0 0 0 0 0 0
+      - threadIdx.z = 0 0 0 0 0 0 0 0
+- Assume 16x16 threads, a grid of 4 blocks  
+  - The entire threads are 16x16
+  - Each block is of 8x8 threads
+  - The grid has 2x2 blocks
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+__global__ void print_threadIds()
+{
+  printf("threadIdx.x/y/z: {%d,%d,%d}\n", threadIdx.x,threadIdx.y,threadIdx.z);
+}
+int main ()
+{
+  int nx, ny;
+  nx = 16; // total number of threads = 16*16 = 256
+  ny = 16;
+  dim3 block(8, 8);
+  dim3 grid(nx/block.x, ny/block.y); // 2x2 block data
+  print_threadIds <<<grid,block >>>();
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```  
+- Demo:
+```bash
+$ nvcc ch06.cu
+$ ./a.out |& grep "{7,6,0}"
+threadIdx.x/y/z: {7,6,0}
+threadIdx.x/y/z: {7,6,0}
+threadIdx.x/y/z: {7,6,0}
+threadIdx.x/y/z: {7,6,0}
+```
+  - Note that same indices are found 4x, as there are 2x2 blocks
 
-## 9. Unique index calculations
+## 7. Organization of thread in a CUDA program - blockidx,blockDim,gridDim
+- blockIdx: CUDA runtime uniquely initializes blockIdx variable for each thread depending on the coordinate of the belonging thread block in the grid (dim3 type data)
+  - Ex:
+    - |ABCDEFGH| threads
+      - blockIdx.x = 0 0 0 0 0 0 0 0
+      - blockIdx.y = 0 0 0 0 0 0 0 0
+      - blockIdx.z = 0 0 0 0 0 0 0 0
+    - |ABCD| |EFGH| threads
+      - blockIdx.x = 0 0 0 0 1 1 1 1
+      - blockIdx.y = 0 0 0 0 0 0 0 0
+      - blockIdx.z = 0 0 0 0 0 0 0 0
+- blockDim: number of threads in each dimension of a thead block. Notice that all the thread block in a grid have the same block size (dim3 type data)
+- gridDim: number of blocks in x/y/z (dim3 type data)
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+__global__ void print_details()
+{
+  printf("threadIdx.x/y/z: {%d,%d,%d} blockDim.x/y/z: {%d,%d,%d} griDim.x/y/z: {%d,%d,%d}\n", threadIdx.x,threadIdx.y,threadIdx.z,blockDim.x,blockDim.y,blockDim.z,gridDim.x,gridDim.y,gridDim.z);
+}
+int main ()
+{
+  int nx, ny;
+  nx = 16; // total number of threads = 16*16 = 256
+  ny = 16;
+  dim3 block(8, 8);
+  dim3 grid(nx/block.x, ny/block.y); // 2x2 block data
+  print_details <<<grid,block >>>();
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```  
+- Demo:
+```bash
+$ nvcc ch07.cu
+$ ./a.out |& grep "{7,6,0}"
+threadIdx.x/y/z: {7,6,0} blockDim.x/y/z: {8,8,1} griDim.x/y/z: {2,2,1}
+threadIdx.x/y/z: {7,6,0} blockDim.x/y/z: {8,8,1} griDim.x/y/z: {2,2,1}
+threadIdx.x/y/z: {7,6,0} blockDim.x/y/z: {8,8,1} griDim.x/y/z: {2,2,1}
+threadIdx.x/y/z: {7,6,0} blockDim.x/y/z: {8,8,1} griDim.x/y/z: {2,2,1}
+```
+
+### 8. Programming exercise 1
+- Print value of threadIdx, blockIdx, gridDim for 3D grids which have 4 threads in all x/y/z and thread block size will be 2 threads in each dimension
+  - Each block has 2x2x2
+  - Grid has 2x2x2 blocks
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+__global__ void print_details()
+{
+  printf("threadIdx.x/y/z: {%d,%d,%d} blockDim.x/y/z: {%d,%d,%d} griDim.x/y/z: {%d,%d,%d}\n", threadIdx.x,threadIdx.y,threadIdx.z,blockDim.x,blockDim.y,blockDim.z,gridDim.x,gridDim.y,gridDim.z);
+}
+int main ()
+{
+  int nx, ny, nz;
+  nx = 4; // total number of threads = 4x4x4 = 64
+  ny = 4;
+  nz = 4;
+  dim3 block(2,2,2);
+  dim3 grid(nx/block.x, ny/block.y,nz/block.z); // 2x2x2 block data
+  print_details <<<grid,block >>>();
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```
+
+### 9. Unique index calculation using threadIdx, blockId, and blockDim
 - Using threadIdx, blockIdx, blockDim, gridDim, a unique index of each thread is found
   - threadIdx out of blockDim
   - blockIdx out of gridDim
 - threadIdx is not unique as the same id exits in other blocks
   - Offset of blockIdx*blockDim
+- Sample code with 1 block of 8 threads
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+__global__ void unique_idx_calc_threadIdx(int *input)
+{
+  int tid = threadIdx.x;
+  printf("threadIdx: %d value: %d\n", tid, input[tid]);
+}
+int main ()
+{
+  int array_size = 8;
+  int array_byte_size = sizeof(int) * array_size;
+  int h_data[] = {23,9,4,53,65,12,1,33};
+  for (int i=0; i< array_size; i++)
+  {
+    printf("%d\n",h_data[i]);
+  }
+  printf("\n\n");
+  int * d_data;
+  cudaMalloc((void**)&d_data, array_byte_size);
+  cudaMemcpy(d_data, h_data, array_byte_size, cudaMemcpyHostToDevice);
+  dim3 block(8);
+  dim3 grid(1);
+  unique_idx_calc_threadIdx <<<grid,block >>>(d_data);
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```
+- Demo:
+```bash
+$ nvcc ch09.cu
+$ ./a.out
+23
+9
+4
+53
+65
+12
+1
+33
+threadIdx: 0 value: 23
+threadIdx: 1 value: 9
+threadIdx: 2 value: 4
+threadIdx: 3 value: 53
+threadIdx: 4 value: 65
+threadIdx: 5 value: 12
+threadIdx: 6 value: 1
+threadIdx: 7 value: 33
+```
+- Sample code with 2 blocks and 4 threads each
+  - Change block and grid as shown below
+```c
+  dim3 block(4);
+  dim3 grid(2);
+```
+  - This yields:
+```
+threadIdx: 0 value: 23 
+threadIdx: 1 value: 9
+threadIdx: 2 value: 4
+threadIdx: 3 value: 53
+threadIdx: 0 value: 23  # duplicated
+threadIdx: 1 value: 9   #
+threadIdx: 2 value: 4   #
+threadIdx: 3 value: 53  #
+```
+  - tid is not unique and wrong results are made
+- Defining a unique global id (gid) using blockIdx and blockDim
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+__global__ void unique_gid_calc_threadIdx(int *input)
+{
+  int tid = threadIdx.x;
+  int gid = tid + blockIdx.x * blockDim.x;
+  printf("gid: %d value: %d\n", gid, input[gid]);
+};;
+int main ()
+{
+  int array_size = 8;
+  int array_byte_size = sizeof(int) * array_size;
+  int h_data[] = {23,9,4,53,65,12,1,33};
+  for (int i=0; i< array_size; i++)
+  {
+    printf("%d\n",h_data[i]);
+  }
+  printf("\n\n");
+  int * d_data;
+  cudaMalloc((void**)&d_data, array_byte_size);
+  cudaMemcpy(d_data, h_data, array_byte_size, cudaMemcpyHostToDevice);
+  dim3 block(4);
+  dim3 grid(2);
+  unique_gid_calc_threadIdx <<<grid,block >>>(d_data);
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```
+- Now correct results are found:
+```bash
+gid: 0 value: 23
+gid: 1 value: 9
+gid: 2 value: 4
+gid: 3 value: 53
+gid: 4 value: 65
+gid: 5 value: 12
+gid: 6 value: 1
+gid: 7 value: 33
+```
 
-## 10. Unique index calculations for 2D grid
+### 10. Unique index calculations for 2D grid
 - A unique index = row offset + block offset + tid
 - gid = gridDim.x*blockDim.x*blockIdx.y + blockIdx.x*blockDim.x + threadIdx.x
 
-## 12. Memory transfer b/w host and device
+### 12. Memory transfer b/w host and device
 - cudaMemCpy(destination ptr, source ptr, size_in_byte, direction)
   - Direction: cudamemcpyhtod, cudamemcpydtoh, cudamemcpydtod
 - Let's make thread block size as multiples of 32
 
-## 13. Exercise 2
+### 13. Exercise 2
 - Produce a random 64 element array and pass to device. 3D grid of 2x2x2 and each block as 2x2x2 threads
 - Use __device__ int getGlobalIdx_3D_3D() to find gid of each thread
   - Ref: https://cs.calvin.edu/courses/cs/374/CUDA/CUDA-Thread-Indexing-Cheatsheet.pdf
 
-## 14. Sum array example
+### 14. Sum array example
 - memset() is used but seems not necessary
 
-## 15. Error handling
+### 15. Error handling
 - cudaError cuda_function()
 - cudaGetErrorString(error)
 - Macro for cuda error check
@@ -72,7 +386,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
 }
 ```
 
-## 16. Timing
+### 16. Timing
 - CPU
 ```
 clock_t cpu_start, cpu_end;
@@ -84,7 +398,7 @@ printf("Sum array CPU wall time = %4.6f\n",
 ```
 
 
-## Assignment 2
+### Assignment 2
 - In the assignment you have to implement array summation in GPU which can sum 3 arrays. You have to use error handling mechanisms, timing measuring mechanisms as well.Then you have to measure the execution time of you GPU implementations.
 
 | block_size | cpu  | gpu  | host->device | device->host |
@@ -94,7 +408,7 @@ printf("Sum array CPU wall time = %4.6f\n",
 |256         |0.0166|0.0028|0.031         | 0.010        |
 |512         |0.0167|0.0027|0.031         | 0.010        |
 
-## 17. Device properties
+### 17. Device properties
 - warp size is 32 for all HW
 - cudaGetDeviceCount() produces the number of devices
 - Run 17_device_query.cu:
@@ -115,12 +429,13 @@ Device 0: GeForce GT 1030
   Maximum Grid size                         :    (2147483647,65535,65535)
   Maximum block dimension                   :    (1024,1024,64)
 ```
+## Section 2: CUDA Execution model
 
-## 19. Understanding the device better
+### 19. Understanding the device better
 - In each block, warp scheduler and shared memory exist
 - A single thread block must match one SM (stream multiprocessor)
 
-## 20. Warps
+### 20. Warps
 - Thread blocks are divided into smaller units called warps, which have 32 consecutive threads
 - CUDA execution model ref: https://stackoverflow.com/questions/10460742/how-do-cuda-blocks-warps-threads-map-onto-cuda-cores
 - GT1030 has 1024 threads per block as max
@@ -132,7 +447,7 @@ Device 0: GeForce GT 1030
 - A single thread block -> partitioned over warps -> now those threads run with a single instruction (SIMT)
   - Unit of warp allocation is multiples of 32. Could be waste if less than 32 threads are used
 
-## 21. Warp divergence
+### 21. Warp divergence
 - Within a single warp, some threads have different instruction than others, this is a warp divergence
   - Significant penalty
   - Any if statement may yield divergence
@@ -170,7 +485,7 @@ Device "GeForce GT 1030 (0)"
           1                         branch_efficiency                         Branch Efficiency      83.33%      83.33%      83.33%
 ```
 
-## 23. Resources partitioning and latency hiding 2
+### 23. Resources partitioning and latency hiding 2
 - nvidia-smi -a -q -d CLOCK
 ```
 ==============NVSMI LOG==============
@@ -214,7 +529,7 @@ GPU 00000000:01:00.0
         Auto Boost Default                : N/A
 ```
 
-## 24. Occupancy
+### 24. Occupancy
 - The ratio of active warps to maximum number of warps per SM
 - Occupancy calculator - an excel sheet from CUDA development kit
 ```
@@ -231,7 +546,7 @@ ptxas info    : Used 4 registers, 328 bytes cmem[0]
   - Avoid small block sizes. Use 128 or 256 or larger threads per block
   - Keep the number of blocks much larger than the number of SMs
 
-## 25. Profile driven optimization
+### 25. Profile driven optimization
 - nvcc -c common.cpp
 - nvcc -link common.o 7_sum_array.cu
 - Metrics to check
@@ -264,7 +579,7 @@ Device "GeForce GT 1030 (0)"
           1                        achieved_occupancy                        Achieved Occupancy    0.910413    0.910413    0.910413
 ```
 
-## 26. Parallel reduction
+### 26. Parallel reduction
 - cudaDeviceSynchronize(): Introduces a global sync in host code
 - __syncthreads(): sync within a block
 - Parallel reduction
@@ -278,7 +593,7 @@ for (int offset=1; offset < blockDim.x; offset *=2) {
 }
 ```
 
-## 27. Parallel reduction reducing warp divergence
+### 27. Parallel reduction reducing warp divergence
 - The code of section 26 idles a half of threads when the gpu sum starts
 - From:
 ```	for (int offset = 1; offset <= blockDim.x/2; offset *= 2)	{
@@ -303,7 +618,7 @@ for (int offset = 1; offset <= blockDim.x /2 ; offset *= 2)	{
 		__syncthreads();	}
 ```
 
-## 28. Loop unrolling
+### 28. Loop unrolling
 - Thread block unrolling
 ```
 if ((index + 3 * blockDim.x) < size) {
@@ -315,7 +630,7 @@ if ((index + 3 * blockDim.x) < size) {
 }
 __syncthreads();
 ```
-## 29. Warp unrolling
+### 29. Warp unrolling
 ```
 	if (tid < 32)
 	{
@@ -331,18 +646,21 @@ __syncthreads();
 - volatile qualifier will disable optimization, preventing a register optimization
   - Ref: https://stackoverflow.com/questions/49163482/cuda-reduction-warp-unrolling-school
 
-## 32. Dynamic parallelism
+### 32. Dynamic parallelism
 - New GPU kernels from the existing GPU kernel
 - Can be recursive
 - nvcc -arch=sm_61 -rdc=true 14_dynamic_parallelism.cu
   - An option -rdc=true is necessary to launch kernel from __device__ or __global__
   - Parent kernel waits until the child kernel completes
 
-## 33. Reduction with dynamic parallelism
+### 33. Reduction with dynamic parallelism
 - nvcc -rdc=true -link common.o reduc.cu
 - GPU version is 60x slower than CPU version. How to accelerate?
 
-## 35. CUDA memory model
+
+## Section 3: CUDA memory model
+
+### 35. CUDA memory model
 - gld_efficiency : global memory load efficiency
 - gld_throughput : global memory load throughput
 - gld_transactions : global memory load transactions
@@ -368,7 +686,7 @@ Device "GeForce GT 1030 (0)"
           1              gld_transactions_per_request      Global Load Transactions Per Request   16.000008   16.000008   16.000008
 ```
 
-## 36. Different memory types in CUDA
+### 36. Different memory types in CUDA
 - Registers: fastest. Thread-private. Max 255 registers per thread
   - In nvcc, using --ptxas-options=-v shows the number of registers
 ```
@@ -395,7 +713,7 @@ ptxas info    : Used 4 registers, 332 bytes cmem[0]
 - Local Memory: local arrays with indices. High latency memory access
 - Shared memory: __shared__ L1 cache and shared memory uses the same on-chip memory
 
-## 37. Memory management and pinned memory
+### 37. Memory management and pinned memory
 - Pinned memory
   - Host allocated host memory is pageable and GPU cannot access safely
   - Pageable memory must be pinneed before copy
@@ -423,7 +741,7 @@ ptxas info    : Used 4 registers, 332 bytes cmem[0]
 ```
   - Pinned memory reduces 438ms to 373ms
 
-## 38. Zero copy memory
+### 38. Zero copy memory
 - Pinned memory mapped into the device address space. Host and device have direct access
 - No explicit data transfer
 - cudaHostAlloc()/cudaFreeHost()
@@ -436,13 +754,13 @@ ptxas info    : Used 4 registers, 332 bytes cmem[0]
 - May result in low performance
   - But may be useful for large memory requirement
 
-## 39. Unified memory
+### 39. Unified memory
 - Let CPU/GPU access the same memory address or pointer
 - __device__ __managed__ int y;
 - cudaMallocManaged()
 - No malloc/free/copy function is required
 
-## 40. Global memory access patterns
+### 40. Global memory access patterns
 - Aligned memory access : First address is an even multiple of the cache granularity
 - Coalesced memory access : 32 threads in a warp access a continuous chunk of memory
 - Uncached memory (skipping L1 cache) may be fine-grained, and may be useful for mis-aligned or non-coalesced memory access
@@ -460,10 +778,10 @@ if (k < size)
   - As offset size increases, gld_efficiency decreases from 100% to 80%
   - Difference of using -dlcm=ca & -dlcm=cg is not clear. Same results.
 
-## 41. Global memory writes
+### 41. Global memory writes
 - Offset is applied into the c[] array, as writing index
 
-## 42. AOS vs SOA
+### 42. AOS vs SOA
 - AOS
 ```
 struct abc
@@ -498,7 +816,7 @@ Device "GeForce GT 1030 (0)"
 ```
   - SOA shows 100% gld efficiency while AOS shows 50%
 
-## 43. Matrix transpose
+### 43. Matrix transpose
 - sudo /usr/local/cuda-11.1/bin/nvprof --metrics  gld_efficiency,gst_efficiency  ./a.out
   - copy_row() shows 100% while copy_column() yields 12.5%, which is non-coalesced
 - copy_row(): well-coalesced (not matrix transpose. Just copy)
@@ -528,11 +846,13 @@ $ sudo /usr/local/cuda-11.1/bin/nvprof --metrics  gld_efficiency,gst_efficiency 
           1                            gst_efficiency            Global Memory Store Efficiency     100.00%     100.00%     100.00%
 ```
 
-## 45. Matrix transpose with diagonal coordinate
+### 45. Matrix transpose with diagonal coordinate
 - Partition camping: memory requests are queued at some partitions while other partitions remain unused
 - Avoid partition camping using diagonal coordinate system
 
-## 47. Shared memory
+## Section 4: CUDA shared memory and constant memory
+
+### 47. Shared memory
 - Mis-aligned/non-coalesced memory access can have benefit from using shared memory
 - nvcc -link common.o --ptxas-options=-v 1_intro_smem.cu
 ```
@@ -544,28 +864,30 @@ ptxas info    : Used 6 registers, 340 bytes cmem[0]
   - May use cudaDeviceSetSharedMemConfig() as eight bytes for double-precision data
   - Data might be distributed along banks to reduce serialization
 
-## 53. Synchronization in CUDA
+### 53. Synchronization in CUDA
 - __threadfence_block()
 - __threadfence()
 
 
-## 55. CUDA constant memory
+### 55. CUDA constant memory
 - Can be adjusted from the host
 - Must be initialized from the host
 - cudaMemcpyToSymbol()
 
-## 56. Matrix transpose with shared memory padding
-## 57. Warp shuffle instructions
+### 56. Matrix transpose with shared memory padding
+### 57. Warp shuffle instructions
 - Shuffling threads within the same warp
 
-## 60. CUDA streams
+## Section 5: CUDA Streams
+
+### 60. CUDA streams
 - Launch multiple kernels, transferring memory b/w kernels by overlapping execution
 - CUDA stream: a sequence of commands that execute in order
 - Overlapping is the key to transfer memory within device
 - NULL stream: default stream that kernel launches and data transfers use
   - Implicitly declared stream
 
-## 61. Asynchronous functions
+### 61. Asynchronous functions
 - cudaMemCpyAsync()
   - Host pointers should be pinned memory
   - Stream is assigned
@@ -580,7 +902,7 @@ cudaStreamDestroy(str);
 ```
 - 3_simple_cuda_stream_modified.cu produced different results than the lecture. Two kernel executions actually don't overlap
 
-## 62. How to use CUDA streams
+### 62. How to use CUDA streams
 - Objective: overlap kernel executions so we can reduce the overhead of memory transfer
   - Launch multiple kernels
     - Concurrent kernel executions
@@ -605,10 +927,10 @@ cudaDeviceReset();
 ```
   - Kernels are overlapping
 
-## 63. Overlapping memory transfer and kernel execution
+### 63. Overlapping memory transfer and kernel execution
 - ? Kernels didn't overlap?
 
-## 64
+### 64
 - NULL stream can block non-null stream
 - Non-NULL streams
   - blocking : can be blocked by NULL stream
@@ -681,7 +1003,7 @@ blocking_nonblocking_test1 << <grid, block, 0, stm3 >> > ();
 ---test1
 ```
 
-## 65. Explicit/implicit synchronization
+### 65. Explicit/implicit synchronization
 - Explicit sync
   - cudaDeviceSynchronize()
   - cudaStreamSynchronize()
@@ -695,7 +1017,7 @@ blocking_nonblocking_test1 << <grid, block, 0, stm3 >> > ();
   - Any CUDA command to the NULL stream
   - Switch b/w L1 and shared memory configurations
 
-## 66. CUDA events
+### 66. CUDA events
 - CUDA event : a marker in CUDA stream
   - Can sync stream execution
   - Can Monitor device progress
@@ -718,7 +1040,7 @@ cudaEventDestroy(start);
 cudaEventDestroy(end);
 ```
 
-## 67. Inter stream dependency
+### 67. Inter stream dependency
 - Events can be used to add inter-stream dependencies
 ```
 cudaEvent_t event1;
@@ -737,18 +1059,20 @@ k3 << <grid, block, 0, stm3 >> > ();
 ```
   - k3() is executed after k1() is completed
 
-## 68. Not all instructions are created equally
+## Section 6: Performance Tuning with CUDA instruction level primitives
+
+### 68. Not all instructions are created equally
 - SAXPY
   - MAD() in CUDA has less numerical accuracy
 
-## 69. Single vs Double FPE
+### 69. Single vs Double FPE
 - Round_to_zero
 - Round_up
 - Round_down
 - Round_to_nearest
 - Coping double precision from device/host may be larger than 2x more than single precision
 
-## 70. Standard vs intrinsic functions
+### 70. Standard vs intrinsic functions
 - Standard functions can be used in host and device
   - sqrt, pow, ... from math.h
 - Intrinsic functions can be used in device only
@@ -811,7 +1135,9 @@ Standard Device calculated	66932851.562500  # pow() in the device
 Intrinsic Device calculated	66932804.000000  # __powf() in the device
 ```
 
-## 72. Scan algorithm
+## Section 7: Parallel patterns and applications
+
+### 72. Scan algorithm
 - Prefix sum (or called `scan`)
   - Cumulative sum in computer science
 ```
@@ -823,16 +1149,19 @@ y2 = x0 + x1 + x2
 - MPI : MPI_Scan(), MPI_Exscan()
 - C++ : std::inclusive_scan(), std::exclusive_scan()
 
-## 73. Simple parallel scan
+### 73. Simple parallel scan
 - CPU scan : N-1
 - Naive scan: NlogN - (N-1)
 
-## 74. Balanced tree model
+### 74. Balanced tree model
 - Reduction + down sweep (exclusive scan) phases
 - Workload: 2*(N-1)
 
-## 75. Efficient inclusive scan
+### 75. Efficient inclusive scan
 - Reduction + down sweep (inclusive scan) phases
 - Workload: 2*(N-1)
 
-## 76. Parallel scan for large data
+### 76. Parallel scan for large data
+
+
+## Section 8: Bonus: Introduction to image processing with CUDA
