@@ -1,5 +1,6 @@
 ## CUDA Programming Masterclass with C++
 - Instructor: Kasun Liyanage
+- Ref: https://www.olcf.ornl.gov/cuda-training-series/
 
 ## Section 1: Introduction to CUDA programming and CUDA programming model
 
@@ -355,28 +356,251 @@ gid: 6 value: 1
 gid: 7 value: 33
 ```
 
-### 10. Unique index calculations for 2D grid
+### 10. Unique index calculations for 2D grid 1
 - A unique index = row offset + block offset + tid
-- gid = gridDim.x*blockDim.x*blockIdx.y + blockIdx.x*blockDim.x + threadIdx.x
+- gid = gridDim.x\*blockDim.x\*blockIdx.y + blockIdx.x\*blockDim.x + threadIdx.x
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+__global__ void unique_gid_calc_2d(int *input)
+{
+  int tid = threadIdx.x;
+  int block_offset = blockIdx.x * blockDim.x;
+  int row_offset = blockDim.x * gridDim.x * blockIdx.y;
+  int gid = row_offset + block_offset + tid;
+  printf("gid: %d value: %d\n", gid, input[gid]);
+};
+int main ()
+{
+  int array_size = 8;
+  int array_byte_size = sizeof(int) * array_size;
+  int h_data[] = {23,9,4,53,65,12,1,33};
+  for (int i=0; i< array_size; i++)
+  {
+    printf("%d\n",h_data[i]);
+  }
+  printf("\n\n");
+  int * d_data;
+  cudaMalloc((void**)&d_data, array_byte_size);
+  cudaMemcpy(d_data, h_data, array_byte_size, cudaMemcpyHostToDevice);
+  dim3 block(4);
+  dim3 grid(2);
+  unique_gid_calc_2d <<<grid,block >>>(d_data);
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```
+
+### 11. Unique index calculations for 2D grid 2
+- Memory access pattern will depend on the way we calculate the global index
+- We prefer to calculate global indices in a way that threads with in same thread block access consecutive memory locations or consecutive elements in the array
+```c
+__global__ void unique_gid_calc_2d_2d(int *input)
+{
+  int tid = blockDim.x*threadIdx.y + threadIdx.x;
+  int num_threads_in_a_block = blockDim.x*blockDim.y;
+  int block_offset = blockIdx.x * num_threads_in_a_block;
+  int num_threads_in_a_row = num_threads_in_a_block * gridDim.x;
+  int row_offset = num_threads_in_a_row * blockIdx.y;
+  int gid = row_offset + block_offset + tid;
+  printf("gid: %d value: %d\n", gid, input[gid]);
+};
+```
 
 ### 12. Memory transfer b/w host and device
 - cudaMemCpy(destination ptr, source ptr, size_in_byte, direction)
   - Direction: cudamemcpyhtod, cudamemcpydtoh, cudamemcpydtod
 - Let's make thread block size as multiples of 32
 
+|   C    | CUDA      |
+|--------|-----------|
+| malloc | cudaMalloc|
+| memset | cudaMemset|
+| free   | cudaFree  |
+
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+__global__ void mem_trs_test(int * input)
+{
+  int tid = threadIdx.x;
+  int block_offset = blockIdx.x * blockDim.x;
+  int row_offset = blockDim.x * gridDim.x * blockIdx.y;
+  int gid = row_offset + block_offset + tid;
+  printf("gid: %d value: %d\n", gid, input[gid]);
+};
+int main ()
+{
+  int size = 128;
+  int byte_size = size * sizeof(int);
+  int *h_input;
+  h_input = (int*)malloc(byte_size);
+  time_t t;
+  srand((unsigned)time(&t));
+  for (int i=0;i<size;i++)
+  {
+    h_input[i] = (int)(rand() & 0xff);
+  }
+  int * d_input;
+  cudaMalloc((void**)&d_input,byte_size); // same as cudaMalloc(&d_input...) ? what is the benefit of void**?
+  cudaMemcpy(d_input,h_input,byte_size,cudaMemcpyHostToDevice);
+  dim3 block(64);
+  dim3 grid(2);
+  mem_trs_test <<< grid,block>>> (d_input);
+  cudaDeviceSynchronize();
+  cudaFree(d_input);
+  free(h_input);
+  cudaDeviceReset();
+  return 0;
+}
+```
+
 ### 13. Exercise 2
 - Produce a random 64 element array and pass to device. 3D grid of 2x2x2 and each block as 2x2x2 threads
-- Use __device__ int getGlobalIdx_3D_3D() to find gid of each thread
-  - Ref: https://cs.calvin.edu/courses/cs/374/CUDA/CUDA-Thread-Indexing-Cheatsheet.pdf
-
-### 14. Sum array example
-- memset() is used but seems not necessary
-
-### 15. Error handling
-- cudaError cuda_function()
-- cudaGetErrorString(error)
-- Macro for cuda error check
+- https://stackoverflow.com/questions/11554280/cuda-global-unique-thread-index-in-a-3d-grid
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+__global__ void gid_3d(int * input)
+{
+  int tid = threadIdx.x;
+  int offset = blockIdx.x + gridDim.x * (blockIdx.y + gridDim.y * blockIdx.z);
+  int gid = tid + offset*blockDim.x;
+  printf("gid: %d value: %d\n", gid, input[gid]);
+};
+int main ()
+{
+  int size = 64;
+  int byte_size = size * sizeof(int);
+  int *h_input;
+  h_input = (int*)malloc(byte_size);
+  time_t t;
+  srand((unsigned)time(&t));
+  for (int i=0;i<size;i++)
+  {
+    h_input[i] = (int)(rand() & 0xff);
+  }
+  int * d_input;
+  cudaMalloc(&d_input,byte_size);
+  cudaMemcpy(d_input,h_input,byte_size,cudaMemcpyHostToDevice);
+  dim3 block(2,2,2);
+  dim3 grid(2,2,2);
+  gid_3d <<< grid,block>>> (d_input);
+  cudaDeviceSynchronize();
+  cudaFree(d_input);
+  free(h_input);
+  cudaDeviceReset();
+  return 0;
+}
 ```
+- Alternative:
+```c
+// ref: https://cs.calvin.edu/courses/cs/374/CUDA/CUDA-Thread-Indexing-Cheatsheet.pdf
+// Ref not working anymore
+__device__ int getGlobalIdx_3D_3D() {
+  int blockId = blockIdx.x + blockIdx.y * gridDim.x +
+                gridDim.x * gridDim.y * blockIdx.z;
+  int threadId= blockId * (blockDim.x * blockDim.y * blockDim.z) +
+                (threadIdx.z * (blockDim.x * blockDim.y)) +
+                (threadIdx.y * blockDim.x) + threadIdx.x;
+  return threadId;
+}
+```
+
+### 14. Sum array example with validity check
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+__global__ void sum_array_gpu(int *a, int *b, int *c, int size) 
+{
+  int tid = threadIdx.x;
+  int offset = blockIdx.x + gridDim.x * (blockIdx.y + gridDim.y * blockIdx.z);
+  int gid = tid + offset*blockDim.x;
+  if (gid < size)
+  {
+    c[gid] = a[gid] + b[gid];
+  }
+};
+void sum_array_cpu(int *a, int *b, int *c, int size)
+{
+  for (int i=0;i<size;i++)
+  { 
+    c[i] = a[i] + b[i];
+  }
+}
+int main ()
+{
+  int size = 10000;
+  int block_size = 128;
+  int NO_BYTES = size * sizeof(int);
+  // host pointers
+  int *h_a, *h_b, *gpu_results, *cpu_results;
+  // allocate memory for host pointers
+  h_a = (int*) malloc(NO_BYTES);
+  h_b = (int*) malloc(NO_BYTES);
+  cpu_results = (int*) malloc(NO_BYTES);
+  gpu_results = (int*) malloc(NO_BYTES);
+  // initialize host pointer
+  time_t t;
+  srand((unsigned)time(&t));
+  for(int i =0; i<size; i++) 
+  {
+    h_a[i] = (int)(rand() & 0xff);
+    h_b[i] = (int)(rand() & 0xff);
+  }
+  memset(gpu_results,0,NO_BYTES); // initializes as zero
+  // device pointer
+  int *d_a, *d_b, *d_c;
+  cudaMalloc(&d_a, NO_BYTES);
+  cudaMalloc(&d_b, NO_BYTES);
+  cudaMalloc(&d_c, NO_BYTES);
+  // copy from host to device
+  cudaMemcpy(d_a,h_a, NO_BYTES, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_b,h_b, NO_BYTES, cudaMemcpyHostToDevice);
+  dim3 block(block_size);
+  dim3 grid(size/block.x + 1);
+  sum_array_gpu <<< grid,block>>> (d_a,d_b,d_c,size);
+  cudaDeviceSynchronize();
+  cudaMemcpy(gpu_results, d_c, NO_BYTES, cudaMemcpyDeviceToHost);
+  sum_array_cpu(h_a,h_b,cpu_results,size); 
+  int diff_sum=0;
+  for (int i=0; i< size; i++)
+  {
+    //printf("%d %d\n", gpu_results[i], cpu_results[i]);
+    diff_sum += gpu_results[i] - cpu_results[i];
+  }
+  printf("diff_sum = %d\n", diff_sum);
+  cudaFree(d_a);
+  cudaFree(d_b);
+  cudaFree(d_c);
+  free(h_a);
+  free(h_b);
+  free(gpu_results);
+  free(cpu_results);
+  cudaDeviceReset();
+  return 0;
+}
+```
+
+### 15. Sum array example with error handling
+- Compile time errors: happens when program is built
+- Run time errors: happens when program is run
+- Error handling in CUDA:
+```c
+cudaError cuda_function(...)
+cudaGetErrorString(error)
+```
+- Macro for cuda error check
+```c
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__);}
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true){
   if (code != cudaSuccess) {
@@ -384,11 +608,13 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
     if(abort) exit(code);
   }
 }
+...
+gpuErrchk( cudaMalloc(&d_a, size*sizeof(int)) );
 ```
 
-### 16. Timing
+### 16. Sum array with timing
 - CPU
-```
+```c
 clock_t cpu_start, cpu_end;
 cpu_start = clock();
 ...
@@ -396,9 +622,15 @@ cpu_end = clock();
 printf("Sum array CPU wall time = %4.6f\n",
       (double)((double)(cpu_end-cpu_start)/CLOCKS_PER_SEC));
 ```
+- Performance of a CUDA application
+  - Execution time
+  - Power consumption
+  - Floor space
+  - Cost of HW
+- Trial and Error method
+  - Running the CUDA program with different grid, block, shared memory, cache, memory access configurations and choose the best configuration based on the execution time
 
-
-### Assignment 2
+### Assignment 2: Extend sum array implementation to sum up 3 arrays
 - In the assignment you have to implement array summation in GPU which can sum 3 arrays. You have to use error handling mechanisms, timing measuring mechanisms as well.Then you have to measure the execution time of you GPU implementations.
 
 | block_size | cpu  | gpu  | host->device | device->host |
@@ -429,14 +661,36 @@ Device 0: GeForce GT 1030
   Maximum Grid size                         :    (2147483647,65535,65535)
   Maximum block dimension                   :    (1024,1024,64)
 ```
+
+### 18. Summary
+- Basic steps of a CUDA program
+  1. Intialize memory in host
+  2. Transfer the memory from host to device
+  3. Launch the kernel from host
+  4. Wait until kernel execution finish
+  5. Transfer the memory from device to host
+  6. Reclaim the memory
+- Launching a kernel from host code, is asynchronous
+  - Use of cudaDeviceSynchronize() is necessary
+
 ## Section 2: CUDA Execution model
 
 ### 19. Understanding the device better
-- In each block, warp scheduler and shared memory exist
-- A single thread block must match one SM (stream multiprocessor)
+- In every SM:
+  - Warp scheduler
+  - CUDA cores
+  - Registers
+  - Load/Store units
+  - Special function units
+- In CUDA
+  - Thread blocks will execute in single SM. Multiple thread blocks can be executed on same SM depending on resource limitation in SM
+  - One thread block cannot run on multiple SMs. If device cannot run single block on one SM, error will return for that kernel launch
 
-### 20. Warps
+### 20. All about warps
 - Thread blocks are divided into smaller units called warps, which have 32 consecutive threads
+  - Warps can be defined as the basic unit of execution in a SM
+  - Once a thread block is scheduled to an SM, threads in the thread block are further partitioned into warps
+  - All threads in a warp are executed in SMIT fashion
 - CUDA execution model ref: https://stackoverflow.com/questions/10460742/how-do-cuda-blocks-warps-threads-map-onto-cuda-cores
 - GT1030 has 1024 threads per block as max
   - This means 32 warps per block as max
@@ -446,15 +700,38 @@ Device 0: GeForce GT 1030
 - Only 4 warps can run simultaneously
 - A single thread block -> partitioned over warps -> now those threads run with a single instruction (SIMT)
   - Unit of warp allocation is multiples of 32. Could be waste if less than 32 threads are used
+```c
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+__global__ void print_details_of_warps()
+{
+  int gid = blockIdx.y * gridDim.x * blockDim.x + blockIdx.x*blockDim.x*threadIdx.x;
+  int warp_id = threadIdx.x/32;
+  int gbid = blockIdx.y * gridDim.x + blockIdx.x;
+  printf("tid: %d, bid.x: %d, bid.y: %d, gid: %d, warp_id: %d, gbid: %d\n", threadIdx.x, blockIdx.x, blockIdx.y,gid, warp_id,gbid);
+};
+int main ()
+{
+  dim3 block_size(42);
+  dim3 grid_size(2,2);
+  print_details_of_warps<<<grid_size,block_size>>>();
+  cudaDeviceSynchronize();
+  cudaDeviceReset();
+  return 0;
+}
+```
 
 ### 21. Warp divergence
 - Within a single warp, some threads have different instruction than others, this is a warp divergence
   - Significant penalty
   - Any if statement may yield divergence
   - Make conditional flow in units of warp size (=32)
+    - Conditional check doesn't diverge when conditions are made in terms of warp size (=32)
 - How to calculate branch efficiency
   - 100*((N. branches - N. divergent branches)/N. branches)
-```
+```c
 if (tid%2 !=0){
   // do something
 } else {
@@ -467,7 +744,7 @@ if (tid%2 !=0){
   - `sudo /usr/local/cuda-11.1/bin/nvprof --metrics branch_efficiency ./a.out`
   - Default compilation will optimize the code and efficiency will be 100%
   - Use -G as a debug mode, then the difference is found
-```
+```bash
 $ nvcc -G 3_warp_divergence.cu
 $ sudo /usr/local/cuda-11.1/bin/nvprof --metrics branch_efficiency ./a.out
 
@@ -485,7 +762,41 @@ Device "GeForce GT 1030 (0)"
           1                         branch_efficiency                         Branch Efficiency      83.33%      83.33%      83.33%
 ```
 
+### 22. Resources partitioning and latency hiding 1
+- Local execution context of a warp mainly consists of the following resources
+  - Program counters
+  - Registers
+  - Shared memory
+- Set of 32-bit registers stored in a register file that are partitioned among threads, and a fixed amoutn of shared memory that is partitioned among thread blocks
+- Warp categories in SM
+  - Active blocks/warps: Resource have been allocated
+  - Selected warp: actively executing
+  - Stalled warp
+  - Eligible warp: ready for execution but not currently executing
+- Conditions to be an eligible warps
+  - 32 CUDA cores must be available for execution
+  - All arguments to the current instruction for that warp must be ready
+
 ### 23. Resources partitioning and latency hiding 2
+- What is latency?
+  - Number of clock cycles b/w instruction being issued and being completed
+- Latency hiding
+  - Switching from one execution context to another has no cost for SM
+- Arithmic latency
+  - Assume that we need 20 warps to hide context
+  - Assume that 1 sm has 128 cores -> 4 warps in one SM
+  - 4x20 = 80 to hide the latency per SM (?)
+  - If we have 13 SMs then 13x80=1040 warps to hide the latency per device (?)
+- Memory latency
+  - Assume DRAM latency of Maxwell architecture as 350 cycles
+  - GTX970 has bandwidth of 196GB/s
+    - nvidia-smi -a -q -d CLOCk
+  - 3.6GHz memory clock
+  - 196/3.6 = 54Bytes/ cycle
+  - 54*350 = 18900 bytes
+  - 18900/4 = 4725 threads
+  - 4725/32 = 148 warps
+  - 146/13 = 12 warps per SM
 - nvidia-smi -a -q -d CLOCK
 ```
 ==============NVSMI LOG==============
@@ -528,6 +839,9 @@ GPU 00000000:01:00.0
         Auto Boost                        : N/A
         Auto Boost Default                : N/A
 ```
+- Categorizing CUDA applications
+  - Bandwidth bound applications
+  - Computation bound applications
 
 ### 24. Occupancy
 - The ratio of active warps to maximum number of warps per SM
@@ -579,7 +893,7 @@ Device "GeForce GT 1030 (0)"
           1                        achieved_occupancy                        Achieved Occupancy    0.910413    0.910413    0.910413
 ```
 
-### 26. Parallel reduction
+### 26. Parallel reduction as synchronization example
 - cudaDeviceSynchronize(): Introduces a global sync in host code
 - __syncthreads(): sync within a block
 - Parallel reduction
@@ -592,33 +906,136 @@ for (int offset=1; offset < blockDim.x; offset *=2) {
   __syncthreads();
 }
 ```
+- Neighbored pair approach
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include "cuda.h"
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__);}
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true){
+  if (code != cudaSuccess) {
+    fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+    if(abort) exit(code);
+  }
+}
+//reduction neighbored pairs kernel
+__global__ void redunction_neighbored_pairs(int * input,
+	int * temp, int size)
+{
+	int tid = threadIdx.x;
+	int gid = blockDim.x * blockIdx.x + threadIdx.x;
+	if (gid > size)
+		return;
+	for (int offset = 1; offset <= blockDim.x/2; offset *= 2)
+	{
+		if (tid % (2 * offset) == 0) // only even index works. odd index idles
+		{
+			input[gid] += input[gid + offset];
+      // offset will be 1, 2, 4, 8, 16, 32
+      // for T0,T1,T2, .... T63
+      // @offset = 1, T0 += T1, T2 += T3, T4 += T5, ....
+      // @offset = 2, T0 += T2 (which added T3 before), ...
+      // @offset = 4, T0 += T4 (which added T5 and T6 before) ...
+      // @offset = 8, T0 += T8 (which added T9, T6, T5) ...
+      // @offset = 16, T0 += T16, ....
+      // @offset = 32, T0 += T32, ...
+		}
+		__syncthreads(); 
+	}
+	if (tid == 0)
+	{
+		temp[blockIdx.x] = input[gid];
+	}
+}
+int reduction_cpu(int * input, const int size)
+{
+	int sum = 0;
+	for (int i = 0; i < size; i++)
+	{
+		sum += input[i];
+	}
+	return sum;
+}
+int main(int argc, char ** argv)
+{
+	printf("Running neighbored pairs reduction kernel \n");
+	int size = 1 << 27; //128 Mb of data - 134_217_728
+	int byte_size = size * sizeof(int);
+	int block_size = 128;
+	int * h_input, *h_ref;
+	h_input = (int*)malloc(byte_size);
+  for(int i =0; i<size; i++) 
+  {
+    h_input[i] = (int)(rand() & 0xff);
+  }
+  //	//get the reduction result from cpu
+	int cpu_result = reduction_cpu(h_input,size);
+	dim3 block(block_size);   // 128
+	dim3 grid(size/ block.x); // 2_097_152
+	printf("Kernel launch parameters | grid.x : %d, block.x : %d \n",
+		grid.x, block.x);
+	int temp_array_byte_size = sizeof(int)* grid.x;
+	h_ref = (int*)malloc(temp_array_byte_size);
+	int * d_input, *d_temp;
+	gpuErrchk(cudaMalloc((void**)&d_input,byte_size));
+	gpuErrchk(cudaMalloc((void**)&d_temp, temp_array_byte_size));
+	gpuErrchk(cudaMemset(d_temp, 0 , temp_array_byte_size));
+	gpuErrchk(cudaMemcpy(d_input, h_input, byte_size,
+		cudaMemcpyHostToDevice));
+	redunction_neighbored_pairs << <grid, block >> > (d_input,d_temp, size);
+	gpuErrchk(cudaDeviceSynchronize());
+	cudaMemcpy(h_ref,d_temp, temp_array_byte_size,
+		cudaMemcpyDeviceToHost);
+	int gpu_result = 0;
+	for (int i = 0; i < grid.x; i++)
+	{
+		gpu_result += h_ref[i];
+	}
+	//validity check
+	//compare_results(gpu_result, cpu_result);
+  printf("diff=  %d\n", gpu_result - cpu_result);
+	gpuErrchk(cudaFree(d_temp));
+	gpuErrchk(cudaFree(d_input));
+	free(h_ref);
+	free(h_input);
+	gpuErrchk(cudaDeviceReset());
+	return 0;
+}
+```
+- **Grid size is not necessarily to be the size of HW**
+  - Block size is constrained by HW spec
+  - Grid size is the size of model, not HW
+- As shown above, warp divergence is found and 50% of threads idle (odd indices)
 
-### 27. Parallel reduction reducing warp divergence
+### 27. Parallel reduction reducing warp divergence example
 - The code of section 26 idles a half of threads when the gpu sum starts
 - From:
-```	for (int offset = 1; offset <= blockDim.x/2; offset *= 2)	{
+```c
+	for (int offset = 1; offset <= blockDim.x/2; offset *= 2)	{
 		if (tid % (2 * offset) == 0)		{
 			input[gid] += input[gid + offset];		}
 		__syncthreads();	}
 ```
 - To:
-```
+```c
 for (int offset = 1; offset <= blockDim.x /2 ; offset *= 2)	{
 		int index = 2 * offset * tid;
 		if (index < blockDim.x)		{
-			i_data[index] += i_data[index + offset];		}
+			input[index] += input[index + offset];		}
 		__syncthreads();	}
 ```
   - This still wastes threads but index of the sum narrows to a warp
 - Using interleaved pairs
-```
+```c
 	for (int offset = blockDim.x/ 2; offset > 0; offset = offset/2)	{
 		if (tid < offset)		{
-			int_array[gid] += int_array[gid + offset];		}
+			input[gid] += input[gid + offset];		}
 		__syncthreads();	}
 ```
 
-### 28. Loop unrolling
+### 28. Parallel reduction with loop unrolling
 - Thread block unrolling
 ```
 if ((index + 3 * blockDim.x) < size) {
@@ -630,7 +1047,7 @@ if ((index + 3 * blockDim.x) < size) {
 }
 __syncthreads();
 ```
-### 29. Warp unrolling
+### 29. Parallel reduction as warp unrolling
 ```
 	if (tid < 32)
 	{
@@ -646,6 +1063,10 @@ __syncthreads();
 - volatile qualifier will disable optimization, preventing a register optimization
   - Ref: https://stackoverflow.com/questions/49163482/cuda-reduction-warp-unrolling-school
 
+### 30. Reduction wtih complete unrolling
+
+### 31. Performance comparison of reduction kernels
+
 ### 32. Dynamic parallelism
 - New GPU kernels from the existing GPU kernel
 - Can be recursive
@@ -657,6 +1078,7 @@ __syncthreads();
 - nvcc -rdc=true -link common.o reduc.cu
 - GPU version is 60x slower than CPU version. How to accelerate?
 
+### 34. Summary
 
 ## Section 3: CUDA memory model
 
