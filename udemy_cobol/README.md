@@ -1013,28 +1013,173 @@ DIVIDE UNITS-OF-ITEM INTO WS-TOTAL ROUNDED.
 ## Section 11: File Management in COBOL
 
 ### 88. COBOL File and Database Handling overview
+- Individual Records
+  - Sequential Files (datasets)
+  - VSAM datasets(Indexed files)
+  - Generation Data Group (CDG)
+- DB2 database (RDBMS database)
+- File Handling: Read/Write/Update/Delete
+- CICS File Handling
+- DB2 DB Handling
+- IMS DB Handling
 
 ### 89. FILE Organization and Access Mode in COBOL
+- ORGANIZATION: how logical records are organized
+  - SEQUENTIAL
+  - INDEXED SEQUENTIAL
+  - RELATIVE
+- ACCESS MODE: the way in which the records in the file will be accessed
+- Fixed length vs variable length
+- Block or unblock records
 
-### 90. Select Statement in COBOL
+### 90. SELECT Statement in COBOL
+- Identifies a disk file or a print file
+```cobol
+SELECT filename ASSIGN TO assignment name
+  ORGANIZATION IS Org
+  ACCESS MODE IS access
+  FILE STATUS IS file-status
+```
 
 ### 91. File Description (FD) Entries in COBOL
+```COBOL
+DATA DIVSION.
+  FILE SECTION.
+FD file name
+  RECORDING MODE IS F/V/U
+  BLOCK CONTAINS integer RECORDS
+  RECORD CONTAINS intger CHARACTERS.
+01 File Record Description
+  05 data-elements-1  PIC 9(06).
+...
+```
 
-### 92. Open Statement in COBOL
+### 92. OPEN Statement in COBOL
+- File mode
+  - INPUT
+  - OUTPUT
+  - I-O
+  - EXTEND
+```cobol
+PROCEDURE DIVISION.
+A001-OPEN-FILE
+  OPEN INPUT EMPRC
+       OUTPUT DAILYRPT.
+```    
 
-### 93. Close Statement in COBOL
+### 93. CLOSE Statement in COBOL
+```COBOL
+PROCEDURE DIVISION.
+CLOSE EMPRC
+      DAILYRPT.
+STOP RUN.
+```
 
-### 94. Start Statement in COBOL
+### 94. START Statement in COBOL
+- Provides the positioning the file pointer at a specific location
+```COBOL
+PROCEDURE DIVISION.
+A000-POS-FLE-PNTR.
+MOVE 1090 TO EMP-ID
+START EMPRC
+  KEY IS >= EMP-ID
+END-START.
+```
 
-### 95. Read Statement in COBOL
+### 95. READ Statement in COBOL
+- Sequential file: sequential read
+- Indexed/Relative file: sequential/dynamic/random read
+- Sequential READ:
+```COBOL
+PROCEDURE DIVISION.
+READ EMPDTL
+AT END   SET END-OF-FILE TO TRUE
+NOT AT END PERFROM A000-MOV-EMP-DATA
+END-READ.
+* using INTO option
+READ EMPSAL INTO WS-EMPSAL
+AT END SET END-OF-FILE TO TRUE
+NOT AT END PERFORM A010-PROC-SAL-DATA
+END-READ.
+```  
+- Random/dynamic READ:
+```COBOL
+PROCEDURE DIVISION.
+MOVE 10909 TO EMP-ID.
+READ EMPRC
+  INVALID KEY
+    DISPLAY "EMP ID NOT FOUND"
+END-READ.
+```
 
 ### 96. How to work with Alternate Index?
+- Alternate indexes make it possible to access records in an indexed file by a field other than the primary key
 
-### 97. Write Statement in COBOL
+### 97. WRITE Statement in COBOL
+- Sequential file writing:
+```COBOL
+PROCEDURE DIVISION.
+*
+MOVE WS-EMP-REC TO EMP-RC.
+WRITE EMP-REC END-WRITE.
+*
+MOVE CUSTOMER-LINE TO PRINT-AREA.
+WRITE PRINT-ARE AFTER ADVANCING 1 LINES.
+*
+WRITE EMP-REC FROM WS-EMP-REC END-WRITE.
+```
+- Index file writing
+```COBOL
+PROCEDURE DIVISION.
+WRITE EMP-REC-AREA FROM WS-EMP-MSTREC
+  INVALID KEY
+    DISPLAY "WRITE ERROR. EMP-ID" WS-EMP-ID
+    MOVE "Y" TO INVMAST-EOF-SWITCH
+END-WRITE.
+```
 
-### 98. Rewrite Statement in COBOL
+### 98. REWRITE Statement in COBOL
+- Writes the record in the record area for th efile back to the file
+- When records already exist and after the record was read
+- For sequential file
+```COBOL
+PROCEDURE DIVISION.
+READ ...
+  AT END ...
+  NOT AT END ...
+END-READ.
+*
+REWRITE EMP-REC END-REWRITE
+```
+- For index file
+```COBOL
+PROCEDURE DIVISION.
+MOVE 1010 TO WS-EMP-ID
+MOVE 200 TO WS-EMP-SAL.
+REWRITE EMP-REC FROM WS-EMP-EMP-REC
+  INVALID KEY DISPLAY "REWRITE ERROR:" WS-EMP-ID
+END-REWRITE.
+```
 
 ### 99. COBOL Delete Statement
+- Deletes records from the file
+- In sequential access, INVALID KEY shouldn't be specified
+- In RANDOM or DYNAMIC access, the record to be deleted is determined by the value of the RECORD KEY. INVALID KEY must be specified
+- For indexed sequential:
+```COBOL
+PRODCEDURE DIVISION.
+READ EMPDTL
+...
+END-READ
+*
+DELETE EMPDTL
+* 
+MOVE 1010 TO WS-ITEM-NO
+...
+DELETE INVMAST
+       INVALID KEY DISPLAY "INVALID KEY:" WS-ITEM-NO
+END-DELETE.
+```
 
 ### 100. 12. Demo Class - How to process Sequential File
 
@@ -1042,18 +1187,161 @@ DIVIDE UNITS-OF-ITEM INTO WS-TOTAL ROUNDED.
 
 ## Section 12: File Sorting and Merging in COBOL
 
+### 102. SORT Statement in COBOL
+
+### 103. MERGE Statement in COBOL
+- Temporary space must be defined as SD
+
+### 104. 14. Demo Class: Mastering File Sorting in COBOL
+
+### 105. 15. Demo Class: Mastering File Merging in COBOL
+
 ## Section 13: Compiling and Debugging COBOL program
+
+### 106. COBOL Compilation Process
+
+### 107. COBOL CICS Compilation Process
+- CICS (Customer Information Control System) is middleware that sits between the z/OS IBM mainframe operating system and business applications
+  - Ref: https://www.techtarget.com/searchdatacenter/definition/CICS
+- COBOL CICS program
+  - Requires CICS Translator
+
+### 108. COBOL DB2 Compilation Process
+
+### 109. COBOL Compiler Options
 
 ## Section 14: Web Services Interface in COBOL
 
+### 110. COBOL Web Services Interface - Introduction
+
+### 111. Comparison of XML and JSON formats for web services
+
+### 112. XML Parser and XML Generate Statements
+- Special registers to receive and pass information
+  - XML-CODE: status of XML parsing
+  - XML-EVENT: name of each XML event
+  - XML-TEXT: receives XML document fragments from an alphanumeric document
+  - XML-NTEXT: receives XML document fragments from a national document
+- Sample parsing:
+```COBOL
+PROCEDURE DIVISION.
+C000-PARSE-XML-TXT.
+XML PARSE XML-OUTPUT
+  PROCESSING PROCEDURE IS D000-GET-DATA
+  ON EXCEPTION  DISPLAY 'XML DOCUMENT ERROR '  XML-CODE
+  NOT ON EXCEPTION PERFORM E000-PRNT-XML-REC
+        DIPSLAY 'XML DOCUMENT WAS SUCCESSFULLY PARSED.'
+END-XML.  
+```
+- Phrases in XML GENERATE statement
+  - COUNT IN
+  - ATTRIBUTES
+  - ENCODING
+  - NAMESPACE
+  - XML-DECLARATION
+- Sample generation
+```COBOL
+*
+ WORKING-STORAGE SECTION.
+  01 XML-OUTPUT   PIC X(1000) VALUE SPACES.
+  01 XML-MSG-CNT PIC 9(09) COMP VALUE ZEROES.
+  ...
+*
+  PROCEDURE DIVISION.
+  B000-GENERATE-XML-TXT.
+    XML GENERATE XML-OUTPUT
+      FROM EMPL-CONTACT
+      COUNT IN XML-MSG-CNT
+      WITH XML-DECLARAWTION WITH ATTRIBUTES
+    END-XML.
+```
+
+### 113. JSON Parser and JSON Generate Statement in COBOL
+- Sample JSON genereate
+```COBOL
+PROCEDURE DIVISION.
+F000-GENRT-JSON-MSG
+  JSON GENERATE JSON-DSP-OUTPUT FROM EMPL-CONTACT
+    COUNT IN JSON-MSG-CNT
+    ON EXCEPTION DISPLAY 'ERROR WHILE GENERATING JSON MSG'
+    NOT ON EXCEPTION DISPLAY 'JSON MSG GENERATED SUCCESSFULLY'
+  END-JSON.
+```  
+- Sample JSON parse statement
+```COBOL
+PROCEDURE DIVISION.
+  JSON PARSE JSON-DSP-INPT INTO JSON-REC-DTL WITH DETAIL
+    ON EXCEPTION     DISPLAY 'ERROR WHILE PARSING JSON DOC.'
+    NOT ON EXCEPTION DISPLAY 'JSON DOC PARSED SUCCESSFULLY.'
+  END-JSON.
+```
+
+### 114. 16. Demo Class: Web Services Integration in COBOL: A hands-on demo class
+
 ## Section 15: How to design and structure a COBOL Program
+
+### 115. How to design a COBOL Program - Overview
+- Define the problem
+- Define input/output
+- Design the data structure
+- Program specifications
+- Write the COBOL code
+- Compile and test
+- Deploy the program
+
+### 116. Hierarchy or structure chart
+
+### 117. How programs are designed?
+- At development team
+  - Requirement analysis
+  - Discussion with stakeholders
+  - Planning and Designing a program
+  - Writing COBOL program
+  - Unit testing and integration testing
+  - Promote to prod environment (Deployment)
+
+### 118. 17. Demo Class: Designing and Structuring COBOL Programs
 
 ## Section 16: Exception Handling in COBOL
 
+### 119. COBOL Declarative Statement
+- How to handle exception
+  - Input/output error
+  - Arithmetic error
+  - Program interruption
+```COBOL
+WORKING-STORAGE SECTION.
+PROCEDURE DIVISION.
+DECLARATIVE.
+DEALER-FILE-ERROR SECTION.
+  USE AFTERSTANDARD ERROR PROCEDURE ON DEALER-FILE.
+DEALER-ERROR.
+  DISPLAY "EROR ON DEALER FILE" DEALER-STATUS.
+END DECLARATIVE.
+```
+
 ## Section 17: Examples: COBOL Integration
+
+### 120. Example: COBOL CICS Program
+- Customer Information Control System: transaction processing system
+- A user cannot run CICS but invokes a transcation, triggering CICS
+- Program Control Table (PCT): identifies user transaction
+- Processing Program Table (PPT): keeps track of programs loaded into storage
+
+### 121. Example: COBOL DB2 Program
+- COBOL compiler will not understand SQL command
+
+### 122. Example: COBOL IMS Program
+- Information Management System: DBMS by IBM
 
 ## Section 18: COBOL Interview Questions
 
+### 123. Mastering COBOL Interview Questions: Tips and Strategies for Success
+
 ## Section 19: Project: Employee Report Generation using COBOL Program
 
+### 124: Employee Report Generation using COBOL program from input file
+
 ## Section 20: Conclusion
+
+### 125: Thank you!
