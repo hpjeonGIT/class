@@ -744,6 +744,7 @@ namespace eval ::mathops {
 }
 ```
 - In the main or tclsh
+  - Configure auto_path
 ```tcl
 % lappend auto_path "/home/hpjeon/hw/class/udemy_tcl"
 /usr/share/tcltk/tcl8.6 /usr/share/tcltk /usr/lib /usr/local/lib/tcltk /usr/local/share/tcltk /usr/lib/tcltk/x86_64-linux-gnu /usr/lib/tcltk /usr/lib/tcltk/tcl8.6 /home/hpjeon/hw/class/udemy_tcl
@@ -803,20 +804,205 @@ hellO wOrld               # all of o's
 ```
 
 ### 81. TCLOO
+- Last update was 8 years ago
+
 ### 82. TCLOO solution
+
 ### 83. Event driven programming
+- The flow of the program is determined by event sor user actions 
+- The program waits for events to occur and tehen reacts to those events by executing specific event handlers or callbacks
+- General outline for tcl
+  - Start by GUI window or defining event sources such as timers or network sockets
+  - Bind command to associated event handlers with specific events
+  - Using vwait command, loop over event
+```tcl
+set count 0
+proc incrementCount {} {
+  global count
+  incr count
+  puts "Count: $count"
+  after 1000 incrementCount
+}
+proc anotherProc{} {
+  puts "Another proc"
+  after 5000 anotherProc
+}
+after 1000 incrementCount
+after 500 anotherProc
+vwait forever
+```
+- `after`: executes a command after a time delay (ms)
+- `fileevent`: associates events with filehandlers
+- `vwait`: Enters the event loop and suspends the execution of a script until a specific variable is set
+
 ### 84. Event driven solution
+
 ### 85. Network sockets
+- Server side:
+```tcl
+set mySocket [socket -server ServerProc 2540]
+proc ServerProc {newSock addr port} {
+  puts "Accepted $newSock from $addr port $port"
+}
+vwait forever
+```
+- clients:
+```tcl
+set s [socket 192.168.1.115 2540 ]
+```
+
 ### 86. Network sockets solution
+
 ### 87. Multiple interpreters and Safe-TCL
+- Running multiple tcl instancs
+- Safe-tcl: sandboxing  un-trusted tcl scripts
+  - `interp create` command with `-safe` option
+
 ### 88. Safe TCL solution
+- Running an external tcl script in a sandbox
+```tcl
+proc createSafeInterpreter {} {
+  set safeInterp [interp create -safe]
+  interp eval $safeInterp {
+    # disable file system access
+    interp alias {} file {} error
+    # disable network
+    interp alias {} socket {} error
+    # disable dangerous commands
+    interp alias {} exec {} error
+    interp alias {} open {} error
+    interp alias {} source {} error    
+  }
+  return $safeInterp
+}
+proc executeScript {script} {
+  set safeInterp [createSafeInterpreter]
+  set result [interp eval $safeInterp $script]
+  return $result
+}
+# main program
+puts "Safe tcl script runner"
+puts "Enter your tcl script:"
+set script [gets stdin]
+set output [executeScript $script]
+puts "Output:"
+puts $output
+```
+- Demo:
+```tcl
+% source ch88.tcl
+Safe tcl script runner
+Enter your tcl script:
+set x [expr 1+2]
+Output:
+3
+% source ch88.tcl
+Safe tcl script runner
+Enter your tcl script:
+puts "hello"
+can not find channel named "stdout" ; # file handler is disabled
+```
+
 ### 89. Clock commands
+- `clock` options
+  - seconds
+  - format
+  - scan: reads string and converts to time value using -format
+  - add
+  - subtract
+  - formatZ
+```tcl
+% set x [clock seconds]
+1713396765
+% clock format $x -format "%Y-%m-%d %H:%M:%S"
+2024-04-17 19:32:45
+```
+
 ### 90. Call stack
+- info level: current level of call stack
+- info frame: current stack frame
+- info command: fully qualified name of the current command being executed
+- info procs: a list of procedures defined in the current stack
+- info args: a list of arguments for the current procedure call
+- info body: the body of the current procedure
+- Put following loop in to every level of the code:
+```tcl
+set procname [lindex [info level 0] 0]
+foreach level [info level] {
+  puts "Stack level: $level"
+  puts "Command:   [info command $level]"
+  puts "Procedure: [info frame $level]"
+  puts "Arguments: [info args $procname]"
+  puts "Body:      [info body $procname]" ; # this will be long
+  puts "------------------------------"
+}
+```
+- Sample code:
+```tcl   
+proc factorial {n} { 
+  set procname [lindex [info level 0] 0]
+foreach level [info level] {
+  puts "Stack level: $level"
+  puts "Command:   [info command $level]"
+  puts "Procedure: [info frame $level]"
+  puts "Arguments: [info args $procname]"
+  puts "------------------------------" 
+  }
+  if {$n==0} { return 1 } else {                         return [expr $n*[factorial [expr $n-1] ] ] }  
+}
+# main program
+puts [ factorial 2 ]
+```
+- Demo:
+```tcl
+Stack level: 1
+Command:   
+Procedure: type eval line 1 cmd {factorial 2 } level 1
+Arguments: n
+------------------------------
+Stack level: 2
+Command:   
+Procedure: type proc line 10 cmd {factorial [expr $n-1] } proc ::factorial level 1
+Arguments: n
+------------------------------
+Stack level: 3
+Command:   
+Procedure: type proc line 10 cmd {factorial [expr $n-1] } proc ::factorial level 1
+Arguments: n
+------------------------------
+2
+```
+
 ### 91. Tracing variables and commands
+- Can trace procedures to monitor/respond to changes in variables, commands or execution events
+  - Can add hooks or callbacks to specific events
+```tcl  
+% trace add variable foo write "tracer foo"
+proc tracer {varname args} {
+    upvar #0 $varname var
+    puts "$varname was updated to be \"$var\""
+}
+% trace add variable foo write "tracer foo"
+% trace add variable bar write "tracer bar"
+```
+- Sample code not working
+
 ### 92. Multi-thread programming
+- thread::create
+- thread::send
+- thread::wait
+- thread::mutex
+- thread::condition
+
 ### 93. Performance considerations part1
+- Use unset when variables are not necessary anymore
+
 ### 94. Performance considerations part2
+- Arrays is faster than dictionary
+
 ### 95. Performance considerations part3
+- Batch IO or async IO for efficiency
+
 ### 96. Programming project - specs
 ### 97. Programming project - architecture
 ### 98. Programming project drafts 1-3
@@ -827,3 +1013,148 @@ hellO wOrld               # all of o's
 ### 103. Scripts Section III
 
 ## Section 4: Extra section: TK(Took Kit) in TCL
+
+### 104. Introduction to TK
+```tcl
+package require Tk
+button .button1 -text ClickMe -command {puts stdout "Hello World"}
+pack .button1 -padx 20 -pady 20
+% foreach item [.button1 configure] {
+   puts [format "%-20s %-10s %s" [lindex $item 0] [lindex $item 3 ] [lindex $item 4]] }
+-activebackground    #ececec    #ececec
+-activeforeground    #000000    #000000
+-anchor              center     center
+-background          #d9d9d9    #d9d9d9
+-bd                             
+-bg                             
+-bitmap                         
+-borderwidth         1          1
+-command                        puts stdout "Hello World"
+-compound            none       none
+-cursor                         
+-default             disabled   disabled
+-disabledforeground  #a3a3a3    #a3a3a3
+-fg                             
+-font                TkDefaultFont TkDefaultFont
+-foreground          #000000    #000000
+-height              0          0
+-highlightbackground #d9d9d9    #d9d9d9
+-highlightcolor      #000000    #000000
+-highlightthickness  1          1
+-image                          
+-justify             center     center
+-overrelief                     
+-padx                3m         3m
+-pady                1m         1m
+-relief              raised     raised
+-repeatdelay         0          0
+-repeatinterval      0          0
+-state               normal     normal
+-takefocus                      
+-text                           ClickMe
+-textvariable                   
+-underline           -1         -1
+-width               0          0
+-wraplength          0          0
+```
+![button](./ch104.png)
+
+### 105. TK widgets
+- button: Creates a clickable button widget
+- label: Displays a static text label
+- entry: Provides a single line text entry field
+- text: Displays and allows editing of multiple line text
+- checkbutton:
+- radiobutton:
+- listbox:
+- frame
+- canvas
+- menu
+- ttk::progressbar
+- scale: a slider widget
+- ttk::spinbox: 
+- ttk::notebook: Organizes multiple pages or tabs
+
+### 106. Entry widget
+```tcl
+package require Tk
+wm title . "Entry data"
+label .label1 -text "Exploration area size:" -padx 0
+pack  .label1 -side left
+entry .text1 -width 20 -relief sunken -textvariable text1
+pack  .text1 -side left -fill x -expand true
+button .run1 -text "OK" -command captureArea
+pack   .run1 -side right -padx 20 -pady 10
+proc captureArea {} {
+  global text1
+  if { [info exists text1] && [string is integer $text1] && $text1 != "" } {
+    puts "Exploration area size = $text1 x $text1"
+  } else {
+    puts "Error: invalid area"
+  }
+}
+```
+![entry](./ch106.png)
+
+### 107. Text widget
+```tcl
+package require Tk
+wm title . "Multiline data"
+label .label1 -text "Obstacles: " -padx 0
+pack  .label1 -side left
+text .text1 -width 20 -height 10 -relief sunken
+pack .text1 -side left -fill x -expand true
+button .run1 -text "OK" -command captureObstacles
+pack   .run1 -side right -padx 20 -pady 20
+proc captureObstacles {} {
+  global text1
+  set lines [.text1 get 1.0 end ]
+  foreach line [split $lines "\n" ] {
+    if {$line != ""} {
+      puts "Add obstacles here: $line"
+    }
+  }
+}
+```
+![text](./ch107.png)
+
+### 108. Canvas Widget
+- The canvas widget provides a way to create/manipulate graphical elements 
+- In terms of pixels or a user-defined coordinates
+```tcl
+package require Tk
+wm title . "Simple canvas"
+canvas .canvas1 -width 6i -height 6i
+pack   .canvas1 -fill both -expand true
+.canvas1 create rectangle 1i 1i 2i 2i -fill red
+```
+![text](./ch108.png)
+
+### 109. Canvas polygons
+```tcl
+package require Tk
+wm title . "Simple canvas"
+canvas .canvas1 -width 6i -height 6i
+pack   .canvas1 -fill both -expand true
+.canvas1 create rectangle 1i 1i 2i 2i -fill red
+set rover1 [.canvas1 create poly -0.125i 0.125i -0.125i -0.125i 0.3i 0 -fill blu
+e]
+.canvas1 move $rover1 3i 3i ; # moves from left top to the center of the canvas
+```
+![text](./ch109.png)
+
+### 110. Bitmaps
+```tcl
+.canvas1 create bitmap 5.8i 5.8i -bitmap questhead
+```
+![bitmap](./ch110.png)
+
+### 111. Rover rotation
+
+### 112. All widgets together
+
+### 113. GUI draft1
+
+### 114. GUI draft2
+
+### 115. Scripts Section IV
