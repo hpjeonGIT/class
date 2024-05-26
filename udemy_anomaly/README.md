@@ -442,15 +442,368 @@ cv2.waitKey(0)
 - Goa is to lean a representation that captures the most important features of the input data
   - Encode the input data to a lower dimensional representation (encoding)
   - Decode this representation back into the original data
-  
+
 ### 18. Building the anomaly detection models
+```py
+from google.colab import drive
+drive.mount('/content/drive')
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+import tensorflow as tf
+from tensorflow.keras import layers
+import time
+import os
+os.chdir("drive/My Drive/Anomaly")
+# Load the data
+data = pd.read_csv("Anomaly dataset for deep learning.csv")
+data.head()
+#label encoding 
+for column in data.columns:
+    if data[column].dtype == np.object:
+        encoded = LabelEncoder()
+        encoded.fit(data[column])
+        data[column] = encoded.transform(data[column])
+data.head()
+### Checking Null values
+list1 = []
+for i in data.columns:
+  null = sum(pd.isnull(data[i]))
+  null1 = i+' - '+str(null)
+  list1.append(null1)
+list1
+# Preprocess the data
+mean = np.mean(data, axis=0)
+std = np.std(data, axis=0)
+data = (data - mean) / std
+data.head()
+# Build the autoencoder model
+input_layer = tf.keras.layers.Input(shape=(data.shape[1],))
+encoded = tf.keras.layers.Dense(128, activation="relu")(input_layer)
+encoded = tf.keras.layers.Dense(64, activation="relu")(encoded)
+decoded = tf.keras.layers.Dense(128, activation="relu")(encoded)
+decoded = tf.keras.layers.Dense(data.shape[1], activation="sigmoid")(decoded)
+autoencoder = tf.keras.models.Model(input_layer, decoded)
+autoencoder.compile(optimizer="adam", loss="mean_squared_error")
+# Train the autoencoder
+autoencoder.fit(data, data, epochs=100, batch_size=64)
+# Calculate the reconstruction error for each sample
+predictions = autoencoder.predict(data)
+reconstruction_error = np.mean((predictions - data)**2, axis=1)
+# Threshold the reconstruction error to identify anomalies
+threshold = np.mean(reconstruction_error) + 3 * np.std(reconstruction_error)
+anomalies = np.where(reconstruction_error > threshold)
+anomalies
+anomaly_data = data.iloc[[i for i in anomalies[0]]]
+anomaly_data
+#-----------------------------------------------------------------------------------
+# Build the generator model - GAN
+generator = tf.keras.Sequential()
+generator.add(tf.keras.layers.Dense(64, input_dim=100, activation="relu"))
+generator.add(tf.keras.layers.Dense(128, activation="relu"))
+generator.add(tf.keras.layers.Dense(data.shape[1], activation="sigmoid"))
+# Build the discriminator model
+discriminator = tf.keras.Sequential()
+discriminator.add(tf.keras.layers.Dense(128, input_dim=data.shape[1], activation="relu"))
+discriminator.add(tf.keras.layers.Dense(64, activation="relu"))
+discriminator.add(tf.keras.layers.Dense(1, activation="sigmoid"))
+# Compile the discriminator
+discriminator.compile(optimizer="adam", loss="binary_crossentropy")
+# Freeze the discriminator weights
+discriminator.trainable = False
+# Build the combined model
+inputs = tf.keras.layers.Input(shape=(100,))
+generated_data = generator(inputs)
+validity = discriminator(generated_data)
+gan = tf.keras.models.Model(inputs, validity)
+gan.compile(optimizer="adam", loss="binary_crossentropy")
+# Train the GAN
+for epoch in range(100):
+    # Generate synthetic data
+    noise = np.random.normal(0, 1, (data.shape[0], 100))
+    synthetic_data = generator.predict(noise)
+    # Train the discriminator on real data and synthetic data
+    real_labels = np.ones((data.shape[0], 1))
+    synthetic_labels = np.zeros((data.shape[0], 1))
+    d_loss_real = discriminator.train_on_batch(data, real_labels)
+    d_loss_synthetic = discriminator.train_on_batch(synthetic_data, synthetic_labels)
+    # Train the generator
+    g_loss = gan.train_on_batch(noise, real_labels)
+    # Print the loss values for each epoch
+    print("Epoch: %d, D Loss (real): %.4f, D Loss (synthetic): %.4f, G Loss: %.4f" % (epoch + 1, d_loss_real, d_loss_synthetic, g_loss))
+# Evaluate the synthetic data using the discriminator
+scores = discriminator.predict(data)
+# Threshold the scores to identify anomalies
+threshold = np.mean(scores) + 3 * np.std(scores)
+anomalies = np.where(reconstruction_error > threshold)
+anomaly_data = data.iloc[[i for i in anomalies[0]]]
+anomaly_data
+#------------------------------------------------------------------------------------------
+# Define the DBN model
+model = tf.keras.models.Sequential()
+# Add RBMs as hidden layers
+model.add(tf.keras.layers.BatchNormalization(input_shape=(37,)))
+model.add(tf.keras.layers.Dense(32, activation='sigmoid', name="layer1"))
+model.add(tf.keras.layers.BatchNormalization())
+model.add(tf.keras.layers.Dense(16, activation='sigmoid', name="layer2"))
+model.add(tf.keras.layers.BatchNormalization())
+# Add the output layer
+model.add(tf.keras.layers.Dense(37, activation='sigmoid', name="output"))
+# Compile the model
+model.compile(optimizer='adam', loss='binary_crossentropy')
+# Fit the model to the data
+model.fit(data, data, epochs=50)
+# Use the model to reconstruct the input data
+reconstructed_data = model.predict(data)
+# Compute the reconstruction error
+error = np.mean(np.abs(data - reconstructed_data))
+# Choose a threshold for the reconstruction error
+threshold = 0.1
+# Identify anomalies
+anomalies = np.abs(data - reconstructed_data) > threshold
+# Print the anomalies
+print(data[anomalies])
+```
 
 ## Seciton 10: PyOD: A comparison of 10 algorithms
 
+### 19. PyOD: A comparison of 10 algorithms
+- Python Outlier Detection toolkit
+- https://pyod.readthedocs.io/en/latest/
+```py
+from google.colab import drive
+drive.mount('/content/drive')
+!pip install pyod
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
+import timeit
+# Reading the Dataset
+df_train = pd.read_csv("/content/drive/MyDrive/SeaportAI/Health_Insurance_Train.csv")
+df_train.head()
+df_train.isnull().sum()
+sum(df_train[df_train["Count_3-6_months_late"].isnull()]["id"] == df_train[df_train["Count_6-12_months_late"].isnull()]["id"])
+df_train.loc[:,["Count_3-6_months_late","Count_6-12_months_late","Count_more_than_12_months_late"]] = df_train.loc[:,["Count_3-6_months_late","Count_6-12_months_late","Count_more_than_12_months_late"]].fillna(0)
+df_train["application_underwriting_score"].fillna(df_train["application_underwriting_score"].mean(skipna = True),inplace = True)
+df_train.isnull().sum()
+df_train.head()
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+df_train[["ScaledAge","ScaledIncome","ScaledPremiumPaid","ScaledPremium","ScaledUnderwritingScore"]] = scaler.fit_transform(df_train[["age_in_days","Income","no_of_premiums_paid","premium","application_underwriting_score"]])
+train_data = df_train.drop(["id","age_in_days","Income","application_underwriting_score","no_of_premiums_paid","premium","target"],axis = 1)
+from sklearn.preprocessing import LabelEncoder
+encoder = LabelEncoder()
+train_data["sourcing_channel"] = encoder.fit_transform(train_data["sourcing_channel"])
+train_data["residence_area_type"] = encoder.fit_transform(train_data["residence_area_type"])
+train_data.head()
+from pyod.models.abod import ABOD
+from pyod.models.knn import KNN
+from pyod.models.iforest import IForest
+from pyod.models.cblof import CBLOF
+from pyod.models.copod import COPOD
+from pyod.models.lof import LOF
+from pyod.models.pca import PCA
+from pyod.models.hbos import HBOS
+doesnot_pay = train_data[df_train["target"] == 0]
+pays = train_data[df_train["target"] == 1]
+outlier_count = doesnot_pay.shape[0]
+outlier_percent = outlier_count/train_data.shape[0]
+outlier_percent = 0.06
+model_dict = {
+    "ABOD" : ABOD(contamination=outlier_percent),
+    "KNN" : KNN(contamination=outlier_percent),
+    "Isolation Forest" : IForest(contamination=outlier_percent),
+    "LOF" : LOF(contamination=outlier_percent),
+    "CBLOF" : CBLOF(contamination=outlier_percent),
+    "COPOD" : COPOD(contamination=outlier_percent),
+    "PCA" : PCA(contamination=outlier_percent),
+    "HBOS" : HBOS(contamination=outlier_percent)
+}
+result_df = pd.DataFrame({"Package Name":[],"Model Name":[],"Time Taken in Seconds":[],"No.Of Data Points":[],"No.Of Outliers":[],"Percentage":[]})
+package_name = "PyOD"
+result_noniqr = pd.DataFrame({"Package Name":[],"Model Name":[],"Outliers Predicted":[],"Outliers Correctly Predicted":[],"Non-Outliers Predicted":[],"Non-Outliers Correctly Predicted":[],"Wrong Predictions":[],"Correct Prediction %":[],"Wrong Prediction %":[]})
+outlier_df = pd.DataFrame()
+n_points = train_data.shape[0]
+doesnot_pay = train_data[df_train["target"] == 0]
+pays = train_data[df_train["target"] == 1]
+outlier_count = doesnot_pay.shape[0]
+def makeDataFrameNonIQR(clf_name,pred):
+  global result_noniqr
+  predicted = train_data[pred == 1]
+  predicted_no = train_data[pred == 0]
+  outliers_predicted = sum(pred == 1)
+  nonoutliers_predicted = sum(pred == 0)
+  idx1 = predicted.index.intersection(doesnot_pay.index)
+  idx2 = predicted_no.index.intersection(pays.index)
+  wrong_preds = train_data.shape[0] - doesnot_pay.loc[idx1].shape[0] - pays.loc[idx2].shape[0]
+  wrong_pct = np.round(((wrong_preds) / train_data.shape[0]) * 100,0)
+  right_pct = np.round(100 - wrong_pct,)
+  cur = {"Package Name":package_name,"Model Name":clf_name,"Outliers Predicted":outliers_predicted,"Outliers Correctly Predicted":doesnot_pay.loc[idx1].shape[0],"Non-Outliers Predicted":nonoutliers_predicted,"Non-Outliers Correctly Predicted":pays.loc[idx2].shape[0],"Wrong Predictions":wrong_preds,"Correct Prediction %":right_pct,"Wrong Prediction %":wrong_pct}
+  result_noniqr = result_noniqr.append(cur,ignore_index = True)
+for clf_name,clf in model_dict.items():
+  # Starting Timer
+  start_time = timeit.default_timer()
+  clf.fit(train_data)
+  y_decision_scores = clf.decision_scores_
+  # Stopping Timer
+  stop_time = timeit.default_timer()
+  makeDataFrameNonIQR(clf_name,clf.labels_)
+  diff = np.round(stop_time - start_time,2)
+  labels = clf.labels_
+  n_outliers = np.count_nonzero(labels)
+  predicted_outlier_percent = np.round((n_outliers / n_points) * 100,0)
+  fig = plt.figure()
+  plt.title(clf_name)
+  plt.hist(labels)
+  plt.show()
+  outlier_df[clf_name + " Outliers"] = labels
+  outlier_df[clf_name + " Distance"] = np.round(y_decision_scores,2)
+  cur_model = {"Package Name":package_name,"Model Name":clf_name,"Time Taken in Seconds":diff,"No.Of Data Points":n_points,"No.Of Outliers":n_outliers,"Percentage":predicted_outlier_percent}
+  result_df = result_df.append(cur_model,ignore_index = True)
+result_df.to_excel("/content/drive/MyDrive/SeaportAI/Models Comparison.xlsx")
+outlier_df.to_excel("/content/drive/MyDrive/SeaportAI/Models Prediction.xlsx")
+```
+![summary](./ch19.png)
+- Compare %accuracy of outliers and %accuracy of non-outliers
+
 ## Section 11: How to handle an Imbalanced Dataset: Predicting High Impact Low Volume Events
+
+### 20. Predicting High Impact Low Volume Events: Predictgive Maintenance
+- Reduce the instances of downtime
+```py
+from google.colab import drive
+drive.mount('/content/drive')
+#!pip install pyod
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from imblearn.over_sampling import SMOTENC
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.pipeline import Pipeline
+# Reading the Dataset
+df_train = pd.read_csv("/content/drive/MyDrive/SeaportAI/Predictive Maintenance/ai4i2020.csv")
+# Data Preprocessing
+df_train.head()
+df_train.info()
+for column in df_train.columns:
+  print(column,sum(df_train[column] == " "))
+df_train.describe()
+# Target Column Selection
+train_data = df_train.drop(["UDI","Product ID","TWF","HDF","PWF","OSF","RNF"],axis = 1)
+train_data.head()
+from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+lencoder = LabelEncoder()
+scaler = MinMaxScaler()
+continuous_columns = list(train_data.columns)
+continuous_columns.remove("Type")
+continuous_columns.remove("Machine failure")
+train_data[continuous_columns] = scaler.fit_transform(train_data[continuous_columns])
+for column in train_data.columns:
+  if column in continuous_columns:
+    continue
+  train_data[column] = lencoder.fit_transform(train_data[column])
+train_data.head()
+from collections import Counter
+cntr = Counter(train_data['Machine failure'])
+cntr
+for label,cnt in cntr.items():
+    row_id = np.where(train_data['Machine failure'] == label)[0]
+    plt.scatter(train_data.iloc[row_id,3],train_data.iloc[row_id,4],label = str(label))
+plt.legend()
+from pyod.models.hbos import HBOS
+over = SMOTENC(categorical_features = [0],sampling_strategy = 0.25)
+under = RandomUnderSampler(sampling_strategy = 0.5)
+pipe = Pipeline(steps = [('o',over),('u',under)])
+X = train_data.drop('Machine failure',axis = 1)
+y = train_data['Machine failure']
+x_cols = X.columns
+X,y = pipe.fit_resample(X,y)
+sampledCntr = Counter(y)
+sampledCntr
+X = pd.DataFrame(X)
+y = pd.DataFrame(y)
+for label,cnt in cntr.items():
+    row_id = np.where(y == label)[0]
+    plt.scatter(X.iloc[row_id,3],X.iloc[row_id,4],label = str(label))
+#
+plt.legend()
+#
+X.columns = x_cols
+#
+failure = X[y[0] == 1]
+non_failure = X[y[0] == 0]
+#
+failure.shape[0] / X.shape[0]
+#
+contamination_percent = 0.3333
+#
+clf_name = "HBOS"
+clf = HBOS(contamination = contamination_percent)
+#
+target = y[0]
+#
+clf.fit(X)
+pred = clf.labels_
+predicted = X[pred == 1]
+predicted_no = X[pred == 0]
+outliers_predicted = sum(pred == 1)
+nonoutliers_predicted = sum(pred == 0)
+print("-"*55)
+print("Classifier : ",clf_name)
+print(f"No of Outliers Predicted by {clf_name} : {outliers_predicted}")
+idx1 = predicted.index.intersection(failure.index)
+print(f"No of Outliers Correctly Predicted: {failure.loc[idx1].shape[0]}")
+idx2 = predicted_no.index.intersection(non_failure.index)
+print(f"No of Non-Outliers Predicted by {clf_name} : {nonoutliers_predicted}")
+print(f"No of Non-Outliers Correctly Predicted: {non_failure.loc[idx2].shape[0]}")
+print(f"No of Wrong predictions: {X.shape[0] - failure.loc[idx1].shape[0] - non_failure.loc[idx2].shape[0]}")
+wrong_preds = X.shape[0] - failure.loc[idx1].shape[0] - non_failure.loc[idx2].shape[0]
+wrong_pct = np.round(((wrong_preds) / X.shape[0]) * 100,3)
+right_pct = np.round(100 - wrong_pct,3)
+print(f"Right Predcitions %: {right_pct}%")
+print(f"Wrong Predcitions %: {wrong_pct}%")
+print("-"*55)
+#
+resuts,edges = np.histogram(X['Type'],normed=True)
+binw = edges[1] - edges[0]
+plt.bar(edges[:-1],resuts*binw,binw)
+plt.xticks(np.arange(0,2,0.5))
+plt.yticks(np.arange(0,1,0.1))
+plt.title('Machine Type')
+plt.show()
+#
+resuts,edges = np.histogram(X['Air temperature [K]'],normed=True)
+binw = edges[1] - edges[0]
+plt.bar(edges[:-1],resuts*binw,binw)
+plt.title('Temprature')
+plt.show()
+#
+resuts,edges = np.histogram(X['Torque [Nm]'],normed=True)
+binw = edges[1] - edges[0]
+plt.bar(edges[:-1],resuts*binw,binw)
+plt.title('Temprature')
+plt.show()
+```
 
 ## Section 12: No Code (AutoML) approach to anomaly detection using PowerBI
 
+### 21. What is AutoML
+- Heavy code -> Low code -> No code
+
+### 22. Anomaly Detection Using PowerBI
+
 ## Section 13: Machine Learning Refresher
 
+### 23. Machine Learning Concepts
+
+### 24. Logistic Regression and Introduction to Deep Learning
+
+### 25. Unsupervised Learning
+
 ## Section 14: Bonus Lecture
+
+### 26. Bonus Lecture
