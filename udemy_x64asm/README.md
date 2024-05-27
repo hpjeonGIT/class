@@ -3,9 +3,9 @@
 
 ## Section 1: The Basics
 
-1. Why we should learn Windows x64 assembly?
+### 1. Why we should learn Windows x64 assembly?
 
-2. Bits, Bytes and Words
+### 2. Bits, Bytes and Words
 - bit = 1 or 0
 - bytes = 8 bits
 - Word = 2 bytes (16bits)
@@ -13,33 +13,33 @@
 - Quad words = 2 double words (64 bits)
 - Oct word = 2 quad words (128 bits)
 
-3. Binary and Hexadecimal
+### 3. Binary and Hexadecimal
 - binary: 11011b
 - decimal: 27d
 - Hexadecimal: 01Bh
 
-4. Signed and Unsigned
+### 4. Signed and Unsigned
 
-5. Zero Extension and Sign Extension
+### 5. Zero Extension and Sign Extension
 
-6. Integer Overflow
+### 6. Integer Overflow
 
-7. Integer Saturation
+### 7. Integer Saturation
 - Just before over/underflow, make value as max/min
 - Maintain value as max/min limit always to avoid any vulnerability
 
-8. Byte Order (Endianness)
+### 8. Byte Order (Endianness)
 - Little endian vs Big endian
 
-9. Difference b/w x86 and x64
+### 9. Difference b/w x86 and x64
 
-10. Assembly and disassembly
+### 10. Assembly and disassembly
 
-11. Build Errors, Runtime Errors and Vulnerabilities
+### 11. Build Errors, Runtime Errors and Vulnerabilities
 
 ## Section 2: Intel64 and AMD64 Architecture
 
-12. Operation Modes
+### 12. Operation Modes
 - x64 has two operation modes
   - Long mode (64bit)
     - More Registers
@@ -51,10 +51,10 @@
     - Virtual 8086 mode
     - Protected mode (16/32bit)
 
-13. General Purpose Registers
+### 13. General Purpose Registers
 ![registers](./13_registers.png)
 
-14. RFLAGS Register
+### 14. RFLAGS Register
 ![rflags](./14_rflags.png)
 - 0...15: FLAGS
 - 0...31: EFLAGS
@@ -66,12 +66,12 @@
 - SF at 7: Sign flag
 - OF at 11: Overflow flag. Detects overflow
 
-15. Instruction Pointer (RIP)
+### 15. Instruction Pointer (RIP)
 - IP: 0...15
 - EIP: 0...31
 - RIP: 0...63
 
-16. Segment Registers
+### 16. Segment Registers
 - DS: data segment
 - ES: Extra data segment
 - SS: Stack segment
@@ -79,33 +79,33 @@
 - FS: Extra data segment
 - GS: Extra data setgment
 
-17. Floating Point Unit Registers
+### 17. Floating Point Unit Registers
 - 8 Registers
 - Performs like stack
 
-18. MultiMedia eXtensions Registers (MMX)
+### 18. MultiMedia eXtensions Registers (MMX)
 - 8 Registers of MM0...MM7
 - Similar to SIMD
 
-19. SSE/AVX/AVX-512 Registers
+### 19. SSE/AVX/AVX-512 Registers
 ![avx](./19_avx.png)
 
-20. Flat Memory Model and Segmented Memory
+### 20. Flat Memory Model and Segmented Memory
 
-21. The Stack
+### 21. The Stack
 - Last in First out
 
-22. Machine Code and Instruction Encoding
+### 22. Machine Code and Instruction Encoding
 - Mnemonic: instructions in text form
 - Operands: registers
 
 ## Section 3: Welcome to the World of Windows64 Assembly
 
-23. Downloading MS Visual Studio
+### 23. Downloading MS Visual Studio
 
-24. Setting Up MASM x64 and Visual Studio
+### 24. Setting Up MASM x64 and Visual Studio
 
-25. MASM x64 Program code template
+### 25. MASM x64 Program code template
 ```asm
 ; commment here
 .code ;code section
@@ -117,54 +117,55 @@ end
 ```
 - Ref: https://learn.microsoft.com/en-us/cpp/assembler/masm/microsoft-macro-assembler-reference?view=msvc-170
 
-26. Running Our First MAXM x64 Program
+### 26. Running Our First MAXM x64 Program
 
-27. Viewing Machine code of our first MASM x64 Program with PE-bear
+### 27. Viewing Machine code of our first MASM x64 Program with PE-bear
 - https://github.com/hasherezade/pe-bear
 - PE file: file format in Windows like ELF in Linux
 
-28. Debugging our first MASM x64 program with Visual Studio
+### 28. Debugging our first MASM x64 program with Visual Studio
 
-29. Debugging our first MASM x64 Program with WinDbg
+### 29. Debugging our first MASM x64 Program with WinDbg
 - WinDbg from MS store
 
-30. Debugging our first MASM x64 Program with x64dbg
+### 30. Debugging our first MASM x64 Program with x64dbg
 
 ## Section 4: Introduction to MASM x64 syntax
 
-31. Named Constants (EQU Directive)
+### 31. Named Constants (EQU Directive)
 ```asm
 IDOK EQU 1
 MOV R8, 1    ; why 1? Hard to understand the code
 MOV R8, IDOK ; better to understand
 ```
-32. BYTE, SBYTE, and DB Directives
 
-33. WORD, SWORD, and DW Directives
+### 32. BYTE, SBYTE, and DB Directives
 
-34. DWORD, SDWORD, and DD Directives
+### 33. WORD, SWORD, and DW Directives
 
-35. QWORD, SQWORD and DQ Directives
+### 34. DWORD, SDWORD, and DD Directives
 
-36. FWORD and DF Directives
+### 35. QWORD, SQWORD and DQ Directives
 
-37. TBYTE and DT Directives
+### 36. FWORD and DF Directives
 
-38. OWORD Directive
+### 37. TBYTE and DT Directives
+
+### 38. OWORD Directive
 - octword. 128bits
 
-39. REAL4, REAL8, and REAL10 Directives
+### 39. REAL4, REAL8, and REAL10 Directives
 
-40. MMWORD Directive
+### 40. MMWORD Directive
 - MultiMedia data
 
-41. XMMWORD Directive
+### 41. XMMWORD Directive
 
-42. YMMWORD Directive
+### 42. YMMWORD Directive
 
-43. ZMMWORD Directive
+### 43. ZMMWORD Directive
 
-44. Type Aliases (TYPEDEF Directive)
+### 44. Type Aliases (TYPEDEF Directive)
 ```asm
 int64 typedef sqword
 int32 typedef sdword
@@ -181,7 +182,7 @@ half float 0.5
 num1 int64 12345
 ```
 
-45. Named and Anonymous Labels
+### 45. Named and Anonymous Labels
 ```asm
 je _seven ; if equal them jump to _seven
 jmp _eight ; if not, jump to _eight
@@ -194,26 +195,25 @@ _eight:
   - `jmp @f`: jump forward
   - `jmp @b`: jump backward
 
-46. Arrays
+### 46. Arrays
 
-47. Text Strings
+### 47. Text Strings
 
-48. Structures
+### 48. Structures
 
-49. Unions
+### 49. Unions
 
-50. Nested Structures and Unions
+### 50. Nested Structures and Unions
 
-51. Procedures and MS x64 Calling Convention
+### 51. Procedures and MS x64 Calling Convention
 
-52. Macros
-
+### 52. Macros
 
 ## Section 5: Basic x86/64 Processor Instructions
 
-53. Data Transfer Instructions
+### 53. Data Transfer Instructions
 
-54. Arithmetic Instructions
+### 54. Arithmetic Instructions
 ```asm
 mov rax,1
 add rax,7  ; add
@@ -231,28 +231,28 @@ inc r8 ; increment by one
 dec r8 ; decrement by one
 ```
 
-55. Logical Instructions
+### 55. Logical Instructions
 
-56. Shift and Rotate Instructions
+### 56. Shift and Rotate Instructions
 - The last shifted out bit goes to Carry Flag
 
-57. Control Flow Instructions
+### 57. Control Flow Instructions
 
-58. Stack Instructions
+### 58. Stack Instructions
 
-59. CPUID Instruction
+### 59. CPUID Instruction
 - `cpuid`
 
-60. Random Number Generator Instructions
+### 60. Random Number Generator Instructions
 - `rdrand rcx`
 
-61. Calling Windows API Functions
+### 61. Calling Windows API Functions
 
-62. Appying Code Size Optimizations
+### 62. Appying Code Size Optimizations
 
 ## Section 6: Understanding MultiMedia eXtensions (MMX)
 
-63. Data Transfer with MMX instructions
+### 63. Data Transfer with MMX instructions
 ```asm
 movd mm0, myDword; movd - move doulbeword
 movq mm1, myQword; movq - move quadword
@@ -260,51 +260,108 @@ mov rcx, offset mem64
 movq mm1, mmword ptr [rcx]
 ```
 
-64. Learning MMX Packed Arithmetic
+### 64. Learning MMX Packed Arithmetic
 ```asm
 movq mm0, mem64a
 movq mm1, mem64b
 paddb mm0, mm1; paddb - add packed byte integers
 ```
 
-65. Learning MMX Logical and Shift Instructions
+### 65. Learning MMX Logical and Shift Instructions
 ```asm
 pand mm0, mm1; pand - bit wise packed logical and
 por mm0, mm1; por - packed or
 ```
 
-66. Learning MMX Comparison Instructions
+### 66. Learning MMX Comparison Instructions
 ```asm
 pcmpeqb mm0, mm1; compare packed bytes for equal
 ```
 
 ## Section 7: Understanding Streaming SIMD Extensions (SSE)
 
-67. Data Transfer with SSE Instructions
+### 67. Data Transfer with SSE Instructions
 ```asm
 movups xmm0, mem128a; move four unaligned packed single precision floating point values b/w XMM registers or b/w XMM register and memory
 movaps xmm1, xmm0; aligned version of movups
 ```
 - movupd, movapd for double-precision
 
-68. Learning Streaming SIMD Instructions
+### 68. Learning Streaming SIMD Instructions
 ```asm
 addps xmm0, xmm1; add packed single precision floating point
 ```
 
 ## Section 8: Understanding Advanced Vector eXtensions (AVX/AVX-512)
 
-69. Learning Advanced Vector eXtensions (AVX/AVX-512)
+### 69. Learning Advanced Vector eXtensions (AVX/AVX-512)
 - x86 core instruction example
   - xor r8, r8: xor 8bytes with single instruction
 - avx-512 instruction example
   - vxorps zmm0, zmm1, zmm2: xor on 64 bytes with single instruction  
 
-70. Laboratory: XORing Payload with AVX
+### 70. Laboratory: XORing Payload with AVX
+```asm
+.data
+mem256a dword 1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 8.0
+mem256b dword 3.0, 5.0, 9.0, 1.0, 5.0, 0.0, 2.0, 4.0
+mem512a dword 1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 8.0
+        dword 3.0, 7.0, 1.0, 2.0, 5.0, 8.0, 0.0, 4.0
+mem512b dword 7.0, 9.0, 4.0, 5.0, 8.0, 1.0, 2.0, 9.0
+        dword 2.0, 1.0, 7.0, 4.0, 3.0, 5.0, 1.0, 11.0
+mem256c dword 1, 0, 1, 0, 1, 0, 1, 0
+mem256d dword 0, 1, 0, 1, 0, 1, 0, 1
+mem512c dword 1, 0, 1, 0, 1, 0, 1, 0
+        dword 1, 0, 0, 1, 1, 0, 0, 1
+mem512d dword 0, 1, 0, 1, 0, 1, 0, 1
+        dword 1, 0, 0, 1, 1, 0, 0, 1
+.code
+Main proc
+    ;------------ AVX ------------;
+    ;VMOVUPS is extended MOVUPS
+    vmovups ymm1, mem256a
+    vmovups ymm2, mem256b
+    ;VADDPS is extended ADDPS
+    vaddps ymm0, ymm1, ymm2
+    vmovups ymm1, mem256a
+    vmovups ymm2, mem256b
+    ;VSUBPS is extended SUBPS
+    vsubps ymm0, ymm1, ymm2
+    vmovups ymm1, mem256a
+    vmovups ymm2, mem256b
+    ;VXORPS is extended XORPS
+    vxorps ymm0, ymm1, ymm2
+    mov rdx, offset mem256c
+    vmovdqu ymm2, ymmword ptr [rdx]
+    mov rdx, offset mem256d
+    vmovdqu ymm3, ymmword ptr [rdx]
+    ;VPXOR is bitwise XOR of YMM3/m256 and YMM2.
+    vpxor ymm1, ymm2, ymm3
+    ;---------- AVX-512 ----------;
+    vmovups zmm1, mem512a
+    vmovups zmm2, mem512b
+    vaddps zmm0, zmm1, zmm2 ;ADD
+    vmovups zmm1, mem512a
+    vmovups zmm2, mem256b
+    vsubps zmm0, zmm1, zmm2 ;SUB
+    vmovups zmm1, mem512a
+    vmovups zmm2, mem512b
+    vxorps zmm0, zmm1, zmm2 ;XOR
+    mov rdx, offset mem512c
+    vmovdqu64 zmm2, zmmword ptr [rdx]
+    mov rdx, offset mem512d
+    vmovdqu64 zmm3, zmmword ptr [rdx]
+    ;VPXORD is bitwise XOR of packed doubleword integers
+    ;in ZMM2 and ZMM3/m512/m32bcst using writemask k1.
+    vpxord zmm1, zmm2, zmm3
+    ret
+Main endp
+end
+```
 
 ## Section 9: Visual C++ and MASM x64 Assembly Hybrid Applications
 
-71. Laboratory: Calling MASM x64 Procedures in Visual C++ Program
+### 71. Laboratory: Calling MASM x64 Procedures in Visual C++ Program
 - Calling assembly function from C
 ```c
 extern "C" int64_t my_procedure();
@@ -313,36 +370,36 @@ int main() {
 }
 ```
 
-72. Laboratory: Using Intrinsics in Visual C++ Program
+### 72. Laboratory: Using Intrinsics in Visual C++ Program
 
 ## Section 10: Visual C#.NET and MASM x64 Assembly Hybrid Applications
 
-73. Laboratory: Using MASM x64 Library in Visual C#.NET Program
+### 73. Laboratory: Using MASM x64 Library in Visual C#.NET Program
 - DllImport() in C#
 
-74. Laboratory: Education AVX Calculator in Visual C#.NET and MASM x64
+### 74. Laboratory: Education AVX Calculator in Visual C#.NET and MASM x64
 
 ## Section 11: Emitting Instructions Opcodes in MASM x64
 
-75. Laboratory: Sample Obfuscation and Deobfuscation in MASM x64
+### 75. Laboratory: Sample Obfuscation and Deobfuscation in MASM x64
 
 ## Section 12: Self-Modifying Code in MASM x64
 
-76. Laboratory: Execute Raw Bytes with Memory Erase
+### 76. Laboratory: Execute Raw Bytes with Memory Erase
 
 ## Section 13: Using SYSCALL Instructions in MASM x64
 
-77. Laboratory: Using SYSCALL Instruction in MASM x64
+### 77. Laboratory: Using SYSCALL Instruction in MASM x64
 
 ## Section 14: Sector Zero Corruptor Virus
 
-78. Laboratory: Building Custom Bootloader Working in Real Mode
+### 78. Laboratory: Building Custom Bootloader Working in Real Mode
 ![zero](./78_zero.png)
 
-79. Laboratory: Corrupting Sector Zero of a Disk using Hexadecimal Editor
+### 79. Laboratory: Corrupting Sector Zero of a Disk using Hexadecimal Editor
  
-80. Laboratory: Executing Sector Zero Corruptor Virus
+### 80. Laboratory: Executing Sector Zero Corruptor Virus
 
 ## Section 15: Legal
 
-81. Legal
+### 81. Legal
