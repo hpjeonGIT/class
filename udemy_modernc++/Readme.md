@@ -1,7 +1,7 @@
 ## Complete Modern C++ (C++11/14/17)
 - Instructor: Umar Lone
 
-21. Assignment
+### 21. Assignment
 - Implement following functions using pointer arguments only
 ```cpp
 #include <iostream>
@@ -61,7 +61,7 @@ int main() {
 }
 ```
 
-33. Inline functions
+### 33. Inline functions
 - Replacement of MACRO in C++11 (?)
 - Injects inline function to the code, instead of calling the function
 - Some functions will not be inlined
@@ -84,7 +84,7 @@ int main() {
         - multiple lines can be used
         - class member functions can be used
 
-34. Function pointers
+### 34. Function pointers
 - Pointer that holds the address of the function
 - Can be used to indirectly invoke the function even if the function name is not known
 - The type is same as the signature of the function (return type & arguments)
@@ -109,7 +109,7 @@ int main() {
 }
 ```
 
-35. Namespace
+### 35. Namespace
 ```cpp
 #include<iostream>
 namespace Avg {
@@ -127,7 +127,7 @@ int main(){
 
 ## Section 4: classes and objects
 
-49. Copy constructor - part I
+### 49. Copy constructor - part I
 - Creates copy of the object's state in another object
 - Compiler may provide one automatically if there no copy constructor
     - This could be problematic if a class has pointer member data
@@ -152,7 +152,7 @@ class Myclass {
 - If pointer or deep-copy is necessary, provide copy-constructor manually
 - If any function returns a class object, it is returned as a value (not reference). Then this will activate copy constructor of that class
 
-50. Copy constructor - part II
+### 50. Copy constructor - part II
 - Operator `=` will do the shallow copy as well
     - This is an **assignment operator**
 ```
@@ -171,7 +171,7 @@ z = x; <--------  shallow copy will be done
 
 ## Section 5: Move Semantics
 
-53. L-value, R-value, & Rvalue references 
+### 53. L-value, R-value, & Rvalue references 
 - L-value
     - Has a name
     - All variables are l-values
@@ -225,7 +225,7 @@ int main(){
 }
 ```
 
-54. Move semantics
+### 54. Move semantics
 - For an object obj1, which points memory m1
     - Deep copy will make obj2, which points memory m2. m2 is copied from m1
         - Very slow
@@ -233,7 +233,7 @@ int main(){
     - So move will make obj2, which points memory m1 while makes obj1 point null memory
         - This has to be done through class/member function definition
 
-56. Rule of 5 & 0
+### 56. Rule of 5 & 0
 - Some class owns a resource
 - Those resources may be acquired in the constructor
 - When copy/move/destroy, users must decide what to do
@@ -304,18 +304,18 @@ int main() {
     - To use move constructor/operator, the custom move constructor/operator must be made
 - parameterized constructor CANNOT use default/delete
 
-57. Copy elision
+### 57. Copy elision
 - `intClass a = 3` can be recognized as `intClass a = intClass(3)`
     - This will call move constructor
     - Intermediate constructor will not be used
     - **Return value optimization**
 
-58. std::move
+### 58. std::move
 - std::move(x): a syntactic sugar of `static_cast<Myclass&&>(x)`
 
 ## Section 6: Operator Overloading
 
-60. Operator overloading - part I
+### 60. Operator overloading - part I
 - Custom implementation for primitive operators
 - Allows usage of user-defined objects in mathematical expressions
 - Overloaded as functions but provides a convenient notation
@@ -335,10 +335,10 @@ int main() {
         - postfix increment requires a temporary object and this is why prefix increment is more efficient
         - Ref: https://stackoverflow.com/questions/24901/is-there-a-performance-difference-between-i-and-i-in-c
 
-61. Operator overloading - part II
+### 61. Operator overloading - part II
 - For `a=a`, address checking mechanism is necessary for `operator=`
 
-62. Operator overloading - part III
+### 62. Operator overloading - part III
 - standard-out: `std::cout << a;`
 ```cpp
 std::ostream & operator << (std::ostream &out, const Integer &a) {
@@ -359,43 +359,33 @@ std::istream & operator >> (std::istream &inp, Integer &a) {
 void operator()() { ... }
 ```
 
-63. Operator overloading - part IV
+### 63. Operator overloading - part IV
 - Use `friend` to access member data (?)
-- Defile `<<` for std::cout as a member function
-```cpp
-class MyClass {
-...
-    friend std::ostream & operator << (std::ostream &out, const MyClass& a) {
-      out << a.getStr();
-      return out;
-    }
-};
-```
 
-64. Operator overloading - part V
+### 64. Operator overloading - part V
 - Overloading `->` and `*`
 - May add a class with destructor
     - Allows automatic memory deallocation when out-of scope
     - This is how **smart pointer** works
 
-65. Operator overloading - part VI
+### 65. Operator overloading - part VI
 
-66. Operator overloading - part VII
+### 66. Operator overloading - part VII
 
-67. Type conversion - part I
+### 67. Type conversion - part I
 - C-style casting is not recommended : `(float) a`
     - Type check is not done
 - `static_cast<float> (a)`
 - `reinterpret_cast` might be done b/w different types (int->char)
 - `const_cast` ?
 
-68. Type conversion - part II
+### 68. Type conversion - part II
 - Compiler may convert initialization parameter implicitly
     - `Integer i1 = 3;`
     - To avoid such implicit conversion, use `explicit` keyword for the parameterized constructor
         - `explicit Integer(int value) { ... }`
 
-69. Type conversion - part III
+### 69. Type conversion - part III
 - Type conversion operator
     - `operator <type> ()`
         - `operator int() { return x; }`
@@ -405,12 +395,12 @@ class MyClass {
     - `explicit operator int() { return x; }`
     - Now `int x = static_cast<int>(i6);` is allowed
 
-70. Initialization vs. assignment & member initialization list
+### 70. Initialization vs. assignment & member initialization list
 - Initialization list (calls parameterized constructor) is preferred than assignment as assignment has more function calls (default constructor + assignment operator)
 
 ## Section 7: Memory Management - Part II
 
-71. Raw pointers
+### 71. Raw pointers
 - Q: factory function?
 - Some good practice
 ```cpp
@@ -421,7 +411,7 @@ p = nulltpr; // clean the addres it is pointing
 ```
 - Raw pointer work OK but smart pointer is recommended as it will prevent memory leak
 
-72. std::unique_ptr
+### 72. std::unique_ptr
 - Cannot be copied
 - To send the unique pointer as an argument, use std::move
 ```cpp
@@ -452,13 +442,13 @@ int main() {
 }
 ```
 
-73. Sharing Pointers
+### 73. Sharing Pointers
 - When multipe pointers share a pointer from a different class
 - Need to deallocate one by one in the end
 
-74. Sharing std::unique_ptr
+### 74. Sharing std::unique_ptr
 
-75. std::shared_ptr
+### 75. std::shared_ptr
 - Increments as it is shared again
 ```cpp
 class Employee{
@@ -483,7 +473,7 @@ int main() {
 ```
 - To remove shared ptr, use `p=nullptr;` or `p.reset()`
 
-76. Weak ownership
+### 76. Weak ownership
 - When using shared_ptr:
 ```cpp
 class Employee{
@@ -508,7 +498,7 @@ int main() {
 ```
     - Even though the memory of `p` at main is deallocated, the memory within Employee objects are not deallocated until the end
 
-77. std::weak_ptr internals
+### 77. std::weak_ptr internals
 - A weak pointer must be defined from a shared pointer
     - It referes the control object (count number) of the shared pointer
     - We check if the weak pointer is expired or not
@@ -546,27 +536,27 @@ int main() {
 }
 ```
 
-78. Circular References
+### 78. Circular References
 - If shared_ptr uses circular reference of classes, destructor may not work
     - Using weak poiners could be a solution
     - Not necessary to replace all shared_ptr into weak_ptr. Only one side may need weak_ptr
 
-79. Deleter
+### 79. Deleter
 
-80. Dynamic arrays
+### 80. Dynamic arrays
 - std::unique_ptr can handle dynamic arrays but STL is recommended
 
-81. Make functions
+### 81. Make functions
 - `auto p = std::make_unique<Integer> (3);` is equivalent to `std::unique_ptr<Integer> p{GetPointer(3)};`
 - `auto e1 = std::make_shared<Employee>();` is equivalent to `std::shared_ptr<Employee> e1 {new Employee{}};`
 
 ## Section 8: More C++ goodies
 
-82. Enums - Part I
+### 82. Enums - Part I
 - Enumerator is converted into unsized integer but integer is not convereted into Enumerator
 - Start from zero
 
-83. Enums - Part II (Scoped Enums since C++11)
+### 83. Enums - Part II (Scoped Enums since C++11)
 - `enum Color {RED, GREEN, BLUE};`: 0,1,2
 - `enum Color {RED=4, GREEN, BLUE};`: 4,5,6
 - `enum Color : char {RED='c', GREEN, BLUE};`: ASCII number of c,d,e
@@ -578,7 +568,7 @@ Color c = Color::RED;
 ```
 - But scoped Enums needs static_cast<int>() to std::cout
 
-86. Assignment 1
+### 86. Assignment 1
 ```cpp
 #include <iostream>
 #include <string>
@@ -603,12 +593,12 @@ int main(){
 }
 ```
 
-87. String streams
+### 87. String streams
 - std::stringstream: read/write
 - std::istringstream: read only
 - std::ostringstream: write only
 
-88. Assignment 2
+### 88. Assignment 2
 ```cpp
 #include <iostream>
 #include <string>
@@ -636,7 +626,7 @@ int main(){
 ```
 - Compare the return value with `std::string::npos` to see if the location is found or not
 
-89. User-Defined literals
+### 89. User-Defined literals
 - A literal is a fixed value that appears directly in the code
     - 14u: unsized integer
     - 621l: long integer
@@ -676,7 +666,7 @@ int main() {
 - Note `d0{32.0_mi}`, not `d0()`. This uses the initialization list
 - Q: Is this really useful? What if a class requires multiple argument like `d0{10.0_mi, 3.1_km}`, can the  user-defined literal work?
 
-90. Constant Expressions - constexpr
+### 90. Constant Expressions - constexpr
 - Since C++11
 - Represents an expression that is constant
 - Can be evaluated at compile time
@@ -702,11 +692,11 @@ int main() {
 }
 ```
 
-91. std::initializer_list(C++11)
+### 91. std::initializer_list(C++11)
 - Enables a list input of {...} as function arguments
 - Needs to use iterator to loop over the elements of the list
 
-93. Assignment III
+### 93. Assignment III
 - Find an integer vector containing the positions of search word in the string
 ```cpp
 #include <iostream>
@@ -741,18 +731,18 @@ int main() {
 }
 ```
 
-94. Union - I
+### 94. Union - I
 - Gives the ability to represent all the members in the same memory
     - Not saving all of member data simultaneously. Only the newest is valid
 - C++11 allows user-defined constructor for Unions
 - Size of the storage is determined by the size of the largest member data
     - When a member data is updated, other member data will be over-ridden or contaminated
 
-95. Union - II
+### 95. Union - II
 
 ## Section 9: Object oriented programming
 
-97. Inheritance & Composition
+### 97. Inheritance & Composition
 - Composition
     - Object composed in another object
     - Represents "has-a" relation
@@ -762,7 +752,7 @@ int main() {
     - Reuse & inherit behavior
     - Represents "is-a" relationship
 
-98. Inheritance & Access modifiers
+### 98. Inheritance & Access modifiers
 - Access modifier
     - private: only accessible from the class
     - public: accessible anywhere
@@ -775,7 +765,7 @@ int main() {
     - Constructors execute from base to child
     - Destructors execute from child to base
 
-99. Project - I (Introduction)
+### 99. Project - I (Introduction)
 - Banking application
     - Manage accounts
     - Customer operations : withdrawal, deposit
@@ -785,7 +775,7 @@ int main() {
         - Member function: deposit, withdraw, transfer, ...
         - Savings/Checking child class
 
-100. Project - II
+### 100. Project - II
 - Child class CANNOT access private data of the base class
     - When child class implements a constructor, it MUST use the constructor of the base class
 ```cpp
@@ -807,7 +797,7 @@ public:
   : Account(name, balance), m_Rate(rate) { }
 ```
 
-101. Assignment
+### 101. Assignment
 - Add Checking class
 ```cpp
 #include <iostream>
@@ -875,7 +865,7 @@ int main() {
 }
 ```
 
-102. Project - III
+### 102. Project - III
 - For Withdraw() function in Checking class, we can re-use the member function of the base class
 ```cpp
 void Withdraw(float balance) {
@@ -896,11 +886,11 @@ void Withdraw(float balance) {
     1318:	e8 35 fe ff ff       	callq  1152 <Account::Account(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, float)>
 ```
 
-103. Project - IV
+### 103. Project - IV
 - Virtual keyword: prevents the member function of the base class from working instead of the functions of the derived class
 - Polymorphism: Let compiler know the base class only. Appropriate mapping to the derived class is done later.
 
-104. Project - V
+### 104. Project - V
 - Polymorphism
     - Different forms of the function are provided
     - The call is resolved at compile time or runtime
@@ -915,11 +905,11 @@ void Withdraw(float balance) {
         - An array of pointers
     - Virtual pointer is generated by the compiler and points the virtual function in the virtual table
 
-105. Project - VI
+### 105. Project - VI
 - When destructed, the destructor of Checking -> Account is executed accordingly
 - But when `Account *acc04 = new Checking {"John", 10.}; delete acc04;`, the destructor of checking will not be invoked. This is why **the destructor of the base class MUST be `virtual`**
 
-106. Project - VII
+### 106. Project - VII
 - `final` keyword: prevents a class from becoming a base class
     - `class Abc final {...};`
     - When tried to load, the compiler will yield an error message
@@ -936,7 +926,7 @@ void Withdraw(float balance) {
     - In the first derived class `void doSomething() override final;`
     - In the next derived class `void doSomething() override;`=>This will yield compiler error
 
-107. Project - VIII
+### 107. Project - VIII
 - Upcasting: cast the derived class into the base class
     - `Checking ch; Account *p = &ch;`
     - Automatically done
@@ -948,7 +938,7 @@ void Withdraw(float balance) {
     - Occurs when child class object is assigned to a concrete base class object
     - ` Account a; Savings s; a = s`
 
-108. Project - IX
+### 108. Project - IX
 - How to use the method of a derived class in the base class?
 - Even though downcast may work, there is no gaurantee that it will point the correct function
 - `typeid()`
@@ -969,7 +959,7 @@ int main() {
 }
 ```
 
-109. Project - X
+### 109. Project - X
 - Using `dynamic_cast` instead of `typeid()`
 ```cpp
 int main() {
@@ -988,7 +978,7 @@ int main() {
     - `dynamic_cast<Savings&>(p)`
     - But nullptr is not returned when failed. Instead, it will throw an error. May use try/catch
 
-110. Abstract class
+### 110. Abstract class
 - Pure virtual
     - Disables the member function to be activated
     - Makes the base class as abstract - cannot be instantiated
@@ -1023,7 +1013,7 @@ int main() {
 }
 ```
 
-111. Multiple inheritance
+### 111. Multiple inheritance
 - Diamond inheritance
 ```
       A
@@ -1037,7 +1027,7 @@ int main() {
 
 ## Section 10: Exception handling
 
-112. Exception Handling - part I
+### 112. Exception Handling - part I
 - Mechanism to handle errors in programs that occur at runtime
 - These errors are called exceptions
 - Exist outside of the normal functioning of the program
@@ -1074,7 +1064,7 @@ int main() {
 }
 ```
 
-113. Exception Handling - part II
+### 113. Exception Handling - part II
 ```cpp
 #include <iostream>
 #include <vector>
@@ -1111,7 +1101,7 @@ int main() {
 - All of exception is inherited from std::exception and  `catch (std::exception &ex) {    std::cout << "error_message IS : " << ex.what() << std::endl;  }` might be located in the end of catch block
 - `catch (...) {    std::cout << "no identity of exception " << std::endl;  }` can catch anything but it doesn't tell any details of the exception caught. Not recommeded to use
 
-114. Exception Handling - Part III
+### 114. Exception Handling - Part III
 - Stack unwinding
     - When exception is caught, local object which was created on stack will be destructed using the destructor
     - If an object is created on heap, memory deallocation is not done and memory leak will happen
@@ -1145,7 +1135,7 @@ int main() {
 }
 ```
 
-115. Exception Handling - Part IV
+### 115. Exception Handling - Part IV
 - Nested exception
     - std::vector<bool> does not obey the standard container rules : https://stackoverflow.com/questions/34079390/range-for-loops-and-stdvectorbool
 ```cpp
@@ -1180,12 +1170,12 @@ int main() {
 }
 ```
 
-116. Exception handling - Part V
+### 116. Exception handling - Part V
 - If an error is to be thrown from a constructor, raw pointers must be avoided as member data
     - The destructur will not be invoked
 - Use STL or smart pointers
 
-117. Exception handling - Part VI
+### 117. Exception handling - Part VI
 - noexcept
     - Applied to functions
     - Indicates the function does not throw exceptions
@@ -1197,7 +1187,7 @@ int Sum(int x, int y) noexcept(true) {...}
 
 ## Section 11: File Input & Output
 
-118. Raw string literals (C++11)
+### 118. Raw string literals (C++11)
 - `\` is a tap and `\n` is a new line
     - `"C:\TEMP\newfile.txt"` => `"C:\\TEMP\\newfile.txt"`
     - Or as a Raw String `R"(C:\TEMP\newfile.txt)"`
@@ -1224,7 +1214,7 @@ C:\temp\newfile.txt
 C:\temp\newfile.txt
 ```
 
-119. Introduction to Filesystem library
+### 119. Introduction to Filesystem library
 - `experimental/filesystem` in c++17 (?)
     - Not sure this works at c++11/14 only or at c++17
 ```cpp
@@ -1254,7 +1244,7 @@ $ ./a.out
 ...
 ```
 
-120. File IO - part I
+### 120. File IO - part I
 - File open modes
     - app: appending
     - binary: open as binary
@@ -1264,7 +1254,7 @@ $ ./a.out
     - ate: seek to end after open
     - can be combiled such as `std::ios:in | std::ios::out`
 
-121. File IO - part II
+### 121. File IO - part II
 - Stream state flags
     - good(): no error
     - bad(): irrecoverable stream error
@@ -1310,7 +1300,7 @@ int main() {
 - `inp.clear()` will clear the fail status
 - `inp.setstate(std::ios::failbit)` may set new fail status
 
-122. File IO - part III
+### 122. File IO - part III
 - Reading entire lines of a file
 ```cpp
 std::ifstream inp {"input.data"};
@@ -1320,7 +1310,7 @@ while (!std::getline(input.line).eof()) {
 }
 ```
 
-123. File IO - part IV
+### 123. File IO - part IV
 - Writing character
     - `out.tellp()` shows the current position
 ```cpp
@@ -1340,10 +1330,10 @@ while (inp.get(ch)) {
 }
 ```
 
-124. File IO - part V
+### 124. File IO - part V
 - No EOF character in binary files
 
-125. Assignment I 
+### 125. Assignment I 
 - Copying binary files
 ```cpp
 #include <iostream>
@@ -1371,13 +1361,13 @@ int main() {
 ```
 - Ref: https://stackoverflow.com/questions/5420317/reading-and-writing-binary-file
 
-126. Assignment II
+### 126. Assignment II
 - Copy the entire contents of the folder
 
 ## Section 12: Templates
 - For generic programming
 
-129. Introduction to Templates
+### 129. Introduction to Templates
 - Templates
   - Generalizes SW components
   - High performance algorithms & classes
@@ -1405,7 +1395,7 @@ int main() {
 - Binary finds only int and float version only
   - If double data type is called, then compiler will instantiate double version in the assembly
 
-130. Assignment I
+### 130. Assignment I
 - Convert following functions into templates
   - int Add(int x, int y)
   - int ArraySum(const in *pArr, size_t arrSize);
@@ -1465,7 +1455,7 @@ int main() {
 }
 ```
 
-131. Template argument deduction & instantiation
+### 131. Template argument deduction & instantiation
 - Template instantiation
   - A template function or class only acts as a blueprint
   - The compiler generates code from the blueprint at compile time
@@ -1489,7 +1479,7 @@ find_max<double>(3, 1.1f);
 ```
 - `find_max<double>()` will override the argument type as double
 
-133. Explicit specialization
+### 133. Explicit specialization
 - `char b {'B'}`: works OK
 - `char *b {'B'}`: NOT allowed
 - `char *b {"B"}`: NOT allowed
@@ -1516,7 +1506,7 @@ template<> const char* find_max(const char* a, const char* b) {
 ```
 - Note that we need `template<>` in the beginning then redefine the function
 
-134. Non-type template arguments
+### 134. Non-type template arguments
 - In template definition, actual data type instead of `typename` then the argument becomes the function parameter
   - It is `constexpr` and a regular variable is NOT allowed
     - Addresses, references, integrals, nullptr, enums
@@ -1541,7 +1531,7 @@ int main() {
 }
 ```
 
-135. Assignment III
+### 135. Assignment III
 - Using a reference instead of a pointer
 ```cpp
 #include <iostream>
@@ -1569,13 +1559,13 @@ int main() {
   - Q: How to define return type? If the return type is const char for the Sum(), then only one char is returned.
 - Specialize for an array of std::strings
 
-136. Perfect forwarding - Part I
+### 136. Perfect forwarding - Part I
 
-137. Perfect forwarding - Part II
+### 137. Perfect forwarding - Part II
 - using `std::forward<T>(x)`
 - Q: Why R value reference is used?
 
-138. Variadic templates - part I
+### 138. Variadic templates - part I
 - For an array input, if the data type is changed in the middle, it will not be compiled
   - Variadic template can avoid such cases
   - Variadic templates are written like a recursive code
@@ -1609,7 +1599,7 @@ int main() {
 0000000000000b96 <void Print<char const*>(char const*)>:
 ```
 
-139. Variadic templates - part II
+### 139. Variadic templates - part II
 - Finding the size of parameter pack
 ```cpp
 void Print(T a, Params... args){
@@ -1620,7 +1610,7 @@ void Print(T a, Params... args){
 ```
 - To call another function using the parameter pack, use `func(args...);`
 
-140. Assignment IV
+### 140. Assignment IV
 - Create a factory function
 ```cpp
 #include <iostream>
@@ -1664,7 +1654,7 @@ int main() {
 }
 ```
 
-141. Class Templates
+### 141. Class Templates
 ```cpp
 #include <iostream>
 template<typename T, int S>
@@ -1696,13 +1686,13 @@ int main() {
 - When instantiate a class object, we need <> after the class name with appropriate argument
 - When member functions are defined outside of class definiiton, needs `template<>` keyword
 
-142. Class Template explicit Specialization - Part I
+### 142. Class Template explicit Specialization - Part I
 - Handling `char *` for string
 
-143. Class Template explicit Specialization - Part II
+### 143. Class Template explicit Specialization - Part II
 - Handling `std::vector<>` for PrettyPrint
 
-144. Assignment V
+### 144. Assignment V
 - PrettyPrint for vector of vector
 ```cpp
 #include <iostream>
@@ -1747,10 +1737,10 @@ int main() {
 }
 ```
 
-145. Class Template Partial Specialization
+### 145. Class Template Partial Specialization
 - Allows the specialization of partial arguments, not all of them
 
-146. Typedef, Type Alias & Alias Templates (C++11)
+### 146. Typedef, Type Alias & Alias Templates (C++11)
 - typedef
   - Introduces a name for an existing type
     - Produces a shorter name for existing types
@@ -1782,7 +1772,7 @@ Names<std::string> names;
 Names<int> inames;
 ```
 
-147. Type Traits (C++11)
+### 147. Type Traits (C++11)
 - can introspect
   - Find the characteristics of types at compile time
   - Transforms the properties of the type
@@ -1807,12 +1797,12 @@ int main() {
 }
 ```
 
-148. static_assert (C++11)
+### 148. static_assert (C++11)
 - Can check expression at compile time
 
 ## Section 13: Lambda Expressions (C++11)
 
-150. Callbacks revisited - Function pointers
+### 150. Callbacks revisited - Function pointers
 ```cpp
 #include <iostream>
 using Comparator = bool(*)(int,int);
@@ -1845,7 +1835,7 @@ int main() {
   - Function pointers will not be inlined and might not be optimized
   - Function points would be global
 
-151. Callbacks - function objects
+### 151. Callbacks - function objects
 - Instead of a function pointer, we may use a member function with operator overloaded() of class/structure (after instantiated), allowing optimization and having function state
 - Function object
   - Functor
@@ -1875,7 +1865,7 @@ int main() {
     - Can be injected as an argument, playing call back function
     - Will have a state (or pre-stored data) from the construction when instantiated
 
-152. Lambda Expressions
+### 152. Lambda Expressions
 - Defines an anonymous function object
 - Syntactic sugar for a function object
 - Can be passed as an argument
@@ -1897,7 +1887,7 @@ fnc();  // add '()' after the function label
 ```
 - type of fnc is a class
 
-153. Lambda Expressions - Internals
+### 153. Lambda Expressions - Internals
 - How to define return type from Lambda expression
   - Return type will be deduced but explicitly given using `->`
   - `auto fnc = []()->double { return 3.5; } ;`
@@ -1922,7 +1912,7 @@ int main() {
 }
 ```
 
-154. Lambda Expressions Capture List - Part I
+### 154. Lambda Expressions Capture List - Part I
 - Instead of a structs based functor, lambda expression could be a light solution
 - Capture list using `[]`
   - Pass by value
@@ -1949,7 +1939,7 @@ int main(){
 }
 ```
 
-155. Lambda Expressions Capture List - Part II
+### 155. Lambda Expressions Capture List - Part II
 - Multiple captured variables: `[var, var2]() {...}`
 - Multiple captured variables as reference: `[&var, &var2]() {...}`
 - All local variables as values: `[=]() {...}`
@@ -1957,7 +1947,7 @@ int main(){
 - Mixed : `[=, &var]() {...}`
 - All member data : `[this]() {...}`
 
-156. Lambda Expressions Capture List - Part III
+### 156. Lambda Expressions Capture List - Part III
 - Nested lambda expression
 ```cpp
 #include <iostream>
@@ -1973,7 +1963,7 @@ int main(){
 ```
 - This prints `10`
 
-156. Generalized Lambda Capture (C++14)
+### 157. Generalized Lambda Capture (C++14)
 - Allows the creation of new variables in the capture clause
 - The type of variables are deduced from the expression
 - Those variables must be initialized
@@ -1988,7 +1978,7 @@ auto write = [out=std::move(out)](int x) mutable {
   out << x ;
 };
 ```
-157. Assignment
+### 158. Assignment
 - Create lambda expressions & their equivalent function objects for the following
   - T Max(T,T)
     - Lesson: When a functor is created, a constructor may not be necessary. 
@@ -2077,13 +2067,13 @@ int main() {
 
 ## Section 14: STL
 
-159. Introduction
+### 159. Introduction
 - Container types
   - Sequence: array, vector, list, deque, forward_list
   - Associative: set, multiset, map, multimap
   - Unordered: unordered_set, unordered_multiset, unordered_map, unordered_multimap
 
-160. std::array(C++11)
+### 160. std::array(C++11)
 - Thin wrapper ver C-style static array
 - Cannot grow
 - Iterator
@@ -2093,15 +2083,15 @@ int main() {
     - Never dereference end(), as it is outside of the container
   - To access value, use `*itr`
 
-161. std::vector
+### 161. std::vector
 - Not good for insertion/deletion
 
-162. std::deque
+### 162. std::deque
 - Reads as `dek`
 - Similar to vector but good at adding/removal from the beginning
 - Not good for insertion/deletion
 
-163. std::list & std::forward_list (C++11)
+### 163. std::list & std::forward_list (C++11)
 - std::list
   - Two way linked list
   - Good at insertion/deletion
@@ -2117,9 +2107,9 @@ forward_list<int> l2 = { 6, 11, 0 };
 int size2 = distance(l2.begin(), l2.end());
 ```
 
-164. Sequence Containers Demo code
+### 164. Sequence Containers Demo code
 
-165. std::set & std::multiset
+### 165. std::set & std::multiset
 - Implemented as a binary tree
 - Stored as sorted order (ascending or descending)
 - Value acts as a key
@@ -2138,13 +2128,13 @@ if (itr != s.end()) {
 - Cannot modify elements directly
 - Multiset allows copy
 
-166. std::map & std::multimap
+### 166. std::map & std::multimap
 - Implemented as a binary tree
 - key vs map
 - key cannot be modified directly
 - If the key doesn't exist, it will allocate with default value per type
 
-168. Unordered containers (C++11) - part I
+### 168. Unordered containers (C++11) - part I
 - Unordered containers
   - Associative containers implemented as hash tables
     - Hash table/hash map: data structure which maps keys to value through hash functions which compute an index
@@ -2154,12 +2144,12 @@ if (itr != s.end()) {
 - std::unordered_map: stores pairs
 - iterators are constant
 
-169. Unordered containers (C++11) - part II
+### 169. Unordered containers (C++11) - part II
 
-170. std::hash (C++11)
+### 170. std::hash (C++11)
 - For user-defined containers
 
-172. Big O notation & Performance of containers
+### 172. Big O notation & Performance of containers
 - Complexity
   - Amount of time taken by an algorithm to run for input size of *n*
   - Commonly Big-O notation is used
@@ -2178,7 +2168,7 @@ if (itr != s.end()) {
   - Use unordered containers if elements need not to be ordered
   - When sorting is required, use set/map
 
-173. Algorithms -Part I
+### 173. Algorithms -Part I
 - STL provides algorithms for common tasks
   - Sorting, removing, searching, numeric, ...
   - More optimized than handwriting
@@ -2186,7 +2176,7 @@ if (itr != s.end()) {
   - Some containers provide specialized versions of algorithms
   - Use <algorithm> header
 
-174. Algorithms -Part II
+### 174. Algorithms -Part II
 - Combine algorithm functions with lambda for more flexible programming
 ```cpp
 #include <iostream>
@@ -2235,28 +2225,28 @@ int main() {
 }
 ```
 
-175. Container Changes in C++11 - Part I
+### 175. Container Changes in C++11 - Part I
 - Brace list initialization
 - emplace_back()
   - variadic member function
   - creates an object (if it is a container of a Class) then push_back. Same as push_back() for primitive or an existing class object
 
-176. Container Changes in C++11 - Part II
+### 176. Container Changes in C++11 - Part II
 - emplace_back() will invoke copy construction for a class object
   - To enable move constructor, not copy constructor, the move operator in the class must be declared with `noexcept`
 
-177. Container Changes in C++11 - Part III
+### 177. Container Changes in C++11 - Part III
 - vector size() vs capacity()
   - capacity() is larger than size() usually
   - shrink_fit() will match capacity() with size()
 - std::string supports `.data()` like vector container  
  
-178. Container Changes in C++11 - Part IV
+### 178. Container Changes in C++11 - Part IV
 
-179. Container Changes in C++11 - Part V
+### 179. Container Changes in C++11 - Part V
 - emplace_hint() might be faster than emplace()
 
-180. STL Project
+### 180. STL Project
 - Contact info: First/last name, Primary phone number, secondary phone number, email id, address, company, group(friends, family, coworker, acquaintance)
 - Display all contacts sorted by first or last name (users may choose)
 - Display only first name with primary number
@@ -2318,25 +2308,25 @@ int main() {
 
 ## Section 15: C++ Concurrency
 
-182. Concurrency basics
+### 182. Concurrency basics
 - Can provide better user experience at GUI
 
-183. Thread creation
+### 183. Thread creation
 - callable: pointer, function, lambda function ...
 - std::thread
     - Accepts a callable as constructor argument
     - The callable is executed in a separated thread
     - The constructor does not wait for the thread to start
 
-185. Thread synchronization using std::mutex
+### 185. Thread synchronization using std::mutex
 - If mutex is not unlocked after locked, it will hang -> deadlock
 
-186. std::lock_guard
+### 186. std::lock_guard
 - Destructor is called when leaving the scope
 
-187. std::thread functions and std::this_thread namespace
+### 187. std::thread functions and std::this_thread namespace
 
-188. Task based concurrency - part 1
+### 188. Task based concurrency - part 1
 ```cpp
 #include <future>
 #include <iostream>
@@ -2358,7 +2348,7 @@ int main() {
 - .get() waits for the thread to close
 - If std::flush is not used, the print of `...` is buffered
 
-189. Task based concurrency - part 2
+### 189. Task based concurrency - part 2
 - std::async
     - High level concurrency    
     - Executes a callable object or a function in a separate thread
@@ -2383,7 +2373,7 @@ int main() {
     - The thread that reads the shared state will wait until the future is ready
     - The pair of promise/future allows safe data sharing b/w threads
 
-190. Launch policies
+### 190. Launch policies
 ```cpp
 #include <future>
 #include <iostream>
@@ -2408,11 +2398,11 @@ int main() {
 }
 ```
 
-191. std::future wait function
+### 191. std::future wait function
 - result.wait_for(4s): returns std::future_status::deferred or std::future_status::ready or std::future_status::timeout
 - result.wait_until(timepoint): 
 
-192. std::promise
+### 192. std::promise
 - Provides a way to store a value or an exception
 - this is called the shared state
 - This state can be accessed later from another thread through a future object
@@ -2452,15 +2442,15 @@ int main() {
 - Note that the promise (inp) was sent even before it was assigned
     - .set_value() was applied to setup the value later
 
-193. Propagating exception
+### 193. Propagating exception
 - Instead of inp.set_value(), use inp.set_exception
     - `data.set_exception(std::make_exception_ptr(ex))` for `std::exception &ex`
 
 ## Section 16: C++17 Core Language Features
 
-195. Deprecated and removed features
+### 195. Deprecated and removed features
 
-196. Changes
+### 196. Changes
 - Direct list initialization
   - Will deduce the type for one element
   - Not working for multiple elements
@@ -2469,20 +2459,20 @@ auto a{1}; //OK
 auto b {1,2}; // ill-formed
 ```
 
-197. Attributes
+### 197. Attributes
 - `[[deprecated("...")]]` :  text that could be used to explain the rationale for deprecation and/or to suggest a replacing entity 
   - Ref: https://en.cppreference.com/w/cpp/language/attributes/deprecated
 - `[[nodiscard]]` :  text that could be used to explain the rationale for why the result should not be discarded 
   - Return value must be stored
   - Ref: https://en.cppreference.com/w/cpp/language/attributes/nodiscard
 
-198. Feature test macros
+### 198. Feature test macros
 - `__has_include` (C++17)
   - Can check if a header is available for inclusion or not
   - Can track the progress of partial implementation of new C++ standards
   - Can be used with `#if` & `#elif` expressions only
 
-199. if & switch with initialization
+### 199. if & switch with initialization
 - Enhanced if
   - `if (initialization ; condition) { ... }`
 - Regular if:
@@ -2515,15 +2505,15 @@ auto b {1,2}; // ill-formed
 ```
 - `switch` also can use similar initialization
 
-200. inline variables
+### 200. inline variables
 - Global name must be defined ONCE
   - Or use `extern` keyword in the header file and the header file can be included in many source files
   - `inline` (C++17) variable works similarly
 - static member data can be initialized using `inline` inside of the class
 
-201. Nested namespace
+### 201. Nested namespace
 
-202. noexcept
+### 202. noexcept
 - noexcept function pointer must point to another noexcept
 - Regular function pointer can point a regular or noexcept
 ```cpp
@@ -2542,12 +2532,12 @@ int main() {
 }
 ```
 
-203. constexpr Lambda
+### 203. constexpr Lambda
 - Lambda functions might be used to return member data of a class
 - When class object is deleted, the return value from Lambda would be null as the object is gone
 - In order to avoid such case, use `[*this]` instead of ``[this]`, having copy of class data, when class object is generated on heap (using a pointer)
 
-204. Structured Bindings
+### 204. Structured Bindings
 - Allows initialization of multiple variables with the elements or members of an object
 - The object could be object of a class/struct or an array
 - For objects of classes, the member should be **public**
@@ -2596,7 +2586,7 @@ int main() {
 }
 ```
 
-205. Expression Evaluation Order
+### 205. Expression Evaluation Order
 - Some C macro
   - Ref: https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros?view=msvc-170
   - `__func__` : the name of the enclosing function
@@ -2635,15 +2625,15 @@ __LINE__:7
 __STDC__:1
 ```
 
-206. Mandatory Copy Elision - part I
+### 206. Mandatory Copy Elision - part I
 - https://stackoverflow.com/questions/12953127/what-are-copy-elision-and-return-value-optimization
 - Optimization technique to reduce the number of object creation
 
-207. Mandatory Copy Elision - part II
+### 207. Mandatory Copy Elision - part II
 
 ## Section 17: C++17 Template Features
 
-208. Class Template Argument Deduction (CTAD)
+### 208. Class Template Argument Deduction (CTAD)
 - Allows argument deduction for functions/classes
 - Compiler generated 
   - Ex) `std::pair p3 {2,5};` integer type is deduced by the compiler
@@ -2658,13 +2648,13 @@ Data(const char *) -> Data<std::string>; // this is user-defined CTAD
 ```
 - Gives a hint to compiler when `const char *` argument is loaded, `std::string` type will be used
 
-209. Folding Basics
+### 209. Folding Basics
 - Applies a binary operator to a list of values recursively
   - Results are combined recursively, building up the final result
   - Variadic template may do similar processes over a template pack
     - But folding overloads with recursion
 
-210. Fold Expressions - Unary folds
+### 210. Fold Expressions - Unary folds
 - Unary right fold: (pack op ...)
 - Unary left fold: (... op pack)
 - Binary right fold: (pack op ... op init)
@@ -2691,7 +2681,7 @@ int main() {
 ```
 - As there is no initial value in unary folding, empty argument will generate compiler error: `Sum_UR()` will not compile
 
-211. Fold Expressions - Binary folds
+### 211. Fold Expressions - Binary folds
 ```cpp
 //Binary right fold
 template<typename...Args>
@@ -2721,12 +2711,12 @@ int main() {
 }
 ```
 
-212. Fold Expressions - Recap
+### 212. Fold Expressions - Recap
 - Variadic template will generate assembly functions for every recursion but folding will generate only one function
 
-213. Type Traits Suffixes
+### 213. Type Traits Suffixes
 
-214. if constexpr - part I
+### 214. if constexpr - part I
 - Compile-Time if
   - Allows the condition of an if statement to be evaluated at compile time
   - Also discards branches of an if statement at compile time
@@ -2787,18 +2777,18 @@ int main() {
 }
 ```
 
-215. if constexpr - part II
+### 215. if constexpr - part II
 
 ## Seciton 18: C++17 Standard Library Components
 
-216. std::optional - part I
+### 216. std::optional - part I
 - Why we need this: https://devblogs.microsoft.com/cppblog/stdoptional-how-when-and-why/
 
-217. std::optional - part II
+### 217. std::optional - part II
 
-218. std::optional - part III
+### 218. std::optional - part III
 
-219. std::variant - part I
+### 219. std::variant - part I
 - A type safe replacement for union type
 - Uses the storage of the largest member
 - Members are destroyed outside of scope
@@ -2821,11 +2811,11 @@ int main() {
 }
 ```
 
-220. std::variant - part II
+### 220. std::variant - part II
 
-221. std::variant - part III
+### 221. std::variant - part III
 
-222. std::any
+### 222. std::any
 - Type safety
   - C++ is a strongly typed language
   - Objects are declared with a specific type and that cannot be changed later
@@ -2868,7 +2858,8 @@ int main() {
   return 0;
 }
 ```
-223. std::string_view - part I
+
+### 223. std::string_view - part I
 - Read-only 
 - Can be accessed through .data()
 - Will not work with C string functions as it might not have a null terminator
@@ -2876,9 +2867,9 @@ int main() {
 - Do not assign temporary strings to string views
 - Avoid as class members
 
-224. std::string_view - part II
+### 224. std::string_view - part II
 
-225. Filesystem - path
+### 225. Filesystem - path
 ```cpp
 #include <iostream>
 #include <filesystem>
@@ -2916,7 +2907,7 @@ void UsingPath() {
 }
 ```
 
-226. Filesystem - directory_entry
+### 226. Filesystem - directory_entry
 ```cpp
 void TraversingDirectory(std::string_view file) {
 	fs::path currentPath{file} ;
@@ -2940,10 +2931,10 @@ void TraversingDirectory(std::string_view file) {
 }
 ```
 
-227. Filesystem - directory functions
+### 227. Filesystem - directory functions
 - `create_directory()` returns true/false by the status 
 
-228. Filesystem - Permissions
+### 228. Filesystem - Permissions
 ```cpp
 void demo_perms(fs::perms p)
 {
@@ -2972,7 +2963,7 @@ void Permissions(std::string_view file) {
 	demo_perms(perm) ;
 ```
 
-229. Parallel Algorithms - part I
+### 229. Parallel Algorithms - part I
 - C++17 provides overloads to STL algorithms with parallel execution
   - Using execution policy
 - Execution policies
@@ -2984,9 +2975,9 @@ void Permissions(std::string_view file) {
   - parallel_unsequenced_policy - par_unseq 
     - Execution may be parallellized, vectorized or migrated across threads    
 
-230. Parallel Algorithms - part II
+### 230. Parallel Algorithms - part II
 
-231. Parallel Algorithms - part III
+### 231. Parallel Algorithms - part III
 - Exception handling
   - If an element access function throws an exception which is not handled, all parallel algorithms call std::terminate
     - In the sequential execution as well
