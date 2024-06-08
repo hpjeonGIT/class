@@ -3,9 +3,9 @@
 
 ## Section 1: Basic Perl: Getting Started
 
-1. Installing Perl and Some Great Free Editors
+### 1. Installing Perl and Some Great Free Editors
 
-2. Hello World
+### 2. Hello World
 ```pl
 use strict;
 use warnings;
@@ -17,7 +17,7 @@ main()
 ```
 - To run, `perl test.pl`
 
-3. Downloading Text and Images - Updated
+### 3. Downloading Text and Images - Updated
 - https://github.com/caveofprogramming/learn-perl
 - learn-perl/Tutorial3
 - download_html.pl:
@@ -74,9 +74,9 @@ print("\nCompleted")
 ```
 
 
-4. Downloading Text and Images with Perl (Old version)
+### 4. Downloading Text and Images with Perl (Old version)
 
-5. Arrays and Checking Whether Files exist
+### 5. Arrays and Checking Whether Files exist
 - Single quote '': as literal
 - Double quote"": when special characters are used
 - `-f` check if file exists or not
@@ -106,7 +106,7 @@ sub main {
 main();
 ```
 
-6. Reading Files and Beginning Regular Expressions
+### 6. Reading Files and Beginning Regular Expressions
 - `die;` let the program die
   - `die "some text";` prints the message
 - `<INPUT>`: reads one line from INPUT
@@ -129,7 +129,7 @@ sub main {
 main();
 ```
 
-7. Writing Files and Replacing Text
+### 7. Writing Files and Replacing Text
 - `my $output = 'output.txt';` yields an error. Use `my $output = '>output.txt';` or use concatenation in open()
   - `open(OUTPUT,'>'.$output)`: overwrites when writes
   - `open(OUTPUT,'>>'.$output)`: appends when writes
@@ -153,10 +153,10 @@ sub main {
 main();
 ```
 
-8. Wildcards in Regular Expressions
+### 8. Wildcards in Regular Expressions
 - `/ h.s /` will look for has, his, hss, hxs, ... surrounded with a space
 
-9. Groups: Finding Out What You Actually Matched
+### 9. Groups: Finding Out What You Actually Matched
 - Grouping using `()`
 - Each group can be called as `$1`, `$2`, ...
 ```pl
@@ -177,7 +177,7 @@ sub main {
 main();
 ```
 
-10. Quantifiers: Greedy vs. Non-Greedy
+### 10. Quantifiers: Greedy vs. Non-Greedy
 - '+': greedy quantifier. `l+` means l or ll or lll ...
 - '+?': non-greedy quantifier. As few as possible
 - '*': greedy quantifier
@@ -187,7 +187,7 @@ main();
   - `/(.l.*?o)/` will capture 'ello' from 'hello world'
   - Will try to capture as few as possible
 
-11. Escape Sequences
+### 11. Escape Sequences
 - `\d`: digit
 - `\s`: space
 - `\S`: non-space character
@@ -206,7 +206,7 @@ sub main {
 main();
 ```
 
-12. Numeric Quantifiers
+### 12. Numeric Quantifiers
 - `\d{5}`: \d for 5 times
 - `\d{3,6}`: \d for min 3 and max 6 times
 - `\d{3,}`: \d for min 3 times or more
@@ -224,7 +224,7 @@ sub main {
 main();
 ```
 
-13. Test your Perl and Regex Knowledge - First Test
+### 13. Test your Perl and Regex Knowledge - First Test
 ```pl
 use strict;
 use warnings;
@@ -250,7 +250,7 @@ main();
 
 ## Section 2: More on Reading Files Line by Line: Tips, Tricks and Vital Knowledge
 
-14. Split and Reading CSV Files
+### 14. Split and Reading CSV Files
 - `while(<INPUT>) {...}`: Reads file handler into `$_`
   - Better practice: Use `while (my $line = <INPUT>) {...}` then every line is captured at `$line`
 ```pl
@@ -271,7 +271,7 @@ sub main {
 main();
 ```
 
-15. Join and Viewing Data Using Data::Dumper
+### 15. Join and Viewing Data Using Data::Dumper
 - `print join '|', @arrays; ` will print the join of array values
 ```pl
 use strict;
@@ -315,11 +315,11 @@ $VAR3 = '10072033
 ```
 - $VAR3 yields '\n'. See next section to remove it
 
-16. Chomp and Removing Spaces in Splits
+### 16. Chomp and Removing Spaces in Splits
 - Q: chomp is not working as shown by the instructor
 - `my @values = split /\s*,\s*/, $line;` : can use REGEX to split 
 
-17. "Pushing" Onto Arrays
+### 17. "Pushing" Onto Arrays
 - `push @arrays, @var;` will push value var to arrays in the end
 ```pl
 use strict;
@@ -338,7 +338,7 @@ sub main {
 main();
 ```
 
-18. Arrays of Arrays
+### 18. Arrays of Arrays
 - When use `push`, use `\` for appending array
 ```pl
 use strict;
@@ -403,7 +403,7 @@ sub main {
 main();
 ```
 
-19. Hashes: Lookup Tables in Perl
+### 19. Hashes: Lookup Tables in Perl
 - Symbols in Perl
   - Ref: https://www.cs.unc.edu/~jbs/resources/perl/perl-basics.html
   - `$name`: scalar variable
@@ -434,7 +434,7 @@ sub main {
 main();
 ```
 
-20. Iterating Over hashes
+### 20. Iterating Over hashes
 - While loop is shown above
 ```pl
 use strict;
@@ -455,7 +455,7 @@ sub main {
 main();
 ```                           
 
-21. Arrays of Hashes
+### 21. Arrays of Hashes
 - Use push
   - Will flatten as default
   - Use `\` to have the shape of keys/values (dereferencing)
@@ -495,7 +495,7 @@ $VAR1 = {
         };
 ```
 
-22. Storing CSV Data in a Data Structure
+### 22. Storing CSV Data in a Data Structure
 ```pl
 use strict;
 use warnings;
@@ -527,7 +527,7 @@ sub main {
 main();
 ```
 
-23. Validating CSV Data
+### 23. Validating CSV Data
 - How to skip empty line:
 ```pl
 while(my $line = <INPUT>) {
@@ -540,7 +540,7 @@ my @val = split ',', $line;
 if (scalar(@val) < 3) { ... }
 ```    
 
-24. Cleaning CSV Data
+### 24. Cleaning CSV Data
 - How to remove redundant spaces
 - Ref: https://www.geeksforgeeks.org/perl-removing-leading-and-trailing-white-spaces-trim/
 - Left Trim (`~ s/^\s+//`): Removes extra spaces from leftmost side of the string till the actual text starts. From the leftmost side the string takes 1 or more white spaces (\s+) and replaces it with nothing.
@@ -548,7 +548,7 @@ if (scalar(@val) < 3) { ... }
 - Trim (`~ s/^\s+|\s+$//`): It removes extra space from both sides of the string.
 - `$line =~ s/\?|\!//g;`: replace all ? or ! symbol with ''
 
-25. Test your Perl and Regex Knowledge - Second Test
+### 25. Test your Perl and Regex Knowledge - Second Test
 - Reading following csv file:
 ```bash
 Name,Payment,Date
@@ -605,7 +605,7 @@ main();
 
 ## Section 3: Web Scraping and More Regular Expressions
 
-26. Basic Web Scraping
+### 26. Basic Web Scraping
 - For web-scraping, it is better to use `Web::Scraper;`
 - `defined()` will check if the argument has some content or not
 - In REGEX, 
@@ -632,7 +632,7 @@ sub main{
 main();
 ```
 
-27. Character Classes
+### 27. Character Classes
 - Matching a single or more characters using []
 ```pl
 use strict;
@@ -655,7 +655,7 @@ main();
 - [A-Za-z_0-9] -- specify alternatives just by listing them; can include ranges.
 - [^0-9T\s] ^ Match anything EXCEPT the specified characters.
 
-28. Matching Repeatedly
+### 28. Matching Repeatedly
 - Using `g` in REGEX
 ```pl
 use strict;
@@ -689,7 +689,7 @@ m| # Use a pipe character as the quote, since we don't need to use it inside the
 main();
 ```
 
-29. Collecting Repeated Matches All At Once
+### 29. Collecting Repeated Matches All At Once
 - Finding class from the webpage
 ```pl
 use strict;
@@ -717,7 +717,7 @@ main();
 
 ## Section 4: Building a Complete Program: Command Line Options
 
-30. Getting Command Line Options
+### 30. Getting Command Line Options
 - How to get argument using options
 ```pl
 use strict;
@@ -736,7 +736,7 @@ main();
 ```
 - Using `print $ARGV[0]."\n";` might be better (?)
 
-31. Subroutines and Returning Values
+### 31. Subroutines and Returning Values
 - No return type in subroutines of perl
   - true/false not allowed. Return 0 for false and 1 for true
 - `return` may not be necessary. The last line will be returned
@@ -760,7 +760,7 @@ sub usage {
 main();
 ```
 
-32. Multi-Line Strings and Commands
+### 32. Multi-Line Strings and Commands
 ```pl
 use strict;
 use warnings;
@@ -796,7 +796,7 @@ JEONB
 }
 ```
 
-33. Passing Arguments to Subroutines
+### 33. Passing Arguments to Subroutines
 - Regardless of type and number of arguments, they can be transferred using `@_`
 ```pl
 use strict;
@@ -817,7 +817,7 @@ main();
   my $count = shift;
 ```
 
-34. References to Hashes
+### 34. References to Hashes
 - How to pass Hashes as function arguments
 - Sending a hash with dereferencing
 ```pl
@@ -841,7 +841,7 @@ sub usage() {
 main();
 ```
 
-35. Checking Values in Hashes
+### 35. Checking Values in Hashes
 - Multiline comments in perl
 ```pl
 =pod
@@ -907,7 +907,7 @@ main();
 
 ## Section 5: Parsing XML and Complex Data Structures
 
-36. Finding All Files in a Directory and Filtering Arrays
+### 36. Finding All Files in a Directory and Filtering Arrays
 - For a directory, use opendir(), readdir(), closedir()
 ```pl
 use strict;
@@ -931,7 +931,7 @@ sub main() {
 main();
 ```
 
-37. Processing Files One By One
+### 37. Processing Files One By One
 - Note that we use `@$files` in foreach loop
 ```pl
 use strict;
@@ -962,11 +962,11 @@ sub main() {
 }
 ```
 
-38. Parsing XML with Regular Expressions
+### 38. Parsing XML with Regular Expressions
 - Instead of line separating using new line ("\n"), separate parsed texts using `</entry>`
   - `$/ = "</entry>";` will configure the parsing separator globally
 
-39. Using XML::Simple, and Extracting Data from Complex Structures
+### 39. Using XML::Simple, and Extracting Data from Complex Structures
 - `undef $/;` disable separator when read file. The entire text will be read
   -  Default would be `$/ = \n;`
 ```pl
@@ -980,7 +980,7 @@ sub main() {
 	print Dumper($dom);
 ```
 
-40. Extracting Data from Complex Structures: A Complete Example
+### 40. Extracting Data from Complex Structures: A Complete Example
 - Use `ForceArray=>1` as an extra argument
 ```pl
 sub process_file {
@@ -1009,15 +1009,15 @@ sub process_file {
 }
 ```
 
-41. Building Complex Data Structures
+### 41. Building Complex Data Structures
 
 ## Section 6: Working with Databases
 
-42. Free Databaes to Use with Perl
+### 42. Free Databaes to Use with Perl
 
-43. Creating Databases with MySQL
+### 43. Creating Databases with MySQL
 
-44. Connecting to a Database
+### 44. Connecting to a Database
 ```pl
 use strict;
 use warnings;
@@ -1033,7 +1033,7 @@ sub main {
 }
 ```
 
-45. Inserting Data into a Database
+### 45. Inserting Data into a Database
 ```pl
 sub add_to_database {
 	my $data = shift;	
@@ -1059,7 +1059,7 @@ sub add_to_database {
 }
 ```
 
-46. Deleting Data and Executing Dataless SQL  Commands
+### 46. Deleting Data and Executing Dataless SQL  Commands
 ```pl
 sub add_to_database {
 	my $data = shift;	
@@ -1087,7 +1087,7 @@ sub add_to_database {
 }
 ```
 
-47. Getting the IDs of Records You've just Inserted
+### 47. Getting the IDs of Records You've just Inserted
 ```pl
 sub add_to_database {
 	my $data = shift;	
@@ -1130,7 +1130,7 @@ sub add_to_database {
 }
 ```
 
-48. Querying Databases
+### 48. Querying Databases
 ```pl
 sub export_from_database {
 	my $dbh = shift;
@@ -1157,23 +1157,23 @@ sub export_from_database {
 }
 ```
 
-49. Exporting Data
+### 49. Exporting Data
 - Export to CSV. Just print to OUTPUT, which would be opened in the earlier stage
 
 ## Section 7: Perl One-Liners
 
-50. Running One-Line Perl Programs
+### 50. Running One-Line Perl Programs
 - `perl -e 'print "Hello world\n"'`
 
-51. Replacing Text in Files
+### 51. Replacing Text in Files
 - `perl -pe 's/OLD/NEW/gi' sample.txt`
 
-52. Editing Files in Place
+### 52. Editing Files in Place
 - `perl -i.orig -pe 's/OLD/NEW/gi' sample.txt`
 
 ## Section 8: Modules and OO Perl
 
-53. Modules
+### 53. Modules
 - File extension: *.pm
 - Speak.pm 
 ```pl
@@ -1202,7 +1202,7 @@ use Exporter qw(subname2);
 @EXPORT_OK = qw(subname1 subname2);
 ```
 
-54. Package and Directories
+### 54. Package and Directories
 - Comm/Speak.pm 
 ```pl
 package Comm::Speak;
@@ -1223,9 +1223,9 @@ main();
 - Run as `perl -I . ch54.pl`
 - Or inject `use lib '/..../';` into the ch54.pl, pointing the location of Comm/Speak.pm
 
-55. Object Orientation: A Brief Introduction
+### 55. Object Orientation: A Brief Introduction
 
-56. Implementing OO in Perl
+### 56. Implementing OO in Perl
 - Data/Person.pm
 ```pl
 package Data::Person;
@@ -1262,9 +1262,9 @@ main();
 
 ## Section 9: Web Application Basics
 
-57. Installing the Apache HTTP server
+### 57. Installing the Apache HTTP server
 
-58. A Hello World Web App
+### 58. A Hello World Web App
 - test.cgi:
 ```pl
 #!/opt/local/bin/perl
@@ -1277,9 +1277,9 @@ sub main {
 main();
 ```
 
-59. The CGI.pm Module
+### 59. The CGI.pm Module
 
-60. Using URL Parameters
+### 60. Using URL Parameters
 ```pl
 #!/opt/local/bin/perl
 use strict;
@@ -1300,7 +1300,7 @@ HTML
 main();
 ```
 
-61. Website Forms
+### 61. Website Forms
 ```pl
 #!/opt/local/bin/perl
 use strict;
@@ -1328,7 +1328,7 @@ main();
 
 ## Section 10: Basic Sysadmin Tasks
 
-62. Moving, Copying, and Deletig Files
+### 62. Moving, Copying, and Deletig Files
 ```pl
 use strict;
 use warnings;
@@ -1347,7 +1347,7 @@ sub main {
 main();
 ```
 
-63. Executing System Commands
+### 63. Executing System Commands
 ```pl
 use strict;
 use warnings;
@@ -1362,23 +1362,23 @@ main();
 
 ## Section 11: Conclusion
 
-64. Where to Find Documentation and More Modules
+### 64. Where to Find Documentation and More Modules
 - https://www.cpan.org/
 - https://perldoc.perl.org/
 
 ## Section 12: Appendix 1: Example Data
 
-65. XML Files
+### 65. XML Files
 
 ## Section 13: Appendix 2: Alternate Systems
 
-66. Running Perl in Unix, Linux, Mac and Cygwin
+### 66. Running Perl in Unix, Linux, Mac and Cygwin
 
 ## Section 14: Extras
 
-67. Arrays and Hashes Review
+### 67. Arrays and Hashes Review
 
-58. References to Hashes and Arrays Review
+### 68. References to Hashes and Arrays Review
 ```pl
 use strict;
 use warnings;
