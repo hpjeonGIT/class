@@ -3,9 +3,9 @@
 
 ## Section 1: Introduction to Linux
 
-1. Course Contents
+### 1. Course Contents
 
-2. Introduction to Linux system Programming and Kernel
+### 2. Introduction to Linux system Programming and Kernel
 - Linux Kernel functions
   - File operation
   - Memory management
@@ -14,26 +14,26 @@
   - Thread management
   - Interprocess communications
 
-3. Outcome of this course
+### 3. Outcome of this course
 
 ## Section 2: System Programming Concepts
 
-4. User mode and kernel mode
+### 4. User mode and kernel mode
 - Or user space vs kernel space
 - user mode cannot access h/w
 - Kernel mode can access h/w through privileged mode
 
-5. Library functions
+### 5. Library functions
 - Application SW <-> C stnadard library <-> System calls <-> H/W
 
-6. Part A: System calls
+### 6. Part A: System calls
 - An interface that allows user application code to enter Kernel mode
 - Can be invoked through
   - Direct system call: open(), close(), read(), write()
   - Use code calls the library function which calls system calls: printf()
 - Instead of `printf("hello\n");`, `write(1, buf, msg);` will do the same work
 
-7. Part B: System Calls
+### 7. Part B: System Calls
 - write() in user code -> wrapper for write() from glibc
 - Kernel model gets system call number for write()
 - Trap handler is triggered and calls sys_write()
@@ -42,7 +42,7 @@
 
 ## Section 3: File Operations
 
-8. Preliminary concepts of File
+### 8. Preliminary concepts of File
 - File permission
   - Read has 4 units
   - Write has 2 units
@@ -63,7 +63,7 @@ drwxr-xr-x 42 hpjeon hpjeon 4096 Jul 15 20:17 ..
 -rw-rw-r--  1 hpjeon hpjeon 2160 Jul 16 16:08 Readme.md
 ```
 
-9. File open() - opening a file
+### 9. File open() - opening a file
 - system calls involved in file operations
   - Open()
   - Read()
@@ -100,7 +100,7 @@ drwxr-xr-x 42 hpjeon hpjeon 4096 Jul 15 20:17 ..
   - `fd = open("newFile.log", O_RDWR | O_CREAT, 0774);`
   - `fd = open("newFile.log", O_RDWR | O_CREAT, S_IRWXU|S_IRWXG|S_IROTH);`
 
-10. File read() - Reading a file
+### 10. File read() - Reading a file
 - `ssize_t read(int fd, void * buffer, size_t count);`
   - `buffer` must be allocaed beforehand
 - read() systemcalls are applied on files like regular files, PIPES, sockets, FIFO
@@ -136,13 +136,13 @@ int main()
 ```
 - In `sz = read(fd, buf, 10);`, sz could be smaller than 10 when the entire contents are almost read
   
-11. File write() - writing to a file
+### 11. File write() - writing to a file
 - `ssize_t write(int fd, void* buffer, size_t count);`
 - O_TRUNC: overwrites
 - O_APPEND: appends
 - `int fd = open("output.txt", O_WRONLY  | O_TRUNC  );`
 
-12. File lseek() and close() system call
+### 12. File lseek() and close() system call
 - lseek() is a system call that changes the location of read/write pointer of a file descriptor. The location can be set either in absolute or relative terms
 - `off_t lseek(int fd, off_t offset, int whence);`
 - Whence
@@ -151,22 +151,22 @@ int main()
   - SEEK_END: offset is set to the size of file plus offset bytes
 - Return value: returns the offset of the pointer from the beginning of the file. -1 when there is an error moving the pointer
 
-13. Tips
+### 13. Tips
 
 ## Section 4: Advanced IO
 
-14. Race condition
+### 14. Race condition
 
-15. Atomicity
+### 15. Atomicity
 
-16. Pre-Emptive and Non Pre-emptive concept
+### 16. Pre-Emptive and Non Pre-emptive concept
 - Ref: https://www.geeksforgeeks.org/preemptive-and-non-preemptive-scheduling/
 - Preemptive scheduling is used when a process switches from running state to ready state or from the waiting state to ready state. The resources (mainly CPU cycles) are allocated to the process for a limited amount of time and then taken away, and the process is again placed back in the ready queue if that process still has CPU burst time remaining. That process stays in the ready queue till it gets its next chance to execute. 
   - ref: https://www.geeksforgeeks.org/time-slicing-in-cpu-scheduling/
   - time slice (or quantum): time frame for which process is allotted to run
 - Non-preemptive Scheduling is used when a process terminates, or a process switches from running to the waiting state. In this scheduling, once the resources (CPU cycles) are allocated to a process, the process holds the CPU till it gets terminated or reaches a waiting state. In the case of non-preemptive scheduling does not interrupt a process running CPU in the middle of the execution. Instead, it waits till the process completes its CPU burst time, and then it can allocate the CPU to another process. 
 
-17. Part A: File descriptor table and open file table
+### 17. Part A: File descriptor table and open file table
 - File descriptor table, file table, and Inode table
 - Each process will have its own **file descriptor table**
   - It holds all open file of that process
@@ -199,23 +199,23 @@ Change: 2022-07-16 17:19:04.793291770 -0400
  Birth: -
 ```
 
-18. Part B: File descriptor table and oepn file table
+### 18. Part B: File descriptor table and open file table
 - File descriptor table (per processor) <-> Open file table (system wide) <-> i-Node table (system wide)
 
-19. Duplicating File descriptor - dup() system call
+### 19. Duplicating File descriptor - dup() system call
 - `int dup(int oldfd);`
 - `int dup2(int oldfd, int newfd);`
 - Q: why we need this?
   - Can redirect to screen or from screen to file
 
-20. Use Case Scenario
+### 20. Use Case Scenario
 
 ## Section 5: Introduction to Process
 
-21. Introduction to Process
+### 21. Introduction to Process
 - A process is an instance of an executing program
 
-22. Process ID and parent process ID
+### 22. Process ID and parent process ID
 - In Linux startup sequence
   - Process 0 is swapper process
   - Process 1 is `init` process, creating and monitoring set of other processes
@@ -232,7 +232,7 @@ hpjeon   23715  8285  0 16:38 pts/0    00:00:03 gedit
 ```
   - PID is 23715 and parent PID is 8285
 
-23. Process States
+### 23. Process States
 - A process is CREATED state using fork() system call
 - Running state: running in main memory
 - Ready to Run in Main/swap memory
@@ -240,7 +240,7 @@ hpjeon   23715  8285  0 16:38 pts/0    00:00:03 gedit
 - Blocked state in Main/swap memory
 - Terminated state
 
-24. Process Memory Layout - Part A
+### 24. Process Memory Layout - Part A
 - Text segment: code resides
 - Data segment: data variables during compile time
   - Initialized data segment
@@ -248,15 +248,15 @@ hpjeon   23715  8285  0 16:38 pts/0    00:00:03 gedit
 - Stack segment: local variables
 - Heap segment: dynamic memory data
 
-25. Process Memory Layout - Part B
+### 25. Process Memory Layout - Part B
 
-26. Tips
+### 26. Tips
 
 ## Seciton 6: Virtual Memory of Process
 
-27. The Big Picture
+### 27. The Big Picture
 
-28. Virtual Memory Management and Page Table
+### 28. Virtual Memory Management and Page Table
 - Each process has a private user space memory, which other process cannot access directly
 - Each process has separate memory segments
   - Text segment
@@ -278,7 +278,7 @@ hpjeon   23715  8285  0 16:38 pts/0    00:00:03 gedit
 - Page fault
   - Whe a process tries to access a page that is not currently present in physical memory (and the page table). Kernel will suspend the process while the page is loaded from swap memroy into main memory
 
-29. Command Line Arguments of Process
+### 29. Command Line Arguments of Process
 ```c
 #include <stdio.h>
 #include <string.h>
@@ -293,7 +293,7 @@ void main(int argc, char *argv[]){
 }
 ```
 
-30. Environment of Process
+### 30. Environment of Process
 - name-value pairs of list
 ```c
 #include <stdio.h>
@@ -332,11 +332,11 @@ int main () {
 ```
 - putenv() to configure an environmental variable
 
-31. Summary
+### 31. Summary
 
 ## Section 7: Memory Allocation
 
-32. Memory allocation - part A
+### 32. Memory allocation - part A
 - malloc(): library function call
 - calloc(): library function call
 - realloc(): library function call
@@ -352,17 +352,17 @@ int main () {
 - brk()/sbrk()
   - Sets Program break to new memory location (brk) or increment as given (sbrk)
 
-33. Memory allocation - part B
+### 33. Memory allocation - part B
 - free(): explicitly releases the memory occupied
   - Does NOT lower the program break
 
-34. Memory allocation example programs
+### 34. Memory allocation example programs
 
-35. Summary
+### 35. Summary
 
 ## Section 8: Process Programming
 
-36. Process creation - fork() and Example program
+### 36. Process creation - fork() and Example program
 - Process creation
   - Creating new process: fork()
   - Dividing tasks up often makes application design simpler
@@ -406,7 +406,7 @@ int main()
 
 ## Section 9: Process Monitor
 
-37. wait(), waitpid() and Process termination
+### 37. wait(), waitpid() and Process termination
 - wait(): system call. Syncs parent and child process and gets the exit status of child process
   - Each process has an entry in process table
   - When a process ends, all of the memory is deallocated. The parent can read the child's exit status by executing the wait system call
@@ -452,7 +452,7 @@ int main()
   - `ret_pid = waitpid(cpid, &status, WNOHANG);` : non-blocking
 - exit(): system call. Terminates the process
 
-38. Orphan, Zombie, and sleeping Process
+### 38. Orphan, Zombie, and sleeping Process
 - If a parent process exits or returns while a child processor, orphaned process is made
 ```c
 #include <stdio.h> 
@@ -490,7 +490,7 @@ int main()
 
 ## Section 10: Advanced Process Programming
 
-39. Exeucting new program - exec()
+### 39. Exeucting new program - exec()
 - execve() - system call which loads a new program into a process's memory
   - Replaces old program's stack, data, heap with new program
   - Returns -1 on error while nothing returned on success
@@ -502,13 +502,13 @@ int main()
   - execvp()
   - execvpe()
 
-40. Examples of exec functions
+### 40. Examples of exec functions
 - execl(): runs an external executable within a C code
   - Like subprocess of python
   - But replaces the parent code
   - The left-over of the parent code will not be executed
 
-41. Example of execv()
+### 41. Example of execv()
 - execv()
 ```c
 char *args[]={"arg1","arg2","arg3",NULL};
@@ -516,15 +516,15 @@ re = execv("./p2",args);
 ```
   - When successful, nothing is returned. The left-over of the source code is ignored
 
-42. Example of execve()
+### 42. Example of execve()
 
-43. Exec() and Fork()
+### 43. Exec() and Fork()
 - When a child process runs execl()
   - The virtual memory of the child process is replaced with the given executable
   - The left-over of the code in child process is not loaded
   - Parent process will get the status of child process through wait()
 
-44. Process Table and file descriptor b/w Parent and Child
+### 44. Process Table and file descriptor b/w Parent and Child
 - When a fork() is run, the child receives the duplicates of all of parent's file descriptors
 - Both of parent/child process will have the same file descriptors 
   - Potential race condition?
@@ -541,7 +541,7 @@ re = execv("./p2",args);
 
 ## Section 11: Signals
 
-45. Signals in Linux
+### 45. Signals in Linux
 - SW interrupts that provide a mechanism for handling asynchronous events
 - Originates from outside of the system - ctrl+c, ...
 - Different signals with unique numbers
@@ -574,7 +574,7 @@ re = execv("./p2",args);
   - SIGSEGV: Segmentation violation. Sent to a process when it attempts an invalid memory access
   - SIGUSR1/2: For user-defined purposes. Kernel never raises them
 
-46. Programming with Signals - Part A
+### 46. Programming with Signals - Part A
 - signal() function defines or configures signum behavior. Raising or triggering is handled by kernel, not application code
 ```
 #include <signal.h>
@@ -590,7 +590,7 @@ sighandler_t signal(int signum, sighandler_t handler);
   - Just the default signum is TERM
   - `int kill(pid_t pid, int signum);`
 
-47. Programming with Signals - Part B
+### 47. Programming with Signals - Part B
 ```c
 #include <stdlib.h>
 #include <stdio.h>
@@ -643,7 +643,7 @@ int main(void) {
 ```
 - First alarm() will trigger display_message(), which configures SIGARM as default behavior. Therefore, 2nd alarm() will default alarm and terminates
 
-48. Programming using SIGUSR signals
+### 48. Programming using SIGUSR signals
 - parent code
 ```c
 #include<stdio.h> 
@@ -720,11 +720,11 @@ int main(int argc, char *argv[])
 
 ## Section 12: Threads
 
-49. The Big Picture
+### 49. The Big Picture
 - Threads can share the virtual memory (stack, heap, data, code segment) with a process
   - Each thread may have its own stack segment
 
-50. Thread creation and termination
+### 50. Thread creation and termination
 ```c
 #include <pthread.h>
 #include <stdio.h>
@@ -753,23 +753,23 @@ int main(int argc, char *argv[])
 }
 ```
 
-51. Pthread join
+### 51. Pthread join
 - `int pthread_join(pthread_t thread, void** retval);`
 
-52. pthread_cancel() and detaching a thread
+### 52. pthread_cancel() and detaching a thread
 - By default, a thread is joinable. When it terminates, another thread can obtain its return value using pthread_join()
 - If a joinable thread is not joined by calling pthread_join(), the terminated thread becomes a zombie thread, consuming memory resource
 - pthread_detach() cleans up terminated thread, without pthread_join()
 - `int pthread_detach(pthread_t, thread);`
 - 0 returned on sucess while positive error number or error
 
-53. Example programs
+### 53. Example programs
 
-54. Threads vs Process
+### 54. Threads vs Process
 
 ## Section 13: Thread Synchronization
 
-55. Synchronization using Mutex
+### 55. Synchronization using Mutex
 - How to avoid race conditions
   - Critical section where atomic execution should be done
 - MUTEX(Mutual Exclusion)
@@ -782,7 +782,7 @@ int main(int argc, char *argv[])
 - Avoiding dead locks
   - Build a hierarchy of mutex
 
-56. Condition Variables
+### 56. Condition Variables
 - Signals from one thread to other thread regarding the changes in the state of a shared variable
 - Can help to define the sequence of thread execution
 - Can be allocated statically or dynamically
@@ -791,7 +791,7 @@ int main(int argc, char *argv[])
 
 ## Section 14: IPC - Introduction
 
-57. A brief overview of IPC
+### 57. A brief overview of IPC
 - Send/receive data b/w processes
 - Sync b/w processes
 - Communication based IPC
@@ -804,7 +804,7 @@ int main(int argc, char *argv[])
 
 ## Section 15: PIPES and FIFO - Inter process communication
 
-58. PIPE - IPC
+### 58. PIPE - IPC
 - A byte stream used for IPC
 - 2 ends
   - read end
@@ -857,7 +857,7 @@ int main()
 ```
 - PIPE/data/flow demo: are printed sequentially
 
-59. FIFO - IPC
+### 59. FIFO - IPC
 - First In First Out
   - Similar to a PIPE
   - Aka `Name PIPES`
@@ -874,7 +874,7 @@ int mkfifo(const char * pathname, mode_t mode);
 
 ## Section 16: POSIX - Message Queue
 
-60. Message Queue operations
+### 60. Message Queue operations
 - Passes messages b/w processes
 - This is message oriented IPC
   - PIPEs and FIFO are byte oriented IPC
@@ -1002,7 +1002,7 @@ $ ./rec /test
 
 ## Section 17: POSIX - Semaphore
 
-61. Semaphore operations - named semaphore
+### 61. Semaphore operations - named semaphore
 - Allows processes and threads to synchronize access to shared resource
 - Executes the critical section in an atomic manner
 - Has name as specified in sem_open()
@@ -1018,7 +1018,7 @@ $ ./rec /test
 - The name of semaphore begins with `/`
 - In order to delete /dev/shm/sem.sem1, `sem_unlink("/sem1");` is necessary in the end of the code
 
-62. Un-named semaphore 
+### 62. Un-named semaphore 
 - Variables of type sem_t that are stored in memory allocatd by the application
   - Named semaphore is present in file system similar to regular files
 - Use same functions of sem_wait(), sem_post, sem_getvalue() and there are two more extra functions 
@@ -1027,7 +1027,7 @@ $ ./rec /test
 
 ## Section 18: POSIX - Shared Memory
 
-63. Shared Memory Concepts
+### 63. Shared Memory Concepts
 - Ref: https://stackoverflow.com/questions/9701757/when-to-use-pipes-vs-when-to-use-shared-memory
 - Same physical memory is mapped into virtual memory of multiple processes
 - At /dev/shm
@@ -1042,7 +1042,7 @@ $ ./rec /test
   - This maps the shared memory object into the process's virtual address space
 - Compile needs `-lrt`
     
-64. Shared Memory Operations
+### 64. Shared Memory Operations
 - shwrite.c
 ```c
 #include <fcntl.h>
@@ -1128,7 +1128,7 @@ Read data from shared memory - (hello world)
 
 ## Section 19: Closing Note
 
-65. Closing Note and Further Reading
+### 65. Closing Note and Further Reading
 - The design of Unix operating system by Maurice J Bach
 - The Linux programming interface  by Michael Kerrisk
 - Advanced Programming in the Unix environment by W. Richard Stevens
