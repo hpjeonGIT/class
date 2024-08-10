@@ -117,7 +117,66 @@
 Q: from demo, definition of compartment may need description    
 - What is CIDR?
     
-            
+      
+## Getting started with Oracle Cloud applications            
+
+- Oracle's Cloud Applications suite
+  - SaaS
+  - Quarterly updated
+  - Advantages of Oracle Cloud Applications SaaS
+    - Automatic updates
+    - Accessibility
+    - Implementation Speed
+    - Operational cost
+- SaaS Suite Capabilities
+  - Enterprise Resource Planning
+    - Financial management
+    - Procurement
+    - Risk Management and Compliance
+  - Supply Chain and Manufacturing
+    - Supply Chain Planning
+    - Inventory Management
+    - IoT
+  - Human Capital Management
+    - HR
+    - Talent Management
+    - Workforce Management
+    - Payroll
+  - Advertiszing and Customer experience
+    - advertising
+    - Sales
+    - Service
+- Oracle Human Capital Management
+  - End to end solution: from Hire to Retirement
+  - HR
+  - Talent Management
+  - Workforce Management
+  - Payroll
+- Demo: Oracle Human Capital Management
+- Oracle Fusion Cloud Enterprise Resource Planning
+  - Financials
+  - Project Management
+  - Enterprise Performance Management
+  - Risk Management and Compliance
+  - ERP Analytics
+- Demo: Oracle Fusion Cloud Financials
+- Oracle Supply Chain Management
+  - One of the largest roles in customer satisfaction
+  - Planning -> Sourcing/Manufacturing -> Inventory Mgmnt/Warehousing -> Fulfillment and delivery -> Servicing  
+- Demo: Oracle Supply Chain management
+- Oracle Advertising and Customer experience
+  - Advertising
+  - Marketing
+  - Sales
+- Demo: Oracle Customer experience
+- Oracle Industry Applications
+  - Collections of vertical applications
+  - Build to cover specific industry areas
+  - Both on-premises and cloud solutions
+  - communications, construction & engineering, energy & water, health sciences, financial services, hospitiality, food & beverage, retail
+- Demo: Oracle Guided Learning
+  - In class, in application digital applicatin platform
+  - Accelerates user adoption
 
 ## Oracle cloud infrastructure foundations
 
