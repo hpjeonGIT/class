@@ -1,0 +1,18 @@
+project(vecAddCuda CXX) 
+cmake_minimum_required(VERSION 3.0.0)
+add_definitions(-std=c++17)
+set(CMAKE_HIP_COMPILER "/opt/rocm/bin/amdclang++")
+set(CMAKE_CXX_COMPILER "/opt/rocm/bin/amdclang++")
+set(HIP_ROOT "/opt/rocm/")
+set(CMAKE_HIP_PLATFORM nvidia)
+include_directories(${HIP_ROOT}/include)
+find_package(hip REQUIRED)
+enable_language(HIP)
+add_definitions(-DROCM  -D__HIP_PLATFORM_NVIDIA__)
+set(default_build_type "Debug") 
+# CMAKE_BUILD_TYPE can be over-ridden by -DCMAKE_BUILD_TYPE=Release
+set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_CXX_FLAGS "${CMAXE_CXX_FLAGS} -Wall")
+set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -std=c++17" )
+add_subdirectory(src)
+
