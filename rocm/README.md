@@ -91,6 +91,7 @@ cmake_hip/
     ├── main.cpp
     └── vectorAdd.hip
 ```
+- Not working/not compiled.
 - Feeding -DCMAKE_HIP_COMPILER=hipcc yields following error message. Use amdclang++
 ```
 $ cmake -DCMAKE_HIP_COMPILER=/opt/rocm/bin/hipcc ..
@@ -101,9 +102,35 @@ CMake Error at /usr/share/cmake-3.22/Modules/CMakeDetermineHIPCompiler.cmake:50 
 Call Stack (most recent call first):
   CMakeLists.txt:1 (project)
 ```
+- Using cmake 3.30
+  - export HIP_ROOT=/opt/rocm
+  - cmake ..
+- Ref: https://github.com/neoblizz/HIP_template/blob/main/library/CMakeLists.txt
+  - Download the entire src
+  - Add following into CMakeLists.txt
+```
+set(ROCM_PATH /opt/rocm)
+set(HIP_PATH /opt/rocm)
+```
 
 ## Tentative conclusion
 - cmake + rocm may not work on nvidia GPUs.
   - Coupling hipcc + cmake yields an error
   - cmake + rocm ignores nvidia relatd variables, yielding -x hip option when built
+- Regarding cmake_hip, add ROCM_PATH or HIP_PATH in the CMakeLists.txt or declare in the CLI
+  - Still not working with HIP over nvidia
   
+## AMD only with cmake
+- Not working on nvidia card but can be compiled
+- cmake_hip_only
+```
+.
+├── CMakeLists.txt
+└── src
+    ├── CMakeLists.txt
+    ├── helper_hip.h
+    ├── helper_string.h
+    ├── main.cpp
+    ├── test.hiph
+    └── vectorAdd.hip
+```
