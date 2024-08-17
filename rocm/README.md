@@ -119,7 +119,10 @@ set(HIP_PATH /opt/rocm)
   - cmake + rocm ignores nvidia relatd variables, yielding -x hip option when built
 - Regarding cmake_hip, add ROCM_PATH or HIP_PATH in the CMakeLists.txt or declare in the CLI
   - Still not working with HIP over nvidia
-  
+  - To compile hip code for nvidia architects:   "--generate-code=arch=compute_50,code=sm_50"
+    - Requires `export HIP_PLATFORM=nvidia` prior to running cmake
+    - TBD
+    
 ## AMD only with cmake
 - Not working on nvidia card but can be compiled
 - cmake_hip_only
