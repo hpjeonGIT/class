@@ -1,3 +1,369 @@
+## Oracle Cloud Infrastructure AI Foundations
+1. Welcome to AI Foundations
+- Welcome to AI Foundations
+  - AI vs ML vs DL
+  - Best practices and Retention tips
+    - Go through the AI Foundataion 2023 course
+      
+2. AI Foundations
+- Module Intro
+  - Objectives
+      - Explain AI
+      - Describe common AI
+- Introduction to AI
+  - Why do we need AI?
+    - Automation and decision making
+    - Creative support
+  - AI Domains and examples
+    - Language translation, image classification, text to speech, cross-sell products, detect fradulent transactions, ...
+- AI - Tasks and data
+  - Language
+    - Text related AI tasks: Detect language, extract entities in a text, extract key phrases, sentiment
+    - Generative AI task: create story, summarize text, ...
+    - Text as Data
+      - Sentences
+      - Tokenization
+      - Padding
+      - Dot or cosine similarity
+    - Lanuage AI models
+      - RNN
+      - LSTM
+      - Transformers
+  - Audio and speech
+    - Speech-related AI tasks: turn speech to text, recognize speaker
+    - Generative AI task: music composition, speech synthesis
+    - Autdio and Speech as data
+      - Sample rate
+      - Sound reconstructed
+      - Bit Depth
+    - Audio and Speech AI models
+      - RNN
+      - LSTM
+      - Transformers
+      - Variational autoencoders
+      - Waveform models      
+  - Image
+    - Image related AI tasks: classification, identify objects/boundaries, extract text , count objects in an image
+    - Generative AI tasks: create images from a text, repair damaged images, get 3d view from 2d sketches
+    - Images as Data
+      - pixel
+      - color
+    - Vision AI models
+      - CNN
+      - YOLO
+      - Generative Adversarial network
+  - Other AI tasks
+    - Anomaly detection
+    - Recommendation
+    - Forecasting      
+- Demo: AI
+  - Dashboard -> Vision
+  - Language -> Text analytics
+- AI vs ML vs DL
+  - AI: imitates human intelligence
+  - ML: learns from past data and predict outcome
+  - DL: learn from complex data
+  - supervised ML: learns from labeled data
+  - Unsupervised ML: 
+  - Reinforcement learning: decision - feedback - learning
+
+3. Machine Learning Foundations
+- Module Intro
+- Introduction to Machine Learning
+  - Supervised: classify data or make predictions
+    - Disease detection, weather forecasting, stock price prediction, spam detection, credit scoring
+  - Unsupervised: Understand relationships within datasets
+    - Fraudulent transactions detections, customer segmentation, outlier detection
+  - Reinforcement: make decision or choices
+    - Automated robots, autonomous cars, video games, healthcare
+- Supervised Lerning - Regression
+  - ML model that learns from labeled data
+  - Applications
+    - House price prediction
+    - Disease detection
+    - Sentiment analysis
+    - Stock price prediction
+  - Regression: continuous output
+    - Minimizing loss: diff of the predicted value from the actual one
+- Supervised Learning - classification
+  - Spam detector: binary
+  - Sentiment analysis: multie-class
+  - Logistic Regression
+    - Sigmoid function to fit
+- Demo: Introduce to Jupyter Notebooks
+- Demo: Basic ML part-1
+- Demo: Basic ML part-2
+- Unsupervised Learning
+  - No labeled inputs
+  - Clustering: grouping of similar data items
+  - Use cases
+    - Market segmentation: identifies similar customers based on purchasing behavior. Can be applied into advertisement
+    - Outlier analysis
+    - Recommendation system
+  - Similarity: how close two data points are to each Other
+  - Work flow
+    - Prepare the data: removing missing values, normalize the data, and feature scaling
+    - Create similarity metrics: based on nature of data and clustering algorithm
+    - Run clustering algorithm
+    - Interpret results and adjust clustering
+- Reinforcement Learning
+  - Use cases
+    - Autonomous vehicles
+    - Smart devices: Alexa
+    - Industrial automation: optimizes performances and control system
+    - Gaming and entertainment
+  - Terminology
+    - Agent: interact with environment, takes actions, learns from feedback
+    - Environment: external system
+    - State: Representation of the current situation of the environment
+    - Action: Possible moves that agent can takes
+    - Policy: Mapping the agent uses to decide
+  - RL Training loop
+    - Agent -> action -> environment
+    - Environment -> state, reward -> Agent
+    - Goal is to find a policy that will yield a lot of rewards for the agent
+    - Optimal policy is learned through training by using algorithms like Q learning or Deep Q Learning
+
+4. Deep Learning Foundations
+- Module Intro
+- Introduction to Deep Learning
+  - A subset of ML that focuses on training ANN with multiple layers
+  - Why we need DL?
+    - DL extracts features from raw and complex data
+    - Can be parallelized
+    - Better scalability and performance
+  - DL algorithms
+    - Images/videos: CNN
+    - Sequential, time series, and NL: transformers, LSTM, RNN
+    - Images, Tex, Audio generation: Transformers, diffusion models, GAN
+  - Building blocks of ANN
+    - Layers
+    - Neurons
+    - Weights
+    - Activation function
+    - Bias
+  - How ANNs are trained?
+    - Backpropagation
+- Deep learning Models - Sequence Models
+  - Input data is in the form of sequences: NLP, speech, music generation, gesture recognition, time series
+  - Recurrent Neural Network (RNN): 
+    - Handles sequential data
+    - Allows information to persist using a feedback loop
+    - Maintains a hidden state or memory
+    - Captures dependencies
+  - RNN architecture types
+    - One to one: standard non-sequential data like FNN
+    - One to many: Music generation or sequence generation
+    - Many to many: sentiment analysis based on reviews
+    - Many to many: machine translation, named entity recognition
+  - LSTM
+    - Input processing
+    - Previous memory
+    - Gating mechanism (input/forget/output gate)
+    - Updating memory
+    - Output generation
+- Deep Learning Models - CNN
+  - DL models
+    - Feed Forward Neural Networks (FNN)
+    - Convolution Neural Networks (CNN)
+    - Recurrent Neural Networks (RNN)
+    - Autoencoders: unsupervised ML for anomaly detection
+    - LSTM
+    - Generative Adversarial Networks (GAN)
+    - Transformers
+  - Limitations of CNN
+    - Computationally expensive
+    - Overfitting
+    - Interpretability: typical black box models
+    - Sensitivity
+
+5. Generative AI and LLM Foundations
+- Module intro
+- Introduction to Generative AI
+  - How Generative AI works?: Learns the underlying patterns in a given data set and ueses that knowledge to create new data that shares those patterns
+  - Use cases 
+    - Image/video generation
+    - Content/code generation,  conversational AI
+    - Music generation
+    - New molecular structure
+- Introduction to Large Language Models
+  - Model size and number of tokens must be scaled equally
+  - Benefits of LLMs
+    - Language understanding
+    - Versatile
+    - Efficient
+    - Innovative
+- LLM and Transformer Model
+- Transformer walkthrough
+  - Allows the model to weigh the importance of words or tokens
+  - Removes the need of recurrent/convolution layers
+  - Encoder: reads the input sentence and uses attention mechanism to capture meaning
+  - Decoder: Uses the info above to generate the output sequence
+  - Type of transformer models
+    - Encoder only: context rich representation learning
+    - Encode/Decoder: machine translation
+    - Decoder only: For creative text generation/autoregressive tasks
+  - Simple transformer Architecture
+    - Tokenization: splits a sentence into tokens
+    - Embedding: Each token is converted into a vector that the model can understanding
+    - Positional Encoding: the order of the words
+    - Transformer block
+      - Attention: helps understand the context of each word. NxN interaction among words
+      - Feedforward: Applies a specific function to each word individually
+        - Softmax: model generates a list of scores for each word then softmax function turns theses scores into probabilties
+- Prompt engineering
+  - Prompt: the inpuit or initial text provided to the model
+  - Prompt instructions: ensures that the language model understands the users's intent correctly and provides accurate response
+  - Zero shot/one shot/few shots: number of examples  
+  - Best practices
+    - Try writing the prompt input in multiple ways
+    - Describe the task with clear and specific instructions
+    - Handel edge cases and conditions response
+    - Give examples for completing the task for a desirable outcome
+- LLM File tuning
+  - LLM Lifecycle
+    - Pretraining
+    - Fine tuning
+    - Prompt engineering
+    - Evaluation and iteration
+    - Deployment and ongoing maintenance
+  - Fine tuning
+    - Process of training a pretrained model on a specific task to make it more specialized
+    - Model is fine-tuned on specific tasks using a smaller, domain-specific datasets
+    - Weights from pretraining are updated based on the new data
+  - Why fine tune?
+    - Task specific adaptation
+    - Domain specific vocabulary
+    - Efficiency and resource utilization
+    - Ethical concerns
+
+6. OCI AI Portfolio
+- Module Intro
+- AI Services Overview
+  - Oracle AI stack
+    - Business Applications, Oracle SaaS Portfolio: AI Services, OCI Generative AI, Digital Assistant, Speech, Language, Vision, Document Understanding, Anomaly Detection
+    - Machine Learning Services: OCI Data Science, ML in Oracle Database, Data Labeling
+    - Data: AI infrastructure, Compute Bare Metal Instances and VMs, Cluster Networking, Block, Object, and File storage, HPC File systems
+  - Ways to access oracle could infrastructure AI services
+    - OCI Console: web-based
+    - Rest API: required programming expertise
+    - Language SKDs: Java, Python, .NET, GO, Ruby, javascript
+    - CLI: 
+  - Overview of AI Services
+    - Language
+      - Pretrained models for language detection, sentiment analysis, key phrase extraction
+      - Custom models for text classification, entity recognition
+      - Text translation: neural machine translation
+    - Vision
+      - Image analysis pretrained
+      - Image analysis custom model
+    - Speech
+    - Document Understanding
+      - Optical Character recognition
+      - Text Extraction: word-level and line-level
+      - Key value extraction - extracts key-value pair
+      - Table extraction - extracts contents in tabular format
+      - Document classification - based on features
+    - Anomaly Detection
+      - Identifies rare items or events that differ greatly from expectation
+    - Digital Assistant
+      - Interacts with users
+      - Lists what it can do
+      - Routes users's request to skills
+      - Handles disambiguation
+- ML Services Overview
+  - Oracle Cloud Infrastructure Data Science
+    - Infrastructure: CPU, GPU, storage, network
+    - Data Management: database, datalake, access, integration, preparation
+    - Model Catalog, Projects, notebook, model deployment, model training model management, model explanation, AutoML
+  - Core Principles of OCI Data Science
+    - Accelerated and easy access to infrastructure
+    - Collaborative: 
+    - Enterprise-grade: fully managed platform
+  - What, whom, where, and how of data sciences
+    - what: builds, trains, deploys ML models
+    - whom: data scientist through ML life cycle
+    - where: jupyter lab notebook
+    - How: preseve in model catalog, deploy models
+  - Terminology
+    - Projects
+    - Notebook sessions
+    - Conda environment
+    - Accelerated Data Science SDK
+    - Models
+    - Model catalog
+    - Model deployments
+    - Jobs: enables you to define and run repeatable Machine Learning tasks on fully managed infrastructure
+- AI Infrastructure Overview
+  - GPU
+    - Allows many processes at the same time with parallel computing
+    - Performs many computations very rapidly
+    - Crunches through extremely large datasets rapidly
+  - Networking
+  - Super Clusters: 4096 OCI compute bm instances with 32,768 A100 GPUs
+  - Storage
+    - local ssd
+    - block storage upto 32TB
+    - object storage: 10TiB
+    - File system: 8EB
+    - HPC File system: BeeGFS, Lustre, ...
+- GPUs and Superclusters in OCI
+  - RDMA 
+  - ROCE
+- Responsible AI
+  - Can we trust AI?
+  - Human ethics
+    - Human dignity
+    - Freedom of the individually
+    - democracy
+    - equality
+    - citizen's rights
+  - AI ethics 
+    - Human autonomy
+    - Prevention of harm
+    - Fairness
+    - Explicability
+
+7. OCI Generative AI Service
+- Introduction to OCI generative AI
+  - LLama2 from Metal
+  - Custom models by fine-tuning
+- Demo: OCI Generative AI
+  - Playground
+    - cohere model
+8. OCI AI Services
+- Module Intro
+- Language Intro
+  - Detects language
+  - Identifies entities in text
+  - Identifies sentiment
+  - ...
+- Demo: Language
+- Speech Intro
+   -Speech to text
+   - English, spanish, portuguese
+   - SRT file with caption
+   - Profanity warning
+- Demo: Speech
+- Vision Intro
+  - Object detection
+  - Image classification
+- Document Understanding
+  - Text recognition
+  - Document classification
+  - Language detection
+  - Table extraction
+  - Key/value extraction
+- Demo: Vision
+- Demo: Document Understanding
+- Anomaly Detection Intro
+  - Identifies anomalies in time-series data
+  - Univariate and Multivariate detection
+    - MSET-2
+- Oracle AI APIs and SDKs
+- Demo: Oracle AI Decision Services
+
+
 ## Getting Started with Oracle Cloud Infrastructure
 
 - Oracle cloud introduction
