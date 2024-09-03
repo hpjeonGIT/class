@@ -124,8 +124,10 @@ set(HIP_PATH /opt/rocm)
     - TBD
     
 ## AMD only with cmake
-- Not working on nvidia card but can be compiled
+- ~~Not working on nvidia card but can be compiled~~
+  - Now runs with GT1030
 - cmake_hip_only
+- Works at cmake 3.30 but not at 3.22
 ```
 .
 ├── CMakeLists.txt
