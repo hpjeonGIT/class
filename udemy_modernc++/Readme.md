@@ -2983,3 +2983,155 @@ void Permissions(std::string_view file) {
     - In the sequential execution as well
   - If we need to handle exception, use standard algorithm, which is non-prallel
   - Parallel algorithm may throw std::bad_alloc if they fail to acquire memory during execution
+
+## C++ experiment
+
+### why explicit instatiation is necessary in template?
+1. When a single is used:
+```cpp
+#include <iostream>
+template<typename T> T add(T x, T y)
+{
+  return x + y;
+}
+int main() 
+{
+std::cout << "float  = " << add(1.1f, 1.2f) << std::endl;
+std::cout << "double  = " << add(1.1, 1.2) << std::endl;
+std::cout << "int  = " << add(1, 2) << std::endl;
+return 0;
+}
+```
+- Compiling generates 3 different assembly of add functions as:
+```asm
+0000000000001389 <_Z3addIfET_S0_S0_>:
+    1389:	f3 0f 1e fa          	endbr64 
+    138d:	55                   	push   %rbp
+    138e:	48 89 e5             	mov    %rsp,%rbp
+    1391:	f3 0f 11 45 fc       	movss  %xmm0,-0x4(%rbp)
+    1396:	f3 0f 11 4d f8       	movss  %xmm1,-0x8(%rbp)
+    139b:	f3 0f 10 45 fc       	movss  -0x4(%rbp),%xmm0
+    13a0:	f3 0f 58 45 f8       	addss  -0x8(%rbp),%xmm0
+    13a5:	5d                   	pop    %rbp
+    13a6:	c3                   	ret    
+00000000000013a7 <_Z3addIdET_S0_S0_>:
+    13a7:	f3 0f 1e fa          	endbr64 
+    13ab:	55                   	push   %rbp
+    13ac:	48 89 e5             	mov    %rsp,%rbp
+    13af:	f2 0f 11 45 f8       	movsd  %xmm0,-0x8(%rbp)
+    13b4:	f2 0f 11 4d f0       	movsd  %xmm1,-0x10(%rbp)
+    13b9:	f2 0f 10 45 f8       	movsd  -0x8(%rbp),%xmm0
+    13be:	f2 0f 58 45 f0       	addsd  -0x10(%rbp),%xmm0
+    13c3:	66 48 0f 7e c0       	movq   %xmm0,%rax
+    13c8:	66 48 0f 6e c0       	movq   %rax,%xmm0
+    13cd:	5d                   	pop    %rbp
+    13ce:	c3                   	ret    
+00000000000013cf <_Z3addIiET_S0_S0_>:
+    13cf:	f3 0f 1e fa          	endbr64 
+    13d3:	55                   	push   %rbp
+    13d4:	48 89 e5             	mov    %rsp,%rbp
+    13d7:	89 7d fc             	mov    %edi,-0x4(%rbp)
+    13da:	89 75 f8             	mov    %esi,-0x8(%rbp)
+    13dd:	8b 55 fc             	mov    -0x4(%rbp),%edx
+    13e0:	8b 45 f8             	mov    -0x8(%rbp),%eax
+    13e3:	01 d0                	add    %edx,%eax
+    13e5:	5d                   	pop    %rbp
+    13e6:	c3                   	ret    
+```
+- Each assembly function corresponds to float/double/int data type
+2. Now assume multiple file cases:
+- common.h
+```cpp
+#include <iostream>
+template<typename T> T add(T x, T y);
+```
+- common.cpp
+```cpp
+template<typename T> T add(T x, T y)
+{
+  return x + y;
+}
+```
+- main.cpp
+```cpp
+#include "common.h"
+int main() 
+{
+std::cout << "float  = " << add(1.1f, 1.2f) << std::endl;
+std::cout << "double  = " << add(1.1, 1.2) << std::endl;
+std::cout << "int  = " << add(1, 2) << std::endl;
+return 0;
+}
+```
+- Compiling:
+```bash
+$ g++ -std=c++17 -c common.cxx  # each compiles OK
+$ g++ -std=c++17 -c main.cxx    # each compiles OK
+$ g++ -std=c++17 main.o common.o -o a.exe
+/usr/bin/ld: main.o: in function `main':
+main.cxx:(.text+0x3c): undefined reference to `float add<float>(float, float)'
+/usr/bin/ld: main.cxx:(.text+0x97): undefined reference to `double add<double>(double, double)'
+/usr/bin/ld: main.cxx:(.text+0xe6): undefined reference to `int add<int>(int, int)'
+collect2: error: ld returned 1 exit status
+```
+- As shown above, linker cannot find float/double/int version of function add, as common.cxx doesn't find each case
+```bash
+$ objdump -d common.o 
+common.o:     file format elf64-x86-64
+```
+- objdump of the object file yields no assembl content
+- Let's modify common.cxx as:
+```cxx
+template<typename T> T add(T x, T y)
+{
+  return x + y;
+}
+template float add<float>(float x, float y);
+template double add<double>(double x, double y);
+template int add<int>(int x, int y);
+```
+- Now compiling generate each function with different typename data
+```asm
+$ objdump -d common.o 
+common.o:     file format elf64-x86-64
+Disassembly of section .text._Z3addIfET_S0_S0_:
+0000000000000000 <_Z3addIfET_S0_S0_>:
+   0:	f3 0f 1e fa          	endbr64 
+   4:	55                   	push   %rbp
+   5:	48 89 e5             	mov    %rsp,%rbp
+   8:	f3 0f 11 45 fc       	movss  %xmm0,-0x4(%rbp)
+   d:	f3 0f 11 4d f8       	movss  %xmm1,-0x8(%rbp)
+  12:	f3 0f 10 45 fc       	movss  -0x4(%rbp),%xmm0
+  17:	f3 0f 58 45 f8       	addss  -0x8(%rbp),%xmm0
+  1c:	5d                   	pop    %rbp
+  1d:	c3                   	ret    
+
+Disassembly of section .text._Z3addIdET_S0_S0_:
+0000000000000000 <_Z3addIdET_S0_S0_>:
+   0:	f3 0f 1e fa          	endbr64 
+   4:	55                   	push   %rbp
+   5:	48 89 e5             	mov    %rsp,%rbp
+   8:	f2 0f 11 45 f8       	movsd  %xmm0,-0x8(%rbp)
+   d:	f2 0f 11 4d f0       	movsd  %xmm1,-0x10(%rbp)
+  12:	f2 0f 10 45 f8       	movsd  -0x8(%rbp),%xmm0
+  17:	f2 0f 58 45 f0       	addsd  -0x10(%rbp),%xmm0
+  1c:	66 48 0f 7e c0       	movq   %xmm0,%rax
+  21:	66 48 0f 6e c0       	movq   %rax,%xmm0
+  26:	5d                   	pop    %rbp
+  27:	c3                   	ret    
+Disassembly of section .text._Z3addIiET_S0_S0_:
+0000000000000000 <_Z3addIiET_S0_S0_>:
+   0:	f3 0f 1e fa          	endbr64 
+   4:	55                   	push   %rbp
+   5:	48 89 e5             	mov    %rsp,%rbp
+   8:	89 7d fc             	mov    %edi,-0x4(%rbp)
+   b:	89 75 f8             	mov    %esi,-0x8(%rbp)
+   e:	8b 55 fc             	mov    -0x4(%rbp),%edx
+  11:	8b 45 f8             	mov    -0x8(%rbp),%eax
+  14:	01 d0                	add    %edx,%eax
+  16:	5d                   	pop    %rbp
+  17:	c3                   	ret    
+```
+- Link generates the executable correctly
+- FYI
+	- Using extern as `extern template int add<int>(int x, int y);` doesn't work
