@@ -3135,3 +3135,5 @@ Disassembly of section .text._Z3addIiET_S0_S0_:
 - Link generates the executable correctly
 - FYI
 	- Using extern as `extern template int add<int>(int x, int y);` doesn't work
+	- As discussed in section 131, the best bractice would be to have template definition in the header file - then no explicit instantiation would be necessary
+  - But if the code is complex and template is supposed to be in the cpp, explicit instantiation might be an alternative
