@@ -961,6 +961,12 @@ int main() {
 
 ### 109. Project - X
 - Using `dynamic_cast` instead of `typeid()`
+```bash
+    Base
+    /   \
+  D1    D2
+```
+- `dynamic_cast` is used when D1 object is casted into D2
 ```cpp
 int main() {
   Checking acc03("Bob",1000.00f);
