@@ -979,6 +979,7 @@ int main() {
 - `dynamic_cast` works for reference too
     - `dynamic_cast<Savings&>(p)`
     - But nullptr is not returned when failed. Instead, it will throw an error. May use try/catch
+- Employs overhead in the class object instantiaion. typeid() might be preferred
 
 ### 110. Abstract class
 - Pure virtual
