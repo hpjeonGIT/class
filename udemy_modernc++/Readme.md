@@ -961,12 +961,6 @@ int main() {
 
 ### 109. Project - X
 - Using `dynamic_cast` instead of `typeid()`
-```bash
-    Base
-    /   \
-  D1    D2
-```
-- `dynamic_cast` is used when D1 object is casted into D2
 ```cpp
 int main() {
   Checking acc03("Bob",1000.00f);
@@ -980,6 +974,8 @@ int main() {
   return 0;
 }
 ```
+- `s` is returned as nullptr
+	- Checking object cannot be down-casted into Savings object
 - `dynamic_cast` works for reference too
     - `dynamic_cast<Savings&>(p)`
     - But nullptr is not returned when failed. Instead, it will throw an error. May use try/catch
