@@ -44,3 +44,7 @@ build $outdir/print.o: cxx print.cxx
 build $outdir/md_run: link $outdir/main.o $outdir/force.o $outdir/verlet.o $outdir/print.o
 ```
 - Run `ninja`
+
+## Why no pattern matching in ninja?
+- For speed-up
+  - Ref: https://www.youtube.com/watch?v=AkGt0fsQ17o
