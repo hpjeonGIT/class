@@ -1309,6 +1309,7 @@ con.close()
   - Cons
     - Negative impact on performance
     - Stateful - cannot benefit web-environment
+      - From the instructor: Because the web is stateless, ie each request can land on a completely different server and served by a different server. This means if you send a request and that created a server side cursor on the database, and you get a reference on the backend server 1, the second request to consume the cursor might go to backend server 2 and it won't know how to retrieve the server side cursor and end up creating a new one.
 
 ### 102. Article - Server Side Cursor Types in SQL Server
 
