@@ -451,7 +451,69 @@ Max_warps_per_SM   :64
   - The compiler will choose the minimum
 
 ### 29. Starting with the Nsight compute (first issue)
-- `ncu ./vectoradd`
+```
+$ ncu ./vectoradd
+  vectorAdd(int *, int *, int *, int) (16, 1, 1)x(128, 1, 1), Context 1, Stream 7, Device 0, CC 7.5
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ------------- ------------
+    Metric Name               Metric Unit Metric Value
+    ----------------------- ------------- ------------
+    DRAM Frequency          cycle/nsecond         4.61
+    SM Frequency            cycle/nsecond         1.27
+    Elapsed Cycles                  cycle        2,693
+    Memory Throughput                   %        10.63
+    DRAM Throughput                     %        10.63
+    Duration                      usecond         2.11
+    L1/TEX Cache Throughput             %         2.67
+    L2 Cache Throughput                 %         8.51
+    SM Active Cycles                cycle     1,367.71
+    Compute (SM) Throughput             %         1.36
+    ----------------------- ------------- ------------
+
+    WRN   This kernel grid is too small to fill the available resources on this device, resulting in only 0.1 full      
+          waves across all SMs. Look at Launch Statistics for more details.                                             
+
+    Section: Launch Statistics
+    -------------------------------- --------------- ---------------
+    Metric Name                          Metric Unit    Metric Value
+    -------------------------------- --------------- ---------------
+    Block Size                                                   128
+    Function Cache Configuration                     CachePreferNone
+    Grid Size                                                     16
+    Registers Per Thread             register/thread              16
+    Shared Memory Configuration Size           Kbyte           32.77
+    Driver Shared Memory Per Block        byte/block               0
+    Dynamic Shared Memory Per Block       byte/block               0
+    Static Shared Memory Per Block        byte/block               0
+    Threads                                   thread           2,048
+    Waves Per SM                                                0.14
+    -------------------------------- --------------- ---------------
+
+    WRN   If you execute __syncthreads() to synchronize the threads of a block, it is recommended to have more than the 
+          achieved 1 blocks per multiprocessor. This way, blocks that aren't waiting for __syncthreads() can keep the   
+          hardware busy.                                                                                                
+
+    Section: Occupancy
+    ------------------------------- ----------- ------------
+    Metric Name                     Metric Unit Metric Value
+    ------------------------------- ----------- ------------
+    Block Limit SM                        block           16
+    Block Limit Registers                 block           32
+    Block Limit Shared Mem                block           16
+    Block Limit Warps                     block            8
+    Theoretical Active Warps per SM        warp           32
+    Theoretical Occupancy                     %          100
+    Achieved Occupancy                        %        14.24
+    Achieved Active Warps Per SM           warp         4.56
+    ------------------------------- ----------- ------------
+
+    WRN   This kernel's theoretical occupancy is not impacted by any block limit. The difference between calculated     
+          theoretical (100.0%) and measured achieved occupancy (14.2%) can be the result of warp scheduling overheads   
+          or workload imbalances during the kernel execution. Load imbalances can occur between warps within a block    
+          as well as across blocks of the same kernel. See the CUDA Best Practices Guide                                
+          (https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#occupancy) for more details on           
+          optimizing occupancy.                      
+```          
 
 ### 30. All profiling tools from Nvidia (Nsight sytems/compute, nvprof, ...)
 - nvprof is deprecated
@@ -509,7 +571,26 @@ Max_warps_per_SM   :64
 
 ### 32. Nsight Compute Performance using command line analysis
 - ncu --metrics sm__cycles_elapsed.avg ./a.out
+```bash
+  vectorAdd(int *, int *, int *, int) (16, 1, 1)x(128, 1, 1), Context 1, Stream 7, Device 0, CC 7.5
+    Section: Command line profiler metrics
+    ---------------------- ----------- ------------
+    Metric Name            Metric Unit Metric Value
+    ---------------------- ----------- ------------
+    sm__cycles_elapsed.avg       cycle     3,572.43
+    ---------------------- ----------- ------------
+```
 - ncu --metrics sm__cycles_elapsed.avg,l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum ./a.out
+```bash
+  vectorAdd(int *, int *, int *, int) (16, 1, 1)x(128, 1, 1), Context 1, Stream 7, Device 0, CC 7.5
+    Section: Command line profiler metrics
+    ---------------------------------------------- ----------- ------------
+    Metric Name                                    Metric Unit Metric Value
+    ---------------------------------------------- ----------- ------------
+    l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum      sector          512
+    sm__cycles_elapsed.avg                               cycle     3,480.43
+    ---------------------------------------------- ----------- ------------
+```
 - ncu --metrics sm__cycles_elapsed.avg --csv ./a.out -o result.csv
 
 ### 33. Graphical Nsight Compute (Windows and Linux)
