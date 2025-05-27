@@ -414,6 +414,8 @@
 - Ways to access CLI
   - Out-of-band: using serial console port or management port
     - Use putty, 9600bit/s, 8 bits Parity None, 1 stop bits, Flow control Hardware
+      - MobaXterm has the feature of serial connection
+      - Will need a management cable - Ex: 5FT USB Console Cable Compatible for Cisco Juniper Router Switch FT232RL Chip USB to RS232 RJ45 Console Serial Cable for Windows 8, 7, Vista, Mac, Linux (5FT) 
   - In-band: using telent or SSH
 - Root user vs non-root user
   - Root account provides full administrative access to the device and is referred to as superuser
@@ -491,21 +493,183 @@
   - `show | display set | match polices`
 
 ### 29. Active vs Candidate Configuration
+- Active configuration
+  - Currently active
+  - Loaded when rebooted
+- Candidate configuration
+  - In configuration mode, a copy of the active config is created, as a candidate configuration
+  - When the candidate configuration is committed, it becomes the active configuration
 
 ### 30. Configure Command
+- Common command
+  - `configure`
+  - `configure exclusive`
+  - `configure private`
+- Shared configuration
+  - Accessed using the `configure` command
+  - Multiple users can be in the configuration mode at the same time
+  - If other users are editing the configuration, you'll see a warning message
+  - When config is committed, changes by all users are committed
+- `show system users` shows the current users
+- `request system logut user AAA` will kick off the user AAA
+- Exclusive configuration
+  - `configure exclusive`
+  - Only one user is allowed
+- Private configuration
+  - `configure private`
+  - Multiple users can enter the private configuration mode, and each user has a private candidate config to edit
+  - When committed, only changes made by the private user will be saved
+    - If there are conflicts, the first commit takes the precedence
 
 ### 31. More Navigation Commands
+- `edit`
+- `up`
+- `top`
+- `exit configuration-mode`
 
 ### 32. Configuration Hierarchy
+- Configure from:
+  - Top of the configuration hierarchy
+  - Item specific configuration hierarchy
+    - Reduces the length of commands
+    - Only commands specific to the hierarchy are shown
+    - Output is reduced to only items under hierarchy
+```
+% cli
+> configure
+set ?
+[edit] 
+set security policies from-zone trust to-zone untrust policy criteria
+[edit] 
+set security policies from-zone trust to-zone untrust policy PERMIT-ALL ?
+[edit]
+edit security policies from-zone trust to-zone untrust policy ALLOW-ALL
+[edit security policies from-zone trust to-zone untrust policy ALLOW-ALL]
+set match source-address any
+[edit security policies from-zone trust to-zone untrust policy ALLOW-ALL]
+show # this will show the reduced items only as we moved to the specific hierarchy
+```
 
 ### 33. Junos Commit
+- `commit` command saves the candidate configuration as the active configuration
+- Before committing, Junos performs a commit check to look for syntax errors
+- To manually run a check, use `commit check`
+- `show | compare` to view changes
+- `commit at` to schedule
+- `clear system commit` to clear pending commit operations
+- `commit confirmed` to commit changes and then require confirmation before making changes permanent
+- `commit and-quit` to commit changes and return to operational mode
+- `commit comment "Interface  XXXX changed"` to leave comment
+- `commit | display ?`
+- `show system commit` to display the history of commit
 
 ### 34. Junos Rollback
+- Store up to 50 committed version of the configuration
+  - Rollback versions range from 0 to 49
+- `rollback 0` is the most recent configuration - the active configuration
+- `rollback 0` can be used to discard the candidate configuration and return to active configuration
+- After rollback, follow it up with `commit` command
 
 ### 35. Junos Configuration Files
+- `save __file_name__`: files are saved to /var/home/username folder
+- `show configuration | compare __file_name__`   to compare active config with a configuration file
+- `file checksum md5 myfile`: prints hash value 
 
 ### 36. Junos Load Command
+- `load override`
+  - Discards the current candidate config and loads config from the file
+- `load merge`
+  - Merges the config from the saved file with the existing candidate config
+  - For any conflicting contents, the saved config file will override them
+- `load replace`
+  - Looks for the `replace:` tags in the loaded file, and replaces parts of the candidate config with whatever is specified after the tag
+  - Loaded file must include `replace:` tags
+  - Useful when detailed control is required
+- `load set`
+  - Loads a config file that contains `set` commands
+  - Executes the configuration instructions line by line as they are stored in the file
+  - Instruction can contain any configuration mode command such as `edit`, `exit`, and `top`
+- `load patch`
+  - On a device, `type show | compare` shows differences
+  - Then use `load patch` to load the differences on another device
 
 ### 37. J-Web
+- GUI for Junos device
+- Using http or https
+- J-Web is provided by the Routing Engine
+```bash
+# show system services web-management
+# edit system services web-management
+[edit system services web-management]
+# set ?
+// Can choose http or https
+# set session ?
+```
 
 ## Section 4: Configuration Basics
+
+### 38. Factory-default Configuration
+- root account has no passwd
+- System logging features
+  - `show system syslog`
+- Default hostname is Amnesiac
+- `load factory-default` will revert to factory-default configuration
+
+### 39. Initial Configuration
+- How to set date
+  - In operation mode, `set date ?`
+- Enter configuration mode using `edit` command
+  - How to set root authentication
+    - `set system root-authentication plain-text-password`
+  - How to set up SSH/telnet access
+    - `edit system services`
+    - `set ssh ?`
+    - `set ssh root-login ?`
+    - `set ssh protocol-version ?`
+  - How to set hostname
+    - `set host-name ?`
+  - How to set domain-name
+    - `set domain-name ?`
+  - How to set name-servers
+    - `set name-server ?`
+    - `set name-server 0.0.0.0` will append to the current list of the name-servers
+      - To delete an existing name-server, `delete name-server x.x.x.x`
+  - How to set time-zone
+    - `set time-zone ?`
+  - How to set login-message
+    - `set system login message ?`
+    - `set system login message "Welcome to XXXX"`
+  - How to set CLI timeout limit
+    - `set cli idle-timeout 10`: 10 min
+
+### 40. Login Classes
+
+### 41. User Accounts
+
+### 42. Authentication methods
+
+### 43. Introduction to Interfaces
+
+### 44. Interface Naming Convention
+
+### 45. Interface Properties
+
+### 46. Interface Address Configuration
+
+### 47. Configuration Groups
+
+### 48. Introduction to System Logging
+
+### 49. Configuring Syslog
+
+### 50. Tracing
+
+### 51. Network Time Protocol
+
+### 52. SNMP
+
+### 53. Rescue Config
+
+### 54. Backups
+
+## Section 5: Operational Monitoring and Maintenance
