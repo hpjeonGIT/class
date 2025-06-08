@@ -643,33 +643,703 @@ show # this will show the reduced items only as we moved to the specific hierarc
     - `set cli idle-timeout 10`: 10 min
 
 ### 40. Login Classes
+- A set of one or more permissions
+- All users must have a login class
+- Allows:
+  - Access privileges on the device
+  - Commands that users can or cannot specify
+  - Session idle time
+- Pre-defined login classes
+  - Super-user: all permissions
+  - Operator: clear, network, reset, trace, and view permissions
+  - read-only: view permissions
+  - unauthorized: no permissions  
+```
+> edit
+# set system login user ?
+# set system login user admin class ?
+# set class my-class ?
+```
+- Create a login class that:
+  - Name is Vendors
+  - Allows login from 9am-5pm
+  - Allows login from Mon-Fri only
+  - Denies any request command
+  - Allows interface configuration
+```
+# edit system login
+# edit class Vendors
+# set access-start 09:00
+# set access-end 17:00
+# set allowed-days [monday tuesday wendesday thursday friday]
+# set allow-commands ping
+# set deny-commands request
+# set permissions interface-control
+# show
+## At this moment, edit mode cannot be executed. So add configure permissions
+# set permissions configure
+```
 
 ### 41. User Accounts
+- Provides a way for users to access the Junos device
+- Each user has a home folder on the device: /var/home/username
+- Users can access the device without accounts if RADIUS or TACACS+ servers have been configured
+- For every user account, define followings:
+  - User name
+  - User identifier
+  - Full name
+  - Login class
+  - Authentication method
+```
+> configure
+# set ?
+# set user ?
+# set user NewAdmin ?
+# set user NewAdmin class ?
+# set user NewAdmin class super-user ?
+# set user NewAdmin class super-user authentication ?
+# set user NewAdmin class super-user authentication plain-text-password
+## Enter passwd here
+# top commit
+# show
+```
 
 ### 42. Authentication methods
+- Junos supports 3 authentication methods
+  - When there are a few devices
+    - Local password
+  - Distributed client and server systems. The client runs on the Junos device while server runs on a remote host
+    - Remote Authentication Dial-In User Service (RADIUS)
+    - Terminal Acces Controller Access Control System Plus (TACACS+)
+- Authentical methods
+  - For each login attempt, Junos tries the authentication method in order, until the password is accepted
+  - If the previous authentication method fails to reply or if the method rejects the login attemp, the next method is tried
+```
+# show system authentication-order
+authentication-order [radius tacplus password];
+```
+  - In this example, if RADIUS fails then TACACS+ will be tried. Then Local password if TACACS+ fails
+```
+# show system authentication-order
+authentication-order [radius tacplus];
+```
+  - When RADIUS fails, TACACS+ will be tried. Local password will not be tried
+  - If servers of RADIUS/TACACS+ are down, then local password will be tried as a fall-back
 
 ### 43. Introduction to Interfaces
+- Primarily used to connect a device to a network
+- Some interfaces are also used to provide a service or a specific function for the system
+- Interfaces may be physical or logical
+- Types of interfaces
+  - Management interface
+    - Dedicated interface used to connect the Junos device to a management network
+    - Common designations include fxp0 and me0
+      - Not concole port
+  - Internal Interface
+    - Provides communication b/w the Routing Engine and the Packet Forwarding Engine
+    - Automatically configured when the device boots
+    - Common designations include fxp1 and em0
+  - Network Interface
+    - Provides physical connections to other devices
+    - Exapmles include Ethernet, SONET, Asynchronous-Transfer Mode (ATM), T1, and DS3
+  - Service Interface
+    - Provides one or mokre traffic manipulating services such as encapsulation, encryption, tunneling, and link services
+    - es: Encryption Interface
+    - gr: Generic Routing Encapsulation (GRE) interface
+    - ip: IP-over-IP encapsulation (IP-IP tunnel) interface
+    - lsq: link services queuing interface
+    - st: secure tunnel interface
+    - tap: internally generated interface to monitor and record traffic during passive monitoring
+  - Loopback Interface
+    - Traffic sent to the loopback interface is addressed to the same device
+    - Uses the lo0 designation on all platforms
+    - Used to identify the device and is the preferred method to determine if the device is online
 
 ### 44. Interface Naming Convention
+- Junos uses a standard naming convention
+- Most interfaces are named as type - `fpc/pic/port`
+  - fpc: flexible PIC concentrator - line card slot number
+  - pic: physical interface card - interface card slot number
+  - port: port number
+- Ex:
+  - `ge-1/0/1`: Gigabit Ethernet, fpc-1, pic-0, port-1
+![demo](./ch44_demo.png)
+- Some exceptions in naming conventions
+  - lo0: loopback interface
+  - ae: aggregated Ethernet Interface
+  - as: aggregated SONET interface
+  - vlan: VLAN interface
 
 ### 45. Interface Properties
+- Physical properties
+  - Mode: half-duplex or full duplex
+  - Speed: link speed
+  - MTU: maximum transmission unit, varies from 256 to 9192 bytes
+  - Clock: interface clock sources, either internal or external
+  - Frame Check Sequence (FCS): error detection scheme
+  - Encapsulation: types include PPP, Frame Relay, PPPoE
+- Logical properties
+  - Protocol family: inet, inet6, iso, mpls, ethernet-switching
+  - Address: IP address for inet family
+  - VLAN tagging
+  - Firewall filters or routing policies
+- Configuration Hierarchy
+```
+interfaces {
+  interface-name {
+    physical-properties :
+    [..]
+    unit unit-number {
+      logical-properties :
+      [..]
+    }
+  }
+}
+```
+- Demo:
+```
+% cli
+> edit
+# edit interfaces ge-0/0/0
+# edit unit 0
+[edit interfaces ge-0/0/0 unit 0]
+```
 
 ### 46. Interface Address Configuration
+- Demo
+```
+% cli
+> edit 
+# edit interface ge-0/0/0
+[edit interface ge-0/0/0]
+# edit unit 0
+[edit interface ge-0/0/0 edit unit 0]
+# edit family inet
+[edit interface ge-0/0/0 edit unit 0 family inet]
+# set address ?
+# set address 10.1.1.1/24
+# set address 10.1.1.2/24
+# show
+address 10.1.1.1/24;
+address 10.1.1.2/24;
+```
+- Multiple address
+  - Junos devices can have more than one IP address on logical interface
+  - Issuing a second `set` command does not over-write the previous address
+  - To change an existing address use `rename` or `delete`
+- Preferred address 
+  - Used when you have multiple IP addresses belonging to the same subnet on the same interface
+  - Allows you to select which address will be used as the source address for packets sent to hosts on the directly connected subnet
+  - By default, this is the numerically lowest address
+- Primary address
+  - Used as the source address for broadcast and multicast packets
+  - By default, this is the numerically lowest address
+- Multiple Protocol Families
 
 ### 47. Configuration Groups
+- Common configuration snippets that can be applied to other parts of the configuration
+- Creates a group containing configuration statements and apply that to the rest of the configuration
+- Ideal for grouping statements that are repeated in many places in the configuration
+```
+# cli
+> edit
+# show interfaces ge-0/0/1
+# set interfaces ge-0/0/1 unit 1 bandwidth ?
+# edit groups MyBW-config interfaces ge-0/0/1 unit <*> 
+[edit groups MyBW-config interfaces ge-0/0/1 unit <*> ]
+# set bandwidth 100
+# show
+# top
+# show groups MyBW-config
+# set interfaces ge-0/0/1 apply-groups MyBW-config
+# show interfaces ge-0/0/1 | display inheritance
+# show interfaces ge-0/0/1 | display inheritance no-comments
+- show groups junos-defaults # pre-defined groups
+```
 
 ### 48. Introduction to System Logging
+- Syslog
+  - Used to record system-wide, high-lvel operations, such as interfaces going up or down, or users logging in to or out of the device
+  - Logs are placed in files that are stored in the /var/log folder
+  - The primary syslog file, which is included in all factory default configurations is the /var/log/messages file
+  - Each system log message belongs to a `facility`
+  - A facility is a group of messages that are either generated by the same SW process or concern a similar activity (such as authentication attempts)
+  - Each message is also assigned a severity level that indicates how seriously the triggering event affects the device functions
+
+| Facility | Type of event or error |
+|----------|------------------------|
+| any      | All messages from all facilities|
+| authorization| Authentication and authorization attempts|
+| change-log | Changes to the Junos configuration|
+| daemon | Actions performed or errors encountered by ssytem processes|
+| firewall | Packet filtering actions performed by a firewall filter|
+| interactive-commands | Commands issued at the Junos CLI |
+| kernel | Actions performed or errros encountered by the Junos kerenel|
+| security| Security related events or errors|
+| user | Actions performed or errors encountered by user processes|
+
+| Value | Severity Level | Description |
+|-------|----------------|-------------|
+| N/A   | none | Dsiables logging of the associated facility|
+| 0 | emergency|  System panic or other condition that causes the device to stop functioning|
+| 1 | alert | Conditions that require immediate correction, such as a corrupted system database|
+| 2 |  critical | Critical conditions |
+| 3 | error | Error conditions that have less serious consequences |
+| 4 | warning |  Conditions that warrant monitoring |
+| 5 | notice | Conditions that are not errors but might warrant special handling |
+| 6 | info | Events or non-error conditions of interest |
+| 7 | any | Includes all severity levels| 
 
 ### 49. Configuring Syslog
+- Demo:
+```
+% cli
+> edit
+# edit system syslog
+[edit system syslog]
+# set file cli-commands interactive-commands any
+# set file change-log change-log any
+# set file security security any
+# annotate file cli-commands "/* Logs commands entered */"
+# annotate file change-log "/* Logs commands entered */"
+# commit
+# exit
+> show log cli-commands # shows all the command entered
+```
+- Interpreting Syslog Entries
+  - Timestamp: indciates when the message was logged
+  - Name: configured system name
+  - Process name or PID: name or ID of the process that generated the log entry
+  - Message code: identifies nature and purpose of the message
+  - Message text: provides additional information related to the message code
+- Priority is not printed by default
+  - Use `explicit-priority` statement
+- Demo:
+```
+> clear log cli-commands
+> edit
+# edit system syslog
+# set file cli-commands explicit-priority
+# commit
+# run show log cli-commands
+```
+- Archival
+  - When a log file called `logfile`1 is archived, the file is closed, compressed, and its name is changed to `logfile.0.gz`
+  - Logs are then written to a new file called logfile
+  - Can be configured for all files or individual files
+```
+[edit system syslog]
+# set archive ?
+# set file cli-commands archive archive-sites ?
+# file delete /var/log/cli-commands
+# clear log change-log
+```
 
 ### 50. Tracing
+- Tracing allows you to track events that occur in the device - both normal operations and error conditions
+  - Actually Debug
+- When enabled, a trace file is created, storing decoded protocol information received or sent by the routing engine
+  - /var/log folder or a remote syslog server
+- Tracing is expensive. Use only when necessary
+```
+# cli
+> edit
+[edit]
+# set security policies traceoptions ?
+# set security policies traceoptions file mypolicy.txt files 3
+# set security policies traceoptions flag all
+# commit
+# exit
+> show log mypolicy.txt
+> edit
+# set interfaces traceoptions ?
+# set interfaces ge-0/0/1 traceoptions ? # cannot specify file name for an interface
+# set interfaces traceoptions file interfaces.txt size 10K
+# set interfaces traceoptions flag all
+# commit
+# set security net ?
+# exit
+> show log interface.txt
+> monitor start messages
+> monitor start interface.txt
+monitor list
+monitor stop
+>
+> edit
+# set system tracing destination-override syslog host ?
+# delete security policies traceoptions
+# delete interfaces traceoptions
+# commit
+# exit
+> file delete ?
+> file list
+```
 
 ### 51. Network Time Protocol
+- To synchrnoize the clocks of routers and other HW devices on the internet
+- Debugging and troubleshooting will be much easier
+- Junos devices can be configured to act as an NTP client, a secondary NTP server, or a primary NTP server
+  - Primary NTP server
+  - Secondary NTP server
+  - NTP client
+- NTP modes
+  - Broadcast
+  - Client/server mode
+  - Symmetric active (peer) mode
+  - When an NTP client drifts by more than 128 milliseconds, it tries to synchronize with the server
+  - To manually synchronize, use command `ntp`
+- NTP boot server vs NTP server
+  - When NTP boot server is configured, the device will sync with the boot server whenever it reboots
+  - When an NTP server is configured, the device is syncronizing with the NTP server periodically
+```
+% cli
+> edit
+# set ?
+# set server ?
+# set servert pool.ntp.org
+# commit
+# exit
+> show system uptime
+> show ntp associations
+> show ntp status
+```
 
 ### 52. SNMP
+- Simple Network Management Protocol
+  - Eanbles the monitoring of network devices from a central location
+  - Requires
+    - SNMP agent
+    - Network Management System (NMS)
+- SNMP agent
+  - Exchanges network management information with SNMP manager SW runnong on an NMS
+  - Responds to requests for information and actions from the manager
+- NMS
+  - Collects information about network connectivity, activity, and events by polling managed devices
+- Junos SNMP versions
+  - SNMPv1
+  - SNMPv2c: added support for community strings
+  - SNMPv3: provides data integrity, data origin authentication, message replay protection and protection against disclosure of message payload
+- Management Information Base
+  - SNMP data is stored in a highly structured, hierarchical format
+  - Based on a TREE structure
+  - Each object in MIB is associated with an object identifier (OID)
+  - MIBs are either standard or enterprise-specific
+- SNMP communication
+  - Get, GetBulk, and GetNext requests: manager requests information from the agent, the agent returns information in a Get response message
+  - Set requests: manager changes the value of an MIB object controlled by th agent; the agent indicates status in a Set response message
+  - Trap notification: agent sends traps to notifiy the manager of significant events that occur on the device
+- SNMP Traps and Informs
+  - Junos devices can send notification to SNMP managers when significant events occur on a network device, most often errors or failures
+  - SNMP notifications can be sent as traps or inform requests
+  - SNMP traps are unconfirmed notifications
+  - SNMP informs are confiremd notifications
+```
+> show snmp mib ?
+> show snmp mib walk jnxMibs # root Juniper OID
+> show snmp mib walk 1 # OID/OI names of objects
+> edit
+# edit snmp
+[edit snmp]
+# set name "My Junos"
+# set contact "Miku - xxx xxx x123"
+# set community myJunos authorization read-only
+# set community myJunos clients 10.0.10.100
+# commit
+```
+- From a Linux client
+```
+# snmpwalk -v 2c -c myJunos xx.xx.xx.xx
+```
 
 ### 53. Rescue Config
+- User-defined, known-good configuration that is designed to restore connectivity in the event of configuration problems
+- If the active configuration is corrupted, the device automatically loads the rescue configuration file as the active configuration
+- Rescue configuraiton
+  - Recommended to include the minimum elements necessary to restore network connectivity
+  - Use `request system configuration rescue save` to save a rescue config
+```
+# cli
+> show system alarms
+> request system configuration rescue ?
+> request system configuration rescue save  
+> show system alarms
+> test configuration ?
+```
 
 ### 54. Backups
+- Junos can backup the current configuration using ftp or scp, periodically or after earch commit
+- If more than one archive site is specified, the system attempts to transfer the configuration file to the first archive site in the list, moving to the next site only if the transfer fails
+- Once the configuraiton file is transferred to the remote storage device, a system log message is generated, confirming success or failure of the transfer
+```
+# cli
+> edit
+[edit]
+> edit system archival
+[edit system archival]
+# set configuration ?
+# set configuration transfer-on-commit
+# set configuration archive-sites ftp://xxx.yy.zz  password 'XXXX'
+# show
+# commit
+# exit
+> show log messages | match transfer
+```
 
 ## Section 5: Operational Monitoring and Maintenance
+
+### 55. System and Chassis Information
+- System information
+  - show system alarms
+  - show system boot-messages
+  - show system certificate
+  - show system commit
+  - show system connection
+  - show system information
+  - show system login lockout
+    - To disable lockout, `clear system login lockout user XXX`
+  - show system memory
+  - show system processes
+    - Options of brief, summary, detail, extensive
+  - show system reboot
+    - To remove scheduled reboot, `clear system reboot`
+  - show system rollback
+  - show system statistics
+  - show system storage
+  - show system uptime
+  - show system users
+- Chassis information
+  - show chassis alarms
+  - show chassis environment
+  - show chassis hardware
+  - show chassis routing-engine
+
+### 56. Interface Monitoring - Stats and errors
+- show interfaces
+- show interfaces terse : Summary view
+- show interfaces detail 
+- show interfaces extensive : all possible information
+- show interfaces traffic
+- show interfaces _interface_name_
+
+### 57. Network Utilities
+- telnet
+- ssh
+- ping 
+- traceroute
+- ftp
+
+### 58. Junos Naming Convention
+- Before release 15.1, package-release-edition
+- Starting with release 15.1, prefix-architecture-ABI-release-edition
+- Could also be prefix-media-architecture-ABI-release-edition
+- Prefix
+  - Name of the Junos package
+  - Ex: junos-install-srx5600
+- Media
+  - May not be present
+  - Only used when the image is not for use with the `request system software add` command
+  - Values include `usb` for images installed from a USB drive or `net` for images installed from the loader prompt
+  - Ex: junos-install-media-usb-srx5000-x86-64-17.3R1.9.img.gz
+- Architecture
+  - Indicates CPU architecture
+  - `x86` or `arm`
+- ABI: application binary interface
+  - Indicates the word length of the CPU architecture
+  - `32` or `64`
+- Release
+  - Includes major/minor release number, release type (R/B?/I), build number, and spin number
+  - R for released
+  - B for beta-level
+  - I for internal
+  - S for service release
+- Edition
+  - Null(empty) or `limited`
+  - Null (empty) for standard domestic versions - supports strong encryption capabilities
+  - `limited` indicates the versions built for jurisdictions with limits on dataplane encryption
+  - FIPS: Federal Information Processing Standards 140-2 environment
+  - Starting with Junos 15.1, FIPS is packaged in the domestic version, users can flip b/w a regular image and FIPS image
+- Ex: junos-install-srx5600-x86-64-17.3R1.9.tgz
+  - Prefix: junos-install-srx5600
+  - Architecture: x86
+  - ABI: 64
+  - Release: 17.3R1.9
+    - Major version: 17
+    - Minor version: 3
+    - R: Released SW
+    - Build: 1
+    - Spin: 9
+  - Edition: domestic (strong encryption)
+- Ex: junos-install-media-usb-srx5600-x86-64-17.3R1.9-limited.img.gz
+  - Prefix: junos-install-srx5600
+  - Media: usb
+  - Architecture: x86
+  - ABI: 64
+  - Release: 17.3R1.9
+    - Major version: 17
+    - Minor version: 3
+    - R: Released SW
+    - Build: 1
+    - Spin: 9
+  - Edition: limited (no strong encryption)
+
+### 59. Snapshots
+- When upgrade fails, snapshots can be used as a rescue or backup
+- When Junos is installed, all stored files except juniper.conf and SSH files are removed
+- Creating a snapshot will back up your currrent configuration
+  - Returns to the current SW configuration after Junos insallation is complete
+- Snapshots
+  - `request system snapshot`
+  - The snapshot is stored on the internal media or to a USB storage device
+  - The snapshot can be used as boot information for Junos
+  - Junos recommends that for media redundancy a secondary storage medium should always be attached to the SRX device
+```
+% cli
+> request system snapshot ?
+> request system snapshot media usb 
+> show system snapshot media usb
+> request system reboot media usb
+# When reboots, it will use USB media to load image
+```
+
+### 60. Upgrading Junos
+1. Connect to the console port
+2. Backup the active file system using `request system snapshot`
+3. Determine the Junos version using `show version` 
+4. Donwload the install package from Juniper website
+5. Copy the packages to `/var/tmp`
+6. Verify the checksum of the package: `file checksum md5 /var/tmp/XXXX`
+7. Upgrade using `request system software add /var/tmp/XXXX`
+8. Reboot the device
+- How to check available storage: `show system storage`
+  - `request system storage cleanup dry-run`
+- When upgrading, Junos validates the SW package against the current configuration by default
+  - This ensures that the device can reboot successfully after the SW package is installed
+- Downgrading Junos
+  - When upgraded, Junos creates a backup image of th SW that was previously installed 
+  - The backup image can be used to downgrade only to the SW release that was installed on the device before the current release  
+  - `request system software rollback`
+
+### 61. Unified ISSU
+- Unified In-Service Software Upgrade (Unified ISSU) allows you to upgrade yoru device b/w two different Junos releases with no disruption on the control plane and with minimal disruption of traffic
+- Only supported on dual Routing Engine platforms
+- Graceful Routing Engine Switchover (GRES) and Nonstop Active Routing (NSR) must be enabled to perform Unified ISSU
+- To perform Unified ISSU, the master and backup Routing Engine must be running the same SW version
+- Unified ISSU eliminates network downtime during SW image upgrades
+- Graceful Routing Engine Switchover
+  - GRES enables a device with redundant Routing Engines to continue forwarding packets even if one Routing Engine fails
+  - Traffic is not interrupted, and device is not rebooted
+  - Mastgership switches to the backup Routing Engine if:
+    - The master RE kernel stops operating
+    - The master RE experiences a SW failure
+    - The administrator initiates a manual switchover
+  - GRES preserves interface and kernel related information
+  - However the control plane is not preserved causing routing to be impacted
+  - To preserve routing during a switchover, GRES may be combined with Nonstop Active Routing (NSR)
+  - With GRES, the PFE disconnects from the old master RE and reconnects to the new master RE
+  - PFE does not reboot and traffic is not disrupted
+- Nonstop Active Routing
+  - With NSR enabled, the JUnos device saves routing protocol informatin during a switchover
+  - This is done by running the routing protocol daemon (rpd) on the backup RE
+  - As a result the routing platform does not need to rely on oither routers to restore routing protocol information
+
+### 62. Root Password Recovery
+1. Connect using the console port and reboot the device
+2. As the system boots, press Spacebar when prompted
+3. At the `loader>` prompt, enter the command `boot -s` to boot into a single-user mode
+4. Enter `recovery` when prompted
+5. At the operational mode prompt, type `configure` to enther configuration mode
+6. Use `set system root-authentication plain-text-password` to set the root password
+7. Commit and reboot
+
+### 63. Important Commands - clear, file, monitor, ping, telnet, ftp, traceroute
+```
+% cli
+> clear ?
+> clear log messages
+> clear interfaces statistics ge-0/0/1.0
+> file show ?
+> file list /var/tmp
+> file delete ?
+> file copy ?
+> file rename ?
+> monitor traffic
+> monitor interface ge-0/0/1.0 # click 'f' to freeze
+> monitor *
+> monitor start messages
+> monitor list
+> monitor stop
+> ping xx.xx.yy.zz
+> ping xx.xx.yy.zz count 3
+> ping xx.xx.yy.zz count 100 rapid # faster ping
+> request dhcp client renew ?
+> request system licenses ?
+> request message ?
+> set ?
+> show security flow session
+```
+
+## Section 6: Routing Fundamentals
+
+### 64. Introduction to Routing
+![ch64](./ch64.png)
+- Manual updating of routing table would be very expensive
+
+### 65. Static vs Dynamic Routing
+- Static routing
+  - Routing tables are created and updated manually
+  - Not fault tolerant
+  - Good for small networks but administrative overhead for large networks
+- Dynamic routing
+  - Routing tables are created and updated by a routing protocol
+  - Routing information is automatically shared b/w participating devices
+  - Fault tolerant
+  - Ex: RIP, OSPF
+
+### 66. Junos Routing
+- Routing overview
+  - Routing is the transmission of packets from a source to a destination address
+  - A routing protocol determines the path by which the packets are forwarded, and shares this information with immediate neighbor devices and other devices in the network
+  - It adjuss to changing network conditions
+- Junos Routing
+  - Junos OS maintains two databases for routing information
+    - Routing table: contains all the routing information learned by all routing protocols
+    - Forwarding table: contains the routes actually used to forward packets through the router
+- Junos Routing Table
+  - Used by the routing protocol process to maintain a database of routing information
+  - The routing protocols stores statically configured routes, directly connected interface routes, and all routing information learned from all routing protocols
+  - The routing protocol process uses this collected routing information to select the `active route` to each destination: this route is used to forward packets
+  - By default, Junos maintains 3 routing tables
+    - Unicast routing table: stores routing information for all unicast routing protocols - BGP, IS-IS, OSPF, RIP
+    - Multicast routing table: stores routing information for all multicast routing protocols - DVMRP, PIM  
+    - MPLS routing table: stores MPLS path and label information
+  - inet.0: default IPv4 unicast routing table
+  - inet.1: IPv4 multicast forwarding cache
+  - inet.2: unicast routes for multicast reverse path forwarding (RPF) lookup
+  - inet.3: IPv4 MPLS routing table for path information
+  - inet6.0: default IPv6 unicast routing table
+  - inet6.1: IPv6 multicast forwarding cache
+  - mpls.0: for MPLS label switching operations
+  - iso.0: used for IS-IS routing
+- Junos Forwarding Table
+  - All active routes from the routing table are installed into the forwarding table
+  - Active routes are used to forward packets to their destinations
+  - The Junos kernel maintains a master copy of the forwarding table
+  - It copies the forwarding table to the packet forwarding engine, which is responsible for forwarding packets
+  - If the routing table is a list of all possible paths a packet can take, the forwarding table is a list of only the best routes to a destination
+  - The best route is determined based on the routing protocol being used, but generally the number of hops b/w the source and destination dtermines the best possible route
+  
+![ch66.png](./ch66.png)
+
+### 67. Routing and Forwarding tables
+
+### 68. Route Preference
+
+### 69. Static Routing - Part 1
+
+### 70. Static Routing - Part 2
+
+### 71. Dynamic Routing
+
+### 72. Longest Route Matching
+
+### 73. Routing Instances
