@@ -1327,19 +1327,609 @@ monitor stop
   - It copies the forwarding table to the packet forwarding engine, which is responsible for forwarding packets
   - If the routing table is a list of all possible paths a packet can take, the forwarding table is a list of only the best routes to a destination
   - The best route is determined based on the routing protocol being used, but generally the number of hops b/w the source and destination dtermines the best possible route
-  
+
 ![ch66.png](./ch66.png)
 
 ### 67. Routing and Forwarding tables
+```
+# cli
+> show route
+> show route protocol static
+> show route extensive
+> show route all
+> show route active-path
+> show route forwarding-table
+> show pfe route ip
+```
+- Routing Table
+  - active: routes used yb the system to forward traffic
+  - holddown: routes that are in pending state before the system declares them as inactive
+  - hidden: routes that are not used because of a routing policy
+- Forwarding Table
+  - Use `show route forwarding-table` to view
+  - Junos kernel adds some forwarding entries and considers them permanent in nature
+  - `default` forwarding entry matches all packets when no other matching entry exists
+    - The router will discards the packet
+- Forwarding Route Types
+  - `perm`: routes installed by the kernel when the routing table initializes
+  - `dest`: remote addresses directly reachable through an interface
+  - `intf`: installed as a result of configuring an interface
+  - `user`: routes intalledy by the routing protocol process or as a result of the configuration
+  - `iddn`: destination route for which the interface is unreachable
+  - `ignr`: ignore this route
+- Next Hop Types
+  - ucst: unicast
+  - bcst: broadcast
+  - hold: next hop is waiting to be resolved into a unicast or multicast types
+  - locl: local addres of an interface
+  - indr: indirect next hop
+  - dscd: discard silently without sending an ICMP unreachable message
+  - rjct: discard and send an ICMP unreachable message
 
 ### 68. Route Preference
+- When a router A is connected B & C, which route path is preferred?
+  - A-B or A-C ?
+- Junos assigns a default preference value to each route that the routing table receives
+- This is same as `administrative distance` on equipment from other vendors
+- The default value depends on the source of the route
+- Ranges from 0 through 2^32-1
+- A lower value indicates a more preferred route
+- Default preference value can be modified
+  - The exception is direct/local routes - theses are always preferred regardless of the modified route preference
+- If multiple paths have the same cost, the routing protocol daemon (rpd) randomly selects one of them
+
+| Routing information source | Default preference |
+|----------------------------|--------------------|
+| Directly connected route   | 0                  |
+| Static route               | 5                  |
+| OSPF internal route        | 10                 |
+| RIP                        | 100                |
+| BGP                        | 170                |
 
 ### 69. Static Routing - Part 1
+- Routes that are permanent fixtures in the routing and forwarding tables are often configured as static routes
+- These routes generally do not change, and are not manipulated by external protocols
+  1. Define the route as static
+  2. Define the destination
+  3. Define the next-hop IP
+- The static route is inserted into the forwarding table when the next-hop address is reachable
+- All traffic destined for the static route is transmitted to the next-hop IP address
+![ch69](./ch69.png)
+- Router 1 can reach 192.168.1.2 directly. No problem
 
 ### 70. Static Routing - Part 2
+![ch70](./ch70.png)
+- Router 1 cannot reach 192.168.1.12 directly
+- By default, Junos requires that the next hop IP address of static routes be reachable using a direct route
+- Junos does not perform recursive lookups of next hops by default
+  1. Use `resolve` keyword 
+  2. A route to the indirect next ho is required
+- No Re-advertise
+  - Static routes are eligible to be advertised - that is, exported from the routing table into dynamic routing protocols, if a policy to do so is configured
+  - To makr an IPv4 static route as being ineligible for re-advertisement, include the `no-readvertise` statement
+  - It is recommended to use the `no-readvertise` option on static routes used for management traffic
+- Qualified Next Hop
+  - A static route can have multiple next hops associated with it
+  - Multiple routes are inserted into the routing table, and Junos must make a route selection
+    - Randomly selected
+  - This allows you to configure multiple next-hop addresses for a route and have them treated differently
+  - You can specify a different preference value for the qualified next hop
+- Route Retention
+  - By default, static routes are not retained in the forwarding table when the routing process shuts down
+  - When the routing process starts up again, any routes configured as static routes must be added to the forwarding table again
+  - This can cause latency
+  - To avoid this, routes can be configured as `retain`, causing them to be kept in the forwarding table even after the routing process shuts down
+  - Retention ensures that the routes are always in the forwarding table, even immediately after a system reboot
+- Passive Route
+  - When a static route's next-hop address is unreachable, the route is marked as passive, and it is removed from the routing or forwarding tables
+  - Marking a route as `passive` forces the route to be included in the routing tables regardless of next-hop reachability
+  - If a route is flagged as `passive` and its next-hop address is unreachable, the route is included in the routing table, and all traffic destined for the route is rejected
 
 ### 71. Dynamic Routing
+- For large networks or networks that change frequently
+- Configure the network interface to participate in a routing protocol
+- When there is a change on the network, routing information is automatically updated
+- Easy to configure
+- Increased network availability
+- Better network scalability
+- Overhead and delay for updating routing tables
+- Autonomous system: a collection of routers under a common administrative domain
+- Dynamic routing protocols can be classified as Exterior Gateway and Interior Gateway Protocols
+- Types of Dynamic Routing
+  - Routing protocols used for routing b/w autonomous systems are called Exterior Gateway Protocols (EGPs)
+    - Ex: Border Gateway Protocol (BGP)
+  - Routing protocols used for routing inside an autonomous system are aclled Interior Gateway Protocols (IGPs)
+    - Ex: RIP, OSPF, IGRP
+    - Are classified as Distance Vector and Link-State routing protocols
+
+![ch71](./ch71.png)
+
+- Distance Vector Routing Protocol
+  - Routers that share a link and configured to use the same routing protocol are called as Neighbors
+  - With distance vector routing protocols, routing updates are shared with neighbors
+  - Routing updates include a distance vector, typically expressed as the number of hops to the destination
+  - Routing updates are flooded out all protocol-enabled interfaces at regular intervals
+  - The router only knows about its own interfaces and remote network that can be reached through its neighbors
+  - The router is not aware of the network topology
+- Link-State Routing Protocol
+  - Routers have complete view of the network topology
+  - Also known as the shortest path first protocols, link-state protocols comkpute the best path to each destination
+  - Routing updates are shared with all routers
+  - Routing updates are sent only when there is a change on the network, and only the changes are sent
+  - Convergence time is less compared to distance vector protocols
 
 ### 72. Longest Route Matching
+- Algorithm used by routers to select an entry from a routing table
+- If multiple routes exist to a destination:
+  - The router uses the loginest match to determine the next-hop address
+  - The routing entry that has the longest number of network bits that match the destination is the best match
 
 ### 73. Routing Instances
+- A collection of routing tables, interfaces, and routing protocol parameters
+- The default routing instance, `master`, uses the main `inte.0` routing table
+- There can be multiple routing tables for a single routing instance: route tables for unicast IPv4, unicast IPv6, and multicast IPv4 in a single routing instance
+- Each routing instance has a unique name and corresponding IP unicast table
+  - Ex: `my-instance.inet.0`
+- Using routing instances, a single device can effectively imitate multiple devices
+- Each routing instance consists of:
+  - Routing tables
+  - Interfaces that belong to these routing tables
+  - Routing configuration
+- Only one instance of a routing protocol can be configured in a single routing instance
+```
+# cli
+> edit
+# run show route
+# run show route instance
+# edit routing-instances R1
+# set instance-types virtual-router 
+# set interface ge-0/0/1.0 
+# show
+# top
+# commit
+# run show route instance
+```
+- Instances do not share information
+
+## Section 7: Routing Policy and Firewall Filters
+
+### 74. Routing Policy Overview - import and export policies
+- All routing protocols install their routes into the routing table by default
+- Routing protocols also advertise a limited set of routes from the routing table - active routes that were learned by that protocol
+- Routing policy allows you to control the flow of routing information to and from the routing table
+- Routing policy allows you to control which routes the routing protocols store into and retrieve from the routing table
+- Can be applied as information enters the routing table and as information leaves the routing table
+- Allows you to modify attributes on routes as they enter or leave the routing table
+- Modifying route attributes allows you to control which route is selected as the active route and placed into the forwarding table
+- Policies applied when the routing protocol places routes into the routing table are called import policies
+- Policies applied when the routing protocol is advertising routes that are in the routing table are called export polices
+- Only active routes are available for export from the routing table
+- Reason to use a routing policy
+  - Control which routes a protocol imports into the routing table
+  - Control which routes a protoc
+  - exports from the routing table
+  - Use a routing protocol to announce active routes learned from another routing protocol, which is sometimes called route redistribution
+  - Manipulate route characteristics such as the preference value
+
+### 75. Default Routing Policies
+- When there is no explicitly configured policy
+- Determines whether the route is placed in or advertised from the routing table
+- Every protocol has a default import/export policy
+- Default policy for RIP
+  - Default import policy: accepts all RIP routes learned from configured neighbors and import into the inet.0 routing table
+  - Default export policy: rejects everything. To export RIP routes, an export policy must be configured
+- Default policy for OSPF
+  - Default import policy: accepts all OSPF routes and import into the inet.0 routing table
+  - Default export policy: rejects everything. OSPF des not export internally learned routes
+- Default policy for IS-IS
+  - Default import policy: accepts all IS-IS routes and import into the inet.0 and inet6.0 routing able
+  - Default export policy: rejects everything
+- Default policy for BGP
+  - Default import policy: accepts all received BGP IPv4 and IPv6 routes learned from configured neighbors and import into the inet.0 and inet6.0 routing table
+  - Default export policy: readvertises all active BGP routes
+
+### 76. Building blocks of Routing Policy
+- Policy Components
+  - Terms:
+    - Named structures in which match conditions and actions are defined
+    - One or more terms can be defined
+  - Match conditions
+    - Criteria against which a route or packet is compared
+    - One or more criteria can be configured
+    - If all criteria match, one or more actions are applied
+  - Actions
+    - What happens if all criteria match
+    - Multiple actions can be configured
+  - Terms are basic building blocks of all Junos policies
+  - Essentially, they are `if...then` statements
+    - Actually written as `from/to...then`
+- Routing Policy Evaluation
+  - The route is evaluated against the first term. If it matches, the specified action is taken
+  - If the action is to accept or reject the route, that action is taken and evaluation of the route ends
+  - Evaluation continues to the next term if the route does not match or if no action is specified or if the `next term` action is specified
+  - If the route matches no terms in the routing policy, the `accept` or `reject` action specified by the default policy is taken
+- Routing Policy Match Conditions
+  - EAch term in a routing policy can include two statements, `from` and `to`, to define the conditions that a route must match for the policy to apply
+  - In the `from` statement, you define the criteria that an incoming route must match
+  - If more than one criteria is matched, they must all match the route for a match to occur
+  - `from` statement is optional
+    - If omitted, all routes are considered to be a match
+  - In `to` statement, you define the criteria that an outgoing route must match
+  - If more than one criteria is matched, they must all match the route for a match to occur
+  - `to` statement is optional
+- Routing Policy Actions
+  - Each term in a routing policy can include a `then` statement, which defines the actions to take if a route matches all the conditions
+  - The `then` statement mayh include one or more actions
+  - Three types of actions
+    1. Flow control actions: decide whether to accept or reject the route and whether to evaluate the next term or routing policy
+    2. Actions that manipulate route characteristics
+    3. Trace action: this logs route matches
+  - `then` statement is optional. If omitted, one of the following occurs:
+    - The next term in the routing policy, if one present, is evaluated
+    - If there are no more terms in the routing policy, the next routing policy, if one present is evaluated
+    - If there are no more terms or routing policies, the accept or reject action specified by the default policy is taken
+
+### 77. Routing Policy Example
+- Ex:
+```
+policy-statement policy1 {
+  term 1 {
+    from protocol rip;
+    then accept;
+  }
+}
+```
+![ch77](./ch77.png)
+- Configure router1 to accept router2 only
+```
+policy-statement rip-import {
+  term 1 {
+    from {
+      protocol rip;
+      route-filter 192.168.0.0/16 orlonger;      
+    }
+    then accept;
+  }
+  term 2 {
+    then reject;
+  }
+}
+```
+
+### 78. Prefix Lists
+- Named list of IP addresses used to match routes
+- Configured under the `[edit policy-options]` hierarchy
+- Can be refernced in multiple terms within a single policy or in different polices
+- Can be used with routing policies and firewall filters
+```
+prefix-list rfc1918 {
+  10.0.0.0/8;
+  172.16.0.0/12;
+  192.168.0.0/16;
+}
+policy-statement my-policy {
+  term reject-rfc1918 {
+    from {
+      prefix-list rfc1918;      
+    }
+    then reject;
+  }
+}
+```
+- With prefix-list-filter, you can specify a match type of `exact`, `longer`, or `orlonger` on the listed prefixes
+
+### 79. Prefix List vs Prefix List Filter
+- Regarding:
+```
+prefix-list rfc1918 {
+  10.0.0.0/8;
+  172.16.0.0/12;
+  192.168.0.0/16;
+}
+```
+- Using a following prefix list, 172.16.0.0/24 is not added to the routing list as it is not an exact match
+```
+policy-statement my-policy {
+  term reject-rfc1918 {
+    from {
+      prefix-list rfc1918;      
+    }
+    then reject;
+  }
+}
+```
+- However, a following prefix-list-filter adds 172.16.0.0/24 as `orlonger accept`
+```
+policy-statement my-policy {
+  term reject-rfc1918 {
+    from {
+      prefix-list-filter rfc1918 orlonger accept;      
+    }
+    then reject;
+  }
+}
+```
+
+### 80. Route Filters
+- List of prefixes configured within a single routing policy or policy term
+- Unlike prefix lists, not usable but rather specific to the policy or term in which they are configured
+- Optional action can be specified to be taken if the `route-filter` statement matches
+- Match types
+  - exact
+    - Ex: `from route-filter 172.16.0.0/16 exact;`
+    - Only routes that match the given prefix exactly are considered to be a match
+  - orlonger
+    - Ex: `from route-filter 172.16.0.0/16 orlonger;`
+    - Only routes with the specified prefix, with prefix length equal to or greater than the given prefix length are considered to be a match
+    - 172.16.0.0/17, 172.16.32.0/20, 172.16.1.192/29, ...
+  - longer
+    - Ex: `from route-filter 172.16.0.0/16 longer;`
+    - Only routes with the specified prefix, with prefix lengtgh great than the given prefix
+    - 172.16.0.0/16 is NOT a match
+    - 172.16.0.0/17, 172.16.32.0/20, 172.16.1.192/29, ...
+  - upto
+    - Ex: `from route-filter 172.16.0.0/16 upto /24;`
+    - Similar to `orlonger` but has an upper limit
+    - 172.16.0.0/16, 172.16.128.0/17, 172.16.38.0/24, ...
+  - prefix-length-range
+    - Ex: `from route-filter 172.16.0.0/16 prefix-length-range /20-/24;`
+    - Lower and upper limits
+    - 172.16.0.0/16 is NOT a match
+      - Not in the range
+    - 172.16.32.0/20, 172.16.38.0/24, ...
+
+### 81. Policy Chaining
+![ch81](./ch81.png)
+
+### 82. Applying Routing Policies
+- Depending on the routing protocol, import/export plicies at multiple levels of the hierarchy
+- RIP import policies can be applied at either the global, group or the neighbor level - this will affect routes from either all peers or a specific neighbor
+- RIP export policies may only be applied at the group level, allowing you to alter routing knowledge for a specific set of peers only
+- BGP import/export policies can be applied at the global, group or neighbor level
+- OSPF allow sonly protocol-level import and export policies
+```
+protocols {
+  rip {
+    import imp-policy;
+    group my-group {
+      import imp-policy;
+      export exp-policy;
+      neighbor ge-0/0/2.0 {
+        import imp-policy;
+      }
+    }
+  }
+  bgp {
+    import imp-policy
+    export exp-policy;
+    group my-group {
+      import imp-policy;
+      export exp-policy;
+      neighbor 1.1.1.1 {
+        import imp-policy;
+        export exp-policy;
+      }
+    }
+  }
+  ospf {
+    import imp-policy;
+    export exp-policy;
+    area 0.0.0.0 {
+      interface ge-0/0/0/.0;
+    }
+  }
+}
+```
+
+### 83. Firewall Filters
+- Provides rules that define wheter to accept or discard packets that are transiting an interface
+- When a packet is accepted, actions such as class-of-service and traffic policing can be performed
+- Also referred to as Access Control Lists on other vendors' equipment
+- Can be configured to accept or discard a packet before it enters or exits a port or interface
+- Can be used to do the following
+  - Restricts traffice destined for the RE based on its source, protocol and application
+  - Limits the rate of packets destined for the RE to protect against flood or Denial-of-Service (DoS) attacks
+- Stateless in nature, so each packet is examined individually
+- Packet contents are evaluated statically, and it does not keep trakc of the state of network connections
+- Firewall Filter Components
+  - Routing policies and firewall filters have a common structure
+  - The fundamental building block of a firewall filter is a term
+  - Firewall filters require at least one term
+  - A term contains match conditions and actions. If all the match conditions are true, the action specified within the term is taken
+  - If no match conditions are specified, all traffic matches the term
+  - When implementing firewall filters, **the order of the terms is important and can impact results**
+  - Fireall filters include a default term that discards all packets that the configuration does not explicitly permit through the defined terms
+- Sample default term:
+```
+term implicit-rule {
+  then discard;
+}
+```
+- Firewall Filter Actions
+  - Terminating action
+    - Stops evaluation of a firewall filter for a specific packet
+    - Specified action is performed, no additional terms are examined
+    - Examples include `accept`, `discard`, and `reject`
+    - accept: causes the system to accept the packet
+    - discard: causes the system to silently discard the packet, without sending an ICMP message to the source address
+    - reject: causes the system to discard the packet and send an ICMP message back to the source address
+  - Nonterminating action
+    - Used to perform functions such as incrementing a counter, logging information about the packet header, sampling the data, or sending information to a remote host
+      - count: counts the packet
+      - log: logs the packet header information
+      - policer: uses a policer to rate limit traffic
+      - syslog: logs the packet to the system log file
+    - Using a nonterminating action without an explicit terminating action results in a default terminating action of `accept`
+    - To prevent the firewall filter action from terminating, use the `next term` action after the nonterminating action
+  - Flow control action
+    - Allows the device to perform configured actions on the packet and then evaluate the next term in the filter, rather than terminating the filter
+    - This is the `next term` action
+
+### 84. Configuring Firewall Filters
+- Applying firewall filters
+  - Firewall filters can be applied to all interfaces to filter traffic entering or exiting them
+  - Can also be applied to `lo0` interface to filter traffic destined for the system
+  - An IPv6 filter cannot be applied to an IPv4 interface - the protocol family of the firewall filter and interface must match
+- Configuring firewall filters
+  - Deny all ICMP/telnet
+```
+% cli
+> edit
+# edit firewall
+# edit filter BLOCK-ICMP-TELNET
+# edit term BLOC-ICMP
+# set from protocol icmp
+# set then discard
+# show
+# set then log
+# set then count BLOCK-ICMP-COUNTER
+# up
+# show
+term BLOCK-ICMP {
+  from {
+    protocol icmp;    
+  }
+  then {
+    count BLOCK-ICMP-COUNTER;
+    log;
+    discard;
+  }
+}
+# edit term ALLOW-ALL
+# set then accept
+# up
+# show
+term BLOCK-ICMP {
+  from {
+    protocol icmp;    
+  }
+  then {
+    count BLOCK-ICMP-COUNTER;
+    log;
+    discard;
+  }
+}
+term ALLOW-ALL {
+  then accept;
+}
+# top
+# commit
+# edit interfaces lo0 unit 0 family inet
+# set filter input BLOCK-ICMP-TELNET
+# run show interfaces terse
+# commit
+# top
+```  
+- **The order of terms matter**
+
+### 85. Traffic Policing
+- Enables you to control the maximum rate of traffic sent or received on an interface
+- Also known as rate limiting, it is designed to thwart denial-of-service (DoS) attacs
+- Can be applied to inboudn or outbound traffic
+- Employs a token-bucket algorithm, which enforces a limit on the average bandwidth while allowing bursts up to a specified maximum value
+- Rate limits
+  - Bandwidth: number of bits per second permitted on average
+  - Burst size: totoal number of bytes the system allows during a burst
+- Demo:
+```
+% cli
+> edit
+# edit firewall
+# edit policer DROP-EXCESS
+# set if-exceeding bandwidth-limit 32000 
+# set if-exceeding burst-size-limit 1500
+# set then discard
+# up
+# show
+firewall {
+  policer DROP-EXCESS {
+    if-exceeding {
+      bandwidth-limit 32k;
+      burst-size-limit 1500;
+    }
+    then discard;
+  }
+}  
+# edit filter FILTER-1
+# edit term POLICER
+# set then policer DROP-EXCESS 
+# set then accept
+# set then log
+# set then count POLICED-COUNT
+# up
+# up
+# show
+firewall {
+  policer DROP-EXCESS {
+    if-exceeding {
+      bandwidth-limit 32k;
+      burst-size-limit 1500;
+    }
+    then discard;
+  }
+}  
+filter FILTER-1 {
+  term POLICER {
+    then {
+      policer DROP-EXCESS;
+      count POLICED-COUNT;
+      log;
+      accept;
+    }
+  }
+}
+```
+- Policing test: `hping 3 x.x.x.x -c 10 --icmp --fast -d 1000`
+
+### 86. Unicast Reverse Path Forwarding
+- Prevents the spoofing of IP address
+- IP Spoofing
+  - Attempts to gain access by inserting a false source address in the packet header
+  - This makes the packet appear as if it is coming from a trusted source
+  - Commonly used in DoS
+- Unicast reverse-path-forwarding (RPF) check is a tool to reduce forwarding of IP packets that may be spoofing an address
+- It performs a route table lookup on an IP packet's source address and checks the incoming interface
+- If the packet is from a valid path, the router forwards the packet to the destination address. Otherwise the router discards the packet
+  - Loose mode: the incoming packet's source address must be in the route table
+  - Strict mode: the incoming packet must be received on the interface that would be used to forward traffic to the source IP address
+  - Strict mode is the default
+- Active vs Feasible Path
+  - By default, when Junos performs its RPF check, it considers only the active routes to a given destination
+  - In networks where multiple routes exist (different forward and reverse paths), the default behavior of considering only active routes can cause legitimate traffic to be dropped
+  - To address this, Junos can be configured to consider all feasible routes to a destination when it performs RPF
+  - In this mode, the system considers all routes it receives to a given destination, even if they are not the active route to the destination
+  - This option should be activated where the possibility of asymmetric routing exists
+- Fail Filter
+  - Allows you to perform additional processing on packets that have failed the unicast RPF check
+  - Can perform operations such as accepting, rejecting, logging, sampling or policing of packets
+- Fail Filter Use Cases
+  - Allow packets that would normally fail an RPF check, such as BOOTP packets and DHCP packets - these packets have a source address of 0.0.0.0 and a destination address of 255.255.255.255
+  - Allow failed packets to be further processed such as logging or counting
+
+### 87. Configuring Unicast Reverse Path Forwarding
+```
+# cli
+> edit
+# run show interfaces terse | match ge
+# set interfaces ge-0/0/1 unit 0 family inet rpf-check
+# edit firewall
+# edit filter DHCP-BOOTP
+# edit term ALLOW-DHCP-BOOTP
+# set from source-address 0.0.0.0/32
+# set from destination-address 255.255.255.255/32
+# set then accept
+# set then count DHCP-BOOTP-COUNTER
+# up
+# edit term DEFAULT
+# set then reject
+# set then log
+# up
+# show
+# top
+# set interfaces ge-0/0/1 unit 0 family inst rpf-check fail-filter DHCP-BOOTP 
+# set routing-options forwarding-table unicast-reverse-path feasible-paths
+```
+
+### 88. Conclusion
+
+### 89. Bonus Lecture
