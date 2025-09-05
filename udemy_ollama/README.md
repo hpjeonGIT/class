@@ -364,7 +364,7 @@ import ollama
 import os
 inputfile = "./grocerylist.txt"
 outputfile = "./result.txt"
-if not os.path.exists(inputfile)
+if not os.path.exists(inputfile):
     print(f"Inputfile '{inputfile}' is not found.")
     exit(1)
 with open(inputfile, "r") as f:
@@ -389,7 +389,7 @@ try:
     with open(outputfile, "w") as f:
         f.write(generated_text.strip())
 
-    print(f"Categorized grocery list has been saved to '{output_file}'.")
+    print(f"Categorized grocery list has been saved to '{outputfile}'.")
 except Exception as e:
     print("An error occurred:", str(e))    
 ```
@@ -493,8 +493,10 @@ elevenlabs
 ```py
 >>> import nltk
 >>> nltk.download('punkt')
+>>> nltk.download('punkt_tab')
 >>> nltk.download('averaged_perceptron_tagger')
 ```
+- This will produce `~/nltk_data` folder. Copy this to /usr/local/share or /usr/local/lib for all user access
 - Steps:
   - Ingest PDF Files
   - Extract Text from PDF Files and split into small chunks
