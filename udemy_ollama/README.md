@@ -478,8 +478,11 @@ chromadb
 pdfplumber 
 langchain
 langchain-core
+langchain_core
 langchain-ollama
+langchain_ollama
 langchain-community
+langchain_community
 langchain_text_splitters
 unstructured
 unstructured[all-docs]
@@ -495,6 +498,7 @@ elevenlabs
 >>> nltk.download('punkt')
 >>> nltk.download('punkt_tab')
 >>> nltk.download('averaged_perceptron_tagger')
+>>> nltk.download('averaged_perceptron_tagger_eng')
 ```
 - This will produce `~/nltk_data` folder. Copy this to /usr/local/share or /usr/local/lib for all user access
 - Steps:
