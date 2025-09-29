@@ -801,92 +801,766 @@ sqlite> SELECT * FROM message_store;
 ## Section 9: Make Your Own Chatbot Application
 
 ### 55. Introduction
+- ChatGPT-like application
+- Web interface
+- user id
+- Button for Start New Conversation
+
 ### 56. Introduction To Streamlit and Our Chat Application
+- Youtube streamlit playlist: https://www.youtube.com/watch?v=hff2tHUzxJM&list=PLc2rvfiptPSSpZ99EnJbH5LjTJ_nOoSWW
+- Interface
+  - Title
+  - sreamlit link
+  - Button
+  - Chat message
+- https://streamlit.io/
+  - https://docs.streamlit.io/develop/tutorials/chat-and-llm-apps/build-conversational-apps
+
 ### 57. Chat Bot Basic Code Setup
+
 ### 58. Create Chat History in Streamlit Session State
+
 ### 59. Create LLM Chat Input Area with Streamlit
+
 ### 60. Update Historical Chat on Streamlit UI
+
 ### 61. Complete Your Own Chat Bot Application
+```py
+import streamlit as st
+from dotenv import load_dotenv # langfuse or opik
+from langchain_ollama import ChatOllama
+from langchain_core.prompts import (
+                                        SystemMessagePromptTemplate,
+                                        HumanMessagePromptTemplate,
+                                        ChatPromptTemplate,
+                                        MessagesPlaceholder
+                                        )
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_community.chat_message_histories import SQLChatMessageHistory
+from langchain_core.output_parsers import StrOutputParser
+load_dotenv('./../.env')
+st.title("Make Your Own Chatbot")
+st.write("Chat with me! Catch me at https://youtube.com/kgptalkie")
+base_url = "http://localhost:11434"
+model = 'llama3.2:latest'
+user_id = st.text_input("Enter your user id", "laxmikant")
+def get_session_history(session_id):
+    return SQLChatMessageHistory(session_id, "sqlite:///chat_history.db")
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if st.button("Start New Conversation"):
+    st.session_state.chat_history = []
+    history = get_session_history(user_id)
+    history.clear()
+for message in st.session_state.chat_history:
+    with st.chat_message(message['role']):
+        st.markdown(message['content'])
+### LLM Setup
+llm = ChatOllama(base_url=base_url, model=model)
+system = SystemMessagePromptTemplate.from_template("You are helpful assistant.")
+human = HumanMessagePromptTemplate.from_template("{input}")
+messages = [system, MessagesPlaceholder(variable_name='history'), human]
+prompt = ChatPromptTemplate(messages=messages)
+chain = prompt | llm | StrOutputParser()
+runnable_with_history = RunnableWithMessageHistory(chain, get_session_history, 
+                                                   input_messages_key='input', 
+                                                   history_messages_key='history')
+def chat_with_llm(session_id, input):
+    for output in runnable_with_history.stream({'input': input}, config={'configurable': {'session_id': session_id}}):
+        yield output
+prompt = st.chat_input("What is up?")
+# st.write(prompt)
+if prompt:
+    st.session_state.chat_history.append({'role': 'user', 'content': prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    with st.chat_message("assistant"):
+        response = st.write_stream(chat_with_llm(user_id, prompt))
+    st.session_state.chat_history.append({'role': 'assistant', 'content': response})
+```
+- Run as `streamlit run chatbot.py`
+
 ### 62. Stream Output of Your Chat Bot like ChatGPT
 
+## Section 10: Document Loaders | Projects on PDF Documents
 
+### 63. Introduction to PDF Document Loaders
+- Projects
+  - Question answering from a PDF file
+  - Summarizing the contents of a PDF file
+- PDF libraries
+  - https://pymupdf.readthedocs.io/en/latest/
+    - pip install -qU langchain-community pymupdf tiktoken
+  - PDFLoader from langchain
+- Dataset required
+  - git clone https://github.com/laxmimerit/rag-dataset
 
-63. Introduction to PDF Document Loaders
-64. Load Single PDF Document with PyMuPDFLoader
-65. Load All PDFs from a Directory
-66. Combine All PDFs Data as Context Text
-67. How Many Tokens are There in Contex Data.
-68. Make Question Answer Prompt Templates and Chain
-69. Project 1 - Ask Questions from Your PDF Documents
-70. Project 2 - Summarize Your PDF Documents
-71. Project 3 - Generate Detailed Structured Report from the PDF Documents
+### 64. Load Single PDF Document with PyMuPDFLoader
+```py
+from langchain_community.document_loaders import PyMuPDFLoader
+loader = PyMuPDFLoader("./rag-dataset/health supplements/1. dietary supplements - for whom.pdf") # space in the file name as it is
+docs = loader.load()
+len(docs)
+docs[0].metadata
+```
 
+### 65. Load All PDFs from a Directory
+```py
+import os
+pdfs = []
+for root, dirs, files, in os.walk("rag-dataset"):
+    #print(root,dirs,files)
+    for file in files:
+        if file.endswith(".pdf"):
+            pdfs.append(os.path.join(root,file))
+#print('\n'.join(pdfs))
+docs = []
+for pdf in pdfs:
+    loader = PyMuPDFLoader(pdf)
+    temp = loader.load()
+    docs.extend(temp)
+```
 
+### 66. Combine All PDFs Data as Context Text
+```py
+def format_docs(docs):
+    return("\n\n".join([x.page_content for x in docs]))
+context = format_docs(docs) # this will be several thousands of lines
+# llama 3.2 can handle 128k tokens
+```
 
-72. Introduction to Webpage Loaders
-73. Load Unstructured Stock Market Data
-74. Make LLM QnA Script
-75. Catastrophic Forgetting of LLM
-76. Break Down Large Text Data Into Chunks
-77. Create Stock Market News Summary for Each Chunks
-78. Generate Final Stock Market Report
+### 67. How Many Tokens are There in Contex Data.
+```py
+import tiktoken
+encoding = tiktoken.encoding_for_model("gpt-4o-mini") # this model works generally for LLM
+len(encoding.encode(docs[0].page_content)) # 1016
+len(encoding.encode(context)) # 22829
+```
+- Make sure that the number of total tokens is smaller than the limit (128K for llama3.2b)
 
+### 68. Make Question Answer Prompt Templates and Chain
+```py
+from langchain_ollama import ChatOllama
+from langchain_core.prompts import (SystemMessagePromptTemplate, 
+                                    HumanMessagePromptTemplate,
+                                    ChatPromptTemplate)
+from langchain_core.output_parsers import StrOutputParser
+base_url = "http://localhost:11434"
+model = "llama3.2:latest"
+llm = ChatOllama(base_url=base_url, model=model)
+#
+system = SystemMessagePromptTemplate.from_template("""You are helpful AI assistant who answers your question based on the provided context. 
+                                                   Do not answer in more than {words} words""")
+prompt = """Answer user question based on the provided context ONLY! If you do not know the answer, just say "I don't know"
+            ### Context:
+            {context}
+            ### Question:
+            {question}
+            ### Answer:"""
+prompt = HumanMessagePromptTemplate.from_template(prompt)
+messages = [system, prompt]
+template = ChatPromptTemplate(messages)
+#template
+template.invoke({'context':context, 'question':'How to gain muscle mass?', 'words':50})
+#
+qna_chain = template | llm | StrOutputParser()
+qna_chain
+```
 
+### 69. Project 1 - Ask Questions from Your PDF Documents
+```py
+response = qna_chain.invoke({'context':context, 'question':"How to gain muscle mass?", 'words':50})
+print(response)
+'''
+The answer was not related to the provided text. However, I can provide you with general information on how to gain muscle mass.
 
+To gain muscle mass, you need to combine proper nutrition with regular exercise and sufficient rest. Here are some tips:
 
-79. Introduction to Unstructured Data Loader
-80. Load .PPTX Data with DataLoader
-81. Process .PPTX data for LLM
-82. Generate Speaker Script for Your .PPTX Presentation
-83. Loading and Parsing Excel Data for LLM
-84. Ask Questions from LLM for given Excel Data
-85. Load .DOCX Document and Write Personalized Job Email
+1. **Eat enough protein**: Protein is essential for building and repairing muscles. Aim for 1-1.5 grams of protein per kilogram of body weight daily.
+2. **Increase caloric intake**: To build muscle, you need to be in a calorie surplus, meaning you consume more calories than your body burns. This will provide your body with the necessary energy to build and repair muscles.
+3. **Focus on compound exercises**: Compound exercises like squats, deadlifts, bench press, and rows work multiple muscle groups at once and are effective for building muscle.
+4. **Resistance training**: Resistance training is essential for building muscle. Focus on weightlifting exercises that challenge your muscles.
+5. **Progressive overload**: Gradually increase the weight or resistance you're lifting over time to challenge your muscles and stimulate growth.
+6. **Rest and recovery**: Adequate rest and recovery are crucial for muscle growth. Ensure you get 7-9 hours of sleep daily and take rest days as needed.
+7. **Consider supplements**: Certain supplements like protein powder, creatine, and HMB can help support muscle growth. However, always consult with a healthcare professional before adding any new supplements to your regimen.
 
+Remember, gaining muscle mass takes time, patience, and consistency. Stick to a well-planned workout and nutrition strategy, and you'll be on your way to building stronger muscles over time.
+'''
+```
+- Took 3m7sec without CUDA
+  - Took 1m17 sec with MX450 
+- This is not RAG
 
+### 70. Project 2 - Summarize Your PDF Documents
+```py
+system = SystemMessagePromptTemplate.from_template("""You are helpful AI assistant who answers your question based on the provided context. 
+                                                   Do not answer in more than {words} words""")
+prompt = """Answer user question based on the provided context ONLY! If you do not know the answer, just say "I don't know"
+            ### Context:
+            {context}
+            ### Summary:"""
+prompt = HumanMessagePromptTemplate.from_template(prompt)
+messages = [system, prompt]
+template = ChatPromptTemplate(messages)
+summary_chain = template | llm | StrOutputParser()
+response = summary_chain.invoke({'context':context, 'words':50})
+print(response)
+```
+- Took 8min without CUDA
 
-86. Load YouTube Video Subtitles
-87. Load YouTube Video Subtitles in 10 Mins Chunks
-88. Generate YouTube Keywords from the Transcripts
+### 71. Project 3 - Generate Detailed Structured Report from the PDF Documents
+```py
+response = qna_chain.invoke({'context':context, 'question':"provide a detailed report from the provided context. Write answer in markdown", 'words':2000})
+print(response)
+```
+- Print format with Markdown
 
+## Section 11: Document Loaders | Stock Market News Report Generation Project
 
+### 72. Introduction to Webpage Loaders
+- Handling HTML data
+- Ref: https://python.langchain.com/docs/how_to/document_loader_web/
+```py
+from langchain_community.document_loaders import WebBaseLoader
+urls = ['https://economictimes.indiatimes.com/markets/stocks/news',
+        'https://www.livemint.com/latest-news',
+        'https://www.livemint.com/latest-news/page-2',
+        'https://www.livemint.com/latest-news/page-3',
+        'https://www.moneycontrol.com']
+loader = WebBaseLoader(web_paths=urls)
+```
 
-89. Introduction to RAG Project
-90. Introduction to FAISS and Chroma Vector Database
-91. Load All PDF Documents
-92. Recursive Text Splitter to Create Documents Chunk
-93. How Important Chunk Size Selection is?
-94. Get OllamaEmbeddings
-95. Document Indexing in Vector Database
-96. How to Save and Search Vector Database
+### 73. Load Unstructured Stock Market Data
+```py
+docs = []
+async for doc in loader.alazy_load():
+    docs.append(doc)
+def format_docs(docs):
+    return "\n\n".join([x.page_content for x in docs])
+context = format_docs(docs) # now unstructured data are made    
+import re
+def text_clean(text):
+    text = re.sub(r'\n\n+','\n', text) # many new lines into one line
+    text = re.sub(r'\t+','\t', text) # many tabs into a tab
+    text = re.sub(r'\s+',' ',text) # many spaces into one space
+    return text
+context = text_clean(context)                
+```
 
+### 74. Make LLM QnA Script
+- Basically repetition of above-discussed contents
+- Save as llm.py:
+```py
+### Question Answering using LLM
+from langchain_ollama import ChatOllama
+from langchain_core.prompts import (SystemMessagePromptTemplate, 
+                                    HumanMessagePromptTemplate,
+                                    ChatPromptTemplate)
+from langchain_core.output_parsers import StrOutputParser
+base_url = "http://localhost:11434"
+model = 'llama3.2:latest'
+llm = ChatOllama(base_url=base_url, model=model)
+system = SystemMessagePromptTemplate.from_template("""You are helpful AI assistant who answer user question based on the provided context.""")
+prompt = """Answer user question based on the provided context ONLY! If you do not know the answer, just say "I don't know".
+            ### Context:
+            {context}
+            ### Question:
+            {question}
+            ### Answer:"""
+prompt = HumanMessagePromptTemplate.from_template(prompt)
+messages = [system, prompt]
+template = ChatPromptTemplate(messages)
+qna_chain = template | llm | StrOutputParser()
+def ask_llm(context, question):
+    return qna_chain.invoke({'context': context, 'question': question})
+```    
 
+### 75. Catastrophic Forgetting of LLM
+- Ref: https://cobusgreyling.medium.com/catastrophic-forgetting-in-llms-bf345760e6e2
+```py
+from scripts2 import llm
+response = llm.ask_llm(context, "Extract stock market news from the given text?")
+print(response)
+```
+- Took more than 4min on CPUs - why CUDA is not running?
+- Not answering well. The scope of data is too large
+  - Split the context into smaller pieces, then collect result on each. Finalize with merging results. See below
 
-97. Load Vector Database for RAG
-98. Get Vector Store as Retriever
-99. Exploring Similarity Search Types with Retriever
-100. Design RAG Prompt Template
-101. Build LLM RAG Chain
-102. Prompt Tuning and Generate Response from RAG Chain
+### 76. Break Down Large Text Data Into Chunks
+```py
+response = llm.ask_llm(context[:10_000], "Extract stock market news from the given text?")
+print(response)
+```
+- Took almost 2min on CPUs - CUDA is not running
+- Answers better than the above.
+- Let's split context while there must be some overlap as well:
+  - Some irrelevant information might be injected
+```py
+def chunk_text(text, chunk_size, overlap=100):
+    chunks = []
+    for i in range(0, len(text), chunk_size - overlap):
+        chunks.append(text[i:i + chunk_size])
+    return chunks
+chunks = chunk_text(context, 10_000)
+```
 
+### 77. Create Stock Market News Summary for Each Chunks
+```py
+question = "Extract stock market news from the given text."
+chunk_summary = []
+for chunk in chunks:
+    response = llm.ask_llm(chunk, question)
+    chunk_summary.append(response)
+for chunk in chunk_summary:
+    print(chunk)
+    print("\n\n")
+    break
+summary = "\n\n".join(chunk_summary)
+print(summary)
+```
+- Took ~15min
 
+### 78. Generate Final Stock Market Report
+```py
+question = """Write a detailed market news report in markdown format. Think carefully then write the report."""
+response = llm.ask_llm(summary, question)
+import os
+os.makedirs("data", exist_ok=True)
+with open("data/report.md", "w") as f:
+    f.write(response)
+with open("data/summary.md", "w") as f:
+    f.write(summary)
+```
 
-103. What is Tool Calling
-104. Available Search Tools at Langchain
-105. Create Your Custom Tools
-106. Bind tools with LLM
-107. Working with Tavily and DuckDuckGo Search Tools
-108. Working with Wikipedia and PubMed Tools
-109. Creating Tool Functions for In-Built Tools
-110. Calling Tools with LLM
-111. Passing Tool Calling Result to LLM Part 1
-112. Passing Tool Calling Result to LLM Part 2
+## Section 12: Document Loaders | Microsoft Office Files Reader and Projects
 
+### 79. Introduction to Unstructured Data Loader
+- PPT, EXCEL, WORD documents
+  - Key-notes and script generation for PPT
+  - Read table data from excel file
+  - Job description word file
+- pip install "unstructured[all-docs]"
+- pip install unstructured openpyxl python-magic python-pptx nltk
 
-113. How Agent Works
-114. Tools Preparation for Agent
-115. More About the Agent Working Process
-116. Selection of Prompt for Agent
-117. Agent in Action
+### 80. Load .PPTX Data with DataLoader
+```py
+from langchain_community.document_loaders import UnstructuredPowerPointLoader
+loader = UnstructuredPowerPointLoader("./data/ml_course.pptx", mode="elements")
+docs = loader.load()
+```
+- As the loader mode is 'elements', meta data like page number are available per element
+  - `len(docs)` = 47 in this example
+
+### 81. Process .PPTX data for LLM
+```py
+ppt_data = {}
+for doc in docs:
+    page = doc.metadata["page_number"]
+    ppt_data[page] = ppt_data.get(page,"") + "\n\n" + doc.page_content
+context = ""
+for page, content in ppt_data.items():
+    context += f"### slide {page}:\n\n{content.strip()}\n\n"
+```
+- Now context has following form:
+```bash
+### slide 1:
+
+Machine Learning Model Deployment
+
+Introduction to ML Pipeline
+
+https://bit.ly/bert_nlp
+
+### slide 2:
+...
+```
+    
+### 82. Generate Speaker Script for Your .PPTX Presentation
+```py
+from scripts2 import llm
+question = """
+For each powerpoint slide provided above, write a 2minute script that effectively conveys the key points.
+Ensure a smooth flow between slides, maintaining a clean and engaging narrative
+"""
+response =llm.ask_llm(context,question)
+print(response)
+with open("output.txt","w") as f:
+    f.write(response)
+```
+- output.txt:
+```bash
+Here is a 2-minute script for each PowerPoint slide:
+
+**Slide 1: Introduction to ML Pipeline**
+
+[Start with a brief introduction]
+Good morning everyone, today we're going to discuss the importance of Machine Learning 
+(ML) pipeline deployment. As we all know, ML models have the potential to revolutionize
+ many industries and applications. However, deploying these models effectively is cruci
+al for their success.
+
+[Show the slide with the title "Machine Learning Pipeline"]
+A machine learning pipeline refers to the process of developing, training, testing, and
+ deploying a machine learning model. It's essential to understand how ML pipelines work
+ before we dive into the different types of deployments.
+
+**Slide 2: What is Machine Learning Pipeline?**
+...
+```
+
+### 83. Loading and Parsing Excel Data for LLM
+- data/Sample.xlsx has a table of:
+```
+First Name	Last Name	City	Gender
+Brandon	James	Miami	M
+Sean	Hawkins	Denver	M
+Judy	Day	Los Angeles	F
+Ashley	Ruiz	San Francisco	F
+Stephanie	Gomez	Portland	F
+```
+- Loading excel file:
+```py
+from langchain_community.document_loaders import UnstructuredExcelLoader
+loader = UnstructuredExcelLoader("data/sample.xlsx",mode="elements")
+docs = loader.load()
+print(len(docs)) # 1 is printed as there is only one sheet
+docs[0].page_content
+context = docs[0].metadata['text_as_html']
+print(context)
+```
+
+### 84. Ask Questions from LLM for given Excel Data
+```py
+question = """
+Return this data in MarkdownFormat
+"""
+response = llm.ask_llm(context,question)
+print(response)
+```
+- Result:
+```
+| First Name | Last Name | City | Gender |
+|------------|-----------|-------|--------|
+| Brandon     | James      | Miami | M       |
+| Sean        | Hawkins    | Denver | M       |
+| Judy        | Day        | Los Angeles | F       |
+| Ashley      | Ruiz       | San Francisco | F       |
+| Stephanie   | Gomez      | Portland  | F       |
+```
+
+### 85. Load .DOCX Document and Write Personalized Job Email
+- pip install -U docx2txt
+```py
+from langchain_community.document_loaders import Docx2txtLoader
+loader = Docx2txtLoader("data/job_description.docx")
+docs = loader.load()
+context = docs[0].page_content
+context = docs[0].page_content
+question = """"
+Prepare a job application fitting with those job descriptions for a fresh collge student, who just completed a degree in computer science. The student name is Anita.
+"""
+response = llm.ask_llm(context,question)
+print(response)
+```
+- Result:
+```
+Here's a sample job application tailored to the requirements of SpiceJet's Data Scientist position, highlighting Anita's skills and qualifications as a recent Computer Science graduate:
+
+**Anita**
+**Contact Information:**
+
+* Email: [anita@email.com](mailto:anita@email.com)
+* Phone: 1234567890
+* LinkedIn: linkedin.com/in/anitacsc
+
+**Summary:**
+Highly motivated and detail-oriented computer science graduate seeking an entry-level Data Scientist position at SpiceJet. Proven analytical skills, programming experience in Python and R, and a strong understanding of statistical analysis and machine learning concepts. Eager to apply theoretical knowledge in real-world applications.
+
+**Education:**
+
+* Bachelor's degree in Computer Science, XYZ University (20XX-20XX)
+
+**Technical Skills:**
+
+* Programming languages: Python, R
+* Data science tools: Tableau, SQL, Excel
+* Machine learning platforms: Familiar with scikit-learn and TensorFlow
+* Statistics and mathematics: Strong understanding of probability theory, linear algebra, and calculus
+
+**Projects:**
+...
+**References:**
+Available upon request.
+
+As a fresh college graduate, Anita may not have extensive experience in data science or machine learning. However, she has demonstrated a strong foundation in computer science and a willingness to learn through her academic projects and internship experiences. By highlighting her technical skills, relevant coursework, and transferable experience, Anita can demonstrate her potential as an entry-level Data Scientist at SpiceJet.
+```
+
+## Section 13: Document Loaders | YouTube Video Transcripts and SEO Keywords Generator
+
+### 86. Load YouTube Video Subtitles
+- pip install youtube-transcript-api pytube
+  - When an Exception while accessing title of ... happens (PytubeError), python -m pip install git+https://github.com/WildDIC/pytube.git
+```py
+from langchain_community.document_loaders import YoutubeLoader
+url = "https://www.youtube.com/watch?v=vCyVVsdKJCg"
+loader = YoutubeLoader.from_youtube_url(url,add_video_info=True)
+docs = loader.load()
+```
+- HTTPError: HTTP Error 400: Bad Request
+- Forgetting issue
+  - If context is too large, breakdown them into smaller chunks
+
+### 87. Load YouTube Video Subtitles in 10 Mins Chunks
+```py
+from langchain_community.document_loaders.youtube import TranscriptFormat
+loader = YoutubeLoader.from_youtube_url(url,add_video_info=True, transcript_format=TranscriptFormat.CHUNKS, chunk_size_seconds=600)
+docs = loader.load()
+```
+
+### 88. Generate YouTube Keywords from the Transcripts
+```py
+from scripts2 import llm
+question = """
+   You are an assistant for generating SEO keywords for Youtube.
+   Please generate a list of keywords from the above context.
+   You can use your creativity and correct spelling if it is needed.
+"""
+keywords = []
+for doc in docs:
+    kws = llm.ask_llm(context=doc.page_content, question=question)
+    keywords.append(kws)
+keywords = ",  ". join(keywords)
+print(keywords)
+```
+
+## Section 14: Vector Stores and Retrievals
+
+### 89. Introduction to RAG Project
+![doc_ingestion](./ch89_ingestion.png)
+![retrieval](./ch89_retrieval.png)
+- The key is to generate FAISS or Chroma vector database
+- The Issue of catastrophic forgetting in LLM
+  - The oldes and the newest data are the most significant
+  - Intermediate data are forgotten
+  - Chunk-wise approach
+
+### 90. Introduction to FAISS and Chroma Vector Database
+- FAISS from Meta
+  - pip install -qU langchain-community faiss-cpu
+  - Ref: https://python.langchain.com/docs/integrations/vectorstores/faiss/
+- Chroma database for prototype development
+  - pip install -qU langchain-chroma
+  - Ref: https://python.langchain.com/docs/integrations/vectorstores/chroma/
+```py
+import os
+import warnings
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True' # when chroma conflicts with fiass
+warnings.filterwarnings("ignore")
+```
+
+### 91. Load All PDF Documents
+```py
+from langchain_community.document_loaders import PyMuPDFLoader
+pdfs = []
+for root,dirs,files in os.walk("rag-dataset"):
+    for file in files:
+        if file.endswith(".pdf"):
+            pdfs.append(os.path.join(root,file))
+docs = []
+for pdf in pdfs:
+    loader = PyMuPDFLoader(pdf)
+    temp = loader.load()
+    docs.extend(temp)
+print(len(docs))    
+```
+
+### 92. Recursive Text Splitter to Create Documents Chunk
+```py
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+chunks = text_splitter.split_documents(docs)
+```
+- Much simpler than the manual splitting in the Chap. 76
+
+### 93. How Important Chunk Size Selection is?
+```py
+import tiktoken
+encoding = tiktoken.encoding_for_model("gpt-4o-mini")
+encoding.encode(chunks[0].page_content)
+```
+
+### 94. Get OllamaEmbeddings
+- Ref: https://ollama.com/blog/embedding-models
+  - Embedding models are models that are trained specifically to generate vector embeddings
+  - The resulting vector embedding arrays can then be stored in a database, which will compare them as a way to search for data that is similar in meaning.
+```py
+from langchain_ollama import OllamaEmbeddings
+import faiss
+from langchain_community.vectorstores import FAISS
+from langchain_community.docstore.in_memory import InMemoryDocstore
+embedings = OllamaEmbeddings(model='nomic-embed-text:latest', base_url='http://localhost:11434')
+vector=embedings.embed_query("Hello world")
+print(len(vector)) # = 768
+```
+
+### 95. Document Indexing in Vector Database
+- The same embedding function must be used in embedding and retrieval steps
+```py
+index = faiss.IndexFlatL2(len(vector))
+vector_store = FAISS(
+  embedding_function=embeddings,
+  index=index,
+  docstore=InMemoryDocstore(),
+  index_to_docstore_id={},
+)
+print(vector_store.index.ntotal, vector_store.index.d) # 0, 768
+ids = vector_store.add_documents(documents=chunks)
+print(len(ids), vector_store.index.ntotal)
+```
+
+### 96. How to Save and Search Vector Database
+```py
+index = faiss.IndexFlatL2(len(vector))
+vector_store = FAISS(
+  embedding_function=embeddings,
+  index=index,
+  docstore=InMemoryDocstore(),
+  index_to_docstore_id={},
+)
+print(vector_store.index.ntotal, vector_store.index.d)
+ids = vector_store.add_documents(documents=chunks) # took > 6min
+print(len(ids), vector_store.index.ntotal) # 1259 1259
+question = "how ot gain muscle mass?"
+docs = vector_store.search(query=question, k=5, search_type="similarity")
+#print(docs)
+db_name = "health_supplements"
+vector_store.save_local(db_name) # this creates a new folder of health_supplements with faiss file and pkl
+```
+
+## Section 15: RAG | Question Answer Over the Health Supplements Data
+
+### 97. Load Vector Database for RAG
+- RAG: Retrieval-Augmented Generation
+- How to create a reponse using vector database
+```py
+import os
+import warnings
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True' # when chroma conflicts with fiass
+warnings.filterwarnings("ignore")
+from langchain_ollama import OllamaEmbeddings
+import faiss
+from langchain_community.vectorstores import FAISS
+from langchain_community.docstore.in_memory import InMemoryDocstore
+embeddings = OllamaEmbeddings(model='nomic-embed-text:latest', base_url='http://localhost:11434')
+# the embedding function must be same to the one used  in the embedding step
+db_name = "health_supplements"
+vector_store = FAISS.load_local(db_name,embeddings, allow_dangerous_deserialization=True)
+# Retrieval
+question = "how to gain muscle mass?"
+docs = vector_store.search(query=question, k=5, search_type="similarity")
+print(docs)
+```
+
+### 98. Get Vector Store as Retriever
+```py
+retriever = vector_store.as_retriever(search_type="similarity", 
+                                      search_kwargs = {'k':3})
+retriever.invoke(question)
+```
+
+### 99. Exploring Similarity Search Types with Retriever
+- Search type in retriever
+  - Ref: https://python.langchain.com/docs/how_to/vectorstore_retriever/
+  - similarity: Default. Returns documents most similar to the query
+  - mmr: Maximal Marginal Relevance to optimize for similarity to the query
+    - lambda_mult: 1 for minimum diversity/0 for the maximum. Default is 0.5
+    - fetch_k: amount of documents to pass to MMR
+  - similarity_score_threshold: filters documents based on a similarity score threshold
+```py
+# Using similarity_score_threshold
+retriever = vector_store.as_retriever(search_type="similarity_score_threshold", 
+                                      search_kwargs = {'k':3, 'score_threshold':0.1})
+retriever.invoke(question)
+# Using mmr
+retriever = vector_store.as_retriever(search_type="mmr", 
+                                      search_kwargs = {'k':3, 'fetch_k':20, 'lambda_mult':1})
+retriever.invoke(question)
+```
+
+### 100. Design RAG Prompt Template
+```py
+from langchain_ollama import ChatOllama
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate
+from langchain import hub
+#prompt = hub.pull("rlm/rag-prompt") # from https://smith.langchain.com/hub/rlm/rag-prompt
+#print(prompt)
+prompt = """
+You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.  
+Question: {question}
+Context: {context}
+Answer:"""
+prompt = ChatPromptTemplate.from_template(prompt)
+```
+
+### 101. Build LLM RAG Chain
+```py
+llm = ChatOllama(model='llama3.2:latest', base_url='http://localhost:11434')
+def format_docs(docs):
+    return "\n\n".join([doc.page_content for doc in docs])
+context = format_docs(docs)
+rag_chain = (
+  {'context': retriever|format_docs, 'question':RunnablePassthrough()}
+  | prompt
+  | llm
+  | StrOutputParser()
+)
+```
+
+### 102. Prompt Tuning and Generate Response from RAG Chain
+```py
+question = "How to lose weight?"
+response = rag_chain.invoke(question)
+print(response)
+```
+- Try some prompt engineering, providing bullets to be brief
+
+## Section 16: Tool and Function Calling
+
+### 103. What is Tool Calling
+- LLM automatically calls the function based on the query
+- Function parameters are automaically passed to the function
+- Essential requirements for the Agent
+- Not all LLM supports tool calling
+- Briefly, instead of natural language, we can give better instruction to LLM through function/tool calling
+  - Providing meta-data explicitly
+```py
+from langchain_ollama import ChatOllama
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate
+llm = ChatOllama(model='llama3.2:latest', base_url='http://localhost:11434')
+llm.invoke('hi')
+```
+
+### 104. Available Search Tools at Langchain
+### 105. Create Your Custom Tools
+### 106. Bind tools with LLM
+### 107. Working with Tavily and DuckDuckGo Search Tools
+### 108. Working with Wikipedia and PubMed Tools
+### 109. Creating Tool Functions for In-Built Tools
+### 110. Calling Tools with LLM
+### 111. Passing Tool Calling Result to LLM Part 1
+### 112. Passing Tool Calling Result to LLM Part 2
+
+## Section 17: Agents
+
+### 113. How Agent Works
+### 114. Tools Preparation for Agent
+### 115. More About the Agent Working Process
+### 116. Selection of Prompt for Agent
+### 117. Agent in Action
 
 
 118. Create MySQL Connection with Local Server
