@@ -1545,42 +1545,333 @@ llm.invoke('hi')
 ```
 
 ### 104. Available Search Tools at Langchain
+- https://python.langchain.com/docs/integrations/tools/
+  - tavily.com: 1000 free search
+  - DuckDuckgoSearch: Free
+
 ### 105. Create Your Custom Tools
+- How to call in-built tool
+```py
+from langchain_core.tools import tool
+@tool
+def add(a,b):
+  """
+  Add two integer numbers together
+  Args:
+  a: First integer
+  b: Second integer
+  """
+  return a+b
+@tool # makes the function runnable
+def multiply(a,b):
+  """
+  multiply two integer numbers together
+  Args:
+  a: First integer
+  b: Second integer
+  """
+  return a*b
+add # StructuredTool(name='add', description='Add two integer numbers together\nArgs:\na: First integer\nb: Second integer', args_schema=<class 'langchain_core.utils.pydantic.add'>, func=<function add at 0x7bb01102a200>)
+print(add.name, add.description)  
+```
+
 ### 106. Bind tools with LLM
+```py
+# add(1,2) # this crashes
+add.invoke({'a': 1,'b': 2}) # now works OK
+myTools = [add,multiply]
+llm_with_tools = llm.bind_tools(myTools)
+question  = "what is 1 plus 2?"
+llm_with_tools.invoke(question)
+"""
+AIMessage(content='', additional_kwargs={}, response_metadata={'model': 'llama3.2:latest', 'created_at': '2025-10-01T00:35:24.470173731Z', 'done': True, 'done_reason': 'stop', 'total_duration': 3097237603, 'load_duration': 83336301, 'prompt_eval_count': 246, 'prompt_eval_duration': 173726198, 'eval_count': 16, 'eval_duration': 2838791331, 'model_name': 'llama3.2:latest'}, id='run--5c0b2c45-392d-49d3-9c39-0e58b4b121ba-0', tool_calls=[{'name': 'add', 'args': {'a': 1, 'b': 2}, 'id': 'ec4306c6-c421-4e22-a6b2-9ce0299004a9', 'type': 'tool_call'}], usage_metadata={'input_tokens': 246, 'output_tokens': 16, 'total_tokens': 262})
+"""
+llm_with_tools.invoke(question).tool_calls
+"""
+[{'name': 'add',
+  'args': {'a': 1, 'b': 2},
+  'id': 'fb59adc1-d459-4a23-b7f9-71b524b016df',
+  'type': 'tool_call'}]
+"""
+```
+
 ### 107. Working with Tavily and DuckDuckGo Search Tools
+- Ref: https://python.langchain.com/docs/integrations/tools/ddg/
+- pip install duckduckgo-search ddgs wikipedia xmltodict tavily-python langchain-community
+```py
+from langchain_community.tools import DuckDuckGoSearchRun
+search = DuckDuckGoSearchRun()
+search.invoke("What is today's stock market news?")
+```
+
 ### 108. Working with Wikipedia and PubMed Tools
+- Ref: https://python.langchain.com/docs/integrations/tools/wikipedia/
+```py
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
+wikipedia = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+question  = "What is the Capital of France?"
+wikipedia.invoke(question)
+```
+- Ref: https://python.langchain.com/docs/integrations/tools/pubmed/
+```py
+from langchain_community.tools.pubmed.tool import PubmedQueryRun
+search =  PubmedQueryRun()
+print(search.invoke("What is the latest search on COVID-19?"))
+```
+  - ? Not working?
+
 ### 109. Creating Tool Functions for In-Built Tools
+```py
+@tool
+def wikipedia_seach(query):
+    """
+    Search wikipedia for general information
+    Args:
+    query: the search query
+    """
+    wikipedia = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+    response = wikipedia.invoke(query)
+    return response
+@tool
+def pubmed_search(query):
+    """
+    Search wikipedia for general information
+    Args:
+    query: the search query
+    """
+    search = PubmedQueryRun()
+    response = search.invoek(query)
+    return response
+tools = [wikipedia_seach, pubmed_search]
+```
+- Comment section is required in @tool
+
 ### 110. Calling Tools with LLM
+```py
+list_of_tools = { tool.name: tool for tool in tools }
+llm_with_tools = llm.bind_tools(tools)
+query  = "what is 2 * 3?"
+response = llm_with_tools.invoke(query)
+print(response.tool_calls)
+```
+
 ### 111. Passing Tool Calling Result to LLM Part 1
+- How to couple a local LLM with external search engines
+![ch111](./ch111.png)
+```py
+from langchain_core.messages import HumanMessage
+query  = "what is 2 * 3?"
+messages = [HumanMessage(query)]
+ai_msg = llm_with_tools.invoke(messages)
+messages.append(ai_msg)
+```
+
 ### 112. Passing Tool Calling Result to LLM Part 2
+```py
+for tool_call in ai_msg.tool_calls:
+    print(tool_call)
+    name = tool_call['name'].lower()
+    selected_tool = list_of_tools[name]
+    tool_msg = selected_tool.invoke(tool_call['args'])
+    messages.append(tool_msg)
+response = llm_with_tools.invoke(messages)
+print(response.content)    
+```
 
 ## Section 17: Agents
 
 ### 113. How Agent Works
+- Agents are systems that use an LLM as a reasoning engine to determine which actions to take and what inputs to those actions must be
+
 ### 114. Tools Preparation for Agent
+```py
+from langchain_ollama import ChatOllama 
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough 
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
+llm = ChatOllama(model='llama3.2:latest', base_url='http://localhost:11434')
+#llm.invoke('hi')
+from langchain_community.tools import DuckDuckGoSearchRun
+@tool
+def search(query:str) -> str:
+    """
+    Search ddg
+    Ags:
+    query: The search query
+    """
+    search = DuckDuckGoSearchRun()
+    search.invoke(query)
+    return response
+from langchain_ollama import OllamaEmbeddings
+import faiss
+from langchain_community.vectorstores import FAISS
+from langchain_community.docstore.in_memory import InMemoryDocstore
+embeddings = OllamaEmbeddings(model='nomic-embed-text', base_url='http://localhost:11434')
+db_name = "health_supplements"
+vector_store = FAISS.load_local(db_name, embeddings, allow_dangerous_deserialization=True)
+retriever = vector_store.as_retriever(search_type = 'similarity', 
+                                      search_kwargs = {'k': 3})
+@tool
+def health_supplements(query: str) -> str:
+    """Search for information about Health Supplements.
+    For any questions about Health and Gym Supplements, you must use this tool!,
+
+    Args:
+        query: The search query.
+    """
+    response = retriever.invoke(query)
+    return response
+health_supplements.invoke("what is the best supplement for muscle gain?")    
+```
+
 ### 115. More About the Agent Working Process
+- The agent is responsible for taking in input and deciding what actions to take
+- The Agent does not execute those actions - done by AgentExecutor
+- `create_tool_calling_agent` will call `.bind_tools` for us under the hood
+
 ### 116. Selection of Prompt for Agent
+```py
+from langchain import hub
+from langchain.agents import create_tool_calling_agent
+from langchain.agents import AgentExecutor
+prompt = hub.pull("hwchase17/openai-functions-agent")
+prompt.messages
+```
+
 ### 117. Agent in Action
+```py
+tools = [search, health_supplements]
+agent = create_tool_calling_agent(llm,tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+question = "What is the best supplement for muscle gain?"
+response = agent_executor.invoke({'input':question})
+"""
+> Entering new AgentExecutor chain...
+Invoking: `health_supplements` with `{'query': 'muscle gain supplements'}`
+...
+"""
+print(response)
+"""
+{'input': 'What is the best supplement for muscle gain?', 'output': "Based on the provided documents, ...
+"""
+```
 
+## Section 18: Text to MySQL Queries | With and Without Agents
 
-118. Create MySQL Connection with Local Server
-119. Get MySQL Execution Chain
-120. Correct Malformed MySQL Queries Using LLM
-121. MySQL Query Chain Execution
-122. MySQL Query Execution with Agents in LangGraph
+### 118. Create MySQL Connection with Local Server
+- Build Q&A systems of SQL database
+  - Executes model-generated SQL queries
+- Make DB as read-only for this example
+- pip install pymysql
+```py
+from langchain_ollama import ChatOllama 
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough 
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
+llm = ChatOllama(model='llama3.2:3b', base_url='http://localhost:11434')
+from langchain_community.utilities import SQLDatabase
+db = SQLDatabase.from_uri("mysql+pymysql://root:root@localhost/employees")
+db.dialect
+db.get_usable_table_names()
+db.run("SELECT * FROM employees LIMIT 5")
+```
 
+### 119. Get MySQL Execution Chain
+```py
+from langchain.chains import create_sql_query_chain
+sql_chain = create_sql_query_chain(llm, db)
+sql_chain.get_prompts()[0].pretty_print()
+question = "how many employees are there? You MUST RETURN ONLY MYSQL QUERIES."
+response = sql_chain.invoke({'question': question})
+print(response)
+```
 
-123. Introduction
-124. Introduction to LinkedIn Profile Scraping
-125. Introduction to Selenium and BeautifulSoup bs4
-126. Code Notebook Setup
-127. Automated Login to LinkedIn Using Selenium Web Driver Tool
-128. Load LinkedIn Profile Source Data with BeautifulSoup
-129. Get the Profile Data Section wise
-130. Text Cleaning for LLM
-131. Parse Your First Section and Limits of LLAMA or Any Smaller Models
-132. Parse LinkedIn Data Section wise
-133. Correct LinkedIn Parsing using Second LLM Call
+### 120. Correct Malformed MySQL Queries Using LLM
+```py
+from scripts.llm import ask_llm
+from langchain_core.runnables import chain
+@chain
+def get_correct_sql_query(input):
+    context = input['context']
+    question = input['question']
+    intruction = """
+        Use above context to fetch the correct SQL query for following question
+        {}
+
+        Do not enclose query in ```sql and do not write preamble and explanation.
+        You MUST return only single SQL query.
+    """.format(question)
+    response = ask_llm(context=context, question=intruction)
+    return response
+response = get_correct_sql_query.invoke({'context': response, 'question': question})
+db.run(response)
+```
+
+### 121. MySQL Query Chain Execution
+```py
+from langchain_community.tools.sql_database.tool import QuerySQLDataBaseTool
+execute_query = QuerySQLDataBaseTool(db=db)
+sql_query = create_sql_query_chain(llm, db)
+final_chain = (
+    {'context': sql_query, 'question': RunnablePassthrough()}
+    | get_correct_sql_query
+    | execute_query
+)
+question = "how many employees are there? You MUST RETURN ONLY MYSQL QUERIES."
+response = final_chain.invoke({'question': question})
+print(response)
+```
+
+### 122. MySQL Query Execution with Agents in LangGraph
+- pip install langgraph
+```py
+from langchain_community.agent_toolkits import SQLDatabaseToolkit
+toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+tools = toolkit.get_tools()
+from langchain_core.messages import SystemMessage
+SQL_PREFIX = """You are an agent designed to interact with a SQL database.
+Given an input question, create a syntactically correct SQLite query to run, then look at the results of the query and return the answer.
+Unless the user specifies a specific number of examples they wish to obtain, always limit your query to at most 5 results.
+You can order the results by a relevant column to return the most interesting examples in the database.
+Never query for all the columns from a specific table, only ask for the relevant columns given the question.
+You have access to tools for interacting with the database.
+Only use the below tools. Only use the information returned by the below tools to construct your final answer.
+You MUST double check your query before executing it. If you get an error while executing a query, rewrite the query and try again.
+
+DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP etc.) to the database.
+
+To start you should ALWAYS look at the tables in the database to see what you can query.
+Do NOT skip this step.
+Then you should query the schema of the most relevant tables."""
+system_message = SystemMessage(content=SQL_PREFIX)
+from langchain_core.messages import HumanMessage
+from langgraph.prebuilt import create_react_agent
+agent_executor = create_react_agent(llm, tools, state_modifier=system_message, debug=False)
+question = "How many employees are there?"
+# question = "How many departments are there?"
+agent_executor.invoke({"messages": [HumanMessage(content=question)]})
+for s in agent_executor.stream(
+    {"messages": [HumanMessage(content=question)]}):
+    print(s)
+    print("----")
+```
+
+## Section 19: Linkedin Profile Scraping Using LLM
+
+### 123. Introduction
+### 124. Introduction to LinkedIn Profile Scraping
+### 125. Introduction to Selenium and BeautifulSoup bs4
+### 126. Code Notebook Setup
+### 127. Automated Login to LinkedIn Using Selenium Web Driver Tool
+### 128. Load LinkedIn Profile Source Data with BeautifulSoup
+### 129. Get the Profile Data Section wise
+### 130. Text Cleaning for LLM
+### 131. Parse Your First Section and Limits of LLAMA or Any Smaller Models
+### 132. Parse LinkedIn Data Section wise
+### 133. Correct LinkedIn Parsing using Second LLM Call
 
 
 134. Introduction to Resume Parsing
