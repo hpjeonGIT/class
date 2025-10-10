@@ -516,3 +516,50 @@ endif()
 ```
 
 ## Section 10: Bonus
+
+
+
+## Extra work
+
+### 1. Nvidia hpc sdk
+- CMakeLists.txt:
+```bash
+cmake_minimum_required(VERSION 3.10)
+project(MyMPIProject VERSION 1.0.0)
+# Find MPI with C++ components
+find_package(MPI)
+# Add an executable target
+add_executable(my_mpi_app main.cpp)
+# (Optional) Display information about the found MPI setup
+message(STATUS "MPI CXX Compiler: ${MPI_CXX_COMPILER}")
+message(STATUS "MPI CXX Libraries: ${MPI_CXX_LIBRARIES}")
+message(STATUS "MPI CXX Include Path: ${MPI_CXX_INCLUDE_PATH}")
+message(STATUS "MPI CXX Compile Flags: ${MPI_CXX_COMPILE_FLAGS}")
+message(STATUS "MPI CXX Link Flags: ${MPI_CXX_LINK_FLAGS}")
+```
+- Screen shot:
+```bash
+$ cmake ..
+-- The C compiler identification is NVHPC 25.3.0
+-- The CXX compiler identification is NVHPC 25.3.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/compilers/bin/nvc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/compilers/bin/nvc++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found MPI_C: /home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/12.8/hpcx/hpcx-2.22.1/ompi/lib/libmpi.so (found version "3.1") 
+-- Found MPI_CXX: /home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/12.8/hpcx/hpcx-2.22.1/ompi/lib/libmpi.so (found version "3.1") 
+-- Found MPI: TRUE (found version "3.1")  
+-- MPI CXX Compiler: /home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/mpi/bin/mpicxx
+-- MPI CXX Libraries: /home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/12.8/hpcx/hpcx-2.22.1/ompi/lib/libmpi.so
+-- MPI CXX Include Path: /home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/12.8/hpcx/hpcx-2.22.1/ompi/include;/home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/12.8/hpcx/hpcx-2.22.1/ompi/include/openmpi;/home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/12.8/hpcx/hpcx-2.22.1/ompi/include/openmpi/opal/mca/hwloc/hwloc201/hwloc/include;/home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/12.8/hpcx/hpcx-2.22.1/ompi/include/openmpi/opal/mca/event/libevent2022/libevent;/home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/12.8/hpcx/hpcx-2.22.1/ompi/include/openmpi/opal/mca/event/libevent2022/libevent/include
+-- MPI CXX Compile Flags: -pthread
+-- MPI CXX Link Flags: -Wl,-rpath -Wl,/home/hpjeon/sw_local/hpc_sdk/Linux_x86_64/25.3/comm_libs/12.8/hpcx/hpcx-2.22.1/ompi/lib -Wl,--enable-new-dtags -pthread
+-- Configuring done (1.5s)
+-- Generating done (0.0s)
+```
