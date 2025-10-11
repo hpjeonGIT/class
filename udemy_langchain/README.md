@@ -1862,28 +1862,312 @@ for s in agent_executor.stream(
 ## Section 19: Linkedin Profile Scraping Using LLM
 
 ### 123. Introduction
+- Reading linkedin page, then get json results
+- Automate using selenium and BeautifulSoup
+- Use LLM to extract information
+
 ### 124. Introduction to LinkedIn Profile Scraping
+- Reading main container from HTML pages
+
 ### 125. Introduction to Selenium and BeautifulSoup bs4
+- Using selenium to browse from Python
+  - Ref: https://www.selenium.dev/documentation/
+- BeautifulSoup: html parser
+
 ### 126. Code Notebook Setup
+- YouTube Video: https://youtu.be/SQtwhuYJk3M
+  - Scrap HTML using classical methods
+- pip install python-dotenv selenium beautifulsoup4
+```py
+import warnings
+warnings.filterwarnings("ignore")
+import os
+from dotenv import load_dotenv
+load_dotenv()
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+driver = webdriver.Chrome()
+driver.get('https://www.linkedin.com/login')
+```
+
 ### 127. Automated Login to LinkedIn Using Selenium Web Driver Tool
+```py
+email = driver.find_element(By.ID, 'username')
+email.send_keys(os.getenv('EMAIL'))
+password = driver.find_element(By.ID, 'password')
+password.send_keys(os.getenv('PASSWORD'))
+password.submit()
+```
+- How to read each section(or card) in the linkedin page?
+  - By LLM
+
 ### 128. Load LinkedIn Profile Source Data with BeautifulSoup
+```py
+## MAKE SURE TO USE ONLY THIS URL TO AVOID BEING STUCK IN ERRORS
+url = "https://www.linkedin.com/in/laxmimerit"
+driver.get(url)
+page_source = driver.page_source
+soup = BeautifulSoup(page_source, 'lxml')
+soup.get_text()
+profile = soup.find('main', {'class': 'scaffold-layout__main'})
+# print(profile.get_text())
+```
+- Some words are duplicated due to Linkedin's internal structure
+
 ### 129. Get the Profile Data Section wise
+```py
+sections = profile.find_all('section', {'class': 'artdeco-card'})
+len(sections)
+sections_text = [section.get_text() for section in sections]
+```
+- LLM can recognize content through each section
+
 ### 130. Text Cleaning for LLM
+```py
+import re
+# remove multiple new lines and tabs
+def clean_text(text):
+    text = re.sub(r'\n+', '\n', text)
+    text = re.sub(r'\t+', '\t', text)
+    text = re.sub(r'\t\s+', ' ', text)
+    text = re.sub(r'\n\s+', '\n', text)
+    return text
+sections_text = [clean_text(section) for section in sections_text]
+def remove_duplicates(text): # removes such as ContentsContents
+    lines = text.split('\n')
+    new_lines = []
+    for line in lines:
+        if line[:len(line)//2] == line[len(line)//2:]:
+            new_lines.append(line[:len(line)//2])
+        else:
+            new_lines.append(line)
+
+    return '\n'.join(new_lines)
+
+sections_text = [remove_duplicates(section) for section in sections_text]
+```
+
 ### 131. Parse Your First Section and Limits of LLAMA or Any Smaller Models
+```py
+from langchain_ollama import ChatOllama
+from langchain_core.prompts import (SystemMessagePromptTemplate, 
+                                    HumanMessagePromptTemplate,
+                                    ChatPromptTemplate)
+from langchain_core.output_parsers import StrOutputParser
+base_url = "http://localhost:11434"
+model = 'llama3.2:latest'
+#model = "qwen2.5:7b"
+llm = ChatOllama(base_url=base_url, model=model)
+system = SystemMessagePromptTemplate.from_template("""You are helpful AI assistant who answer LinkedIn profile parsing related 
+                                                    user question based on the provided profile text data.""")
+def ask_llm(prompt):
+    prompt = HumanMessagePromptTemplate.from_template(prompt)
+
+    messages = [system, prompt]
+    template = ChatPromptTemplate(messages)
+
+    qna_chain = template | llm | StrOutputParser()
+
+    return qna_chain.invoke({})
+ask_llm("hello")   
+template = """
+Extract and return the requested information from the LinkedIn profile data in a concise, point-by-point format (up to 5 points). Avoid preambles or any additional context.
+### LinkedIn Profile Data:
+{}
+### Information to Extract:
+Extract '{}' in bullet points, limiting the output to 5 points. Provide only the necessary details.
+Remember, It is LinkedIn profile data.
+### Extracted Data:"""
+context = sections_text[0]
+k = "Name and Headline"
+prompt = template.format(context, k)
+response = ask_llm(prompt) 
+```
+
 ### 132. Parse LinkedIn Data Section wise
+- As llama3.2 didn't yield good results, we try qwen 7b model
+```py
+section_keys = ['Name and Headline']
+for section in sections_text[1:]:
+    # print(section.strip().split('\n'))
+    section_keys.append(section.strip().split('\n')[0])
+section_keys
+# sections_text
+responses = {}
+for k,context in zip(section_keys, sections_text):
+    prompt = template.format(context, k)
+    response = ask_llm(prompt=prompt)
+    responses[k] = response
+```
+
 ### 133. Correct LinkedIn Parsing using Second LLM Call
+```py
+import json
+with open('linkedin_profile_data.json', 'w') as f:
+    json.dump(responses, f, indent=4)
+template = """You are provided with LinkedIn profile data in JSON format.
+            Parse the data according to the specified schema, correct any spelling errors,
+            and condense the information if possible.
+### LinkedIn Profile JSON Data:
+{context}
+### Schema You need to follow:
+You need to extract
+Name:
+Headline:
+About:
+Experience:
+Education:
+Skills:
+Projects:
+Summary:
 
+Do not return preambles or any other information.
+### Parsed Data:"""
+prompt = template.format(context=responses).replace("{", "{{").replace("}", "}}")
+response = ask_llm(prompt=prompt)
+# response
+```
 
-134. Introduction to Resume Parsing
-135. Read Resume Data and Prepare Context and Question
-136. Prepare Parsing and Validation LLM Pipeline
-137. Parse and Validate Any Resume Data into JSON file
-138. Make Resume Parsing Streamlit Application
-139. Parse Any Type of Resume with LLM and Streamlit 
+## Section 20: Resume Parsing with LLM
 
+### 134. Introduction to Resume Parsing
+- Reading a resume pdf, extract a json result
 
+### 135. Read Resume Data and Prepare Context and Question
+```py
+from langchain_community.document_loaders import PyMuPDFLoader
+filename = 'resume-2.pdf'
+loader = PyMuPDFLoader(filename)
+docs = loader.load()
+print(docs[0].page_content)
+context = docs[0].page_content
+question = """You are tasked with parsing a job resume. Your goal is to extract relevant information in a valid structured 'JSON' format. 
+                Do not write preambles or explanations."""
+```
 
-140. Launch Deep Learning AWS EC2 Ubuntu Machine
-141. Installing Ollama and Langchain on EC2 Server
-142. Connect Your VS Code with Remote EC2 Server
-143. Deploy LLM Application on the Server
+### 136. Prepare Parsing and Validation LLM Pipeline
+- llm.py:
+```py
+from langchain_ollama import ChatOllama
+from langchain_core.prompts import (SystemMessagePromptTemplate, 
+                                    HumanMessagePromptTemplate,
+                                    ChatPromptTemplate)
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
+base_url = "http://localhost:11434"
+model = 'llama3.2:latest'
+# model = 'qwen2.5:7b'
+llm = ChatOllama(base_url=base_url, model=model)
+system = SystemMessagePromptTemplate.from_template("""You are helpful AI assistant who answer user question based on the provided context.""")
+prompt = """
+            **Task:** Extract key information from the following resume text.
+            **Resume Text:**
+            {context}
+            **Instructions:**
+            Please extract the following information and format it in a clear structure:
+            1. **Contact Information:**
+            - Name:
+            - Email:
+            - Phone Number:
+            - Website/Portfolio:
+            2. **Education:**
+            - Institution Name:
+            - Degree:
+            - Field of Study:
+            - Graduation Dates:
+            3. **Experience:**
+            - Job Title:
+            - Company Name:
+            - Location:
+            - Dates of Employment:
+            - Responsibilities/Projects:
+            4. **Projects:**
+            - Project Title:
+            - Description/Technologies Used:
+            - Outcomes/Results:
+            5. **Skills:**
+            - Programming Languages:
+            - Technologies/Tools:
+            6. **Additional Information:** (if applicable)
+            - Certifications:
+            - Awards or Honors:
+            - Professional Affiliations:
+            - Languages:
+            **Question:**
+            {question}
+            **Extracted Information:**
+        """
+prompt = HumanMessagePromptTemplate.from_template(prompt)
+def ask_llm(context, question):
+    messages = [system, prompt]
+    template = ChatPromptTemplate(messages)
+    qna_chain = template | llm | StrOutputParser()
+    return qna_chain.invoke({'context': context, 'question': question})
+def validate_json(data):
+    json_prompt = """
+            Please validate and correct the following JSON data:
+            **Extracted Information:**
+            {data}
+            Provide only the corrected JSON, with no preamble or explanation.
+            **Corrected JSON:**"""
+    json_prompt = HumanMessagePromptTemplate.from_template(json_prompt)
+    json_messages = [system, json_prompt]
+    json_template = ChatPromptTemplate(json_messages)
+
+    json_chain = json_template | llm | JsonOutputParser()
+    return json_chain.invoke({'data': data})
+```
+
+### 137. Parse and Validate Any Resume Data into JSON file
+```py
+from scripts.llm import ask_llm, validate_json
+response = ask_llm(context=context, question=question)  # invalid json results are found
+response = validate_json(response)
+print(response)
+```
+
+### 138. Make Resume Parsing Streamlit Application
+- Ref: https://www.youtube.com/watch?v=hff2tHUzxJM&list=PLc2rvfiptPSSpZ99EnJbH5LjTJ_nOoSWW
+- app.py:
+```py
+import streamlit as st
+import pymupdf
+from scripts.llm import ask_llm, validate_json
+st.title("Resume Parsing")
+st.write("Upload a resume in PDF format to extract information")
+uploaded_file = st.file_uploader("Choose a file")
+if uploaded_file is not None:
+    bytearray = uploaded_file.read()
+    pdf = pymupdf.open(stream=bytearray, filetype="pdf")
+    context = ""
+    for page in pdf:
+        context = context + "\n\n" + page.get_text()
+    pdf.close()
+question = """You are tasked with parsing a job resume. Your goal is to extract relevant information in a valid structured 'JSON' format. 
+                Do not write preambles or explanations."""
+if st.button("Parse Resume"):
+    with st.spinner("Parsing Resume..."):
+        response = ask_llm(context=context, question=question)
+    with st.spinner("Validating JSON..."):
+        response = validate_json(response)
+    st.write("**Extracted Information**")
+    st.write(response)
+    st.write("You can copy the JSON output and use it in your application.")
+    st.balloons()
+```    
+
+### 139. Parse Any Type of Resume with LLM and Streamlit 
+
+## Section 21: Deploy Resume Parser LLM Application in Production
+
+### 140. Launch Deep Learning AWS EC2 Ubuntu Machine
+- How to deploy LLM application into cloud service
+- Select Deep Learning OSS Nvidia driver image to avoid the manual installation of pytorch
+- c7 instance is recommended due to computing power requirement
+
+### 141. Installing Ollama and Langchain on EC2 Server
+- pip install langchain_ollama streamlit lanchain_pymupdf
+
+### 142. Connect Your VS Code with Remote EC2 Server
+
+### 143. Deploy LLM Application on the Server
