@@ -4189,160 +4189,2444 @@ int main() {
 ## Section 11: Move Semantics
 
 ### 154. Move Semantics
-### 155. Lvalues and Rvalues
-### 156. Lvalue and Rvalue References
-### 157. Value Categories
-### 158. Move Operators
-### 159. RAII Class with Move Operators
-### 160. Move-only Types and RAII
-### 161. Special Member Functions in C++11
-### 162. Using Special Member Functions in C++11
-### 163. Function Arguments and Move Semantics
-### 164. Forwarding References
-### 165. Perfect Forwarding
-### 166. Perfect Forwarding Practical
+- In swap(), we can save time by exchanging data instead of copying it
+  - With move semantics, we can save time by moving data in and out of function calls
+- Value semantics
+  - C++ often use value semantics, in which data is copied
+    - By default, function arguments are passed by value
+    - By default, functions return by value
+  - STL containers copy data into their elements
+    - Using references is not allowed - to prevent dangling references
+    - Pointers might be used but at the risk of dangle or memory leaks
+  - Value semantics avoids the need for garbage collector
+  - But requires copying objects
+    - Affects the performance
+- Move semantics
+  - C++11 introduced
+  - If the source object is an "rvalue", its data can be moved into the target instead of being copied
+  - Similar to moving files b/w folders instead of copying them
+- Pass-by-reference (Lvalue References) vs Move semantics (Rvalue References)
+  - T& or const T& vs T&& (rvalue references) or std::move
 
+### 155. Lvalues and Rvalues
+- An object in C++ can either be an lvalue or an rvalue
+- lvalue on LHS of an assignment
+- rvalue on RHS of an assignment
+- `x=2;`, `x=func()`;
+- In C++, an lvalue represents a named memory location
+  - It has a name
+  - We can take its address using & operator
+  - Ex) `x`
+- Anything else is an rvalue
+  - Ex) `2`, `func()`
+- lvalues and rvalues can behave differently when passed as function arguments
+- Pass by value
+  - lvalues can be passed by value
+    - `void func(int); int x=2; func(x);`
+  - rvalues can be passed by value
+    - `func(2);`
+- Pass by address
+  - lvalues can be passed by address
+    - `void func(int *); int x=2; func(&x);`
+  - rvalues cannot be passed by address
+- Pass by reference
+  - lvalues can be passed by reference
+    - `void func(int &); int x=2; func(x);`
+  - rvalues cannot be passed by reference
+- Pass by address and pass by non-const reference are used when the function wants to modify the argument
+  - This doesn't make sens for rvalues, and is not allowed
+- Passing rvalue by const reference
+  - An efficient way of passing large objects by value
+```cpp     
+int get() {return 2;} // return value from get() is an rvalue
+...
+void func(const int&); //
+func(get());           // rvalue is passed by const reference
+```
+- Pass by move
+  - In older C++, arguments are copied by default
+    - `void func(Type obj);`
+  - In C++11, the argument can be moved if
+    - obj is an rvalue
+    - and Type is "moveable"
+    - True for all C++ library types (some exception)
+  - obj will be copied if
+    - obj is an lvalue
+    - or Type is not moveable
+
+### 156. Lvalue and Rvalue References
+- Lvalue reference
+  - Typically implemented as a pointer
+  - Compiler adds code to dereference the pointer as needed
+```cpp
+int x; 
+int &y=x;  // equivalent to int *y = &x;
+y=3;       // equivalent to *y = 3;
+```
+- lvalue reference to rvalue
+  - cannot bind an lvalue refernce to an rvalue
+    - `int&x = 3;` // Error
+  - But const reference works OK
+    - `const int&x = 3;` // OK
+- Rvalue reference
+  - Since C++11
+  - This is a syntactic device which indicates that a function argument must be a moveable rvalue
+  - rvalue reference has `&&` after the type
+```cpp
+void func(int&& x);
+func(2); // 2 is an rvalue. OK
+int y{2};
+func(y)  ; // Error. ys is an lvalue
+```
+- std::move
+  - If we want to pass an lvalue to a function which take an rvalue reference, we have to cast it to rvaule
+  - std::move() will cast its argument to rvalue
+    - `int y{2}; func(std::move(y));`
+  - This will move y's data into the function argument x
+  - This must only be done if y's data is expendable
+    - After calling func(), y's data may be empty or unusable
+    - If we want to use y again, we must re-assign its data
+```cpp
+#include<iostream>
+#include<string>
+void test(std::string &s) { std::cout << "lvalue ref\n"; }
+void test(std::string&& s) { std::cout <<"rvalue ref\n";}
+int main() {
+  std::string lval {"Hello"};
+  std::string& lref = lval;
+  test(lval);            // lvalue ref
+  test(lref);            // lvalue ref
+  test("Hello");         // rvalue ref
+  test(std::move(lval)); // rvalue ref
+  std::cout << lval << std::endl; // Prints "Hello". local data is still available
+  return 0;
+}
+```
+- Argument type summary
+  - Lvalue
+    - Can pass an lvalue then the function has a copy of the data
+    - Can pass a moveable rvalue then the function now owns the passed object'd data
+  - Lvalue reference
+    - Can pass an lvalue then the function can modify the passed object's data through the reference
+  - Const lvalue reference
+    - Can pass an lvalue or an rvalue then the unction cannot modify the passed object's data 
+  - Rvalue reference
+    - Can pass a moveable rvalue but not an lvalue
+    - The function now owns the passed object's data
+
+### 157. Value Categories
+- Characteristics of lvalues
+  - lvalues represent persistent objects
+  - Theses occupy memory which is accessible to the programmer
+    - On stack or heap
+  - They remain valid until they go out of scope or are deleted
+    - Local variables
+    - Global variables
+    - Static variables
+    - Function arguments
+- Characteristics of rvalues
+  - rvalues are stored in locations which are not accessible to the programmer, such as processor registers
+  - Literals like 2 or `c`
+  - Temporary objects
+- C++ has 3 "value categories"
+  - Literals
+    - No name and cannot be referred to again
+    - Pure rvalues or prvalues
+  - Temporary objects
+    - Represents an object and their data can be moved
+    - xvalues
+  - Lvalues
+- Every expression has a type and a value category
+- rvalue = xvalue + prvalue
+- glvalue = lvalue + xvalue
+
+### 158. Move Operators
+- We can overload a functio so that it behaves differently depending on whether its argument is moved
+  - `void func(const myClass& obj);` // pass an lvalue
+  - `void func(myClass&& obj);` // pass an rvalue
+  - Overload the copy constructor and assignment operator using the same way
+- Move operators
+  - C++11 added new special member functions for this purpose
+    - Move constructor
+    - Move assignment oeprator
+  - These are called automatically when the passed object is a moveable
+```cpp
+Test(const Test& arg);     // Copy constructor
+Test(Test&& arg) noexcept; // Move constructor
+Test& operator=(const Test& arg);     // Copy assignment operator
+Test& operator=(Test&& arg) noexcept; // Move assignment operator
+```  
+- The move operator argument CANNOT be const
+- The move operators must not throw exceptions
+  - No simple way to recover from a part-completed move
+  - STL containers will only call an element's move oeprator if it is noexcept
+- The move assignment operator returns the assigned-to object by lvalue reference
+```cpp
+#include <iostream>
+
+using namespace std;
+
+class MyClass {};
+
+// Class with move constructor
+class Test {
+private:
+	int i{0};
+	MyClass m;
+public:
+	Test() = default;
+	// Copy constructor 
+	Test(const Test&arg) : i(arg.i), m(arg.m) {
+		cout << "Copy constructor called" << endl;
+	}
+	// Move constructor
+	Test(Test&& arg) noexcept : i(arg.i), m(std::move(arg.m)) { // local data are copied while class object is moved
+		cout << "Move constructor called" << endl;
+	}
+	// Copy assignment operator
+	Test& operator =(const Test& arg) {
+		cout << "Copy assignment operator called" << endl;
+		if (this != &arg) {
+			i = arg.i;
+			m = arg.m;
+		}
+		return *this;
+	}
+	// Move assignment operator
+	Test& operator =(Test&& arg) noexcept {
+		cout << "Move assignment operator called" << endl;
+		if (this != &arg) {
+			i = arg.i;                       
+			m = std::move(arg.m);            // Force move assignment operator to be called
+		}
+		return *this;
+	}
+};
+int main() {
+	Test test;                                 // Call default constructor
+	cout << "Copying: ";
+	Test test2 = test;                         // Call copy constructor 
+	cout << "\nMoving temporary: ";
+	Test test3 = Test();                       // Call move constructor by using temporary object
+	cout << "\nMoving rvalue: ";
+	Test test4(std::move(test));               // Call move constructor by casting test to rvalue
+	cout << endl;
+	Test test5;
+	cout << "\nAssigning: ";
+	test5 = test2;                             // Call copy assignment operator
+	Test test6;
+	cout << "\nAssigning from temporary: ";
+	test6 = Test();                            // Call move assignment operator
+}
+```
+- Move operators for derived classes
+  - Apply the corresponding operator for the base class when a move operator is used for a derived class
+```cpp
+// copy constructor
+Derived(const Derived& arg): Base(arg) {...}
+// Move constructor
+Derived(Derived&& arg): Base(std::move(arg)) noexcept {...}
+```
+- MOVE sematics saves the planet !!!
+
+### 159. RAII Class with Move Operators
+- How to add a move constructor and move assignment operator to our RAII class:
+```cpp
+class String {
+  private:
+    int size;
+    char *data;
+  public:
+  ...
+};
+```
+- Move constructor and assignment operator
+```cpp
+	// Move constructor
+	String(String&& arg) noexcept {
+		data = arg.data;
+		size = arg.size;
+		// Anything else?
+		// "arg" and "this" now have a pointer to the same allocated memory
+		// We must make sure "arg" does not delete the pointer
+		arg.data = nullptr;                 // Safe - deleting nullptr has no effect
+		arg.size = 0;
+	}
+	// Move assignment operator
+	String& operator=(String&& arg) noexcept {
+		if (this != &arg) {
+			delete[] data;
+			data = arg.data;
+			size = arg.size;
+			arg.data = nullptr;
+			arg.size = 0;
+		}
+		return *this;
+	}
+```
+- Move assignment operator
+  - May use move-and-swap
+```cpp
+String& operator=(String&& arg) noexcept {
+  String temp(std::move(arg));
+  swap(*this,temp);
+  return *this
+}
+```
+
+### 160. Move-only Types and RAII
+- To make a move-only class, implement the move operators and make the copy operators deleted
+```cpp
+class Test{ 
+  public:
+    Test(const Test&) = delete;           // delete copy constructor
+    Test& operator=(const Test&) = delete; // delete copy assignment operator
+    Test(test&&) noexcept;                 // implement move constructor
+    Test& operator=(Test&&) noexcept;      // implement move assignment operator
+}
+```
+- Move-only types
+  - C++ has some types which cannot be copied but can be moved
+    - fstream, iostream
+    - Smart pointers
+  - These types follow the RAII idiom
+    - Only one object can own a given resource instance at a time
+    - The object acquires ownership of the resource in the constructor
+    - The object releases ownership of the resource in the destructor
+  - The onwership of the resource can be transferred from one object to another using move semantics
+- fstream
+  - Has a file handle as a data member
+  - fstream constructor opens a file
+  - fstream destructor closes the file
+  -  an fstream object cannot be copied but can be moved
+    - The moved-from object no longer owns the file handle. It has anull handle
+    - The moved-to object becomes the owner of the file handle
+- Lambda capture and move-only objects
+  - C++11 lambda expressions are not good at capturing move-only objects
+  - By C++14, generalized lambda capture
+  - A variable in the outer scope can be moved into a lambda-local variable: `[lfs = std::move(fs)]`
+```cpp
+#include <iostream>
+#include <vector>
+#include <string>
+using namespace std;
+int main() {
+	vector<string> strings(5);
+	cout << "Capture by reference" << endl;
+	[&strings]() { cout << "Size in lambda = " << strings.size() << endl; }();
+	cout << "After calling lambda, size in main = " << strings.size() << endl;
+	cout << endl << "Capture by move" << endl;
+	[vs = std::move(strings)] () { cout << "Size in lambda = " << vs.size() << endl; }();
+	cout << "After calling lambda, size in main = " << strings.size() << endl << endl;
+}
+```
+
+### 161. Special Member Functions in C++11
+- Move constructor
+- Move assignment operator
+- Synthesized move operators if
+  - The class does not define a copy constructor, assignment operator or destructor
+  - Every data member is either:
+    - Built-in type
+    - User-defined type with move operators
+    - Static data member (not moved)
+- Synthesized move constructor will call the move constructor for each member
+- Synthesized move assignment operator will call the move assignment operator for each member
+- If a class defines a move operator, both the copy operators will be synthesized as "deleted"
+  - The class will be move-only
+  - If its own copy operators are required, define them
+
+### 162. Using Special Member Functions in C++11
+- Rule of zero
+  - If a class does not need to declare a destructor (to release memory), it doesn't need to declare copy or move operators
+- Rule of 3 (older C++)
+  - When a class implements destructor (to release memory), implement copy constructor and copy assignment operator
+- Rule of 5 (C++11)
+  - When a class implements destructor, implement copy constructor, move constructor, copy assignment operator, and move assignment operator
+- Move-only class
+  - Ex) network managing class. destructor will close the connection
+  - Ex) fstream. destructor will close the file
+  - Make the class move-only
+  - Provide:
+    - Destructor
+    - Move constructor
+    - Move assignment operator
+- Immovable class
+  - A class which is immoveable and uncopyable
+  - Delete the copy oerators
+  - Compiler will not synthesize move operators
+- Copy-only class
+  - Declare the move operators as deleted
+  - But not recommended
+
+### 163. Function Arguments and Move Semantics
+- Pass by value
+  - Copy constructor called
+  - Function has its own copy of the caller's object
+  - Caller's object is unmodified
+- Pass by const reference
+  - Function has read-only access to caller's object
+  - Caller's object is unmodified
+- Pass by non-const reference and pass by address
+  - Function has full access to caller's object
+  - Caller's object may be modified
+- Pass by move
+  - Move constructor called
+  - Function now owns the caller object's data
+  - Caller's object is unusable (until re-assigned)
+
+### 164. Forwarding References
+- Nested references
+```cpp
+#include <iostream>
+using namespace std;
+void func(int& x) {
+	cout << "func called with argument int&" << endl;
+}
+int main() {
+	int i{42};
+	//int& & ri = i;                       // Error
+	using int_ref = int&;                  // or typedef int& int_ref;
+	int_ref j{i};                          // j is a reference to int
+	int_ref& rj{j};                        // rj is a reference to (reference to int)
+	func(rj);
+}
+```
+- Reference collapsing rules
+```cpp
+using lval_ref = int&;
+using rval_ref = int&&;
+```
+  - lval_ref& => int&
+  - lval_ref&& => int&
+  - rval_ref& => int&
+  - rval_ref&& => int&&
+- && argument parameters
+  - It can only be bound to an rvalue (xvalue or prvalue)
+  - When used with Template, it means "forwarding" reference
+```cpp
+#include <iostream>
+using namespace std;
+class Test {};
+template <class T>
+void func(T&& x) {
+	cout << "func called" << endl;
+}
+int main() {
+	Test t;
+	Test& rt{t};
+	// T is Test& and x is T&& => Test&
+	func(t);                  // Compiler instantiates func(Test& x)
+	// T is Test& and x is T&& => Test&
+	func(rt);                 // Compiler instantiates func(Test& x)
+	// T is Test and x is T&& => Test&&
+	func(std::move(t));       // Compiler instantiates func(Test&& x)
+}
+```
+- Why are forwarding references useful?
+  - We can write only one function, without overloading (?)
+
+### 165. Perfect Forwarding
+- Forwarding
+  - A function that passes some or all of its argument to another function is called to "forward" them
+  - `void f(Test x) { g(x);}` // f() forwards the argument x to g()
+- With perfect forwarding, the properties of the passed objects are preserved
+  - If x is modifiable in f(), it is modifiable in g()
+  - If x is unmodifiable in f(), it is unmodifiable in g()
+  - If x was moved into f()'s argument, it will be moved into g()'s argumen
+  - Ex) `make_pair()`
+```cpp
+#include <iostream>
+using namespace std;
+class Test { };
+void g(Test& x) {
+    std::cout << "Modifiable version of g called\n";
+}
+void g(const Test& x) {
+    std::cout << "Immutable version of g called\n";
+}
+void g(Test&& x) {
+    std::cout << "Move version of g called\n";
+}
+template <class T>
+void f(T&& x) {
+    g(x); // will run lvalue. To run rvalue, see below
+    // The solution is g(std::forward<T>(x));
+}
+int main() {
+    Test x;
+    const Test cx;
+    cout << "Calling f() with lvalue argument\n";
+    f(x);
+    cout << "\nCalling f() with const lvalue argument\n";
+    f(cx);
+    cout << "\nCalling f() with rvalue argument\n";
+    f(std::move(x));
+}
+```
+- move() problem
+  - The rvalue verson of f() does not call the rvalue version of g()
+  - Inside of f(), x is an lvalue
+  - Therefore, when call g(), it should be `g(std::move(x));`
+- std::forward()
+  - Casts its argument to rvalue reference
+  - `std::forward<T>(x);`
+
+### 166. Perfect Forwarding Practical
+```cpp
+#include <iostream>
+using namespace std;
+class Test { 
+    string m_str;
+public:
+	Test(const string& str) : m_str(str) {
+		cout << "const string& constructor called\n";
+	}
+	Test(string&& str) : m_str(std::move(str)) {
+		cout << "string&& constructor called\n";
+	}
+};
+void g(string& x) {
+    std::cout << "Modifiable version of g called\n";
+}
+void g(string&& x) {
+    std::cout << "Move version of g called\n";
+}
+template <class T>
+Test make_test(T&& x) {
+    g(std::forward<T>(x));
+	return Test(std::forward<T>(x));
+}
+int main() {
+    string hello{"Hello"};
+    cout << "Calling make_test() with lvalue argument\n";
+	Test t1 = make_test(hello);
+    cout << "\nCalling make_test() with rvalue argument\n";
+	Test t2 = make_test(std::move(hello));
+}
+```
 
 ## Section 12: Smart Pointers
 
-    Smart Pointers Introduction
-    05:58
-    Unique Pointer
-    08:17
-    Unique Pointers and Polymorphism
-    07:02
-    Unique Pointers and Custom Deleters
-    05:49
-    The Handle-Body Pattern
-    06:08
-    The pImpl Idiom
-    06:33
-    Reference Counting
-    10:59
-    Shared pointer
-    06:43
-    Weak Pointer
-    08:24
-    Weak Pointer and Cycle Prevention
-    03:22
+### 167. Smart Pointers Introduction
+- Drawbacks of traditional pointers
+  - No concept of ownership
+  - No destructor
+- From C++11, 
+  - Use references instwead of pointers for stack memory
+  - Smart pointers for heap memory
+  - Smart pointers or references for dynamic binding
+- Smart pointers
+  - Implemented using RAII
+- std::auto_ptr
+  - In C++98
+  - Removed in C++14
+- std::unique_ptr
+  - In C++11
+    - Cannot be copied or assigned to
+    - Can be moved (std::move())
+- std::shared_ptr
+  - In C++11
+  - Can share the memory allocation with other shared_ptr objects
+  - Reference counting is used to manage memory
+  - Similar to garbage-collected object
+  - More overheads than std::unique_ptr
 
-    Chrono Library Introduction
-    02:51
-    Chrono Duration Types
-    05:26
-    Chrono Clocks and Time Points
-    06:25
-    Bitsets
-    06:14
-    Tuples
-    06:21
-    Tuples in C++17
-    04:22
-    Unions
+### 168. Unique Pointer
+- std::unique_ptr
+  - In most situations, the best replacement for traditional pointers which manage heap memory
+  - No issue with shallow copying
+  - Very lightweight
+  - Defined in `<memory>`
+  - A template class with a traditional poiner as member
+    - `std::unique_ptr<int> p;`
+- Initialization in C++11
+  - `std::unique_ptr<int> p1 {new int(42)};` // p1's member points to the int on the heap
+  - `std::unique_ptr<int[]> p1 {new int[6]};` // fixed size array. p2's member points to the first element
+    - Better to use std::array or std::vector though
+- C++14 initialization using make_unique:
+  - `auto p1 {std::make_unique<int> (42)};`
+  - `auto p2 {std::make_unique<int[]> (6)};`
+  - std::make_unique() uses perfect forwards its argument to the constructor
+- std::unique_ptr as function argument  
+  - Using pass-by-move
+``` cpp
+void func(std::unique_ptr<Point> upp) {...}
+auto ptr {std::make_unique<Point>(p)};
+func(std::move(ptr)); // std::unique_ptr cannot be copied
+```
+- Returning std::unique_ptr from function
+  - Returning std::unique_ptr object uses move, not copy
+```cpp
+std::unique_ptr<Poitn>  point_ptr (int x, int y) {
+  Point p{x,y};
+  auto ptr{std::make_unique<Point>(p)};
+  return ptr; // move is used, not copy
+}
+auto upp {point_ptr(3,6)}
+```
 
-05:37
-Unions Continued
-06:57
-Mathematical Types
-06:40
-Bind
-07:33
-Callable Objects
-05:45
-Member Function Pointers
-06:38
-Interfacing to C
-10:50
-Interfacing to C
+### 169. Unique Pointers and Polymorphism
+- Vector of class objects
+  - Each vector element was created by new, and must be deallocated in the end
+  - Unless, memory leak
+```cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+class Shape {
+public:
+    virtual void draw() const = 0;
+	virtual ~Shape() = default;
+};
+class Circle : public Shape {
+public:
+    void draw() const { cout << "Drawing a Circle...\n"; }
+};
+class Triangle : public Shape {
+public:
+    void draw() const { cout << "Drawing a Triangle...\n"; }
+};
+class Square : public Shape {
+public:
+    void draw() const { cout << "Drawing a Square...\n"; }
+};
+int main() {
+	vector<Shape *> shapes;
+	shapes.push_back(new Circle);
+	shapes.push_back(new Triangle);
+	shapes.push_back(new Square);
+	for (auto& it : shapes)
+		it->draw();
+	for (auto& it : shapes)  // Memory leak if the pointers are not deleted
+		delete it;
+}
+```
+- Polymorphism with unique_ptr
+  - `std::unique_ptr<Base> pbase {make_unique<Derived>()};`
+  - The allocated memory is handled by unique_ptr
+```cpp
+...
+int main() {
+	vector<unique_ptr<Shape>> shapes;
+	shapes.push_back(make_unique<Circle>());
+	shapes.push_back(make_unique<Triangle>());
+	shapes.push_back(make_unique<Square>());	
+	for (auto& it : shapes)
+		it->draw();
+  // manual deallocation is not necessary
+}
+```  
+- Factory pattern
+  - Calls a function to create a new object
+  - The function decides the type of the new object and returns a pointer to it
+  - Easy to extend if new child classes are added
+- Traditionally, the factory pattern was written with new()
+  - Since C++11, unique_ptr
+  - Return this unique_ptr from the function
+  - Caller's unique_ptr will release the memory when done
+```cpp
+// Factory function
+unique_ptr<Shape> create_shape(int sides) {
+	// The returned unique_ptr will be moved into the function's return space
+	if (sides == 1)
+		return make_unique<Circle>();               // Create 1-sided shape
+	else if (sides == 3)
+		return make_unique<Triangle>();             // Create 3-sided shape
+	else if (sides == 4)
+		return make_unique<Square>();               // Create 4-sided shape
+	else {
+		cout << "Cannot create a shape with " << sides << " sides\n";
+		return nullptr;
+	}
+}
+int main() {
+	// The returned unique_ptr will be moved into a variable in the caller
+	auto pshape{create_shape(3)};
+	if (pshape)
+		pshape->draw();
+	// Memory allocation is automatically released at end of scope
+}
+```
 
-    2 questions
-    Run-time Type Information
-    07:23
-    Multiple Inheritance
-    06:14
-    Virtual Inheritance
-    04:53
-    Inline Namespaces
-    05:58
-    Attributes
-    07:13
+### 170. Unique Pointers and Custom Deleters
+- How to create unique_ptr object
+  - Using std::make_unique(), which calls new() internally
+  - Call the constructor with a traditional pointer as argument. Unique_ptr takes the ownership
+    - `myClass obj; std::unique_ptr<myClass> ptr(&obj);`
+- Destructor of unique_ptr calls delete() internally
+- We can provide a "deleter"
+  - Can use Lambda expression
+  - Using decltype
+```cpp
+#include <iostream>
+#include <memory>
+/// Code from C Networking API ///
+struct destination { /* ... */};
+struct connection { /* ... */ };
+// Function to open a connection
+connection connect(destination dest) { 
+	std::cout << "Connecting\n";
+	connection conn;
+	return conn;
+}
+// Function to close a connection
+void disconnect(connection conn) {
+	std::cout << "Disconnecting\n"; 
+}
+/// End of code from C Networking API ///
+// Custom deleter to close network connection
+auto end_connection = [] (connection *conn) { disconnect(*conn); };
+void get_data(const destination& d) {
+    connection conn = connect(d);
+	std::unique_ptr<connection, decltype(end_connection)> p(&conn, end_connection);
+	std::cout << "Getting data...\n";
+}
+int main() {
+	destination dest;
+	get_data(dest);
+}
+```
 
-    Compile-time Programming Overview
-    08:01
-    Constant Expressions
-    04:39
-    Constexpr Functions
-    06:49
-    Classes and Templates
-    05:32
-    Template Specialization
-    08:13
-    Extern Templates
-    09:18
-    Variadic Templates
-    09:33
-    Miscellaneous Template Features
-    05:07
-    Library-defined Operators
-    05:26
-    Constexpr If Statement
-    09:52
-    Constexpr If Examples
-    04:36
-    The decltype Keyword
-    09:03
+### 171. The Handle-Body Pattern
+- In OOP, we aim to separate the interface from the implementation
+  - Clients do not need to know the inner detais of class
+  - Clients do not need to modify their code
+- Handle-body pattern
+  - We split the class into two parts
+  - The handle is an outer class that provides the interface to clients
+  - The body is an inner class that provides the implementation
+  - When a client creates a handle object, the handle creates a body object
+  - When a client calls a member function on the handle object, the call is forwarded to the body
 
-    Project Breakout
+### 172. The pImpl Idiom
+- In the pImpl idiom, the handle has a private member which is a pointer to a body object
+- pImpl: pointer to Implementation
+  - Known as compiler firewall
+- The handle class is implemented using RAII
+- Applications of pImpl
+  - In many large projects like Qt
+  - Simplifies product updates
 
-01:28
-SFML Introduction
-03:07
-Compiler Configuration for SFML
-05:17
-Basic Window
-04:16
-Random Walk Revisited
-05:46
-Sprite
-06:30
-Ball
-04:09
-Bouncing Ball
-04:18
-Paddle
-03:03
-Moving Paddle
-04:26
-Ball-Paddle Interaction
-04:31
-Bricks
-04:48
-Ball Interaction with Bricks
-08:08
-Game Manager
-07:13
-Entity Manager Overview
+### 173. Reference Counting
+- A technique for allowing different objects to share the same resource
+- Reference counter
+  - An integer to store the number of sharing
+- Constructor
+  - Allocates the counter
+- Destructor
+  - Decrements the counter
+  - If the counter is non-zero, we must not release the memory as it is still shared
+- Copy constructor
+- Assignment operator
+- Move operator
 
-    05:31
-    Entity Manager and Object Creation
-    08:22
-    Entity Manager and Object Operations
-    08:08
-    Brick Strength
-    06:34
-    More Features
-    08:11
-    Conclusion
-    04:23
+### 174. Shared pointer
+- std::shared_ptr
+  - Defined in `<memory>`
+  - Uses reference counting
+  - When shared_ptr object is copied or assigned, there are no memory operations
+  - Insted, the reference counter is incremented
+- std::shared_ptr structure
+  - Has a private data member which is a pointer to the allocated memory
+  - Has another private data member which si a pointer to control block
+    - The control block contains the reference counter
+- How to create std::shared_ptr object
+  - Pass a pointer to its constructor
+  - make_shared()
+  - Move a unique_ptr into shared_ptr
+    - This transfers the ownership of the uniqe_ptr's allocated memory
+    - Can be useful with factory functions
+    - But we cannot convert shared_ptr into unique_ptr
+- Initialization
+  - Using make_shared: `auto p1 {std::make_shared<int>(42)};`
+  - Calling new() will allocate the memory manually, and this may require the control block to allocate separately. Not recommended
+- Assignment
+  - `p3 = p1;`
+  - p1 counter increments
+  - p3 counter decrements
+- shared_ptr has more overhead than unique_ptr
 
-    Recommended Books
-    00:14
-    C++ "Cheat Sheet" Infographics
-    00:07
-    The "Awesome C++ Frameworks and Libraries" Github
-    00:05
-    The "Awesome Modern C++ Resources" Github
-    00:05
-    "Classy Header-only Classes"
-    00:10
-    Bonus Material
+### 175. Weak Pointer
+- Not a smart poiner
+- A safe way of aliasing a shared_ptr
+- Avoids the problem of dangling
+- std::weak_ptr
+  - Bound to a shared_ptr object
+  - Doesn't affect the reference count
+  - weak_ptr cannot access the shared memory directly
+  - Has to be converted back to shared_ptr to access the shared memory
+    - Only allowed when the shared_ptr is still valid
+- weak_ptr to shared_ptr
+  - `shared_ptr<int> sp1 = wptr.lock();`
+  - `shared_ptr<int> sp2(wptr);`
+  - Will throw std::bad_weak_ptr exception when not valid
+  - .lock() is an atomic operation
+- Weak pointer applications
+  - Cache implementatin
+
+### 176. Weak Pointer and Cycle Prevention
+- Cyclic references
+  - Objects which have shared_ptr to each other
+  
+## Section 13: Miscellaneous Features
+
+### 177. Chrono Library Introduction
+- Time and dates in C++
+  - In herited some functions and types from C
+    - `<ctime>`
+    - Low level and poorly designed
+  - C++11 added the chrono library
+    - More precise but more complicated
+  - C++20 extends chrono library to handle dates
+- Time in traditional C++
+  - clock() returns the number of clock ticks since the program started
+    - Type of clock_t
+    - Can be used for intervals of up to a few minutes
+    - Precision is implementation-defined (usually 1microsecond)
+  - time()
+    - Type time_t by address
+    - Number of seconds since 1970
+    - Up to several decades
+    - Precision is 1 second
+- std::chrono
+  - Defined in `<chrono>`
+  - Three important concepts
+    - Clock
+      - Start date (epoch) and tick rate
+      - C's clock started on Jan 01 1970 and ticks once per second        
+    - Time point
+      - The number of clock ticks since the epoch, at a given point in time
+    - Duration
+      - An interval b/w two time points, measured in clock ticks
+
+### 178. Chrono Duration Types
+- `<chrono>` defines integer types which represents units of duration
+  - hours
+  - minutes
+  - seconds
+  - milliseconds
+  - microseconds
+  - nanoseconds
+- C++20 has days, weeks, months and years
+- Duration initialization
+  - Constructor takes a single argument
+  - `hours a{5};`
+- std::chrono literals
+```cpp
+using namespace std::literals;
+auto a = 5h;
+auto b = 10min;
+```
+- Duration type cannot be printed directly. Use .count() member function
+```cpp
+#include <iostream>
+#include <chrono>
+using namespace std;
+using namespace std::chrono;
+using namespace std::literals;  // For suffixes
+int main() {
+	seconds s;                                  // Undefined value
+	//cout << "Uninitialized seconds variable has value " << s << endl;
+	cout << "Uninitialized seconds variable has value " << s.count() << endl;
+	auto hour = 5h;                             // 5 hour interval
+	auto mins = 10min;                          // 10 minute interval
+	auto sec = 2s;                              // 2 second interval
+	auto msec = 20ms;                           // 20 milliseconds
+	auto usec = 50us;                           // 50 microseconds
+	auto nsec = 80ns;                           // 80 nanoseconds
+	cout << "hour = " << hour.count() << " hours " << endl;
+	cout << "mins = " << mins.count() << " minutes " << endl;
+	cout << "sec = " << sec.count() << " seconds " << endl;
+	cout << "msec = " << msec.count() << " milliseconds " << endl;
+	cout << "usec = " << usec.count() << " microseconds " << endl;
+	cout << "nsec = " << nsec.count() << " nanoseconds " << endl;
+}
+```
+- The construct is explicit
+  - `seconds s = 2;` // error. Cannot convert from int
+  - `seconds s = 2s;` // OK
+  - `seconds s = 1h;` // OK. s= 3600seconds
+
+### 179. Chrono Clocks and Time Points
+- std::chrono provides three clocks
+  - system_clock
+    - Measures wall time using HW system's clock
+    - Similar to C library clock
+    - The best choice for interactive use
+    - Not well suited for measuring time intervals
+      - Change of system (like daylight saving) may yield wrong results
+  - steady_clock
+    - Idealized clock which only goes forward, one tick at a time (monotonic)
+    - **The best clock for measuring time intervals**    
+  - high_resolution_clock
+    - Clock with the shortest tick period supported by the system
+    - Implementation-defined. Usually an alias of system_clock or stead_clock
+- now() function
+  - All three clock types have a static function now()
+  - Returns the clock's current time point
+  - `system_clock::now()`
+  - `stead_clock::now()`
+- time_point class represents a point in time
+  - now() returns a time_point object
+  - dt = time_point_1 - time_point_0
+```cpp
+#include <iostream>
+#include <chrono>
+using namespace std::chrono;
+long long fibonacci (long long n) {
+	return (n < 2) ? n: fibonacci(n-1) + fibonacci(n-2);
+}
+int main() {
+	auto start = steady_clock::now();
+	long long n = fibonacci(45);
+	std::cout << "Fibonacci number is " << n << std::endl;
+	auto finish = steady_clock::now();
+	auto elapsed = duration_cast<milliseconds>(finish - start).count();
+	std::cout << "Time taken: " << elapsed << " milliseconds" << std::endl;
+}
+```
+- sleep_for()
+  - From `<thread>`
+```cpp
+include <thread>  
+...
+std::cout << "Wait\n";
+this_thread::sleep_for(2s);
+std::cout << "Done\n";
+```
+  - In a single threaded program, this will make the main thread sleep
+  - The actual duration may be longer due to the scheduling
+```cpp
+#include<thread>
+#include<iostream>
+#include<chrono>
+using namespace std::chrono_literals;
+int main() {
+  std::cout << "Wait 2s\n";
+  auto start = std::chrono::steady_clock::now();
+  std::this_thread::sleep_for(2s);
+  auto finish = std::chrono::steady_clock::now();
+  std::cout << "Done\n";
+  auto elapsed = std::chrono::duration_cast<std::chrono::millisecond
+s>(finish - start).count();
+  std::cout << "Time taken: " << elapsed << " milliseconds" << std::
+endl;
+  return 0;
+}
+```
+
+### 180. Bitsets
+- C has operators for bitwise manipulation of integers
+  - Inherited to C++
+- C++11 provides std::bitset in `<bitset>`
+- Abstraction which represents groups of bits
+- std::bitset is a templated type
+```cpp
+std::bitset<8> b1{"10101110"};  // from string
+std::bitset<8> b2{Oxae};        // from integer
+std::bitset<8> b3{0b1010'1110}; // from binary constant
+```
+- Can be used with streams: `std::cout << b1 << std::endl;`
+- to_ulong()
+- to_ullong()
+- to_string()
+- size()
+- test() checks bounds: `b1.test(8);`
+```cpp
+#include <iostream>
+#include <bitset>
+using namespace std;
+int main() {
+	bitset<8> b1{"10101110"};              // Initialize from string literal - bitset with value 174
+	bitset<8> b2{0xae};                    // Initialize from integer (decimal or hexadecimal)
+	bitset<8> b3{0b1010'1110};             // Initialize from binary constant (C++14)
+	cout << "b1 is " << b1 << endl;                          // Displays 10101110
+	cout << "b2 in decimal is " << b2.to_ulong() << endl;    // Displays 174
+	cout << "b2 as a string is " << b2.to_string() << endl;  // Displays 10101110
+	cout << "b3 is " << b3 << endl;                          // Displays 10101010
+	cout << "b1 has " << b1.size() << " bits\n";         //Displays 8
+	// Display all the bits in b1
+	cout << "The bits of b1 are: ";
+	for (std::size_t i = 0; i < b1.size(); ++i)
+		std::cout << b1[i] << ",";
+	cout << endl;
+	// Bit access with bounds checking
+	cout << "Trying access to bit 8 of b1 with bounds checking\n";
+	try {
+		std::cout << "b1 bit "<< 8 << " = " << b1.test(8) << endl;
+	}
+	catch (std::exception& e) {
+		cout << "Caught exception: " << e.what() << endl;
+	}
+}
+```
+- Bit operations  
+  - set()
+  - reset()
+  - flip()
+- Bitset checks
+  - all()
+  - any()
+  - none()
+  - count()
+
+### 181. Tuples
+- std::pair review
+  - A compound type
+  - Two members, first and second respectively
+  - `std::pair<std::string,std::string> wordpair("hello"s, "there"s);`
+  - `auto wordpair { std::make_pair("hello"S,"there"s)};`
+- std::tuple
+  - From `<tuple>`
+  - Similar to std::pair but many members
+  - Elements are accessed by index, not by member name
+  - `std::tuple<double, int, std::string> number(1.1, 2, "three"s);`
+  - `auto numbers {std::make_tuple(1.1,2,"three"s)};`
+- Accessing tuple members
+  - `std::get()` with element's index
+  - `auto x = std::get<0>(numbers);`
+  - `std::get<1>(numbers) = 3; `
+  - C++14 allows us to use the type, if unique
+  - `auto i = std::get<int>(numbers);`
+- Unpacking a tuple
+  - Use `std::tie()`
+  - `double d; int i; std::string msg; std::tie(d,i,msg) = numbers;`
+  - Cannot use auto with tie()
+- When to use tuples
+  - Ad-hoc dataype
+  - Somewhere to store data in short-term
+    - No member functions
+    - No need to make a new type
+    - Elements of different types
+- When returning multiple values
+  - Traditional solution is to use a struct
+  - Tuple enables us to use much smaller code
+```cpp
+tuple<double,int,std::string> func() {
+  ...
+  return {1.1, 2, "three"s};
+}
+...
+std::tie(d,i,msg) = func();
+```
+
+### 182. Tuples in C++17
+- Constructor Template Argument Deduction (CTAD) works with tuples
+  - In C++11/14, `std::tuple<int, double, string> tup{1, 1.1, "three"s};`
+  - In C++17 with CTAD, `std::tuple tup {1, 1.1, "three"s};`
+- Unpacking
+  - `auto [d,i,msg]= func();`
+- Unpacking tuple into function arguments
+  - `std::apply()`
+  - The first argument is the function name
+  - The second argument is a tuple containing arguments
+```cpp
+void func(int i, double d, std::string s);
+...
+std::apply(func, std::tuple(1, 2.0, "three"s));
+```
+- Unpacking tuple into constructor arguments
+  -  Use `std::make_from_tuple<T>()`
+  - `auto test = std::make_from_tuple<Test>(tup);` is equivalent to `Test(1,2.0,"three"s);`
+
+### 183. Unions
+- Inherited from C
+- A compound data structure
+  - Each member has a distinct type
+  - All the members are stored at the same address
+  - Only one member can be in used at a time
+- Union characteristics
+  - All members are public by default
+  - Can have member functions but not virtual
+  - No base/derived class
+  - Data member share the same memory space
+    - This is why only one member at a time
+- Union usage
+  - If we assign to char member, that member is now "in use"
+    - Only one member at a time
+    - The other member is not reached, and yields undefined value
+- Tagged union
+  - Use of unions is higly error-prone
+  - The programmer has to remember which type is in use
+  - May add a "tag" to indicate which member is in use
+```cpp
+#include <iostream>
+using namespace std;
+union Token {
+	// Members are public by default
+	char c;
+	int i;
+	double d;
+};
+int main() {
+	Token token;
+	token.c = 'Z';               // char member is in use
+	cout << token.d << endl;    // Double member not in use - has undefined value
+}
+```
+- Why union vs tuple?
+  - Union can achieve memory efficiency  or low-level interoperability
+
+### 184. Unions Continued
+- Wrapped tagged union
+  - A tagged union requires the programmer to check before accessing a member
+  - For safety, wrap the tagged union inside a class
+    - The union is a private member 
+    - It can only be accessed by the class's public member function
+    - Performs the necessary setting and checking of the tag member
+    - This enforces the correct use of the union
+- C++17 std::variant
+  - Similar to a wrapped tagged union but
+    - Type safe
+    - Can have different alternatives with the same type
+    - Automatically calls constructors and destructors, when required
+    - Simpler to use
+  - Defined in `<variant>`
+```cpp
+std::variant<char, int, double> v;
+v = 'Z';
+std::get<char>(v);
+std::get<0>(v);
+```
+- `std::holds_alternative()` to check whether an alternative is in use
+```cpp
+if (std::holds_alternative<double>(v))
+  std::cout << std::get<double>(v) << std::enld;
+else
+  std::cout >> "Double-alternative is not in use\n";
+```
+- Applications of unions and std::variant
+  - Parsing
+  - Language implementation
+  - Return values
+  - Polymorphism
+
+### 185. Mathematical Types
+- std::valarray
+  - Vector-like type based on Fortran arrays
+  - Fixed size
+  - Easier synatx for numerical operations
+  - Not widely used
+  - Not well optimized (?)
+  - Better to use a third party library (eigen, blaze, armadillo)
+- std::complex from `<complex>`
+  - Templated type
+  - float, double, or long double
+  - For std::cin/cout, `(r,i)` works OK
+  - ==operator is defined already
+  - ++/-- not working
+  - By C++14, literal suffix i is supported: `auto z = 3.0 + 4i;`
+
+### 186. Bind
+- `std::bind` from `<functional>`
+- Takes a callable object as its first argument
+- bind() performs a partial function call
+- It makes a new callable, using the remaining arguments
+- `auto match_cat = bind(match, "cat");` yields a new callable, `match_cat();`, which is equivalent to `match("cat");`
+- When multiple arguments are required, use a place holder like `_1`, `_2`, from `std::placeholders`
+  - `auto match_cat = bind(match,_1, "cat");` yields a new callable while `match_cat("dog);` is equivalent to `match("dog","cat");`
+```cpp
+#include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <functional>
+using namespace std;
+using namespace std::placeholders;
+bool match(const string& animal, const string& species) {
+	cout << R"(1st argument is ")" << animal << R"(", 2nd argument is ")" << species << "\"" << endl;
+	return animal == species;
+}
+int main() {
+	auto match_cat = bind(match, _1, "cat");                  // Captures "cat" as second argument
+	if (match_cat("dog")) {                                   // Calls match("dog", "cat");
+		cout << "Matched\n";
+	}
+	else {
+		cout << "Not matched\n";
+	}
+}
+```
+- This is equivalent to a C++14 lambda which creates a local variable
+- bind1st() and bind2nd() are deprecated in C++11 and removed in C++17
+
+### 187. Callable Objects
+- An object supports () operator
+- Different callable objects
+  - Pointer to non-member function
+  - Functors
+  - Lambda expressions
+  - Objects returned from calling bind()
+- Different callable objects which have the same signature
+- std::function in `<functional>`
+  - This class has a private member which stores a callable object
+    - This can be any callable object which has a given signature
+  - Template class
+    - The object's signature is the parameter
+      - `std::function<bool(const std::string&)> match_ptr;`
+  - Implemented using inheritance
+  - std::function performs type erasure
+    - The object's original type cannot be recovered
+- Uses of std::function
+  - We can declare as function argument as type std::function
+  - We can create a container whose elements are of type std::function
+- Limitations of std::function
+  - No support for overloading
+  - Run-time overhead
+  - Invoking the callable object involves indirection
+  - May perform a memory allocation
+- Alternatives to std::function
+  - Must be used only when we need a polymorphic function object
+  - For string a callable object in a variable, use auto
+```cpp
+#include <iostream>
+#include <string>
+#include <vector>
+#include <functional>
+using namespace std;
+using namespace std::placeholders;
+// Non-member function
+bool match(const string& test) {
+    return test == "cat";
+}
+// Functor
+class functor_match {
+	public:
+	bool operator()(const string& test) {
+		return test == "cat";
+	}
+};
+bool bind_match(const string& animal, const string& species) {
+    return animal == species;
+}
+int count_strings(vector<string> &texts, function<bool(const string&)> match_ptr) {
+    int tally = 0;
+    for(auto text : texts) {
+        if(match_ptr(text)) {
+            ++tally;
+        }
+    }
+    return tally;
+}
+int main() {
+	vector<string> animals = {"cat", "dog", "tiger", "lion", "bear", "cat", "giraffe"};
+	int n;
+	// Function pointer
+	cout << "Calling count_strings with function pointer\n";
+	n = count_strings(animals, match);
+	cout << R"(The vector contains )" << n << R"( occurrences of the word "cat")" << endl;
+	// Functor
+	cout << "\nCalling count_strings with functor\n";
+	n = count_strings(animals, functor_match());
+	cout << R"(The vector contains )" << n << R"( occurrences of the word "cat")" << endl;
+	// Lambda expression
+	cout << "\nCalling count_strings with lambda expression\n";
+	n = count_strings(animals,
+		[](const string& test) { return test == "cat";}
+		);
+	cout << R"(The vector contains )" << n << R"( occurrences of the word "cat")" << endl;
+	// bind() object
+	cout << "\nCalling count_strings with bind() object\n";
+	auto match_cat = bind(bind_match, _1, "cat");                    // Captures "cat" as second argument
+	n = count_strings(animals, match_cat);
+	cout << R"(The vector contains )" << n << R"( occurrences of the word "cat")" << endl;
+}
+```
+
+### 188. Member Function Pointers
+- Can define a pointer to a member function of a class
+- More complicated tha with function pointers
+  - Requires different syntax
+  - May need to provide "this" pointer
+- Member function pointers cannot be called directly  
+  - Must be explicitly derefereneced
+- For a class: `class Test { ... ; void func(int a, const std::string&b);};`
+  - Define a function pointer: `void(Test::*pfunc) (int,const std::string&);`
+  - Make a pfunc pointer: `pfunc = &Test::func;`
+  - In C++11, `auto pfunc = &Test::func(int, const std::string&);`
+  - May use a type alias: `using PfuncType = void (Test::*)(int, const string&); std::vector<PfuncType> ptrs;`
+- std::mem_fn() in `<functional>`
+  - Member function pointer
+  - `auto f = std::mem_fn(pfunc);`
+```cpp
+#include <iostream>
+#include <functional>
+using namespace std;
+class Test {
+public:
+	void func(int a, const string& b) {
+		cout << "func called with arguments " << a << " and " << b << endl;
+	}
+};
+int main() {
+	// Define pfunc as a pointer to a member function of Test
+	auto pfunc = &Test::func;
+	// Generate a callable object from pds
+	auto f = mem_fn(pfunc);
+	// Invoke this callable object
+	Test test;
+	f(test, 42, "Hello"s);                      // Pass the "this" object as the first argument
+}
+```
+- May use std::bind()
+- Applications of member function pointers
+  - Concurrency
+  - Run-time decision making
+  - Choose which object is used
+  - Choose which member function is called
+  -
+### 189. Interfacing to C
+- Many interfaces are written in C
+  - OS API
+  - Database API
+  - Third party libraries and frameworks
+  - Language with foreign function interfaces
+- Source code compatibility
+  - C is almost complete subset of C++
+    - C99 introduced some incompatible features
+  - The simplest solution is to compile the entire source code with C++ compiler
+  - May not work
+    - C code contains incompatibilities
+    - When C source code is not available
+- Binary compatibility
+  - Object, static library or shared object
+  - C and C++ compilers must be compatible
+- Name mangling
+  - C++ compiler manges the name while C doesn't
+- Extern "C" directive
+  - No name mangling in C
+  - To make C++ binaries compatible with C, we use extern "C" directive
+    - This tells C++ compiler not to mangle the function name
+```cpp
+extern "C" int ifunc(int x);
+...
+extern "C" {
+  int func(int x);
+  double dfunc(double x);  
+}
+...
+extern "C" {#include "cstuff.h"}
+```
+- Exporting to C
+  - When writing C++ function that will be called from C
+    - Built in types only
+    - Array/pointer in built-in type
+    - Structs which have members of built-in types only
+  - Put the function in the global namespace
+- Conditional compilation
+  - For C++ compiler, `__cplusplus` preprocess symbol
+    - Use this like `#ifdef __cplusplus` to hide some code for C copmiler
+- Adding C++ code into C
+  - add.cc
+```cpp
+#include "add.h"
+int add(int x, int y) {
+	return x + y;
+}
+```
+  - add.h
+```cpp
+#ifndef ADD_H
+#define ADD_H
+#ifdef __cplusplus
+extern "C" int add(int x, int y);
+#else
+int add(int x, int y);
+#endif
+#endif //ADD_H
+```
+  - add_main.c
+```c
+#include <stdio.h>
+#include "add.h"
+int main() {
+	printf("add(2, 3) returns %d\n", add(2, 3));
+}
+```
+- Converting sequential containers to arrays
+  - std::string and std::vectoir have member function .data()
+- Using C function in the C++ code
+  - array.h
+```c
+#ifndef ARRAY_H
+#define ARRAY_H
+int array_print(int arr[], int n);
+#endif //ARRAY_H
+```  
+  - array.c
+```c
+#include <stdio.h>
+#include "array.h"
+int array_print(int arr[], int n) {
+	int i = 0;
+	for (i = 0; i < n; ++i)
+		printf("%d,", arr[i]);
+	printf("\n");
+}
+```  
+  - array_main.cc
+```cpp
+#include <iostream>
+#include <vector>
+extern "C" {
+	#include "array.h"
+}
+using namespace std;
+int main() {
+	vector<int> vec {3, 1, 4, 1, 5, 9};
+	cout << "Vector elements: ";
+	for (auto v : vec)
+		cout << v << ", ";
+	cout << endl;
+	cout << "Calling array_print(): ";
+	array_print(vec.data(), vec.size());
+}
+```  
+
+### Assignment 16: Interfacing to C
+- Using array.c/h above:
+```cpp
+#include <iostream>
+#include <set>
+extern "C" {
+	#include "array.h"
+}
+int main() {
+  std::set<int> aset {1,2,3};
+  auto nsize = aset.size();
+  int *carray = new int[nsize];
+  int i = 0;
+  for (auto& el: aset) { carray[i] = el; i++;}
+  array_print(carray, nsize);
+  delete [] carray;
+  return 0;
+} 
+```
+
+### 190. Run-time Type Information
+- RTTI relates to the dynamic type of the object
+  - typeid
+  - type_info
+  - dynamic_cast
+- `std::typeid()` returns information about the dynamic type of its arguments
+  - From `<typeinfo>`  
+  - Mainly used in comparisons
+```cpp
+Circle d;
+Shape *pShape = &d;
+...
+if (std::typeid(*pShape) == std::typeid(Circle)) {...}
+```
+- `std::type_info` from `<typeinfo>`
+  - Contains the information about the dyanmic type of an object
+  - `std::type_info::name()` returns C-style string
+```cpp
+#include <iostream>
+#include <typeinfo>
+using namespace std;
+class Shape {
+	public:
+	virtual ~Shape() {}
+};
+class Circle : public Shape {};
+class Triangle : public Shape {};
+int main() {
+	Circle circle;
+	Triangle triangle;
+	//Shape *pShape = &circle;
+	Shape *pShape = &triangle;
+	const type_info& tShape = typeid(*pShape);
+	const type_info& tCircle = typeid(circle);
+	cout << "Dynamic type of pShape is " << tShape.name() << endl;
+	cout << "Dynamic type of circle is " << tCircle.name() << endl;
+}
+```
+  - `std::type_info::hash_code()`
+    - Can be used for comparison
+- `dynamic_cast` converts a pointer to Base to a poiner to Derived
+  - When failed, nullptr is returned
+
+### 191. Multiple Inheritance
+- A derived class has more than one parent
+- Controversial
+  - Adds complexity
+  - Many programmers and OO designers dislike it
+  - Some languages do not support it
+- But useful for writing "mix-in" classes
+- Memory layout
+  - base1 + base2 + derived class
+- The derived class inherits the members of all parents
+- Class scope
+  - When both parents have the same name of member functions
+  - Call the function name with the namespace of the parent
+
+### 192. Virtual Inheritance
+- In multiple inheritance, both parents class may have the same base class
+- Virtual inheritance
+  - When parents inherit from the base, use virtual keyword
+  - `class SalesEmployee: public virtual Employee {...};`
+  - Resolves the issue of diamond inheritance
+```cpp
+#include <iostream>
+using namespace std;
+class Employee {
+public:
+	void address() { cout << "Employee address = " << static_cast<void *>(this) << endl; }
+};
+class SalesEmployee: public virtual Employee {
+};
+class Manager: public virtual Employee {
+};
+class SalesManager: public SalesEmployee, public Manager {
+};
+int main() {
+	SalesManager sm;
+	cout << "Cast to SalesEmployee\n";
+	SalesEmployee* se{static_cast<SalesEmployee *>(&sm)};
+	se->address();
+	cout << "Cast to Manager\n";
+	Manager* m{static_cast<Manager *>(&sm)};
+	m->address();
+}
+```  
+
+### 193. Inline Namespaces
+- Compressing steps of namespaces
+- Useful for multi-versioning
+```cpp
+namespace MyLibrary {
+  namespace V1 { // Older version
+    void old_function();
+  }
+  inline namespace V2 { // Newer, preferred version
+    void new_function();
+  }
+}
+```    
+- MyLibrary::new_function(); // Automatically uses V2::new_function()
+- MyLibrary::V1::old_function(); // Explicitly uses the older version
+
+### 194. Attributes
+- Vendor provided compiler directives
+  - #pragma
+  - __attribute
+  - __delspec
+- C++11 introduced attributes to provide a standard syntx
+  - Gives extra information to the compiler
+  - `[[ noreturn ]] void server();`
+  - `[[gnu::always_inline]]`
+- C++14 added `[[deprecated]]`
+  - `[[ deprecated ("Use version 2.0 in new code) ]] void func();`
+- C++17 added `[[nodiscard]]`
+  - Compiler gives warning when the return value is not received
+
+## Section 14: Compile-time Programming
+
+### 195. Compile-time Programming Overview
+- Compile time programming
+  - Compiler executes the code at compile time
+  - The reuslt of computation is available in the program
+  - No run-time overhead
+- Compile-time programming in C
+  - Uses preprocessor macro functions
+  - Copy/paste with substitution
+  - No type information
+  - Error prone
+- Template programming features
+  - It was intended for generic programming
+  - Provides a Turing-complete programming language
+- Template metaprogramming
+  - Mainly by library developers
+  - Making decisions at compile time for efficiency and/or portabilty
+  - Domain specific programming
+  - Expressing complex software patterns and concepts
+  - Uses class templates rather than functions
+  - Heavy use of template specialization
+- Compile-time programming
+  - Templates
+    - Clumsy and verbose syntax
+    - Logcial operations are complicated
+    - Incomprehensible error messages
+    - No debuggr support
+  - C++11 Also  provides constexpr
+    - The compiler executes normal C++ code
+    - Understandable error messages
+
+### 196. Constant Expressions
+- A value that is evaluated at compile-time and which cannot change
+  - A literal
+  - A value computed from literals
+  - A value computed from other constant expressions
+- constexpr
+  - In C++11
+- constexpr vs const
+  - const is used for function argument/return
+  - constexpr variable is known at compile time
+    - For constant values
+    - Improves performance by doing computations at compile time
+```cpp
+ std::array<int,5> arr1; // works OK
+ int i {5}; std::array<int,i> arr2; // compile error
+ const int n {5}; std::array<int,n> arr3; // works OK
+```
+### 197. Constexpr Functions
+- In C++11
+  - Arguments are const expressions
+  - Return a constant expression
+  - Executed at compile time
+  - `constexpr double miles_to_km(double miles) { return miles *1.602;}`
+  - Must be pure - cannot modify the arguments
+  - Implicitly defined as inline
+    - Multiple definitions allowed
+- Run-time constexpr functions
+  - A constexpr function can be called with non-const arguments
+  - The return value will not be a constant expression
+  - The function will be evaluated at runtime
+  - If it is received by constexpr variable then errors out
+```cpp
+// constexpr function
+constexpr double miles_to_km(double miles) { return miles * 1.602; }
+// The argument is a constant expression
+// The return value is a constant expression
+// The function is evaluated at compile time
+const double dist1 = miles_to_km(40);
+// The argument is not a constant expression
+// The return value is not a constant expression
+// The function is evaluated at run time
+double arg{40};
+double dist2 = miles_to_km(arg);
+// The argument is not a constant expression
+// The return value is not a constant expression
+// The return value is required to be a constant expression
+// Error!
+//constexpr double dist4 = miles_to_km(arg);
+int main() {}
+```
+- Applications
+  - Useful for performing calculations at compile time
+  - No runtime overhead
+- constexpr member functions
+  - A member function can be made constexpr
+    - Takes constexpr arguments
+    - Returns a constexpr
+  - In C++11, constexpr member functions were also const - cannot modify "this"
+  - In C++11, constexpr member functions are allowed to modify "this", unless also declared as const
+- constexpr members
+  - Initialized from constant expression
+  - Cannot be modified
+  - Must be declared static - no dynamic memory
+
+### 198. Classes and Templates
+- Template classes work very much like other classes
+  - Friend functions and classes
+  - Static members
+  - Member function with default arguments
+- A templated member functions of a class is called a member template
+- A member template cannot be virtual
+- Member template with different parameters
+  - Func has to be a callable object which can compare two objects of type T
+- C++20 has concepts
+  - Concepts allow us to express the requirement as part of the template definition
+  - Clearer code
+  - Compiler errors will clearly state
+```cpp
+#include <iostream>
+using namespace std;
+// Templated class with parameter T
+template <typename T>
+class comparer {
+	T t1, t2;
+public:
+	comparer(const T& t1, const T& t2): t1(t1), t2(t2) {}
+	// Member template with parameter Func
+	template <typename Func>
+	bool compare(Func f) { return f(t1, t2); }
+};
+int main() {
+	int x{1}, y{2};
+	// Instantiate a comparer object where T is an int
+	comparer<int> c(x, y);
+	cout << "comparer class: t1 = " << x << ", t2 = " << y << endl;
+	// Instantiate comparer::compare() where Func is a lambda expression
+	auto b = c.compare([](int i1, int i2) { return i1 < i2; });
+	cout << "Result of calling compare: " << boolalpha << b << endl;
+}
+```
+
+### 199. Template Specialization
+- Templates are generic
+- We may want a different behavior for some types
+  - Template specialization
+  - Use `template <>` then add `<datatype>` next to the class name
+```cpp
+template <typename T> // generic definition
+class Vector {
+public:
+	void identify() {
+		cout << "Vector<T>\n";
+	}
+};
+// Specialization of Vector class for bool type
+template <>
+class Vector<bool> {
+public:
+	void identify() {
+		cout << "Vector<bool>\n";
+	}
+};
+```
+- Specialization must follow the generic one
+- Partial specialization
+```cpp
+// generic
+template <typename T>
+class Vector {...};
+// partial specialization for pointer
+template <typename T>
+class Vector<T*> {...};
+```
+
+### 200. Extern Templates
+- Template bloat
+  - One header file has `template <typename T> void func(arg<T>) {...}`
+  - File_001.cc has `func(this_string);`
+  - File_999.cc has `func(that_string);`
+  - Every File_nnn.o will contain th ebinary code for func
+  - But the linker will remove the duplicate definitions
+  - Still serious problem in large projects as those object files have duplicated definitions
+- extern keyword
+  - extern declaration means that the defintion is in an else file
+- extern template
+  - In the header file:
+```cpp
+template<typename T> void func(arg<T>) {...}
+extern template void func(string);
+```
+  - In many files, func(string) can be called but instantiated somewhere
+  - There must be exactly one file where the function is instantiated: `template void func(string);`
+
+### 201. Variadic Templates
+- Variadic functions
+  - Can take any number of arguments
+  - Last parameter is `...`
+  - Not type-safe
+  - Only work properly with C-types
+  - Arguments are processed at run time
+- C++11 introduced variadic template functions
+  - `template <typename... Args> void func(Args.. args);`
+  - `...` lists are known as parameter packs
+- Type deduction
+  - `func("hello"s);` // Equivalent to template <typename T> func(T t);
+  - `func(442, 0.0);` // Equivalent to template<typename T, typename U> func(T t , U u);
+- Parameter packs
+  - Available only at compile time
+  - Three things are allowed
+    - sizeof...() to get the number of elements
+    - make_tuple() to store them in tuple
+    - Iterate over the elements, using template recursion
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+template <typename... Args>                 // Args is a list of types (template parameter pack)
+void func(Args... args) {                   // args is a list of arguments whose types match Args
+	cout << "Compiler has deduced call with " << sizeof...(args) << " argument(s)\n";
+}
+int main() {
+	int i{42}; double d{0.0}; string s{"text"};
+	func(s);                                // Instantiated as func(string);
+	func(i, d, s);                          // Instantiated as func(int, double, string);
+}
+```
+- Template recursion
+```cpp
+template <typename T, typename U, typename V>
+void func(T t, U u, V v) {
+  func(u,v);      // recursive call
+}
+template<typename U, typename V>
+void func(U u, V, v) {
+  func(v);        // recursive call
+}
+template <typename V>
+void func(V v) {} // End of recurssion
+```
+  - Pack processing
+    - Each call removes the first element from the list
+```cpp
+template<typename T, typename... Args>
+void func(T t , Args... args) {
+  // do something
+  func(args...);
+}
+```
+  - Terminate the recursion
+    - Write another template with a single argument
+    - This must be declared above the variadic template
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+template <typename T>
+void func(T t) {
+	cout << "Non-variadic template\n";
+	cout << "Processing argument " << t << endl;
+}
+template <typename T, typename... Args>      // Args is a list of types (template parameter pack)
+void func(T t, Args... args) {               // args is a list of arguments whose types match Args
+	size_t n_args = sizeof...(args) + 1;
+	cout << "Variadic template: compiler has deduced variadic call with " << n_args << " argument(s)\n";
+	cout << "Processing argument " << t << endl;
+	func(args...);
+}
+int main() {
+	int i{42}; double d{0.0}; string s{"text"};
+	func(i, d, s);                           // Instantiated as func(int, double, string);
+}
+```
+
+### 202. Miscellaneous Template Features
+- assert()
+  - Inherited from C
+  - Defined in `<cassert>`
+  - Checks its argument at runtime. If the argument is zero, it calls std::abort(). Otherwise, the program continues normal execution
+  - Useufl for checking invariants: `assert(x==42);`
+  - Can be disabed by `#define NDEBUG`
+- static_assert()
+  - In C++11
+  - Takes a constant bool expression and a string literal
+  - Bool expression is checked during compilation
+  - Mainly used in template metaprogramming
+- Default template parameters
+  - `template <typename T=int> class number { ...};`
+  - Same instantiation for other datatype
+  - For default parameer, leave `<>` empty: `number <> myObject(2);`
+
+### 203. Library-defined Operators
+- Library-defined operator objects
+  - C++11 defines some generic operator classes in `<functional>`
+  - Arithmetic operators
+  - Relational operators
+  - Logical operators
+  - Bitwise operators
+```cpp
+#include <iostream>
+#include <functional>
+using namespace std;
+// Function template with parameter Func
+// If caller does not provide a callable object, use T's operator <
+template <typename T, typename Func = less<T>>
+bool compare(const T& t1, const T& t2, Func f = Func()) { 
+	return f(t1, t2); 
+}
+int main() {
+	int x{1}, y{2};
+	cout << "x = " << x << ", y = " << y << endl;
+	auto b = compare(x, y, [] (int i1, int i2) { return i1 < i2; });
+	cout << "Result of calling compare with lambda: " << boolalpha << b << endl;
+	auto b2 = compare(x, y);
+	cout << "Result of calling compare with default: " << boolalpha << b2 << endl;
+}
+```
+
+### 204. Constexpr If Statement
+- `constexpr if` was added in C++17
+  - Allows conditionals to be evaluated at compile time
+```cpp
+if constexpr (a<b)  
+...
+else
+...
+```
+  - Only the true branch is compiled
+  - False granch is ignored
+- constexpr if vs preprocessor directives
+  - C++ has preprocessor directive like `#if` and `#ifdef`
+    - Simple tex-based substitution
+    - No understanding types or C++ syntax
+    - Arguments are not evaluated
+  - `constexpr if` is executed at compilation
+    - Has access to all the compiler's internal data and type information
+- Advantages of constexpr if
+  - Template specialization
+  - SFINAE and enable_if
+    - Complex and obscure code
+    - Hard to maintain
+  - constexpr if
+    - Single function with normal looking code
+
+### 205. Constexpr If Examples
+```cpp
+// Requires C++17 compiler
+#include <iostream>
+#include <string>
+using namespace std;
+template <typename T, typename... Args>      // Args is a list of types (template parameter pack)
+void func(T t, Args... args) {               // args is a list of arguments whose types match Args
+	size_t n_args = sizeof...(args) + 1;
+	cout << "Variadic template: compiler has deduced variadic call with " << n_args << " argument(s)\n";
+	cout << "Processing argument " << t << endl;
+	
+	if constexpr(sizeof...(args) > 0)
+		func(args...);
+}
+int main() {
+	int i{42}; double d{0.0}; string s{"text"};
+	func(i, d, s);                           // Instantiated as func(int, double, string);
+}
+```
+
+### 206.The decltype Keyword
+- decltype
+  - Figures out the declaration type
+  - Added in C++11
+  - Used at compile time
+  - Does not evaluate its argument
+  - Not executed
+  - Just the compiler relaces decltype with the type of the argument would return
+- Unlike auto, decltype will retain const, reference, etc
+- decltype with lvalues
+  - int x;
+  - decltype(x) // Gives "int"
+  - decltype(x+y) // Gives "int&"
+  - decltype((x)) // Gives "int&"
+- decltype with rvalues
+  - decltype(2) // Gives "int"
+  - decltype(Test()) // Gives "Test&&"
+
+## Section 15: Project: A Breakout Game Using Modern C++ with SFML
+
+### 207. Project Breakout
+- Inspired by a talk by Vittorio Romeo
+
+### 208. SFML Introduction
+- Simple and Fast Multimedia Library
+  - Written in C++
+  - Easy to use
+  - Very well documented
+  - www.sfml-dev.org
+- At ubuntu: `sudo apt-get install libsfml-dev`
+
+### 209. Compiler Configuration for SFML
+- -I path to SFML include files
+- -L path to SFML library files
+- Compile command: `g++ main.cc -I/usr/include/ -L/usr/lib/x86_64-linux-gnu -lsfml-system -lsfml-window -lsfml-graphics`
+
+### 210. Basic Window
+- Defined from `<SFML/Graphiics.hpp>`
+- namespace sf
+- sf::Window
+- sf::RenderWindow
+  - clear()
+  - draw()
+  - display()
+- sf::Event
+- constants.h 
+```cpp
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
+// Code for a "breakout" game
+// Based on a talk by Vittorio Romeo
+// Uses the SFML graphics library
+struct constants {
+  static constexpr int window_width{520};
+  static constexpr int window_height{450};
+};
+#endif // CONSTANTS_H
+```
+- main.cc:
+```cpp
+#include <SFML/Graphics.hpp>
+#include <string>
+#include "constants.h"
+using namespace std::literals;
+// The main function for the program
+int main() {
+  // Create the game's window using an object of class RenderWindow
+  // The constructor takes an SFML 2D vector with the window dimensions
+  // and an std::string with the window title
+  // The SFML code is in the sf namespace
+  sf::RenderWindow game_window{{constants::window_width, constants::window_height},
+			       "Simple Breakout Game Version 1"s,};
+  // Limit the framerate
+  // This allows other processes to run and reduces power consumption
+  game_window.setFramerateLimit(60);      // Max rate is 60 frames per second
+  // Game loop
+  // Clear the screen
+  // Check for new events
+  // Calculate the updated graphics
+  // Display the updated graphics
+  while (game_window.isOpen()) {
+    // Clear the screen
+    game_window.clear(sf::Color::Black);
+    // Check for any events since the last loop iteration
+    sf::Event event;
+    // If the user pressed "Escape", or clicked on "close", we close the window
+    // This will terminate the program
+    while (game_window.pollEvent(event)) {
+	if (event.type == sf::Event::Closed)
+	  game_window.close();
+    }
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape))
+      game_window.close();
+    // Calculate the updated graphics
+    // This space left intentionally blank!
+    // Display the updated graphics
+    game_window.display();
+  }
+}
+```
+
+### 211. Random Walk Revisited
+- sf::Vector2
+  - 2D vector
+  - Member x and y
+  - Supports == and !=
+  - Template class
+- sf:Vector2f
+  - Alias for `sf::Vector2<float>` instantiation
+  - SFML uses float internally
+- Texture
+  - sf::Texture represents an image
+  - sf::Shape represents a pre-defined image
+    - An abstract base class
+  - sf::CircleShape: derived from sf::Shape
+```cpp
+#include <SFML/Graphics.hpp>
+#include <string>
+#include <random>
+#include "constants.h"
+using namespace std;
+using namespace std::literals;
+// Class to represent the creature moving around the screen
+class creature {
+    // Static random number engine and Bernoulli distribution objects
+    static mt19937 mt;
+    static bernoulli_distribution bd;
+    // Define some properties of the creature
+    // SFML uses float internally
+    float vx{4.0f};
+    float vy{4.0f};
+    sf::Vector2f velocity;
+    // We use the SFML CircleShape
+    sf::CircleShape circle;
+public:
+    // Interface of the class
+    // Constructor
+    // Arguments are the initial coordinates of the centre of the ball
+    // SFML uses the computer graphics convention
+    // (0, 0) is the top left corner of the screen
+    // x increases to the right
+    // y increases downwards
+    creature(float x, float y) {
+        // Set the initial position and velocity
+        // Use (x, y) for the initial position
+        velocity = {vx, vy};
+        circle.setPosition(x, y);
+        // Set the graphical properties
+        circle.setRadius(5.0f);
+        circle.setFillColor(sf::Color::Red);
+    }
+    void draw(sf::RenderWindow& window) {
+        // Ask the window to draw the shape for us
+        window.draw(circle);
+    }
+    // Compute the creature's new position
+    void update() {
+        // Change the direction of movement at random
+        vx = bd(mt) ? vx : -vx;
+        vy = bd(mt) ? vy : -vy;
+        // Move the creature to its new position
+        circle.move({vx, vy});
+    }
+};
+mt19937 creature::mt;
+bernoulli_distribution creature::bd;
+// The main function for the program
+int main() {
+    // Create a creature object in the middle of the screen
+    creature the_creature(constants::window_width/2.0,
+        constants::window_height/2.0);
+
+    // Create the game's window using an object of class RenderWindow
+    // The constructor takes an SFML 2D vector with the window dimensions
+    // and an std::string with the window title
+    // The SFML code is in the sf namespace
+    sf::RenderWindow window{{constants::window_width, constants::window_height},
+        "Random Walk"s};
+    // Limit the framerate
+    // This allows other processes to run and reduces power consumption
+    window.setFramerateLimit(60);      // Max rate is 60 frames per second
+    // Game loop
+    // Clear the screen
+    // Check for user input
+    // Calculate the updated graphics
+    // Display the updated graphics
+    while (true) {
+        // Clear the screen
+        window.clear(sf::Color::Black);
+        // Check for any events
+        sf::Event event;
+        // If the user pressed "Escape", or clicked on "close", we close the window
+        // This will terminate the program
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window.close();
+                break;
+            }
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape)) {
+            window.close();
+            break;
+        }
+        // Calculate the updated graphics
+        the_creature.update();
+        // Display the updated graphics
+        the_creature.draw(window);
+        window.display();
+    }
+}
+```
+
+### 212. Sprite
+- sf::Sprite represents a texture associated with a rectangle
+  - A group of pixels as a single graphical entity
+  - This entity floats over th display
+- Loading an image into the graphics card
+  - sf::Texture texture;
+  - texture.loadFromFile("aaa.jpg");
+- Use setTexture to associate this texture with a sprite
+  - sf::Sprite sprite;
+  - sprite.setTexture(texture);
+- entity class
+  - Our game will require several sprites
+  - An abstract base class
+- background.h:
+```cpp
+#ifndef BACKGROUND_H
+#define BACKGROUND_H
+#include "constants.h"
+#include "entity.h"
+// Class to represent the background
+// Inherits from entity
+class background : public entity {
+  // Private data members
+  static sf::Texture texture;
+ public:
+  // Interface of the class
+  // Constructor
+  // Arguments are the initial coordinates of the centre of the background
+  // SFML uses the computer graphics convention
+  // (0, 0) is the top left corner of the screen
+  // x increases to the right
+  // y increases downwards
+  background(float x, float y);
+  // Implement the pure virtual functions
+  void update() override;
+  void draw(sf::RenderWindow& window) override;
+};
+#endif // BACKGROUND_H
+```
+- background.cc
+```cpp
+#include "background.h"
+// Initialize static data
+sf::Texture background::texture;
+background::background(float x, float y) : entity() {
+  // Load the texture
+  texture.loadFromFile("background.jpg");
+  sprite.setTexture(texture);
+  // Set the initial position and velocity of the background
+  // Use (x, y) for the initial position of the background
+  sprite.setPosition(x, y);
+}
+// Compute the background's new position
+void background::update() {
+  // Nothing to do here
+}
+void background::draw(sf::RenderWindow& window) {
+  // Ask the window to draw the sprite for us
+  window.draw(sprite);
+```
+
+### 213. Ball
+- Implement as a sprite which can move b/w updates
+- moving entity
+  - Inherits from entity
+  - Derives ball class
+- ball.h:
+```cpp
+#ifndef BALL_H
+#define BALL_H
+#include "constants.h"
+#include "entity.h"
+// Class to represent the bouncing ball
+// Inherits from moving_entity
+class ball : public moving_entity {
+  // Private data members
+  static sf::Texture texture;
+ public:
+  // Interface of the class
+  // Constructor
+  // Arguments are the initial coordinates of the centre of the ball
+  // SFML uses the computer graphics convention
+  // (0, 0) is the top left corner of the screen
+  // x increases to the right
+  // y increases downwards
+  ball(float x, float y);
+  // Implement the pure virtual functions
+  void update() override;
+  void draw(sf::RenderWindow& window) override;
+};
+#endif // BALL_H
+```
+- ball.cc:
+```cpp
+#include "ball.h"
+// Initialize static data
+sf::Texture ball::texture;
+ball::ball(float x, float y) : moving_entity() {
+  // Load the texture
+  texture.loadFromFile("ball.png");
+  sprite.setTexture(texture);
+  // Set the initial position and velocity of the ball
+  // Use (x, y) for the initial position of the ball
+  sprite.setPosition(x, y);
+  velocity = {constants::ball_speed, constants::ball_speed};
+}
+// Compute the ball's new position
+void ball::update() {
+  // Move the position of the ball
+  sprite.move(velocity);
+}
+void ball::draw(sf::RenderWindow& window) {
+  // Ask the window to draw the sprite for us
+  window.draw(sprite);
+}
+```
+
+### 214. Bouncing Ball
+- Getter function to return
+  - The current position of the ball: getPosition()
+  - Its center:  get_centre()
+  - Its bounding rectangle: get_bounding_box()
+
+### 215. Paddle
+
+### 216. Moving Paddle
+- When a user presses left arrow key, it moves to the left
+- Pressing right arrow key, it moves to the right
+- paddle::update()
+  - Check for key press
+  - Change velocity.x
+- paddle.h
+```cpp
+#ifndef PADDLE_H
+#define PADDLE_H
+#include "constants.h"
+#include "entity.h"
+// A class to represent a paddle
+// Inherits from moving_entity
+// The paddle moves across the bottom of the screen, under the user's control
+// When the ball hits the paddle, it will bounce and change its direction
+class paddle : public moving_entity {
+  // Private data and member functions
+  static sf::Texture texture;
+  // Respond to input from the player
+  void process_player_input();
+ public:
+  // Interface of the class
+  // Constructor
+  // Arguments are the initial coordinates of the centre of the paddle
+  paddle(float x, float y);
+  // Implement the pure virtual functions
+  void update() override;
+  void draw(sf::RenderWindow& window) override;
+};
+#endif // PADDLE_H
+```
+- paddle.cc
+```cpp
+#include "paddle.h"
+// Initialize static data
+sf::Texture paddle::texture;
+paddle::paddle(float x, float y) : moving_entity() {
+  // Load the texture
+  texture.loadFromFile("paddle.png");
+  sprite.setTexture(texture);
+  // Set the initial position of the paddle
+  sprite.setPosition(x, y);
+  // Set the velocity of the paddle
+  velocity = {constants::paddle_speed, 0.0f};    // The paddle can only move sideways
+  // By default, operations are relative to the sprite's top lh corner
+  // Make them relative to the sprite's centre
+  sprite.setOrigin(get_centre());
+}
+// Compute the paddle's new position
+void paddle::update() {
+   // Respond to user input as this will affect how the paddle moves
+  process_player_input();
+  // Move the position of the paddle
+  sprite.move(velocity);
+}
+void paddle::draw(sf::RenderWindow& window) {
+  // Ask the window to draw the shape for us
+  window.draw(sprite);
+}
+// Respond to input from the player
+// If the player presses the left arrow key, move to the left (negative velocity)
+// If the player presses the right arrow key, move to the right (positive velocity)
+// Otherwise, do not move (zero velocity)
+// Do not allow the paddle to move off the screen
+void paddle::process_player_input() {
+  if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) {
+    // Left arrow key pressed - move to the left
+    // Unless the paddle has gone past the left hand side
+    if (x() >= 0)
+      velocity.x = -constants::paddle_speed;
+    else
+      velocity.x = 0;
+  }
+  else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
+    // Similarly for the right arrow
+    if (x() <= constants::window_width)
+      velocity.x = constants::paddle_speed;
+    else
+      velocity.x = 0;
+  }
+  else {
+    // Some other key pressed, or no key at all
+    velocity.x = 0;
+  }
+}
+```
+
+### 217. Ball-Paddle Interaction
+- Detects and resovles collisions b/w entities
+- `void handle_collisio(ball &b, const apddle&p);`
+- `bool is_interacting(const entity& e1, const entity& e2);`
+
+### 218. Bricks
+- Implemented as a vector of sprites
+
+### 219. Ball Interaction with Bricks
+- When the ball hits a brick
+  - The brick is destroyed
+    - Removed from a vector
+  - The ball bounces off
+- handle_collision()
+  - Collision can occur on all four sides
+
+### 220. Game Manager
+- We need to refactor the code
+  - main() is too long
+  - Duplicated code
+- We move the code from main() to a new class
+- game class
+  - Data member
+    - Game window
+    - The ball
+    - The background
+    - The paddle
+    - The vector of blocks
+  - Member function
+    - Constructor to intialize
+    - run() to perform the game loop
+    - reset() to re-initialize the entities
+- Pausing the game
+  - A class enum manages the state
+
+### 221. Entity Manager Overview
+- Refactoring the entity management into a separate class
+  - Simplifies the game loop
+  - Provides tbetter abstraction
+- entity_manager
+  - Will use polymorphism
+    - Store entities as pointers to base class
+    - Call virtual function through pointer to base
+  - Will provide an interface for performing operations on entities
+    - creat()
+    - refresh()
+    - clear()
+    - get_all()
+    - apply_all()
+    - update()
+    - draw()
+  - Will create all entities in the game
+  - all_entities
+    - Stores all the entities in the game as an std::vector of std::unique_ptr<entity>
+  - grouped_entities
+    - Sotres all the entities in the game as an std::map
+    - The key depends on the entity type
+
+### 222. Entity Manager and Object Creation
+- entity_manager::create()
+  - Creates a new entity object
+  - Adds it to all_entities
+  - Adds an alias to the object to grouped_entities
+  - Will use a variadic template
+  - Perfect forwarding for efficiency
+
+### 223. Entity Manager and Object Operations
+- entity_manager::get_all()
+  - Returns all the entities of a given type
+  - Template for class type
+- entity_manager::apply_all()
+  - Applies a function to all entities of a given type
+
+### 224. Brick Strength
+- Requires several impacts before the brick is destroyed
+- Add a strength member to the brick class
+- sf::Color
+  - red
+  - green
+  - blue
+  - alpha: opacity. 0 is a completely transparent and 255 is opaque color. Default is 255
+  - They are 8-bit unsigned intgers
+  - sf::Color(255,0,0) => red
+
+### 225. More Features
+- Player lives
+- Text in SFML
+  - sf::Text represents graphical text
+  - Associated wtih sf::Font
+
+### 226. Conclusion
+- A game code in 670 lines
+  - Modular
+  - Easy to understand except entity_manager
+- Adding a new entity type
+  - Derive a class from entity or moving_entity
+  - Load its image file in the constructor
+  - Override update()
+  - Add data members and member functions
+  - Create and register objects in game_manager::reset()
+  - Add collision handling code to game loop if required
+- How to improve?
+  - Code refactoring
+  - Randomize brick strengths
+  - Sound effects
+
+## Section 16: Resources
+
+### 227. Recommended Books
+- The recommended book for this course is "C++ Primer (5th Edition)" by Lippman, Lajoie and Moo. Thorough coverage of C++11, plus traditional features which are still widely used.
+- Also worth reading is "A Tour of C++ (2nd Edition)" by Bjarne Stroustrup which gives a brief description of every important feature in Modern C++ up to C++17.
+
+### 228. C++ "Cheat Sheet" Infographics
+- A very useful resource for quickly looking up how to do things in C++. Contains some C++17 and C++20 features not covered in this course. https://hackingcpp.com/cpp/cheat_sheets.html
+
+### 229. The "Awesome C++ Frameworks and Libraries" Github
+- The "Awesome C++ Frameworks and Libraries" github is a massive collection of links to C++ libraries and frameworks: https://github.com/fffaraz/awesome-cpp
+
+### 230. The "Awesome Modern C++ Resources" Github
+- The "Awesome Modern C++ Resources" Github is a massive collection of links to C++ books, talks, blogs etc etc
+- https://github.com/rigtorp/awesome-modern-cpp
+
+### 231. "Classy Header-only Classes"
+- A cross-platform collection of useful classes which fill many gaps in the C++ standard library. Header-only, so you just drop them into your project* without further ado!
+- https://github.com/Tracktion/choc
+- * except for HTTP and WebSocket Server class, which requires linking against boost::beast
+
+### 232. Bonus Material
