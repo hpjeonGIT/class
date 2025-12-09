@@ -1026,76 +1026,771 @@ ui.launch(inbrowser=True, auth=("ed", "bananas"))
   - Spaces: apps, many built in Gradio, including Leaderboards
 - Free Hugging Face account is required for this training
   - Not pro account
-  
+
 ### 61. Day 1 - HuggingFace Libraries: Transformers, Datasets, and Hub Explained
+- Hugging face libraries compared to using Ollama
+  - hub
+  - datasets
+  - transformers
+  - peft (parameter efficient fine training)
+  - trl (transformers reinforcement library)
+  - accelerate
 
 ### 62. Day 1 - Introduction to Google Colab and Cloud GPUs for AI Development
+- Google colab
+  - Run a jupyter notebook in the cloud with a powerful runtime
+  - Collaborate with others
+  - Integate with other Google services
+- Runtimes
+  - CPU based
+  - Lower spec GPU for free or low-cost - T4(15GB GPU RAM)
+  - HIghe spec GPU for resource intensive runs - A100 (40GB)
 
 ### 63. Day 1 - Getting Started with Google Colab: Setup, Runtime, and Free GPU Access
+- Downside of colab
+  - You might be off the box from Google anytime
+  - Need pip install packages every single time
+  - Some latency
 
 ### 64. Day 1 - Setting Up Google Colab with Hugging Face and Running Your First Model
+- Jupyter note book is the default interface
+- To use Linux CLI, use `!`
+  - `!pip install gradio`
+- User keys or tokens
+  - From colab login menu -> Settings -> Access Tokens -> Create Tokens
+  - In the jupyter notebook, from ions in the left pane -> keys-> Secrets
+    - Can control each notebook to access keys/secrets
+  - Accessing your secret keys in Python:
+```py
+from google.colab import userdata
+userdata.get('OPENAI_API_KEY')
+```
 
 ### 65. Day 1 - Running Stable Diffusion and FLUX on Google Colab GPUs
+```py
+from huggingface_hub import login
+from google.colab import userdata
+hf_token = userdata.get('HF_TOKEN')
+login(hf_token, add_to_git_credential=True)
+from IPython.display import display
+from diffusers import AutoPipelineForText2Image
+import torch
+pipe = AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16")
+pipe.to("cuda")
+prompt = "A class of students learning AI engineering in a vibrant pop-art style"
+image = pipe(prompt=prompt, num_inference_steps=4, guidance_scale=0.0).images[0]
+display(image)
+# Restart the kernel
+import IPython
+IPython.Application.instance().kernel.do_shutdown(True)
+from IPython.display import display
+from diffusers import DiffusionPipeline
+import torch
+pipe = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16, use_safetensors=True, variant="fp16")
+pipe.to("cuda")
+prompt = "A class of data scientists learning AI engineering in a vibrant high-energy pop-art style"
+image = pipe(prompt=prompt, num_inference_steps=30).images[0]
+display(image)
+```
 
 ### 66. Day 2 - Introduction to Hugging Face Pipelines for Quick AI Inference
+- Two API levels of Hugging Face
+  - Pipelines: Higher level APIs to carry out standard tasks incredibly quickly
+    - Sentimental analysis
+    - Classifier
+    - Named entity recognition
+    - Question answering
+    - Summarizing
+    - Translation    
+  - Tokenizers and Models: Lower level APIs to provide the most power and control
+- Use pipelines to generate content
+  - Text
+  - Image
+  - Audio
 
 ### 67. Day 2 - HuggingFace Pipelines API for Sentiment Analysis on Colab T4 GPU
+```py
+!pip install -q --upgrade datasets==3.6.0
+# Imports
+import torch
+from google.colab import userdata
+from huggingface_hub import login
+from transformers import pipeline
+from diffusers import DiffusionPipeline
+from datasets import load_dataset
+import soundfile as sf
+from IPython.display import Audio
+```
+- Using pipeline
+  - `my_pipeline = pipeline(task, model=xx, device=xx)`
+  - `result = my_pipeline(input1)`
+```py
+better_sentiment = pipeline("sentiment-analysis", model="nlptown/bert-base-multilingual-uncased-sentiment", device="cuda")
+result = better_sentiment("I should be more excited to be on the way to LLM mastery!!")
+print(result)
+```
 
 ### 68. Day 2 - Named Entity Recognition, Q&A, and Hugging Face Pipeline Tasks
+```py
+# Named Entity Recognition
+ner = pipeline("ner", device="cuda")
+result = ner("AI Engineers are learning about the amazing pipelines from HuggingFace in Google Colab from Ed Donner")
+for entity in result:
+  print(entity)
+# Question Answering with Context
+question="What are Hugging Face pipelines?"
+context="Pipelines are a high level API for inference of LLMs with common tasks"
+question_answerer = pipeline("question-answering", device="cuda")
+result = question_answerer(question=question, context=context)
+print(result)
+# Text Summarization
+summarizer = pipeline("summarization", device="cuda")
+text = """
+The Hugging Face transformers library is an incredibly versatile and powerful tool for natural language processing (NLP).
+It allows users to perform a wide range of tasks such as text classification, named entity recognition, and question answering, among others.
+It's an extremely popular library that's widely used by the open-source data science community.
+It lowers the barrier to entry into the field by providing Data Scientists with a productive, convenient way to work with transformer models.
+"""
+summary = summarizer(text, max_length=50, min_length=25, do_sample=False)
+print(summary[0]['summary_text'])
+# Translation
+translator = pipeline("translation_en_to_fr", device="cuda") # no model is given but HF will use a default one
+result = translator("The Data Scientists were truly amazed by the power and simplicity of the HuggingFace pipeline API.")
+print(result[0]['translation_text'])
+```
 
 ### 69. Day 2 - Hugging Face Pipelines: Image, Audio & Diffusion Models in Colab
+```py
+# Image Generation - remember this?! Now you know what's going on
+# Pipelines can be used for diffusion models as well as transformers
+from IPython.display import display
+from diffusers import AutoPipelineForText2Image
+import torch
+pipe = AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16")
+pipe.to("cuda")
+prompt = "A class of students learning AI engineering in a vibrant pop-art style"
+image = pipe(prompt=prompt, num_inference_steps=4, guidance_scale=0.0).images[0]
+display(image)
+# Audio Generation
+from transformers import pipeline
+from datasets import load_dataset
+import soundfile as sf
+import torch
+from IPython.display import Audio
+synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts", device='cuda')
+embeddings_dataset = load_dataset("matthijs/cmu-arctic-xvectors", split="validation", trust_remote_code=True)
+speaker_embedding = torch.tensor(embeddings_dataset[7306]["xvector"]).unsqueeze(0)
+speech = synthesiser("Hi to an artificial intelligence engineer, on the way to mastery!", forward_params={"speaker_embeddings": speaker_embedding})
+Audio(speech["audio"], rate=speech["sampling_rate"])
+```
 
 ### 70. Day 3 - Tokenizers: How LLMs Convert Text to Numbers
+- Introducing the Tokenizer
+  - Maps b/w text and tokens for a particular model
+  - Translates b/w text, tokens and token IDs with encode() and decode() methods
+  - Contains a Vocab that can include special tokens to signal information to th elLM, like the start of prompt
 
 ### 71. Day 3 - Tokenizers in Action: Encoding and Decoding with Llama 3.1
+```py
+from google.colab import userdata
+from huggingface_hub import login
+from transformers import AutoTokenizer
+tokenizer = AutoTokenizer.from_pretrained('meta-llama/Meta-Llama-3.1-8B', trust_remote_code=True)
+text = "I am excited to show Tokenizers in action to my LLM engineers"
+tokens = tokenizer.encode(text)
+tokens
+character_count = len(text)
+word_count = len(text.split(' '))
+token_count = len(tokens)
+print(f"There are {character_count} characters, {word_count} words and {token_count} tokens")
+# 61 characters, 12 words and 15 tokens
+```
+- In order to use Llama, Meta requires to sign up
+  - To be granted, register email which was used to register HF 
+  - For purpose, personal education/AI experimentalist will suffice
 
 ### 72. Day 3 - How Chat Templates Work: LLaMA Tokenizers and Special Tokens
+- LLM models
+  - Base model
+  - Chat model
+  - Reasoning model
+- Instruct variants of models
+  - HF trains models for chats
+  - *-Instruct models
+- LLM special tokens
+  - `<|start_header_id|>`, `<|end_header_id>`, `<|eot_id|>`, ...
 
 ### 73. Day 3 - Comparing Tokenizers: Phi-4, DeepSeek, and QWENCoder in Action
+```py
+PHI4 = "microsoft/Phi-4-mini-instruct"
+DEEPSEEK = "deepseek-ai/DeepSeek-V3.1"
+QWEN_CODER = "Qwen/Qwen2.5-Coder-7B-Instruct"
+phi4_tokenizer = AutoTokenizer.from_pretrained(PHI4)
+text = "I am curiously excited to show Hugging Face Tokenizers in action to my LLM engineers"
+print("Llama:")
+tokens = tokenizer.encode(text)
+print(tokens)
+print(tokenizer.batch_decode(tokens))
+print("\nPhi 4:")
+tokens = phi4_tokenizer.encode(text)
+print(tokens)
+print(phi4_tokenizer.batch_decode(tokens))
+print("Llama:")
+print(tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True))
+print("\nPhi 4:")
+print(phi4_tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True))
+deepseek_tokenizer = AutoTokenizer.from_pretrained(DEEPSEEK)
+text = "I am curiously excited to show Hugging Face Tokenizers in action to my LLM engineers"
+print(tokenizer.encode(text))
+print()
+print(phi4_tokenizer.encode(text))
+print()
+print(deepseek_tokenizer.encode(text))
+print("Llama:")
+print(tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True))
+print("\nPhi:")
+print(phi4_tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True))
+print("\nDeepSeek:")
+print(deepseek_tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True))
+```
 
 ### 74. Day 4 - Deep Dive into Transformers, Quantization, and Neural Networks
+- Quantization
+  - LLM handles lots of parameters, big matrix calculations, 16-32bit numbers
+  - Store those numbers into smaller digit like 8bits or 4bits
+  - Squeeze into smaller memory/less calculations
+  - Affects neural network not much
+- Model internals
+- Streaming
 
 ### 75. Day 4 - Working with Hugging Face Transformers Low-Level API and Quantization
+```py
+!pip install -q --upgrade bitsandbytes accelerate
+from google.colab import userdata
+from huggingface_hub import login
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer, BitsAndBytesConfig
+import torch
+import gc
+hf_token = userdata.get('HF_TOKEN')
+login(hf_token, add_to_git_credential=True)
+# instruct models and 1 reasoning model
+# Llama 3.1 is larger and you should already be approved
+# see here: https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct
+# LLAMA = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+# Llama 3.2 is smaller but you might need to request access again
+# see here: https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct
+LLAMA = "meta-llama/Llama-3.2-1B-Instruct"
+PHI = "microsoft/Phi-4-mini-instruct"
+GEMMA = "google/gemma-3-270m-it"
+QWEN = "Qwen/Qwen3-4B-Instruct-2507"
+DEEPSEEK = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+messages = [
+    {"role": "user", "content": "Tell a joke for a room of Data Scientists"}
+  ]
+# Quantization Config - this allows us to load the model into memory and use less memory
+quant_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_quant_type="nf4"
+)  # reduces into 4bit
+# Tokenizer
+tokenizer = AutoTokenizer.from_pretrained(LLAMA)
+tokenizer.pad_token = tokenizer.eos_token # eos = end of sentence
+inputs = tokenizer.apply_chat_template(messages, return_tensors="pt").to("cuda")
+# The model
+model = AutoModelForCausalLM.from_pretrained(LLAMA, device_map="auto", quantization_config=quant_config) 
+memory = model.get_memory_footprint() / 1e6
+print(f"Memory footprint: {memory:,.1f} MB")
+# yields 1,012.0 MB
+```
+- NF4 data type: a low-precision representation method used in machine learning, specifically designed to efficiently quantize the weights of large language models (LLMs). It uses only 4 bits to store floating-point values, significantly reducing memory usage and accelerating inference and finetuning. 
 
 ### 76. Day 4 - Inside LLaMA: PyTorch Model Architecture and Token Embeddings
+- Looking under the hood at the Transformer model
+  - This model object is a Neural Network, implemented with the Python framework PyTorch. The Neural Network uses the architecture invented by Google scientists in 2017: the Transformer architecture.
+  - While we're not going to go deep into the theory, this is an opportunity to get some intuition for what the Transformer actually is.
+  - Now take a look at the layers of the Neural Network that get printed in the next cell. Look out for this:
+    - It consists of layers
+    - There's something called "embedding" - this takes tokens and turns them into 4,096 dimensional vectors. We'll learn more about this in Week 5.
+    - There are then 16 sets of groups of layers (32 for Llama 3.1) called "Decoder layers". Each Decoder layer contains three types of layer: (a) self-attention layers (b) multi-layer perceptron (MLP) layers (c) batch norm layers.
+    - There is an LM Head layer at the end; this produces the output
+      - This is opposite of Embedding layer
+  - Notice the mention that the model has been quantized to 4 bits.
 
 ### 77. Day 4 - Inside LLaMA: Decoder Layers, Attention, and Why Non-Linearity Matters
+- LlamaForCausalLM()
+  - (model): LlamaModel
+    - (embed_tokens): Embedding(128256,2048)
+    - (layers):
+      - (0-15): 16 x LlamaDecoderLayer
+        - (self_attn): LlamaAtention
+          - (q_proj): Linear4bit()
+          - (k_proj): Linear4bit()
+          - (v_proj): Linear4bit()
+          - (o_proj): Linear4bit()
+        - (mlp): LlamaMLP
+        - (input_layernorm): LlamaRMSNorm
+        - (post_attention_layernorm): LlamaRMSNorm
+    - (norm): LlamaRMSNorm(2048,)
+    - (rotary_emb): LlamaRotaryEmbedding()
+  - (lm_head): Linear(in_features=2049, out_features=128256)
 
 ### 78. Day 4 - Running Open Source LLMs: Phi, Gemma, Qwen & DeepSeek with Hugging Face
+```py
+# Wrapping everything in a function - and adding Streaming and generation prompts
+def generate(model, messages, quant=True, max_new_tokens=80):
+  tokenizer = AutoTokenizer.from_pretrained(model)
+  tokenizer.pad_token = tokenizer.eos_token
+  input_ids = tokenizer.apply_chat_template(messages, return_tensors="pt", add_generation_prompt=True).to("cuda")
+  attention_mask = torch.ones_like(input_ids, dtype=torch.long, device="cuda")
+  streamer = TextStreamer(tokenizer)
+  if quant:
+    model = AutoModelForCausalLM.from_pretrained(model, quantization_config=quant_config).to("cuda")
+  else:
+    model = AutoModelForCausalLM.from_pretrained(model).to("cuda")
+  outputs = model.generate(input_ids=input_ids, attention_mask=attention_mask, max_new_tokens=max_new_tokens, streamer=streamer)
+messages = [
+    {"role": "user", "content": "Tell a light-hearted joke for a room of Data Scientists"}
+  ]
+generate(GEMMA, messages, quant=False)
+generate(QWEN, messages)
+generate(DEEPSEEK, messages, quant=False, max_new_tokens=500)
+```
 
 ### 79. Day 5 - Visualizing Token-by-Token Inference in GPT Models
+- Create a solution that makes a meeting minutes
+  - Use a Frontier model to convert the audio to text
+  - Use an open source model to generate minutes
+  - Stream back results and show in Markdown
+- How the next token is selected
+  - By statistics
 
 ### 80. Day 5 - Building Meeting Minutes from Audio with Whisper and Google Colab
+```py
+!pip install -q --upgrade bitsandbytes accelerate
+# imports
+import os
+import requests
+from IPython.display import Markdown, display, update_display
+from openai import OpenAI
+from google.colab import drive
+from huggingface_hub import login
+from google.colab import userdata
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer, BitsAndBytesConfig
+import torch
+LLAMA = "meta-llama/Llama-3.2-3B-Instruct"
+# New capability - connect this Colab to your Google Drive
+# See immediately below this for instructions to obtain denver_extract.mp3
+# Place the file on your drive in a folder called llms, and call it denver_extract.mp3
+drive.mount("/content/drive")
+audio_filename = "/content/drive/MyDrive/llms/denver_extract.mp3"
+# Sign in to HuggingFace Hub
+hf_token = userdata.get('HF_TOKEN')
+login(hf_token, add_to_git_credential=True)
+# Open the file
+audio_file = open(audio_filename, "rb")
+# Step 1: Transcribe Audio
+## Opiton 1: using HF pipelines
+from transformers import pipeline
+pipe = pipeline(
+    "automatic-speech-recognition",
+    model="openai/whisper-medium.en",
+    dtype=torch.float16,
+    device='cuda',
+    return_timestamps=True
+)
+result = pipe(audio_filename)
+transcription = result["text"]
+print(transcription)
+```
 
 ### 81. Day 5 - Building Meeting Minutes with OpenAI Whisper and LLaMA 3.2
+```py
+# Option 2: using OpenAI
+AUDIO_MODEL = "gpt-4o-mini-transcribe"
+openai_api_key = userdata.get('OPENAI_API_KEY')
+openai = OpenAI(api_key=openai_api_key)
+transcription = openai.audio.transcriptions.create(model=AUDIO_MODEL, file=audio_file, response_format="text")
+print(transcription)
+#
+open_source_transcription = transcription
+display(Markdown(open_source_transcription))
+print("\n\n")
+display(Markdown(transcription))
+# Step 2: Analyze and report
+system_message = """
+You produce minutes of meetings from transcripts, with summary, key discussion points,
+takeaways and action items with owners, in markdown format without code blocks.
+"""
+user_prompt = f"""
+Below is an extract transcript of a Denver council meeting.
+Please write minutes in markdown without code blocks, including:
+- a summary with attendees, location and date
+- discussion points
+- takeaways
+- action items with owners
+Transcription:
+{transcription}
+"""
+messages = [
+    {"role": "system", "content": system_message},
+    {"role": "user", "content": user_prompt}
+  ]
+quant_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_quant_type="nf4"
+)
+tokenizer = AutoTokenizer.from_pretrained(LLAMA)
+tokenizer.pad_token = tokenizer.eos_token
+inputs = tokenizer.apply_chat_template(messages, return_tensors="pt").to("cuda")
+streamer = TextStreamer(tokenizer)
+model = AutoModelForCausalLM.from_pretrained(LLAMA, device_map="auto", quantization_config=quant_config)
+outputs = model.generate(inputs, max_new_tokens=2000, streamer=streamer)
+response = tokenizer.decode(outputs[0])
+display(Markdown(response))
+```
 
 ### 82. Day 5 - Week 3 Wrap-Up: Build a Synthetic Data Generator with Open Source Models
+- Generating Synthetic data
+  - Write models that can generate datasets
+  - Use a variety of models and prompts for diverse outputs
+  - Create a Gradio UI for your product
 
 ## Section 4: New Week 4 - LLM Showdown: Evaluating Models for Code Gen & Business Tasks
 
 ### 83. Day 1 - Choosing the Right LLM: Model Selection Strategy and Basics
+- What's the right LLM for the task at hand
+  - Start with the basics
+    - Parameters
+    - Context length
+    - Pricing
+  - THen look at the results
+    - Benchmark
+    - Leaderboards
+    - Arenas
+- Comparing LLMs
+  - The Basics (1)
+    - Open source or closed
+    - Chat/Reasoning/Hybrid
+    - Release date and konwlege cut-off
+    - Parameters
+    - Training tokens
+    - Context window
+  - The Basics (2)
+    - Inference cost: API charge or runtime compute
+    - Training cost
+    - Build cost
+    - Time to market
+    - Rate limits
+    - Speed
+    - Latency
+    - License
 
 ### 84. Day 1 - The Chinchilla Scaling Law: Parameters, Training Data and Why It Matters
+- Chinchilla scaling law
+  - Number of parameters is proportional to the number of training tokens
+  - If you upgrade a model with double number of weights, you need twice the data
 
 ### 85. Day 1 - Understanding AI Model Benchmarks: GPQA, MMLU-Pro, and HLE
+- 6 hard, next-level benchmarks
+  - GPQA from Google
+    - PHD science expertise
+    - 448 expert questions
+  - MMLU-PRO
+    - Language understanding
+    - A more advanced and cleaned up version of Massive Multitask Language Undrstanding including choice of 10 instead of 4
+  - AIME
+    - Math
+    - Hard competitive Math puzzles from the prestigious, invite-only Math competition for top high schoolers
+  - LIveCode Bench
+    - Coding
+    - Holistic benchmark for evaluating Code LLMs based on problems from contests on LeetCode, AtCoder and Codeforces
+  - MuSR
+    - Reasoning
+    - Logical deduction, such as analyzing 1,000 word murder mystery and answeroing: who has means, motive, and opportunity?
+  - HLE (Humanity's Last Exam)
+    - Super-human intelligence
+    - 2,500 of the toughest, subject-diverse, multi-modal questions designed to be the last academic exame of its kind for AI
+
 ### 86. Day 1 - Limitations of AI Benchmarks: Data Contamination and Overfitting
+- Limitations of Benchmarks
+  - Training data contamination
+  - Not consistentl applied
+  - Too narrow in scope
+  - Hard to measure nuanced reasoning
+  - Saturation
+  - Overfitting
+- A new concern, not yet proven
+  - Frontier LLMs may be aware that they are being evaluated
+
 ### 87. Day 1 - Build a Connect Four Leaderboard (Reasoning Benchmark)
+
 ### 88. Day 2 - Navigating AI Leaderboards: Artificial Analysis, HuggingFace & More
+- Five leaderboards
+  - Artificial analysis
+    - THE leaderboard
+  - Vellum
+    - Includes API cost and context window
+  - Scale.com
+    - SEAL leaderboards
+  - Hugging Face
+    - Open source leaderboards
+  - Live Bench
+    - Contamination-free
+
 ### 89. Day 2 - Artificial Analysis Deep Dive: Model Intelligence vs Cost Comparison
+- Artificial analysis
+  - https://artificialanalysis.ai/
+  - Artificial Analysis Intelligence Index v3.0 incorporates 10 evaluations: MMLU-Pro, GPQA Diamond, Humanity's Last Exam, LiveCodeBench, SciCode, AIME 2025, IFBench, AA-LCR, Terminal-Bench Hard, 𝜏²-Bench Telecom
+
 ### 90. Day 2 - Vellum, SEAL, and LiveBench: Essential AI Model Leaderboards
+- Vellum
+  - https://www.vellum.ai/llm-leaderboard?utm_source=google&utm_medium=organic#
+  - context window size
+  - Cached tokens
+- Scale.com
+  - https://scale.com/leaderboard
+  - https://scale.com/leaderboard/humanitys_last_exam
+- Hugging Face
+  - https://huggingface.co/open-llm-leaderboard
+- Live Bench
+  - https://livebench.ai/#/
+
 ### 91. Day 2 - LM Arena: Blind Testing AI Models with Community Elo Ratings
+- LM Arena (formerly LMSYS)
+  - https://lmarena.ai/
+  - Compares Frontier and opensource models directly
+  - Blind human evals based on head-to-head comparison
+  - LLMs are measured with an ELO-style score rating
+
 ### 92. Day 2 - Commercial Use Cases: Automation, Augmentation & Agentic AI
+- Commercial use cases: Automate, then augment, then differentiate
+  - ChatGTP wrapper
+    - DuoLingo
+    - Copilots
+  - Specialized
+    - Harvey
+    - nebular.io
+    - Khanmigo
+    - Salesforce Health
+    - Palantir
+  - Agentic
+    - Claude Code
+    - OpenAI Codex
+    - OpenAI Agent
+
 ### 93. Day 3 - Selecting LLMs for Code Generation: Python to C++ with Cursor
+- Your duty as an AI engineer
+  - What business problem are you solving?
+- An AI engineer wears 2 hats
+  - Data scienstist
+    - What business problem?
+    - How you measure the success?
+    - What data do you have, and do you need?
+  - Software engineer  
+    - Architecture
+    - Framework
+    - DB
+    - How to integrate?
+- The 5 step strategy: to select, train, and apply LLM to a commercial problem
+  - Understand
+  - Prepare
+  - Select
+  - Customize
+  - Productionize
+
 ### 94. Day 3 - Selecting Frontier Models: GPT-5, Claude, Grok & Gemini for C++ Code Gen
+```py
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+import subprocess
+from IPython.display import Markdown, display
+from system_info import retrieve_system_info
+system_info = retrieve_system_info()
+system_info
+message = f"""
+Here is a report of the system information for my computer.
+I want to run a C++ compiler to compile a single C++ file called main.cpp and then execute it in the simplest way possible.
+Please reply with whether I need to install any C++ compiler to do this. If so, please provide the simplest step by step instructions to do so.
+If I'm already set up to compile C++ code, then I'd like to run something like this in Python to compile and execute the code:
+------------
+compile_command = # something here - to achieve the fastest possible runtime performance
+compile_result = subprocess.run(compile_command, check=True, text=True, capture_output=True)
+run_command = # something here
+run_result = subprocess.run(run_command, check=True, text=True, capture_output=True)
+return run_result.stdout
+------------
+Please tell me exactly what I should use for the compile_command and run_command.
+System information:
+{system_info}
+"""
+response = openai.chat.completions.create(model=OPENAI_MODEL, messages=[{"role": "user", "content": message}])
+display(Markdown(response.choices[0].message.content))
+```
+
 ### 95. Day 3 - Porting Python to C++ with GPT-5: 230x Performance Speedup
+- Conversion using ollama model
+```py
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+import subprocess
+from IPython.display import Markdown, display
+message = f"""
+Here is a report of the system information for my computer.
+I want to run a C++ compiler to compile a single C++ file called main.cpp and then execute it in the simplest way possible.
+Please reply with whether I need to install any C++ compiler to do this. If so, please provide the simplest step by step instructions to do so.
+If I'm already set up to compile C++ code, then I'd like to run something like this in Python to compile and execute the code:
+------------
+compile_command = # something here - to achieve the fastest possible runtime performance
+compile_result = subprocess.run(compile_command, check=True, text=True, capture_output=True)
+run_command = # something here
+run_result = subprocess.run(run_command, check=True, text=True, capture_output=True)
+return run_result.stdout
+------------
+Please tell me exactly what I should use for the compile_command and run_command.
+System information:
+
+"""
+client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+response = client.chat.completions.create(model="gemma3:270m", messages=[{"role": "user", "content": message}])
+display(Markdown(response.choices[0].message.content))
+system_prompt = """
+Your task is to convert Python code into high performance C++ code.
+Respond only with C++ code. Do not provide any explanation other than occasional comments.
+The C++ response needs to produce an identical output in the fastest possible time.
+"""
+def user_prompt_for(python):
+    return f"""
+Port this Python code to C++ with the fastest possible implementation that produces identical output in the least time.
+The system information is:
+Your response will be written to a file called main.cpp and then compiled and executed; the compilation command is:
+Respond only with C++ code.
+Python code to port:
+------ 
+{python}
+------
+"""
+def messages_for(python):
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt_for(python)}
+    ]
+def write_output(cpp):
+    with open("main.cpp", "w", encoding="utf-8") as f:
+        f.write(cpp)
+pi = """
+import time
+def calculate(iterations, param1, param2):
+    result = 1.0
+    for i in range(1, iterations+1):
+        j = i * param1 - param2
+        result -= (1/j)
+        j = i * param1 + param2
+        result += (1/j)
+    return result
+
+start_time = time.time()
+result = calculate(200_000_000, 4, 1) * 4
+end_time = time.time()
+
+print(f"Result: {result:.12f}")
+print(f"Execution Time: {(end_time - start_time):.6f} seconds")
+"""
+def run_python(code):
+    globals = {"__builtins__": __builtins__}
+    exec(code, globals)
+run_python(pi)
+def port(client, model, python):
+    mess = messages_for(python)
+    print(mess)
+    response = client.chat.completions.create(model=model, messages=mess)
+    reply = response.choices[0].message.content
+    reply = reply.replace('```cpp','').replace('```','')
+    write_output(reply)
+    print(reply)
+port(client, "gemma3:270m", pi)
+```
+- Generated cpp code:
+```cpp
+#include <iostream>
+#include <algorithm>
+using namespace std::endl;
+int calculate(int iterations, int param1, int param2) {
+  result = 1.0;
+  for (int i = 0; i < iterations; ++i) {
+    result -= (1/i) * param1;
+    result += (1/i) * param2;
+  }
+  return result;
+}
+int main() {
+  int iterations = 200;
+  int param1 = 4;
+  int param2 = 1;
+
+  std::cout << "Result: " << calculate(iterations, param1, param2) << std::endl;
+  std::cout << "Execution Time: {(end_time - start_time):.6f} seconds" << std::endl;
+  return 0;
+}
+```
+
 ### 96. Day 3 - AI Coding Showdown: GPT-5 vs Claude vs Gemini vs Groq Performance
+- With higher reasoning options, Grok/Gemini optimize code using multi-threading
+  - Conversion cost is very high (several min) but those optimized codes outperform other LLM generated codes (184x -> 1440x than Python)
+
 ### 97. Day 4 - Open Source Models for Code Generation: Qwen, DeepSeek & Ollama
+- Big Code Models Leaderboard: https://huggingface.co/spaces/bigcode/bigcode-models-leaderboard
+
+
 ### 98. Day 4 - Building a Gradio UI to Test Python-to-C++ Code Conversion Models
+```py
+with gr.Blocks() as ui:
+    with gr.Row():
+        python = gr.Textbox(label="Python code:", lines=28, value=pi)
+        cpp = gr.Textbox(label="C++ code:", lines=28)
+    with gr.Row():
+        model = gr.Dropdown(models, label="Select model", value=models[0])
+        convert = gr.Button("Convert code")
+
+    convert.click(port, inputs=[model, python], outputs=[cpp])
+ui.launch(inbrowser=True)
+```
+
 ### 99. Day 4 - Qwen 3 Coder vs GPT OSS: OpenRouter Model Performance Showdown
+
 ### 100. Day 5 - Model Evaluation: Technical Metrics vs Business Outcomes
+- How to evaluate the performance of a Gen AI solution?
+  - Model centric or Technical Metrics
+    - Loss (eg cross-entropy loss)
+    - Perplexity
+    - Accuracy
+    - Precision, Recall, F1
+    - AUC-ROC
+    - Easiest to optimize with
+  - Business-centric or Outcome Metrics
+    - KPIs tied to business objectives
+    - ROI
+    - Improvements in time, cost or resources
+    - Customer satisfaction
+    - Benchmark comparisons
+    - Most tangible impact
+
 ### 101. Day 5 - Python to Rust Code Translation: Testing Gemini 2.5 Pro with Cursor
+- Business centric metrics in this lesson
+  - Performance of C++ solution with identical results
+  - So far Gemini2.5 Pro is the winner
+  - Time for a harder test
+  
 ### 102. Day 5 - Porting Python to Rust: Testing GPT, Claude, and Qwen Models
+
 ### 103. Day 5 - Open Source Model Wins? Rust Code Generation Speed Challenge
+
+## Section 5: New Week 5 - Mastering RAG: Build Advanced Solutions with Vector Embeddings
 
 ### 104. Day 1 - Introduction to RAG: Retrieval Augmented Generation Fundamentals
 ### 105. Day 1 - Building a Simple RAG Knowledge Assistant with GPT-4-1 Nano
