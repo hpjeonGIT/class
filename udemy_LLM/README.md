@@ -1785,7 +1785,7 @@ ui.launch(inbrowser=True)
   - Performance of C++ solution with identical results
   - So far Gemini2.5 Pro is the winner
   - Time for a harder test
-  
+
 ### 102. Day 5 - Porting Python to Rust: Testing GPT, Claude, and Qwen Models
 
 ### 103. Day 5 - Open Source Model Wins? Rust Code Generation Speed Challenge
@@ -1793,68 +1793,1175 @@ ui.launch(inbrowser=True)
 ## Section 5: New Week 5 - Mastering RAG: Build Advanced Solutions with Vector Embeddings
 
 ### 104. Day 1 - Introduction to RAG: Retrieval Augmented Generation Fundamentals
+- How to improve prompts
+  - Multishot prompoting
+  - Use of tools
+  - Additional context
+- What is the next level?
+  - Build a database of expert information, called a **knowledge base**
+  - Every time the user asks a question, search for anything relevant in the knowledge base
+  - Add relevant details to the prompt
+- The small idea behind RAG
+  - Chat
+  - Code
+  - LLM
+  - Knolwedge Base
+
 ### 105. Day 1 - Building a Simple RAG Knowledge Assistant with GPT-4-1 Nano
+- Business application demo:
+  - Synthetic data at week5/knoweldge-base/company
+  - Read in all employee data into a dictionary
+```py
+import os
+import glob
+from dotenv import load_dotenv
+from pathlib import Path
+import gradio as gr
+from openai import OpenAI
+knowledge = {}
+filenames = glob.glob("knowledge-base/employees/*")
+for filename in filenames:
+    name = Path(filename).stem.split(' ')[-1]
+    with open(filename, "r", encoding="utf-8") as f:
+        knowledge[name.lower()] = f.read()
+filenames = glob.glob("knowledge-base/products/*")
+for filename in filenames:
+    name = Path(filename).stem
+    with open(filename, "r", encoding="utf-8") as f:
+        knowledge[name.lower()] = f.read()
+SYSTEM_PREFIX = """
+You represent Insurellm, the Insurance Tech company.
+You are an expert in answering questions about Insurellm; its employees and its products.
+You are provided with additional context that might be relevant to the user's question.
+Give brief, accurate answers. If you don't know the answer, say so.
+
+Relevant context:
+"""
+def get_relevant_context(message):
+    text = ''.join(ch for ch in message if ch.isalpha() or ch.isspace())
+    words = text.lower().split()
+    return [knowledge[word] for word in words if word in knowledge]   
+get_relevant_context("Who is lancaster?")
+```
+
 ### 106. Day 1 - Building a Simple RAG System: Dictionary Lookup and Context Retrieval
+```py
+def additional_context(message):
+    relevant_context = get_relevant_context(message)
+    if not relevant_context:
+        result = "There is no additional context relevant to the user's question."
+    else:
+        result = "The following additional context might be relevant in answering the user's question:\n\n"
+        result += "\n\n".join(relevant_context)
+    return result
+print(additional_context("Who is Alex Lancaster?")) # finding info using python dictionary
+#  Now feeding al info into LLM
+def chat(message, history):
+    system_message = SYSTEM_PREFIX + additional_context(message)
+    messages = [{"role": "system", "content": system_message}] + history + [{"role": "user", "content": message}]
+    response = openai.chat.completions.create(model=MODEL, messages=messages)
+    return response.choices[0].message.content
+view = gr.ChatInterface(chat, type="messages").launch(inbrowser=True)    
+```
+
 ### 107. Day 1 - Vector Embeddings and Encoder LLMs: The Foundation of RAG
+- Auto-regressive LLMs predict a future token from the past
+  - Chatting style LLMs like Gemini, Grok, OpenAI, ...
+- Auto-encoding LLMs produce output based on the full input
+  - Sentiment analysis and classification
+  - Used to calculate "Vector Embeddings"
+  - BERT from Google and OpenAIEmbeddings from OpenAI
+- Tokens vs vectors
+  - Tokens are the text chunks (words, sub-words, punctuation) that get processed, while vectors (or embeddings) are the high-dimensional numerical representations of those tokens, capturing their meaning and context, allowing the AI to understand and manipulate language mathematically
+
 ### 108. Day 1 - How Vector Embeddings Represent Meaning: From word2vec to Encoders
+- These vectors mathematically represent the meaning of an input
+  - Can represent a character, a token, a word, an entire document, or something abstract
+  - Typically have hundreds or thousands of dimensions
+  - Represents an understanding of the inputs; similar inputs are close to each other
+  - Supports vector math like the famous example: King - man + woman = Queen
+- In traditional methods, word2vec  
+- In the state-of-art LLM, encoders
+
 ### 109. Day 1 - Understanding the Big Idea Behind RAG and Vector Data Stores
+- Big idea behind RAG
+  - Question -> vectorize by encoding LLM -> retreive from Vector DB -> prompts into LLM
+- Summary of RAG
+  - Knowledge base -> Vector DB 
+  - Encoding (or vectorizing) inputs and finding the matching vectors from the knowledge base
+  - Lots of hacks
+
 ### 110. Day 2 - Vectors for RAG: Introduction to LangChain and Vector Databases
+- Langchain: open source framework
+  - Provides a common framework for interfacing with many LLMs
+  - LangChain v1 by Oct 2025 with significant changes
+  - Pros & cons
+    - Simplifies the creation of applications using LLM - AI assistant, RAG, summarization
+    - Significant adoption in enterprise
+    - As APIs for LLM have matured, the need for a unifying framework has decreased
+    - Heavy weight and high learning curves    
+- Vectors: encoders
+- Chroma: vector storage
+
 ### 111. Day 2 - Breaking Documents into Chunks with LangChain Text Splitters
+- TODAY:
+  - Part A: We will divide our documents into CHUNKS
+  - Part B: We will encode our CHUNKS into VECTORS and put in Chroma
+  - Part C: We will visualize our vectors
+```py
+import os
+import glob
+import tiktoken
+import numpy as np
+from dotenv import load_dotenv
+from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from sklearn.manifold import TSNE
+import plotly.graph_objects as go
+#
+MODEL = "gpt-4.1-nano"
+db_name = "vector_db"
+knowledge_base_path = "knowledge-base/**/*.md"
+files = glob.glob(knowledge_base_path, recursive=True)
+print(f"Found {len(files)} files in the knowledge base")
+entire_knowledge_base = ""
+for file_path in files:
+    with open(file_path, 'r', encoding='utf-8') as f:
+        entire_knowledge_base += f.read()
+        entire_knowledge_base += "\n\n"
+print(f"Total characters in knowledge base: {len(entire_knowledge_base):,}")
+# How many tokens in all the documents?
+encoding = tiktoken.encoding_for_model(MODEL)
+tokens = encoding.encode(entire_knowledge_base)
+token_count = len(tokens)
+print(f"Total tokens for {MODEL}: {token_count:,}")
+# Load in everything in the knowledgebase using LangChain's loaders
+folders = glob.glob("knowledge-base/*")
+documents = []
+for folder in folders:
+    doc_type = os.path.basename(folder)
+    loader = DirectoryLoader(folder, glob="**/*.md", loader_cls=TextLoader, loader_kwargs={'encoding': 'utf-8'})
+    folder_docs = loader.load()
+    for doc in folder_docs:
+        doc.metadata["doc_type"] = doc_type
+        documents.append(doc)
+print(f"Loaded {len(documents)} documents")
+# Divide into chunks using the RecursiveCharacterTextSplitter
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+chunks = text_splitter.split_documents(documents)
+print(f"Divided into {len(chunks)} chunks")
+print(f"First chunk:\n\n{chunks[0]}")
+```
+- Part A done now
+
 ### 112. Day 2 - Encoder Models vs Vector Databases: OpenAI, BERT, Chroma & FAISS
+- Encoder/Embedding Models
+  - The encoder model turns text into a vector embedding. This is then stored in a vector database like Chroma
+  - Vector data are created by encoder models
+  - word2vec(2013)
+  - BERT(2018)
+  - OpenAI text embedding 3 small/large
+  - gemini-embedding-001
+  - Hugging Face Setence Transformers 
+    - all-MiniLM-L6-v2
+- Process of LangChain to load our Knowledge base
+  - Read in the documents in all folders
+  - Divide into chunks
+  - Vectorize and store
+    - Encoder turns text into a vector
+    - Vector store is a DB that does quick lookup
+      - Chroma, Qdrant, FAISS, Pinecone, ...
+      - Choice of vector DB is largely unrelated with vector calculation and is code/performance tradeoff
+
 ### 113. Day 2 - Creating Vector Stores with Chroma and Visualizing Embeddings with t-SNE
+```py
+# Pick an embedding model
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+#embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+if os.path.exists(db_name):
+    Chroma(persist_directory=db_name, embedding_function=embeddings).delete_collection()
+vectorstore = Chroma.from_documents(documents=chunks, embedding=embeddings, persist_directory=db_name)
+print(f"Vectorstore created with {vectorstore._collection.count()} documents")
+# Let's investigate the vectors
+collection = vectorstore._collection
+count = collection.count()
+sample_embedding = collection.get(limit=1, include=["embeddings"])["embeddings"][0]
+dimensions = len(sample_embedding)
+print(f"There are {count:,} vectors with {dimensions:,} dimensions in the vector store")
+```
+- Part B done now
+- Chroma uses SQLite as backend
+```py
+# Prework
+result = collection.get(include=['embeddings', 'documents', 'metadatas'])
+vectors = np.array(result['embeddings'])
+documents = result['documents']
+metadatas = result['metadatas']
+doc_types = [metadata['doc_type'] for metadata in metadatas]
+colors = [['blue', 'green', 'red', 'orange'][['products', 'employees', 'contracts', 'company'].index(t)] for t in doc_types]
+# We humans find it easier to visalize things in 2D!
+# Reduce the dimensionality of the vectors to 2D using t-SNE
+# (t-distributed stochastic neighbor embedding)
+tsne = TSNE(n_components=2, random_state=42)
+reduced_vectors = tsne.fit_transform(vectors)
+# Create the 2D scatter plot
+fig = go.Figure(data=[go.Scatter(
+    x=reduced_vectors[:, 0],
+    y=reduced_vectors[:, 1],
+    mode='markers',
+    marker=dict(size=5, color=colors, opacity=0.8),
+    text=[f"Type: {t}<br>Text: {d[:100]}..." for t, d in zip(doc_types, documents)],
+    hoverinfo='text'
+)])
+fig.update_layout(title='2D Chroma Vector Store Visualization',
+    scene=dict(xaxis_title='x',yaxis_title='y'),
+    width=800,
+    height=600,
+    margin=dict(r=20, b=10, l=10, t=40)
+)
+fig.show()
+```
+- Part C done now
+
 ### 114. Day 2 - 3D Vector Visualizations and Comparing Embedding Models
+```py
+# Let's try 3D!
+tsne = TSNE(n_components=3, random_state=42)
+reduced_vectors = tsne.fit_transform(vectors)
+# Create the 3D scatter plot
+fig = go.Figure(data=[go.Scatter3d(
+    x=reduced_vectors[:, 0],
+    y=reduced_vectors[:, 1],
+    z=reduced_vectors[:, 2],
+    mode='markers',
+    marker=dict(size=5, color=colors, opacity=0.8),
+    text=[f"Type: {t}<br>Text: {d[:100]}..." for t, d in zip(doc_types, documents)],
+    hoverinfo='text'
+)])
+fig.update_layout(
+    title='3D Chroma Vector Store Visualization',
+    scene=dict(xaxis_title='x', yaxis_title='y', zaxis_title='z'),
+    width=900,
+    height=700,
+    margin=dict(r=10, b=10, l=10, t=40)
+)
+fig.show()
+```
+- Using `HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")`
+  - 413 vectors with 384 dimensions
+  ![HF](./HF_2d.png)
+- Using openAI embedding requires OPENAI_API_KEY
+- Using `OllamaEmbeddings(model="llama3.2:1b", base_url='http://localhost:11434')`
+  - 413 vectors with 2,048 dimensions
+  ![llama3.2](./llama3_2d.png)
+
 ### 115. Day 3 - Building a Complete RAG Pipeline with LangChain and Chroma
+- We will use two key abstractions from LangChain
+  - LLM
+  - Retreiver: around Chroma and Embedding model
+- Many common abstractions like this can be called with invoke()
+
 ### 116. Day 3 - Building a RAG Pipeline with LangChain: LLM & Retriever Setup
+```py
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain_chroma import Chroma
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_huggingface import HuggingFaceEmbeddings
+import gradio as gr
+MODEL = "gpt-4.1-nano"
+DB_NAME = "vector_db"
+load_dotenv(override=True)
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+vectorstore = Chroma(persist_directory=DB_NAME, embedding_function=embeddings)
+## Set up the 2 key LangChain objects: retriever and llm
+retriever = vectorstore.as_retriever()
+llm = ChatOpenAI(temperature=0, model_name=MODEL)
+```
+- In ChatOpenAI():
+  - temperature=0 means: always select the token with highest probabilty. The output must be predictable
+  - tempereture=1 usually means: a token with 10% probability should be picked 10% of the time. More variety in answers
+```py
+retriever.invoke("Who is Avery?") # from DB
+llm.invoke("Who is Avery?") # generic answer
+```
+- Those two abstractions are not coupled
+- RAG will couple them
+```py
+SYSTEM_PROMPT_TEMPLATE = """
+You are a knowledgeable, friendly assistant representing the company Insurellm.
+You are chatting with a user about Insurellm.
+If relevant, use the given context to answer any question.
+If you don't know the answer, say so.
+Context:
+{context}
+"""
+def answer_question(question: str, history):
+    docs = retriever.invoke(question)
+    context = "\n\n".join(doc.page_content for doc in docs)
+    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(context=context)
+    response = llm.invoke([SystemMessage(content=system_prompt), HumanMessage(content=question)])
+    return response.content
+answer_question("Who is Averi Lancaster?", [])
+```
+
 ### 117. Day 3 - Building RAG with LangChain: Retriever and LLM Integration
+- At week5/implementation folder
+  - ingest.py
+    - Read in knowledge base 
+    - Turn documents into chunks
+    - Vectorize the chunks
+    - Store in Chroma
+  - answer.py
+    - Two key functions
+      - fetch_context(question)
+      - answer_question(question, history)
+
 ### 118. Day 3 - Building Production RAG with Python Modules and Gradio UI
-### 119. Day 3 - RAG with Conversation History: Building a Gradio UI and Debugging Chunki
+
+### 119. Day 3 - RAG with Conversation History: Building a Gradio UI and Debugging Chunking
+- Context or history + RAG + Question
+- Due to chunking, RAG may not have full information
+  - Could be off-track easily
+
 ### 120. Day 4 - RAG Evaluations: Measuring Performance and Iterating on Your Pipeline
+- Pros of RAG
+  - Rapid time to market
+  - Give an LLM vast expertise
+  - Save on context length
+  - Avoid distracting with irrelevant context
+- Cons of RAG
+  - It's a hack
+  - Empirical or aka trial and error
+  - Unexpected IDK
+- Chunking strategy can have a significant impact on performance
+  - This is why evaluation is necessary
+
 ### 121. Day 4 - Evaluating RAG Systems: Retrieval Metrics, LLM as Judge, and Golden Data
+- Evaluations are everything
+  - Curate a test set
+    - Example questions set with the right context identified and reference answers provided
+  - Measure retrieval
+    - MRR (Mean Reciprocal Rank)
+      - Average inverse rank of the first hit
+      - 1 if the first chunk always has relevant context
+    - nDCG (Normalized Discounted 
+    Cumulative Gain)
+      - Did relevant chunks get ranked higher up?
+    - Recall@K
+      - Proportion of tests where relevant context was in the top K-chunks
+      - Or if you ahve multiple keywords to look for, keyword coverge is similar recall metric
+    - Precision@K
+      - Proportion of the top K chunks that are relevant
+  - Measure Answers
+    - Use LLM-as-a-judge to score provided answers against criteria like accuracy, completeness and relevance
+
 ### 122. Day 4 - Evaluating RAG Systems: MRR, NDCG, and Test Data with Pydantic
+- *.jsonl file: each line is a dictionary
+  - Json version of CSV file
+  - Common files for testing
+```json
+{"question": "Who won the prestigious IIOTY award in 2023?", "keywords": ["Maxine", "Thompson", "IIOTY"], "reference_answer": "Maxine Thompson won the prestigious Insurellm Innovator of the Year (IIOTY) award in 2023.", "category": "direct_fact"}
+{"question": "When was Insurellm founded?", "keywords": ["2015", "founded"], "reference_answer": "Insurellm was founded in 2015.", "category": "direct_fact"}
+...
+```
+  - You need to make those questions manually
+- Running tests: week5/evaluation  
+```py
+from evaluation import test
+tests = test.load_tests()
+len(tests) # 150
+example = tests[0]
+print(example.question)
+print(example.category)
+print(example.reference_answer)
+print(example.keywords)
+```
+- Calculating MRR
+```py
+def calculate_mrr(keyword: str, retrieved_docs: list) -> float:
+    """Calculate reciprocal rank for a single keyword (case-insensitive)."""
+    keyword_lower = keyword.lower()
+    for rank, doc in enumerate(retrieved_docs, start=1):
+        if keyword_lower in doc.page_content.lower():
+            return 1.0 / rank
+    return 0.0
+```
+- Calculating DCG
+```py
+def calculate_dcg(relevances: list[int], k: int) -> float:
+    """Calculate Discounted Cumulative Gain."""
+    dcg = 0.0
+    for i in range(min(k, len(relevances))):
+        dcg += relevances[i] / math.log2(i + 2)  # i+2 because rank starts at 1
+    return dcg
+```    
+
 ### 123. Day 4 - LLM as a Judge: Evaluating RAG Answers with Structured Outputs
+- evaluate_answer()
+  - Makes a call to LLM to produce generated answer, using RAG
+  - Then ask LLM to compare generatd results with reference answer, in the order of 1 to 5
+- Calling LLM judge with structured outputs (async)
+  `judge_response = completion(model=MODEL, messages=judge_messages, response_format=AnswerEval)`
+  - AnswerEval is given as a schema:
+```py  
+class AnswerEval(BaseModel):
+    """LLM-as-a-judge evaluation of answer quality."""
+    feedback: str = Field(
+        description="Concise feedback on the answer quality, comparing it to the reference answer and evaluating based on the retrieved context"
+    )
+    accuracy: float = Field(
+        description="How factually correct is the answer compared to the reference answer? 1 (wrong. any wrong answer must score 1) to 5 (ideal - perfectly accurate). An acceptable answer would score 3."
+    )
+    completeness: float = Field(
+        description="How complete is the answer in addressing all aspects of the question? 1 (very poor - missing key information) to 5 (ideal - all the information from the reference answer is provided completely). Only answer 5 if ALL information from the reference answer is included."
+    )
+    relevance: float = Field(
+        description="How relevant is the answer to the specific question asked? 1 (very poor - off-topic) to 5 (ideal - directly addresses question and gives no additional information). Only answer 5 if the answer is completely relevant to the question and gives no additional information."
+    )
+```    
+
 ### 124. Day 4 - Running RAG Evaluations with Gradio: MRR, nDCG, and Test Results
+
 ### 125. Day 4 - Experimenting with Chunking Strategies and Embedding Models in RAG
+- Adjusting week5/implementation/ingest.py with different chunk size and week5/implementation/answer.py with different RETRIEVAL_K
+- Instead of RecursiveCharacterTextSPlitter(), MarkdownTextSplitter() from LangChain for markdown files
+
 ### 126. Day 4 - Testing OpenAI Embeddings and Evaluating RAG Performance Gains
+
 ### 127. Day 5 - Advanced RAG Techniques: Pre-processing, Re-ranking & Evals
+- How to improve RAG
+  - Preprocessing
+  - Re-ranking
+  - and more
+
 ### 128. Day 5 - Advanced RAG Techniques: Chunking, Encoders, and Query Rewriting
+- 10 RAG advanced techniques
+  1. Chunking R&D: experiment with chunking strategy
+  2. Encoder R&D: select the best encoder model based on a test set
+  3. Improve Prompts: general content, the current date, relevant context and history
+  4. Document pre-processing: use an LLM to make the chunks and/or text for encoding
+    - Table data into query-friendly text
+    - Semantic chunking: chunking based on meaning and context
+  5. Query rewriting: use an LLM to convert the user's question to a RAG query
+  6. Query expansion: use an LLM to turn the question into multiple RAG queries
+  7. Re-ranking: use an LLM to sub-select from RAG results
+  8. Hierarchical: use an LLM to summarize at multiple levels
+  9. Graph RAG: retrieve content closely related to similar documents
+  10. Agentic RAG: use Agents for retrieval, combining with Memory and Tools such as SQL
+
 ### 129. Day 5 - Advanced RAG Techniques: Query Expansion, Re-ranking & GraphRAG
+- RAG is DEAD ?
+  - Context window is large enough
+    - Knowledge base might be extremely large
+  - Agents can decide what to do for retrieval
+    - Long live RAG 
+
 ### 130. Day 5 - Building Advanced RAG Without LangChain: Semantic Chunking with LLMs
+- RAG without LangChain
+- We use LiteLLM here
+```py
+from pathlib import Path
+from openai import OpenAI
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+from chromadb import PersistentClient
+from tqdm import tqdm
+from litellm import completion
+import numpy as np
+from sklearn.manifold import TSNE
+import plotly.graph_objects as go
+load_dotenv(override=True)
+MODEL = "gpt-4.1-nano"
+DB_NAME = "preprocessed_db"
+collection_name = "docs"
+embedding_model = "text-embedding-3-large"
+KNOWLEDGE_BASE_PATH = Path("knowledge-base")
+AVERAGE_CHUNK_SIZE = 500
+openai = OpenAI()
+# Inspired by LangChain's Document - let's have something similar
+class Result(BaseModel):
+    page_content: str
+    metadata: dict
+# A class to perfectly represent a chunk
+class Chunk(BaseModel):
+    headline: str = Field(description="A brief heading for this chunk, typically a few words, that is most likely to be surfaced in a query")
+    summary: str = Field(description="A few sentences summarizing the content of this chunk to answer common questions")
+    original_text: str = Field(description="The original text of this chunk from the provided document, exactly as is, not changed in any way")
+    def as_result(self, document):
+        metadata = {"source": document["source"], "type": document["type"]}
+        return Result(page_content=self.headline + "\n\n" + self.summary + "\n\n" + self.original_text,metadata=metadata)
+class Chunks(BaseModel):
+    chunks: list[Chunk]
+```
+- Three steps
+  1. Fetch documents from the knowledge base, like LangChain did
+  2. Call an LLM to turn documents into chunks
+  3. Store the Chunks in chroma
+```py
+def fetch_documents():
+    """A homemade version of the LangChain DirectoryLoader"""
+    documents = []
+    for folder in KNOWLEDGE_BASE_PATH.iterdir():
+        doc_type = folder.name
+        for file in folder.rglob("*.md"):
+            with open(file, "r", encoding="utf-8") as f:
+                documents.append({"type": doc_type, "source": file.as_posix(), "text": f.read()})
+    print(f"Loaded {len(documents)} documents")
+    return documents
+documents = fetch_documents()
+def make_prompt(document):
+    how_many = (len(document["text"]) // AVERAGE_CHUNK_SIZE) + 1
+    return f"""
+You take a document and you split the document into overlapping chunks for a KnowledgeBase.
+The document is from the shared drive of a company called Insurellm.
+The document is of type: {document["type"]}
+The document has been retrieved from: {document["source"]}
+A chatbot will use these chunks to answer questions about the company.
+You should divide up the document as you see fit, being sure that the entire document is returned in the chunks - don't leave anything out.
+This document should probably be split into {how_many} chunks, but you can have more or less as appropriate.
+There should be overlap between the chunks as appropriate; typically about 25% overlap or about 50 words, so you have the same text in multiple chunks for best retrieval results.
+For each chunk, you should provide a headline, a summary, and the original text of the chunk.
+Together your chunks should represent the entire document with overlap.
+Here is the document:
+{document["text"]}
+Respond with the chunks.
+"""
+print(make_prompt(documents[0]))
+def make_messages(document):
+    return [
+        {"role": "user", "content": make_prompt(document)},
+    ]
+make_messages(documents[0])  
+def process_document(document):
+    messages = make_messages(document)
+    response = completion(model=MODEL, messages=messages, response_format=Chunks)
+    reply = response.choices[0].message.content
+    doc_as_chunks = Chunks.model_validate_json(reply).chunks
+    return [chunk.as_result(document) for chunk in doc_as_chunks]
+process_document(documents[0])
+def create_chunks(documents):
+    chunks = []
+    for doc in tqdm(documents):
+        chunks.extend(process_document(doc))
+    return chunks
+chunks = create_chunks(documents)
+```
+
 ### 131. Day 5 - Creating Embeddings with Chroma, Visualizing with t-SNE, and Re-ranking
+```py
+def create_embeddings(chunks):
+    chroma = PersistentClient(path=DB_NAME)
+    if collection_name in [c.name for c in chroma.list_collections()]:
+        chroma.delete_collection(collection_name)
+    texts = [chunk.page_content for chunk in chunks]
+    emb = openai.embeddings.create(model=embedding_model, input=texts).data
+    vectors = [e.embedding for e in emb]
+    collection = chroma.get_or_create_collection(collection_name)
+    ids = [str(i) for i in range(len(chunks))]
+    metas = [chunk.metadata for chunk in chunks]
+    collection.add(ids=ids, embeddings=vectors, documents=texts, metadatas=metas)
+    print(f"Vectorstore created with {collection.count()} documents")
+create_embeddings(chunks)
+```
+- Plotting
+```py
+chroma = PersistentClient(path=DB_NAME)
+collection = chroma.get_or_create_collection(collection_name)
+result = collection.get(include=['embeddings', 'documents', 'metadatas'])
+vectors = np.array(result['embeddings'])
+documents = result['documents']
+metadatas = result['metadatas']
+doc_types = [metadata['type'] for metadata in metadatas]
+colors = [['blue', 'green', 'red', 'orange'][['products', 'employees', 'contracts', 'company'].index(t)] for t in doc_types]
+tsne = TSNE(n_components=2, random_state=42)
+reduced_vectors = tsne.fit_transform(vectors)
+# Create the 2D scatter plot
+fig = go.Figure(data=[go.Scatter(
+    x=reduced_vectors[:, 0],
+    y=reduced_vectors[:, 1],
+    mode='markers',
+    marker=dict(size=5, color=colors, opacity=0.8),
+    text=[f"Type: {t}<br>Text: {d[:100]}..." for t, d in zip(doc_types, documents)],
+    hoverinfo='text'
+)])
+fig.update_layout(title='2D Chroma Vector Store Visualization',
+    scene=dict(xaxis_title='x',yaxis_title='y'),
+    width=800,
+    height=600,
+    margin=dict(r=20, b=10, l=10, t=40)
+)
+fig.show()
+tsne = TSNE(n_components=3, random_state=42)
+reduced_vectors = tsne.fit_transform(vectors)
+# Create the 3D scatter plot
+fig = go.Figure(data=[go.Scatter3d(
+    x=reduced_vectors[:, 0],
+    y=reduced_vectors[:, 1],
+    z=reduced_vectors[:, 2],
+    mode='markers',
+    marker=dict(size=5, color=colors, opacity=0.8),
+    text=[f"Type: {t}<br>Text: {d[:100]}..." for t, d in zip(doc_types, documents)],
+    hoverinfo='text'
+)])
+fig.update_layout(
+    title='3D Chroma Vector Store Visualization',
+    scene=dict(xaxis_title='x', yaxis_title='y', zaxis_title='z'),
+    width=900,
+    height=700,
+    margin=dict(r=10, b=10, l=10, t=40)
+)
+fig.show()
+```
+- Let's build an advanced RAG
+  - Using reranking - reorder the rank results
+  - Query re-writing
+```py
+class RankOrder(BaseModel):
+    order: list[int] = Field(
+        description="The order of relevance of chunks, from most relevant to least relevant, by chunk id number"
+    )
+def rerank(question, chunks):
+    system_prompt = """
+You are a document re-ranker.
+You are provided with a question and a list of relevant chunks of text from a query of a knowledge base.
+The chunks are provided in the order they were retrieved; this should be approximately ordered by relevance, but you may be able to improve on that.
+You must rank order the provided chunks by relevance to the question, with the most relevant chunk first.
+Reply only with the list of ranked chunk ids, nothing else. Include all the chunk ids you are provided with, reranked.
+"""
+    user_prompt = f"The user has asked the following question:\n\n{question}\n\nOrder all the chunks of text by relevance to the question, from most relevant to least relevant. Include all the chunk ids you are provided with, reranked.\n\n"
+    user_prompt += "Here are the chunks:\n\n"
+    for index, chunk in enumerate(chunks):
+        user_prompt += f"# CHUNK ID: {index + 1}:\n\n{chunk.page_content}\n\n"
+    user_prompt += "Reply only with the list of ranked chunk ids, nothing else."
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+    response = completion(model=MODEL, messages=messages, response_format=RankOrder)
+    reply = response.choices[0].message.content
+    order = RankOrder.model_validate_json(reply).order
+    print(order)
+    return [chunks[i - 1] for i in order]
+RETRIEVAL_K = 10
+def fetch_context_unranked(question):
+    query = openai.embeddings.create(model=embedding_model, input=[question]).data[0].embedding
+    results = collection.query(query_embeddings=[query], n_results=RETRIEVAL_K)
+    chunks = []
+    for result in zip(results["documents"][0], results["metadatas"][0]):
+        chunks.append(Result(page_content=result[0], metadata=result[1]))
+    return chunks
+question = "Who won the IIOTY award?"
+chunks = fetch_context_unranked(question)
+for chunk in chunks:
+    print(chunk.page_content[:15]+"...")
+reranked = rerank(question, chunks)
+for chunk in reranked:
+    print(chunk.page_content[:15]+"...")
+```
+
 ### 132. Day 5 - Building RAG Without LangChain: Re-ranking and Query Rewriting
+```py
+question = "Who went to Manchester University?"
+RETRIEVAL_K = 20
+chunks = fetch_context_unranked(question)
+for index, c in enumerate(chunks):
+    if "manchester" in c.page_content.lower():
+        print(index)
+reranked = rerank(question, chunks)
+for index, c in enumerate(reranked):
+    if "manchester" in c.page_content.lower():
+        print(index)
+reranked[0].page_content
+def fetch_context(question):
+    chunks = fetch_context_unranked(question)
+    return rerank(question, chunks)
+SYSTEM_PROMPT = """
+You are a knowledgeable, friendly assistant representing the company Insurellm.
+You are chatting with a user about Insurellm.
+Your answer will be evaluated for accuracy, relevance and completeness, so make sure it only answers the question and fully answers it.
+If you don't know the answer, say so.
+For context, here are specific extracts from the Knowledge Base that might be directly relevant to the user's question:
+{context}
+With this context, please answer the user's question. Be accurate, relevant and complete.
+"""
+# In the context, include the source of the chunk
+def make_rag_messages(question, history, chunks):
+    context = "\n\n".join(f"Extract from {chunk.metadata['source']}:\n{chunk.page_content}" for chunk in chunks)
+    system_prompt = SYSTEM_PROMPT.format(context=context)
+    return [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content":
+def rewrite_query(question, history=[]):
+    """Rewrite the user's question to be a more specific question that is more likely to surface relevant content in the Knowledge Base."""
+    message = f"""
+You are in a conversation with a user, answering questions about the company Insurellm.
+You are about to look up information in a Knowledge Base to answer the user's question.
+This is the history of your conversation so far with the user:
+{history}
+And this is the user's current question:
+{question}
+Respond only with a single, refined question that you will use to search the Knowledge Base.
+It should be a VERY short specific question most likely to surface content. Focus on the question details.
+Don't mention the company name unless it's a general question about the company.
+IMPORTANT: Respond ONLY with the knowledgebase query, nothing else.
+"""
+    response = completion(model=MODEL, messages=[{"role": "system", "content": message}])
+    return response.choices[0].message.content
+rewrite_query("Who won the IIOTY award?", [])
+def answer_question(question: str, history: list[dict] = []) -> tuple[str, list]:
+    """
+    Answer a question using RAG and return the answer and the retrieved context
+    """
+    query = rewrite_query(question, history)
+    print(query)
+    chunks = fetch_context(query)
+    messages = make_rag_messages(question, history, chunks)
+    response = completion(model=MODEL, messages=messages)
+    return response.choices[0].message.content, chunks
+answer_question("Who won the IIOTY award?", [])
+answer_question("Who went to Manchester University?", [])
+```
+
 ### 133. Day 5 - Building Production RAG with Query Expansion and Multiprocessing
+- week5/pro_implementation/answer.py and ingest.py
+- Multiprocessing using pool
+```py
+def create_chunks(documents):
+    """
+    Create chunks using a number of workers in parallel.
+    If you get a rate limit error, set the WORKERS to 1.
+    """
+    chunks = []
+    with Pool(processes=WORKERS) as pool:
+        for result in tqdm(pool.imap_unordered(process_document, documents), total=len(documents)):
+            chunks.extend(result)
+    return chunks
+```
+- Top 10 only out of 20 rankings after re-ranking
+```py
+RETRIEVAL_K = 20
+FINAL_K = 10
+...
+def fetch_context(original_question):
+    rewritten_question = rewrite_query(original_question)
+    chunks1 = fetch_context_unranked(original_question)
+    chunks2 = fetch_context_unranked(rewritten_question)
+    chunks = merge_chunks(chunks1, chunks2)
+    reranked = rerank(original_question, chunks)
+    return reranked[:FINAL_K]
+```
+
 ### 134. Day 5 - Advanced RAG Evaluation: From 0.73 to 0.91 MRR with GPT-4o
+
 ### 135. Day 5 - RAG Challenge: Beat My Results & Build Your Knowledge Worker
+- Change prompts, chunking size control
+- Agentic AI
+  - Take tools and allows them search all files/return documents
 
-## 
+## Section 6: New Week 6: Fine-tuning Frontier Large Language Models with LoRA/QLoRA
+
 ### 136. Day 1 - Training, Datasets, and Generalization: Your Capstone Begins
-### 137. Day 1 - Finetuning LLMs & The Price is Right Capstone Project Intro
-### 138. Day 1 - Curating Datasets: Finding Data Sources and Building Training Sets
-### 139. Day 1 - Curating Amazon Data with Hugging Face for Price Prediction
-### 140. Day 1 - Exploring Amazon Dataset Distribution and Removing Duplicates
-### 141. Day 1 - Weighted Sampling with NumPy and Uploading Datasets to Hugging Face
-### 142. Day 2 - Five-Step Strategy for Selecting and Applying LLMs to Business Problems
-### 143. Day 2 - The Five-Step AI Process & Productionizing with MLOps
-### 144. Day 2 - Data Pre-processing with LLMs and Groq Batch Mode
-### 145. Day 2 - Batch Processing with Groq API and JSONL Files for LLM Workflows
-### 146. Day 2 - Batch Processing with Groq: Running 22K LLM Requests for Under $1
-### 147. Day 3 - Building Baseline Models with Traditional ML and XGBoost
-### 148. Day 3 - Building Your First Baseline with Random Pricer and Scikit-learn
-### 149. Day 3 - Baseline Models and Linear Regression with Scikit-Learn
-### 150. Day 3 - Bag of Words and CountVectorizer for Linear Regression NLP
-### 151. Day 3 - Random Forest and XGBoost: Ensemble Models in Scikit-Learn
-### 152. Day 4 - Training Your First Neural Network and Testing Frontier Models
-### 153. Day 4 - Human Baseline Performance vs Machine Learning Models in PyTorch
-### 154. Day 4 - Building Your First Neural Network with PyTorch
-### 155. Day 4 - Testing GPT-4o-mini and Claude Opus Against Neural Networks
-### 156. Day 4 - Testing Gemini 3, GPT-5.1, Claude 4.5 & Grok on Price Prediction
-### 157. Day 5 - Fine-Tuning OpenAI Frontier Models with Supervised Fine-Tuning
-### 158. Day 5 - Fine-Tuning GPT-4o Nano with OpenAI's API for Custom Models
-### 159. Day 5 - Fine-Tuning GPT-4o-mini-nano: Running Jobs and Monitoring Training
-### 160. Day 5 - Fine-Tuning Results: When GPT-4o-mini Gets Worse, Not Better
-### 161. Day 5 - When Fine-Tuning Frontier Models Fails & Building Deep Neural Networks
-### 162. Day 5 - Deep Neural Network Redemption: 289M Parameters vs Frontier Models
+- Training is the core idea of AI
+- It involves setting the parameters of a model based on inputs and outputs
+- After training, the model is given new inputs ("unseen data")
+- The ability of a model to make good predictions on unseen data is called **Generalization**
+- LLMs are remarkably good at generalization
 
-##
+### 137. Day 1 - Finetuning LLMs & The Price is Right Capstone Project Intro
+- Training a multi-billion parameter model from scratch would cost $10-100s M
+- Instead, we can take advantage of **Transfer Learning**
+- We take a pretrained model as base, and use additional training data to fine-tune it for our task
+- Demo project: The price is right
+  - Given a description of a product, predict its price
+  - The true value of a product
+  - This will ultimately be incorporated in an Agentic Solution that will hunt for bargains
+  - We'd typically use a Regression model to predict prices, but there are good reasons to try Gen AI
+- 3 alternative ways to follow
+  1. Focus on intuition: watch lectures and see the results, recreate the final result
+  2. Follow along: use the lite version of the data set (20,000 vs 800,000). Don't curate the data - use the enclosed one
+    - May cost some dollars
+  3. Dig deep: use the full dataset, curate, and train fully
+    - May cost ~$35
+
+### 138. Day 1 - Curating Datasets: Finding Data Sources and Building Training Sets
+- Finding datasets
+  - Your own proprietary data
+  - Kaggle
+  - Hugging Face datasets
+    - Ex: Amazon-Reviews-2023
+  - Synthetic data
+  - Specialist companies like Scale.com
+- Digging into the data
+  - Investigate
+  - Parse
+  - Visualize
+  - Assess data quality
+  - Curate
+  - Save
+- How ill we evaluate performance?
+  - Model-centric or Technical Metrics 
+    - "Loss"
+  - Business-centric or Outcome Metrics
+    - Actual difference in price
+- Data is typically divided into 3 datasets
+  1. Training data: the majority of data used to learn patterns to make new predictions
+  2. Validation data: held-out data used to evaluate wheter the model can make new predictions accurately
+  3. Test data: held-out data used at the end of the process to confirm model prediction accuracy
+
+### 139. Day 1 - Curating Amazon Data with Hugging Face for Price Prediction
+- Dataset: https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023
+- You need HF_TOKEN or HF API KEY
+- Some data are missing price
+
+### 140. Day 1 - Exploring Amazon Dataset Distribution and Removing Duplicates
+
+### 141. Day 1 - Weighted Sampling with NumPy and Uploading Datasets to Hugging Face
+
+### 142. Day 2 - Five-Step Strategy for Selecting and Applying LLMs to Business Problems
+- 5 step strateggy
+  1. Understand
+      - Gather business requirements for the task
+      - Identify performance criteria (model and business centric metrics) 
+      - Understand the data: quantity, quality, format
+      - Determine non-functionals such as cost constraints, acalability, latency, R&D/build budget and implementation timeline
+  2. Prepare
+      - Research existing/non-LLM solutions - search potential baseline model
+      - Compare relevant LLMs: the basics, including context length, price, license, benchmarks, leaderboards and arenas. Specialist scores for the task at hand
+      - Curate data: clean, preproces, and split
+  3. Select
+      - Choose LLM(s)
+      - Experiment
+      - Train and validate with curated data
+  4. Customize
+      1. Prompt
+      2. RAG
+      3. Agents
+      4. Fine-tune
+      - 1-3 are for inference time. 4 is for training time
+  5. Productionize
+      - Determine API b/w model and platform
+      - Identify model hosting and deployment architecture
+      - Address caling, monitoring, security, compliance, observability
+      - Evals: measure the business-focused metrics identified in step 1
+      - Continuously retrain and measure performance
+    
+### 143. Day 2 - The Five-Step AI Process & Productionizing with MLOps
+- Demo project: The Price is Right
+  - The order of play
+    - Day 1: curate the data
+    - Day 2: Pre-process the data
+    - Day 3: Baseline models and traditional ML
+    - Day 4: Neural Netowrks and Frontier LLMs
+    - Day 5: Fine-tuned Frontier LLM
+
+### 144. Day 2 - Data Pre-processing with LLMs and Groq Batch Mode
+```py
+SYSTEM_PROMPT = """Create a concise description of a product. Respond only in this format. Do not include part numbers.
+Title: Rewritten short precise title
+Category: eg Electronics
+Brand: Brand name
+Description: 1 sentence description
+Details: 1 sentence on features"""
+```
+- Ask LLM to re-write description of a product in terms of Title, Category, Brand, Description, and Details, using batch jobs
+  - One job took 0.011 cents using gpt-oss-20b at groq
+
+### 145. Day 2 - Batch Processing with Groq API and JSONL Files for LLM Workflows
+- Same pre-processing using ollama + llama3.2 seems not good as groq but still can be useful
+- We save those pre-processed contents into jsonl file
+
+### 146. Day 2 - Batch Processing with Groq: Running 22K LLM Requests for Under $1
+- week6/pricer/batch.py
+
+### 147. Day 3 - Building Baseline Models with Traditional ML and XGBoost
+- The importance of a baseline
+  - Start cheap and simple
+  - Gives a benchmark to improve on
+  - An LLM might not be the righ solution
+- Machine Learning
+  - A branch of AI where algorithms learn from data to make predictions without being explicitly programmed
+  - These days, ML is most often used in the context of traditional ML, pre-Deep Learning & LLMs
+  - It is still crucial to understand core ML principles to be an LLM practitioner
+- Generalizing: the ability to perform well on new, unseen data by capturing underlying patterns
+- Overfitting: when a model mimics training data too closely, leading to poor performance on unseen data
+- The goal of ML is to GENERALIZE - to make accurate predictions on unseen data
+
+### 148. Day 3 - Building Your First Baseline with Random Pricer and Scikit-learn
+- Comparison over random pricer
+
+### 149. Day 3 - Baseline Models and Linear Regression with Scikit-Learn
+- Comparison over constant pricer
+
+### 150. Day 3 - Bag of Words and CountVectorizer for Linear Regression NLP
+- Random pricer: but based on the keyword like luxury, smart, we may assign higher value/cheap, affordable for lower price
+- Bag of words
+```py
+import random
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.ensemble import RandomForestRegressor
+from pricer.evaluator import evaluate
+from pricer.items import Item
+LITE_MODE = False
+username = "ed-donner"
+dataset = f"{username}/items_lite" if LITE_MODE else f"{username}/items_full"
+train, val, test = Item.from_hub(dataset)
+print(f"Loaded {len(train):,} training items, {len(val):,} validation items, {len(test):,} test items")
+def random_pricer(item):
+    return random.randrange(1,1000)
+random.seed(42)
+evaluate(random_pricer, test)
+# That was fun!
+# We can do better - here's another rather trivial model
+training_prices = [item.price for item in train]
+training_average = sum(training_prices) / len(training_prices)
+print(training_average)
+def constant_pricer(item):
+    return training_average
+evaluate(constant_pricer, test)
+def get_features(item):
+    return {
+        "weight": item.weight,
+        "weight_unknown": 1 if item.weight==0 else 0,
+        "text_length": len(item.summary)
+    }
+def list_to_dataframe(items):
+    features = [get_features(item) for item in items]
+    df = pd.DataFrame(features)
+    df['price'] = [item.price for item in items]
+    return df
+train_df = list_to_dataframe(train)
+test_df = list_to_dataframe(test)
+# Traditional Linear Regression!
+np.random.seed(42)
+# Separate features and target
+feature_columns = ['weight', 'weight_unknown', 'text_length']
+X_train = train_df[feature_columns]
+y_train = train_df['price']
+X_test = test_df[feature_columns]
+y_test = test_df['price']
+# Train a Linear Regression
+model = LinearRegression()
+model.fit(X_train, y_train)
+for feature, coef in zip(feature_columns, model.coef_):
+    print(f"{feature}: {coef}")
+print(f"Intercept: {model.intercept_}")
+# Predict the test set and evaluate
+y_pred = model.predict(X_test)
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+print(f"Mean Squared Error: {mse}")
+print(f"R-squared Score: {r2}")
+def linear_regression_pricer(item):
+    features = get_features(item)
+    features_df = pd.DataFrame([features])
+    return model.predict(features_df)[0]
+evaluate(linear_regression_pricer, test)
+prices = np.array([float(item.price) for item in train])
+documents = [item.summary for item in train]
+np.random.seed(42)
+vectorizer = CountVectorizer(max_features=2000, stop_words='english')
+X = vectorizer.fit_transform(documents)
+# Here are the 1,000 most common words that it picked, not including "stop words":
+selected_words = vectorizer.get_feature_names_out()
+print(f"Number of selected words: {len(selected_words)}")
+print("Selected words:", selected_words[1000:1020])
+regressor = LinearRegression()
+regressor.fit(X, prices)
+def natural_language_linear_regression_pricer(item):
+    x = vectorizer.transform([item.summary])
+    return max(regressor.predict(x)[0], 0)
+evaluate(natural_language_linear_regression_pricer, test)
+```
+- CountVectorizer(): Converts a collection of text documents into a matrix of token counts
+  - Can convert text data into a numerical representation in NLP
+
+### 151. Day 3 - Random Forest and XGBoost: Ensemble Models in Scikit-Learn
+```py
+def random_forest(item):
+    x = vectorizer.transform([item.summary])
+    return max(0, rf_model.predict(x)[0])
+evaluate(random_forest, test)
+```
+
+### 152. Day 4 - Training Your First Neural Network and Testing Frontier Models
+- Four steps of NN training
+  - Tweaking the parameters of a model based on training data
+  - In a way that should generalize to unseen data
+  1. Forward pass: predicts the output given inputs
+  2. Loss calculation: How different was the prediction to the ground truth
+  3. Backward pass: How should we tweak parameters to do better next time (the "gradients")
+  4. Optimization: Updates parameters a tiny step to do better next time
+  - You can specify additional settings that aren't updated during training known as **hyper-parameters** like epoch and learning rate
+  - The process of experimenting with these is called hyper-parameter optimization
+    - Basically Trial & Error
+
+### 153. Day 4 - Human Baseline Performance vs Machine Learning Models in PyTorch
+- human_pricer() based on CSV file
+
+### 154. Day 4 - Building Your First Neural Network with PyTorch
+- A vanilla network
+```py
+y = np.array([float(item.price) for item in train])
+documents = [item.summary for item in train]
+# Use the HashingVectorizer for a Bag of Words model
+# Using binary=True with the CountVectorizer makes "one-hot vectors"
+np.random.seed(42)
+vectorizer = HashingVectorizer(n_features=5000, stop_words='english', binary=True)
+X = vectorizer.fit_transform(documents)
+# Define the neural network - here is Pytorch code to create a 8 layer neural network
+class NeuralNetwork(nn.Module):
+    def __init__(self, input_size):
+        super(NeuralNetwork, self).__init__()
+        self.layer1 = nn.Linear(input_size, 128)
+        self.layer2 = nn.Linear(128, 64)
+        self.layer3 = nn.Linear(64, 64)
+        self.layer4 = nn.Linear(64, 64)
+        self.layer5 = nn.Linear(64, 64)
+        self.layer6 = nn.Linear(64, 64)
+        self.layer7 = nn.Linear(64, 64)
+        self.layer8 = nn.Linear(64, 1)
+        self.relu = nn.ReLU()
+    def forward(self, x):
+        output1 = self.relu(self.layer1(x))
+        output2 = self.relu(self.layer2(output1))
+        output3 = self.relu(self.layer3(output2))
+        output4 = self.relu(self.layer4(output3))
+        output5 = self.relu(self.layer5(output4))
+        output6 = self.relu(self.layer6(output5))
+        output7 = self.relu(self.layer7(output6))
+        output8 = self.layer8(output7)
+        return output8
+# Convert data to PyTorch tensors
+X_train_tensor = torch.FloatTensor(X.toarray())
+y_train_tensor = torch.FloatTensor(y).unsqueeze(1)
+# Split the data into training and validation sets
+X_train, X_val, y_train, y_val = train_test_split(X_train_tensor, y_train_tensor, test_size=0.01, random_state=42)
+# Create the loader
+train_dataset = TensorDataset(X_train, y_train)
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+# Initialize the model
+input_size = X_train_tensor.shape[1]
+model = NeuralNetwork(input_size)
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Number of trainable parameters: {trainable_params:,}") # 669,249
+# Define loss function and optimizer
+loss_function = nn.MSELoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+# We will do 2 complete runs through the data
+EPOCHS = 2
+for epoch in range(EPOCHS):
+    model.train()
+    for batch_X, batch_y in tqdm(train_loader):
+        optimizer.zero_grad()
+        # The next 4 lines are the 4 stages of training: forward pass, loss calculation, backward pass, optimize
+        outputs = model(batch_X) # step 1
+        loss = loss_function(outputs, batch_y) # step 2
+        loss.backward() # step 3
+        optimizer.step() # step 4
+    model.eval()
+    with torch.no_grad():
+        val_outputs = model(X_val)
+        val_loss = loss_function(val_outputs, y_val)
+    print(f'Epoch [{epoch+1}/{EPOCHS}], Train Loss: {loss.item():.3f}, Val Loss: {val_loss.item():.3f}')
+```
+
+### 155. Day 4 - Testing GPT-4o-mini and Claude Opus Against Neural Networks
+- Without training, how LLM reponds to the question about the price?
+  - Still better than the trained neural network obove
+
+### 156. Day 4 - Testing Gemini 3, GPT-5.1, Claude 4.5 & Grok on Price Prediction
+- So far GPT-5.1 is the best
+
+### 157. Day 5 - Fine-Tuning OpenAI Frontier Models with Supervised Fine-Tuning
+- Three Stages To Fine-tuning with OpenAI
+  1. Create training dataset in jsonl format and upload to OpenAI
+  2. Run training - training loss and validation loss should decrease
+  3. Evaluate results, tweak, and repeat
+- OpenAI allows you tune small number of parameters (not entire parameters)
+  - Supervised fine tuning
+    - https://platform.openai.com/docs/guides/supervised-fine-tuning
+    - For specific case: given input and output
+  - Direct preference optimization
+    - https://platform.openai.com/docs/guides/direct-preference-optimization
+    - Based on prompts and pairs of response (correct and incorrect)
+    - Generating chat messages with the right tone and style
+  - Reinforcement fine-tuning
+    - https://platform.openai.com/docs/guides/reinforcement-fine-tuning
+    - Relies on a programmable grader that scores every candidate response
+    - Reasoning models only
+    - Medical diagnoses based on history and diagnostic guidelines
+
+### 158. Day 5 - Fine-Tuning GPT-4o Nano with OpenAI's API for Custom Models
+- Data size
+  - OpenAI recommends fine tuning with a small population of 50-100 examples
+  
+### 159. Day 5 - Fine-Tuning GPT-4o-mini-nano: Running Jobs and Monitoring Training
+```py
+openai.fine_tuning.jobs.create(
+    training_file=train_file.id,
+    validation_file=validation_file.id,
+    model="gpt-4.1-nano-2025-04-14",
+    seed=42,
+    hyperparameters={"n_epochs": 1, "batch_size": 1}, # 1 epoch only
+    suffix="pricer"
+)
+openai.fine_tuning.jobs.list(limit=1)
+job_id = openai.fine_tuning.jobs.list(limit=1).data[0].id
+openai.fine_tuning.jobs.retrieve(job_id)
+openai.fine_tuning.jobs.list_events(fine_tuning_job_id=job_id, limit=10).data
+```
+- OpenAI will censor the training data
+
+### 160. Day 5 - Fine-Tuning Results: When GPT-4o-mini Gets Worse, Not Better
+```py
+fine_tuned_model_name = openai.fine_tuning.jobs.retrieve(job_id).fine_tuned_model
+fine_tuned_model_name # 
+# The prompt
+def test_messages_for(item):
+    message = f"Estimate the price of this product. Respond with the price, no explanation\n\n{item.summary}"
+    return [
+        {"role": "user", "content": message},
+    ]
+# Try this out
+test_messages_for(test[0])
+# The inference function
+def gpt_4__1_nano_fine_tuned(item):
+    response = openai.chat.completions.create(
+        model=fine_tuned_model_name,
+        messages=test_messages_for(item),
+        max_tokens=7
+    )
+    return response.choices[0].message.content
+print(test[0].price)
+print(gpt_4__1_nano_fine_tuned(test[0]))
+evaluate(gpt_4__1_nano_fine_tuned, test)
+```
+- Yielded not very good results
+  - Error: $75.91
+  - Why it didn't work well?
+
+### 161. Day 5 - When Fine-Tuning Frontier Models Fails & Building Deep Neural Networks
+- Key objectives of fine-tuning for frontier models
+  1. Setting style or tone in a way that can't be achieved with prompting
+  2. Improving the relability of producing a type of output
+  3. Correcting failures to follow complex prompts
+  4. Handling edge cases
+  5. Performing a new skill or task that's hard to articulate in a prompt
+- A problem like ours doesn't benefit signficiantly from fine tuning
+  - The problem and sytle of outptu can be clearly specified in a prompt
+  - The model can take advantage of its enormous world knowledge from its pre-training; providing a few extra prices doesn't materially help
+
+### 162. Day 5 - Deep Neural Network Redemption: 289M Parameters vs Frontier Models
+- week6/pricer/deep_neural_network.py
+  - 289,128,449 parameters
+  
+## Section 7: New Week 7 - Fine-tuned open-source model to compete with Frontier model
 
 ### 163. Day 1 - Mastering Parameter-Efficient Fine-Tuning: LoRa, QLoRA & Hyperparameters
 ### 164. Day 1 - Introduction to LoRA Adaptors: Low-Rank Adaptation Explained
