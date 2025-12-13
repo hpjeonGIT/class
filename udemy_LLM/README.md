@@ -2795,7 +2795,7 @@ evaluate(random_forest, test)
   - In a way that should generalize to unseen data
   1. Forward pass: predicts the output given inputs
   2. Loss calculation: How different was the prediction to the ground truth
-  3. Backward pass: How should we tweak parameters to do better next time (the "gradients")
+  3. Backward pass (Backpropagation): How should we tweak parameters to do better next time (the "gradients")
   4. Optimization: Updates parameters a tiny step to do better next time
   - You can specify additional settings that aren't updated during training known as **hyper-parameters** like epoch and learning rate
   - The process of experimenting with these is called hyper-parameter optimization
@@ -2960,77 +2960,829 @@ evaluate(gpt_4__1_nano_fine_tuned, test)
 ### 162. Day 5 - Deep Neural Network Redemption: 289M Parameters vs Frontier Models
 - week6/pricer/deep_neural_network.py
   - 289,128,449 parameters
-  
+
 ## Section 7: New Week 7 - Fine-tuned open-source model to compete with Frontier model
 
-### 163. Day 1 - Mastering Parameter-Efficient Fine-Tuning: LoRa, QLoRA & Hyperparameters
-### 164. Day 1 - Introduction to LoRA Adaptors: Low-Rank Adaptation Explained
-### 165. Day 1 - QLoRA: Quantization for Efficient Fine-Tuning of Large Language Models
-### 166. Day 1 - Optimizing LLMs: R, Alpha, and Target Modules in QLoRA Fine-Tuning
-### 167. Day 1 - Parameter-Efficient Fine-Tuning: PEFT for LLMs with Hugging Face
-### 168. Day 1 - How to Quantize LLMs: Reducing Model Size with 8-bit Precision
-### 169. Day 1: Double Quantization & NF4: Advanced Techniques for 4-Bit LLM Optimization
-### 170. Day 1 - Exploring PEFT Models: The Role of LoRA Adapters in LLM Fine-Tuning
-### 171. Day 1 - Model Size Summary: Comparing Quantized and Fine-Tuned Models
-### 172. Day 2 - How to Choose the Best Base Model for Fine-Tuning Large Language Models
-### 173. Day 2 - Selecting the Best Base Model: Analyzing HuggingFace's LLM Leaderboard
-### 174. Day 2 - Exploring Tokenizers: Comparing LLAMA, QWEN, and Other LLM Models
-### 175. Day 2 - Optimizing LLM Performance: Loading and Tokenizing Llama 3.1 Base Model
-### 176. Day 2 - Quantization Impact on LLMs: Analyzing Performance Metrics and Errors
-### 177. Day 2 - Comparing LLMs: GPT-4 vs LLAMA 3.1 in Parameter-Efficient Tuning
-### 178. Day 3 - QLoRA Hyperparameters: Mastering Fine-Tuning for Large Language Models
-### 179. Day 3 - Understanding Epochs and Batch Sizes in Model Training
-### 180. Day 3 - Learning Rate, Gradient Accumulation, and Optimizers Explained
-### 181. Day 3 - Setting Up the Training Process for Fine-Tuning
-### 182. Day 3 - Configuring SFTTrainer for 4-Bit Quantized LoRA Fine-Tuning of LLMs
-### 183. Day 3 - Fine-Tuning LLMs: Launching the Training Process with QLoRA
-### 184. Day 3 - Monitoring and Managing Training with Weights & Biases
-### 185. Day 4 - Keeping Training Costs Low: Efficient Fine-Tuning Strategies
-### 186. Day 4 - Efficient Fine-Tuning: Using Smaller Datasets for QLoRA Training
-### 187. Day 4 - Visualizing LLM Fine-Tuning Progress with Weights and Biases Charts
-### 188. Day 4 - Advanced Weights & Biases Tools and Model Saving on Hugging Face
-### 189. Day 4 - End-to-End LLM Fine-Tuning: From Problem Definition to Trained Model
-### 190. Day 5 - The Four Steps in LLM Training: From Forward Pass to Optimization
-### 191. Day 5 - QLoRA Training Process: Forward Pass, Backward Pass and Loss Calculation
-### 192. Day 5 - Understanding Softmax and Cross-Entropy Loss in Model Training
-### 193. Day 5 - Monitoring Fine-Tuning: Weights & Biases for LLM Training Analysis
-### 194. Day 5 - Revisiting the Podium: Comparing Model Performance Metrics
-### 195. Day 5 - Evaluation of our Proprietary, Fine-Tuned LLM against Business Metrics
-### 196. Day 5 - Visualization of Results: Did We Beat GPT-4?
-### 197. Day 5 - Hyperparameter Tuning for LLMs: Improving Model Accuracy with PEFT
+### 163. Day 1 - Introduction to QLoRA for Fine-Tuning Open-Source Models
 
-##
+### 164. Day 1 -  LoRA: Training LLaMA 3.2 with Low-Rank Adapters
+- Llama3.2 with 3B is still very large model to train on a single GPU
+  - 28 groups of modules stacked on top of each other, called Llama Decoder Layers
+  - Each has self-attention layers, multi-layer perceptron layer, SiLU activation and layer norm
+  - These parameters take up 13GB memory
+- High level explanation of LoRA (Low Rank Adaptation)
+  1. Freeze the weights: we will not optimize them
+  2. Select some layers to target, called "Target Modules" (out of 28 in LLama 3.2)
+  3. Create new "adaptor" matrices with lower dimensions, fewer parameters
+  4. Apply these adaptors to the Target Modules to adjust them - and these get trained
+  * There are in fact two LoRA matrices that get applied: LoRA_a, LoRA_b on each target module
+  * Scale paramter alpha as well
 
-### 198. Day 1 - From Fine-Tuning to Multi-Agent Systems: Next-Level LLM Engineering
-### 199. Day 1: Building a Multi-Agent AI Architecture for Automated Deal Finding Systems
-### 200. Day 1 - Unveiling Modal: Deploying Serverless Models to the Cloud
-### 201. Day 1 - LLAMA on the Cloud: Running Large Models Efficiently
-### 202. Day 1 - Building a Serverless AI Pricing API: Step-by-Step Guide with Modal
-### 203. Day 1 - Multiple Production Models Ahead: Preparing for Advanced RAG Solutions
-### 204. Day 2 - Implementing Agentic Workflows: Frontier Models and Vector Stores in RAG
-### 205. Day 2 - Building a Massive Chroma Vector Datastore for Advanced RAG Pipelines
-### 206. Day 2 - Visualizing Vector Spaces: Advanced RAG Techniques for Data Exploration
-### 207. Day 2 - 3D Visualization Techniques for RAG: Exploring Vector Embeddings
-### 208. Day 2 - Finding Similar Products: Building a RAG Pipeline without LangChain
-### 209. Day 2 - RAG Pipeline Implementation: Enhancing LLMs with Retrieval Techniques
-### 210. Day 2 - Random Forest Regression: Using Transformers & ML for Price Prediction
-### 211. Day 2 - Building an Ensemble Model: Combining LLM, RAG, and Random Forest
-### 212. Day 2 - Wrap-Up: Finalizing Multi-Agent Systems and RAG Integration
-### 213. Day 3 - Enhancing AI Agents with Structured Outputs: Pydantic & BaseModel Guide
-### 214. Day 3 - Scraping RSS Feeds: Building an AI-Powered Deal Selection System
-### 215. Day 3 - Structured Outputs in AI: Implementing GPT-4 for Detailed Deal Selection
-### 216. Day 3 - Optimizing AI Workflows: Refining Prompts for Accurate Price Recognition
-### 217. Day 3 - Mastering Autonomous Agents: Designing Multi-Agent AI Workflows
-### 218. Day 4 - The 5 Hallmarks of Agentic AI: Autonomy, Planning, and Memory
-### 219. Day 4 - Building an Agentic AI System: Integrating Pushover for Notifications
-### 220. Day 4 Implementing Agentic AI: Creating a Planning Agent for Automated Workflows
-### 221. Day 4 - Building an Agent Framework: Connecting LLMs and Python Code
-### 222. Day 4 - Completing Agentic Workflows: Scaling for Business Applications
-### 223. Day 5 - Autonomous AI Agents: Building Intelligent Systems Without Human Input
-### 224. Day 5 - AI Agents with Gradio: Advanced UI Techniques for Autonomous Systems
-### 225. Day 5 - Finalizing the Gradio UI for Our Agentic AI Solution
-### 226. Day 5 Enhancing AI Agent UI: Gradio Integration for Real-Time Log Visualization
-### 227. Day 5 - Analyzing Results: Monitoring Agent Framework Performance
-### 228. Day 5 - AI Project Retrospective: 8-Week Journey to Becoming an LLM Engineer
+### 165. Day 1 - LoRA Hyperparameters and QLoRA Quantization Explained
+- 3 Essential Hyperparameters for LoRA fine-tuning
+  1. r: the rank, or how many dimensios in the low-rank matrices
+      - Rule of thumb: start with 8, then double to 16, 32 until diminishing returns
+  2. Alpha: a scaling factor that multiplies the lower rank matrices
+      - Rule of thumb: 2x of r
+  3. Target modules which layers of neural network are adpated
+      - Rule of thumb: start by targeting the attention heads
+- Quantization - the Q in QLoRA
+  - 3B variants are enormous
+  - Intuition: keep the number of weights but reduce their precision
+  - Model performance is worse but the impact is surprisingly small
+    - With huge memory saving
+  - Reduce to 8 bits or even to 4 bits
+    - 4bits are interpreted as float, not int
+    - The adaptor matrices are still 32bit
 
+### 166. Day 1 - Setting Up Google Colab and Exploring LLaMA 3.2 Model Architecture
+- Lab on HuggingFace
+- HF_TOKEN is necessary
+```py
+# Constants
+BASE_MODEL = "meta-llama/Llama-3.2-3B"
+PROJECT_NAME = "price"
+RUN_NAME =  f"{datetime.now():%Y-%m-%d_%H.%M.%S}"
+PROJECT_RUN_NAME = f"{PROJECT_NAME}-{RUN_NAME}"
+LITE_MODE = False
+DATA_USER = "ed-donner"
+DATASET_NAME = f"{DATA_USER}/items_prompts_lite" if LITE_MODE else f"{DATA_USER}/items_prompts_full"
+FINETUNED_MODEL = f"ed-donner/price-2025-11-30_15.10.55-lite"
+# Load the Base Model without quantization
+base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, device_map="auto")
+print(f"Memory footprint: {base_model.get_memory_footprint() / 1e9:,.1f} GB") # 12.9GB
+base_model
+LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(128256, 3072)
+    (layers): ModuleList(
+      (0-27): 28 x LlamaDecoderLayer(
+        (self_attn): LlamaAttention(
+          (q_proj): Linear(in_features=3072, out_features=3072, bias=False)
+          (k_proj): Linear(in_features=3072, out_features=1024, bias=False)
+          (v_proj): Linear(in_features=3072, out_features=1024, bias=False)
+          (o_proj): Linear(in_features=3072, out_features=3072, bias=False)
+        )
+        (mlp): LlamaMLP(
+          (gate_proj): Linear(in_features=3072, out_features=8192, bias=False)
+          (up_proj): Linear(in_features=3072, out_features=8192, bias=False)
+          (down_proj): Linear(in_features=8192, out_features=3072, bias=False)
+          (act_fn): SiLUActivation()
+        )
+        (input_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+        (post_attention_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+      )
+    )
+    (norm): LlamaRMSNorm((3072,), eps=1e-05)
+    (rotary_emb): LlamaRotaryEmbedding()
+  )
+  (lm_head): Linear(in_features=3072, out_features=128256, bias=False)
+)
+```
+
+### 167. Day 1 -  Loading Models with 8-bit and 4-bit Quantization Using QLoRA
+```py
+# Load the Base Model using 8 bit
+quant_config = BitsAndBytesConfig(load_in_8bit=True)
+base_model = AutoModelForCausalLM.from_pretrained(
+    BASE_MODEL,
+    quantization_config=quant_config,
+    device_map="auto",
+)
+print(f"Memory footprint: {base_model.get_memory_footprint() / 1e9:,.1f} GB") # now reduced to 3.6GB
+base_model
+LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(128256, 3072)
+    (layers): ModuleList(
+      (0-27): 28 x LlamaDecoderLayer(
+        (self_attn): LlamaAttention(
+          (q_proj): Linear8bitLt(in_features=3072, out_features=3072, bias=False)
+          (k_proj): Linear8bitLt(in_features=3072, out_features=1024, bias=False)
+          (v_proj): Linear8bitLt(in_features=3072, out_features=1024, bias=False)
+          (o_proj): Linear8bitLt(in_features=3072, out_features=3072, bias=False)
+        )
+        (mlp): LlamaMLP(
+          (gate_proj): Linear8bitLt(in_features=3072, out_features=8192, bias=False)
+          (up_proj): Linear8bitLt(in_features=3072, out_features=8192, bias=False)
+          (down_proj): Linear8bitLt(in_features=8192, out_features=3072, bias=False)
+          (act_fn): SiLUActivation()
+        )
+        (input_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+        (post_attention_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+      )
+    )
+    (norm): LlamaRMSNorm((3072,), eps=1e-05)
+    (rotary_emb): LlamaRotaryEmbedding()
+  )
+  (lm_head): Linear(in_features=3072, out_features=128256, bias=False)
+)
+```
+- Linear() into Linear8bitLt()
+```py
+# Load the Tokenizer and the Base Model using 4 bit
+quant_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_quant_type="nf4")
+base_model = AutoModelForCausalLM.from_pretrained(
+    BASE_MODEL,
+    quantization_config=quant_config,
+    device_map="auto",
+)
+print(f"Memory footprint: {base_model.get_memory_footprint() / 1e9:,.2f} GB") # 2.2 GB
+base_model
+LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(128256, 3072)
+    (layers): ModuleList(
+      (0-27): 28 x LlamaDecoderLayer(
+        (self_attn): LlamaAttention(
+          (q_proj): Linear4bit(in_features=3072, out_features=3072, bias=False)
+          (k_proj): Linear4bit(in_features=3072, out_features=1024, bias=False)
+          (v_proj): Linear4bit(in_features=3072, out_features=1024, bias=False)
+          (o_proj): Linear4bit(in_features=3072, out_features=3072, bias=False)
+        )
+        (mlp): LlamaMLP(
+          (gate_proj): Linear4bit(in_features=3072, out_features=8192, bias=False)
+          (up_proj): Linear4bit(in_features=3072, out_features=8192, bias=False)
+          (down_proj): Linear4bit(in_features=8192, out_features=3072, bias=False)
+          (act_fn): SiLUActivation()
+        )
+        (input_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+        (post_attention_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+      )
+    )
+    (norm): LlamaRMSNorm((3072,), eps=1e-05)
+    (rotary_emb): LlamaRotaryEmbedding()
+  )
+  (lm_head): Linear(in_features=3072, out_features=128256, bias=False)
+)
+```
+- Linear() into LInear4bit()
+```py
+fine_tuned_model = PeftModel.from_pretrained(base_model, FINETUNED_MODEL)
+print(f"Memory footprint: {fine_tuned_model.get_memory_footprint() / 1e9:,.2f} GB") # 2.27GB. 2.27-2.20 = 70MB is the size of LoRA matrices
+fine_tuned_model
+PeftModelForCausalLM(
+  (base_model): LoraModel(
+    (model): LlamaForCausalLM(
+      (model): LlamaModel(
+        (embed_tokens): Embedding(128256, 3072)
+        (layers): ModuleList(
+          (0-27): 28 x LlamaDecoderLayer(
+            (self_attn): LlamaAttention(
+              (q_proj): lora.Linear4bit(
+                (base_layer): Linear4bit(in_features=3072, out_features=3072, bias=False)
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.1, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=3072, out_features=32, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=32, out_features=3072, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+                (lora_magnitude_vector): ModuleDict()
+              )
+              (k_proj): lora.Linear4bit(
+                (base_layer): Linear4bit(in_features=3072, out_features=1024, bias=False)
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.1, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=3072, out_features=32, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=32, out_features=1024, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+                (lora_magnitude_vector): ModuleDict()
+              )
+              (v_proj): lora.Linear4bit(
+                (base_layer): Linear4bit(in_features=3072, out_features=1024, bias=False)
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.1, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=3072, out_features=32, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=32, out_features=1024, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+                (lora_magnitude_vector): ModuleDict()
+              )
+              (o_proj): lora.Linear4bit(
+                (base_layer): Linear4bit(in_features=3072, out_features=3072, bias=False)
+                (lora_dropout): ModuleDict(
+                  (default): Dropout(p=0.1, inplace=False)
+                )
+                (lora_A): ModuleDict(
+                  (default): Linear(in_features=3072, out_features=32, bias=False)
+                )
+                (lora_B): ModuleDict(
+                  (default): Linear(in_features=32, out_features=3072, bias=False)
+                )
+                (lora_embedding_A): ParameterDict()
+                (lora_embedding_B): ParameterDict()
+                (lora_magnitude_vector): ModuleDict()
+              )
+            )
+            (mlp): LlamaMLP(
+              (gate_proj): Linear4bit(in_features=3072, out_features=8192, bias=False)
+              (up_proj): Linear4bit(in_features=3072, out_features=8192, bias=False)
+              (down_proj): Linear4bit(in_features=8192, out_features=3072, bias=False)
+              (act_fn): SiLUActivation()
+            )
+            (input_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+            (post_attention_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+          )
+        )
+        (norm): LlamaRMSNorm((3072,), eps=1e-05)
+        (rotary_emb): LlamaRotaryEmbedding()
+      )
+      (lm_head): Linear(in_features=3072, out_features=128256, bias=False)
+    )
+  )
+)
+```
+- lora_A and lora_B are injected
+  - lora_A: 3072x32 in q_proj
+  - lora_B: 32x3072 in q_proj
+```py
+r = 32
+# See the matrix dimensions above
+# Attention layers
+lora_q_proj = 3072 * r + 3072 * r
+lora_k_proj = 3072 * r + 1024 * r
+lora_v_proj = 3072 * r + 1024 * r
+lora_o_proj = 3072 * r + 3072 * r
+# Each layer comes to
+lora_layer = lora_q_proj + lora_k_proj + lora_v_proj + lora_o_proj
+# There are 28 layers
+params = lora_layer * 28
+# So the total size in MB is
+size = (params * 4) / 1_000_000
+print(f"Total number of params: {params:,} and size {size:,.1f}MB") # Total number of params: 18,350,080 and size 73.4MB
+```
+
+### 168. Day 1 - LoRA Parameter Calculations and Model Size on Hugging Face
+- When LITE_MODE=False
+```py
+# Each of the Target Modules has 2 LoRA Adaptor matrices, called lora_A and lora_B
+# These are designed so that weights can be adapted by adding alpha * lora_A * lora_B
+# Let's count the number of weights using their dimensions:
+r = 256
+# See the matrix dimensions above
+# Attention layers
+lora_q_proj = 3072 * r + 3072 * r
+lora_k_proj = 3072 * r + 1024 * r
+lora_v_proj = 3072 * r + 1024 * r
+lora_o_proj = 3072 * r + 3072 * r
+# MLP layers
+lora_gate_proj = 3072 * r + 8192 * r
+lora_up_proj = 3072 * r + 8192 * r
+lora_down_proj = 3072 * r + 8192 * r
+# Each layer comes to
+lora_layer = lora_q_proj + lora_k_proj + lora_v_proj + lora_o_proj + lora_gate_proj + lora_up_proj + lora_down_proj
+# There are 28 layers
+params = lora_layer * 28
+# So the total size in MB is
+size = (params * 4) / 1_000_000
+print(f"Total number of params: {params:,} and size {size:,.1f}MB") # Total number of params: 389,021,696 and size 1,556.1MB
+```
+  - Very beefy case. Adaptor into MLP layers as well
+- Size of weights in MB
+  - Llama 3.2 3B: 13,000 MB
+  - Quantized to 8 bit: 3,600 MB
+  - Quantized to 4bit: 2,200 MB
+  - QLoRA with r=32: 73 MB
+
+### 169. Day 2 - Preparing Your Dataset for Fine-Tuning with Token Limits
+```py
+import os
+from dotenv import load_dotenv
+from huggingface_hub import login
+from pricer.items import Item
+from tqdm.notebook import tqdm
+from transformers import AutoTokenizer
+import matplotlib.pyplot as plt
+LITE_MODE = False # control LITE or NOT
+load_dotenv(override=True)
+hf_token = os.environ['HF_TOKEN']
+login(hf_token, add_to_git_credential=True)
+username = "ed-donner"
+dataset = f"{username}/items_lite" if LITE_MODE else f"{username}/items_full"
+train, val, test = Item.from_hub(dataset)
+items = train + val + test
+print(f"Loaded {len(train):,} training items, {len(val):,} validation items, {len(test):,} test items")
+BASE_MODEL = "meta-llama/Llama-3.2-3B"
+tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL) # loading tokenizer from quantized model
+token_counts = [item.count_tokens(tokenizer) for item in tqdm(items)]
+for item in tqdm(train+val): # rounding for train+val
+    item.make_prompts(tokenizer, CUTOFF, True)
+for item in tqdm(test): # no rounding for test
+    item.make_prompts(tokenizer, CUTOFF, False)
+print("PROMPT:") # input description
+print(test[0].prompt)
+print("COMPLETION:") # price
+print(test[0].completion)
+```
+- From week7/pricer/itemps.py:
+```py
+    def make_prompts(self, tokenizer, max_tokens, do_round):
+        """Make prompts and completions"""
+        tokens = tokenizer.encode(self.summary, add_special_tokens=False)
+        if len(tokens) > max_tokens:
+            summary = tokenizer.decode(tokens[:max_tokens]).rstrip()
+        else:
+            summary = self.summary
+        self.prompt = f"{QUESTION}\n\n{summary}\n\n{PREFIX}"
+        self.completion = f"{round(self.price)}.00" if do_round else str(self.price)
+```
+  - Reduce the size of summary when there are too many tokens
+  - Removing cents from the price
+
+### 170. Day 2 - Fine-Tuning Data Prep: Rounding Prices and Token Length Optimization
+
+### 171. Day 2 - Preparing Hugging Face Datasets and Testing Base LLaMA 3.2 Model
+```py
+dataset = load_dataset(DATASET_NAME)
+train = dataset['train']
+val = dataset['val']
+test = dataset['test']
+## pick the right quantization
+if QUANT_4_BIT:
+  quant_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_quant_type="nf4"
+  )
+else:
+  quant_config = BitsAndBytesConfig(
+    load_in_8bit=True,
+    bnb_8bit_compute_dtype=torch.bfloat16
+  )
+# Load the Tokenizer and the Model
+tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
+tokenizer.pad_token = tokenizer.eos_token
+tokenizer.padding_side = "right"
+base_model = AutoModelForCausalLM.from_pretrained(
+    BASE_MODEL,
+    quantization_config=quant_config,
+    device_map="auto",
+)
+base_model.generation_config.pad_token_id = tokenizer.pad_token_id
+print(f"Memory footprint: {base_model.get_memory_footprint() / 1e9:.1f} GB") # 2.2GB
+def model_predict(item):
+    inputs = tokenizer(item["prompt"],return_tensors="pt").to("cuda")
+    with torch.no_grad():
+        output_ids = base_model.generate(**inputs, max_new_tokens=8)
+    prompt_len = inputs["input_ids"].shape[1]
+    generated_ids = output_ids[0, prompt_len:]
+    return tokenizer.decode(generated_ids)
+model_predict(test[0])
+#
+evaluate(model_predict, test)
+```
+
+### 172. Day 2 - Base Models vs Chat Models: Understanding LLaMA Fine-Tuning
+- Unlike Frontier models we tuned above, we don't use system prompt
+  - Those Frontier models are Chat models
+  - Llama here is the Base model
+- Results of base model, without training
+  - Error: $110.72, MSE: 73,321, r2: -233.6%
+  - How to improve this?
+    - Fining tuning through QLoRA
+
+### 173. Day 3 - Fine-Tuning Hyperparameters: QLoRA Settings and Training Config
+- Five important hyper-parameters for QLoRA
+  1. Target modules
+  2. r: number of dimensions in LoRA matrix
+  3. Alpha: scale parameter
+  4. Quantization: 4 or 8 bit
+  5. Dropout
+
+### 174. Day 3 - Learning Rate, Optimizers, and Training Hyperparameters for LoRA
+- Five important hyper-parameters for TRAINING
+  1. Epochs
+  2. Batch size
+  3. Learning rate
+  4. Gradient accumulation
+  5. Optimizer: sgd, adam, ...
+- Four steps of training
+  1. Forward pass: predict the output given inputs
+  2. Loss calculation: How different was the prediction to the ground trugh
+  3. Backward pass (Backpropagation): How should we tweak parameters to do better next time (the gradients)
+  4. Optimization: Update parameters a tiny step to do better next time
+
+### 175. Day 3 - Setting Up Training: Hyperparameters, qLoRA Config & Weights & Biases
+```py
+import os
+import re
+import math
+from tqdm import tqdm
+from google.colab import userdata
+from huggingface_hub import login
+import torch
+import transformers
+from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, set_seed, BitsAndBytesConfig
+from datasets import load_dataset, Dataset, DatasetDict
+import wandb # weight and bias package
+from peft import LoraConfig
+from trl import SFTTrainer, SFTConfig
+from datetime import datetime
+import matplotlib.pyplot as plt
+# Constants
+BASE_MODEL = "meta-llama/Llama-3.2-3B"
+PROJECT_NAME = "price"
+HF_USER = "ed-donner" # your HF name here!
+LITE_MODE = True
+DATA_USER = "ed-donner"
+DATASET_NAME = f"{DATA_USER}/items_prompts_lite" if LITE_MODE else f"{DATA_USER}/items_prompts_full"
+RUN_NAME =  f"{datetime.now():%Y-%m-%d_%H.%M.%S}"
+if LITE_MODE:
+  RUN_NAME += "-lite"
+PROJECT_RUN_NAME = f"{PROJECT_NAME}-{RUN_NAME}"
+HUB_MODEL_NAME = f"{HF_USER}/{PROJECT_RUN_NAME}"
+# Hyper-parameters - overall
+EPOCHS = 1 if LITE_MODE else 3
+BATCH_SIZE = 32 if LITE_MODE else 256
+MAX_SEQUENCE_LENGTH = 128
+GRADIENT_ACCUMULATION_STEPS = 1
+# Hyper-parameters - QLoRA
+QUANT_4_BIT = True
+LORA_R = 32 if LITE_MODE else 256
+LORA_ALPHA = LORA_R * 2
+ATTENTION_LAYERS = ["q_proj", "v_proj", "k_proj", "o_proj"]
+MLP_LAYERS = ["gate_proj", "up_proj", "down_proj"]
+TARGET_MODULES = ATTENTION_LAYERS if LITE_MODE else ATTENTION_LAYERS + MLP_LAYERS
+LORA_DROPOUT = 0.1 # 10% as rule of thumb
+# Hyper-parameters - training
+LEARNING_RATE = 1e-4
+WARMUP_RATIO = 0.01
+LR_SCHEDULER_TYPE = 'cosine'
+WEIGHT_DECAY = 0.001
+OPTIMIZER = "paged_adamw_32bit"
+capability = torch.cuda.get_device_capability()
+use_bf16 = capability[0] >= 8
+# Tracking
+VAL_SIZE = 500 if LITE_MODE else 1000
+LOG_STEPS = 5 if LITE_MODE else 10
+SAVE_STEPS = 100 if LITE_MODE else 200
+LOG_TO_WANDB = True
+```
+
+### 176. Day 3 - Setting Up Weights & Biases and the HuggingFace SFT Trainer
+- https://wandb.ai/site
+  - Will need an WANDB_API_KEY
+```py
+# Log in to HuggingFace
+hf_token = userdata.get('HF_TOKEN')
+login(hf_token, add_to_git_credential=True)
+# Log in to Weights & Biases
+wandb_api_key = userdata.get('WANDB_API_KEY')
+os.environ["WANDB_API_KEY"] = wandb_api_key
+wandb.login()
+# Configure Weights & Biases to record against our project
+os.environ["WANDB_PROJECT"] = PROJECT_NAME
+os.environ["WANDB_LOG_MODEL"] = "false"
+os.environ["WANDB_WATCH"] = "false"
+dataset = load_dataset(DATASET_NAME)
+train = dataset['train']
+val = dataset['val'].select(range(VAL_SIZE))
+test = dataset['test']
+if LOG_TO_WANDB:
+  wandb.init(project=PROJECT_NAME, name=RUN_NAME)
+```
+- Now load the tokenizer and model
+```py
+# pick the right quantization
+if QUANT_4_BIT:
+  quant_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.bfloat16 if use_bf16 else torch.float16,
+    bnb_4bit_quant_type="nf4"
+  )
+else:
+  quant_config = BitsAndBytesConfig(
+    load_in_8bit=True,
+    bnb_8bit_compute_dtype=torch.bfloat16 if use_bf16 else torch.float16,
+  )
+# Load the Tokenizer and the Model
+tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
+tokenizer.pad_token = tokenizer.eos_token
+tokenizer.padding_side = "right"
+base_model = AutoModelForCausalLM.from_pretrained(
+    BASE_MODEL,
+    quantization_config=quant_config,
+    device_map="auto",
+)
+base_model.generation_config.pad_token_id = tokenizer.pad_token_id
+print(f"Memory footprint: {base_model.get_memory_footprint() / 1e6:.1f} MB")
+# LoRA Parameters
+lora_parameters = LoraConfig(
+    lora_alpha=LORA_ALPHA,
+    lora_dropout=LORA_DROPOUT,
+    r=LORA_R,
+    bias="none",
+    task_type="CAUSAL_LM",
+    target_modules=TARGET_MODULES,
+)
+# Training parameters
+train_parameters = SFTConfig(
+    output_dir=PROJECT_RUN_NAME,
+    num_train_epochs=EPOCHS,
+    per_device_train_batch_size=BATCH_SIZE,
+    per_device_eval_batch_size=1,
+    gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
+    optim=OPTIMIZER,
+    save_steps=SAVE_STEPS,
+    save_total_limit=10,
+    logging_steps=LOG_STEPS,
+    learning_rate=LEARNING_RATE,
+    weight_decay=0.001,
+    fp16=not use_bf16,
+    bf16=use_bf16,
+    max_grad_norm=0.3,
+    max_steps=-1,
+    warmup_ratio=WARMUP_RATIO,
+    group_by_length=True,
+    lr_scheduler_type=LR_SCHEDULER_TYPE,
+    report_to="wandb" if LOG_TO_WANDB else None,
+    run_name=RUN_NAME,
+    max_length=MAX_SEQUENCE_LENGTH,
+    save_strategy="steps",
+    hub_strategy="every_save",
+    push_to_hub=True,
+    hub_model_id=HUB_MODEL_NAME,
+    hub_private_repo=True,
+    eval_strategy="steps",
+    eval_steps=SAVE_STEPS
+)
+fine_tuning = SFTTrainer(
+    model=base_model,
+    train_dataset=train,
+    eval_dataset=val,
+    peft_config=lora_parameters,
+    args=train_parameters
+)
+```
+- SFTTrainer() 
+  - Supervised Fine-Tuning trainer for training language model
+  - requires prompt/completion keyword for training data
+    - https://huggingface.co/docs/trl/en/dataset_formats#prompt-completion
+
+### 177. Day 3 - Running Fine-Tuning with TRL and Monitoring Training in Weights & Biases
+```py
+# Fine-tune!
+fine_tuning.train() # this will take time. Monitor GPU memory consumption. If breaks, reduce the batch size
+# Push our fine-tuned model to Hugging Face
+fine_tuning.model.push_to_hub(PROJECT_RUN_NAME, private=True)
+print(f"Saved to the hub: {PROJECT_RUN_NAME}")
+```
+
+### 178. Day 4 - Monitoring Your Fine-Tuning Run with Weights & Biases
+- When WANDB_API_KEY is available, plots of training related data are available through their website
+- Monitor eval/loss and make sure it decreases
+
+### 179. Day 4 - Full Dataset Training on Google Colab A100 with 800K Data Points
+- `LITE_MODE = True`
+
+### 180. Day 4 - Monitoring Training Loss and Learning Rate in Weights & Biases
+- If there is a huge drop in train/loss b/w epochs, this may indicate **over-fitting**
+  - Double-check if eval/loss jumps at the same point
+
+### 181. Day 4 - Analyzing Weights & Biases Results and Catching Overfitting
+- When overfitting is found, try higher dropout (10%->20%)
+  - Or more comprehensive experiment
+
+### 182. Day 4 - Managing Runs in Weights & Biases and Selecting Best Model Checkpoints
+
+### 183. Day 5 - Results Day: Running Inference on Fine-Tuned Models & Loss Calculation D
+
+### 184. Day 5 - Cross-Entropy Loss: How LLMs Calculate Probability Distributions
+- In the loss calculation
+  - Instead of predicted next token, consider what probabilty did the model assign the true next token
+  - If it gave this a probability of 100%, then the loss =0. Otherwise, lower prob yields higher loss
+  - This is cross-entropy loss
+- Next token prediction and cross entropy loss
+  - The model output
+    - The model doesn't simply predict the next token
+    - Rather, it outputs the probabilities of all possible next tokens
+    - During inference, you can pick the token with the highest probability, or sample from possible next tokens
+  - The loss function
+    - What probability did the model assign to the token that actually was the correct next token?
+    - This is called **cross-entropy loss**
+
+### 185. Day 5 - Testing Our Fine-Tuned LoRA Model Against GPT-4o Nano
+- LITE_MODE: Error 65.40, MSE: 13,751, r2: 37.4%
+
+### 186. Day 5 - Fine-Tuned LLaMA 3.2 Crushes GPT-5.1 and Frontier Models
+- non LITE_MODE: Error 39.85, MSE: 4,643, r2: 78.9%
+
+## Section 8: New Week 8 - Build Autonomous multi agent system
+
+### 187. Day 1 - Intro to Agentic AI & Serverless Deployment on Modal
+- Demo project: the price is right
+  - We will buidl an autonomous agentic AI framework
+    - Watches for deals being published online
+    - Estimates the price of the product
+    - Sends a push notification when it finds great opportunities
+  - Seven agents will collaborate in our framework
+    - GPT-5 model will identify the deals from an RSS feed
+    - Our frontier-busting fine-tuned model will estimate prices
+    - We'll also use a Frontier Model with a massive RAG db
+- Three definitions of Agents
+  1. Sam Altman: AI systems that can do work for you independently
+  2. Early 2025 consensus: AI systems where an LLM controls the workflow
+  3. Late 2025: An agent runs tools in a loop to achieve a goal
+
+### 188. Day 1 - Designing Agent Architectures & Modal Platform Setup
+- Agent Architecture
+  - Scanner agnet: identifies promising deals from RSS feed
+  - Ensemble agent: estimates prices using multiple models like RF
+  - Messaging agent: sends push notifications
+  - Planning agent: coordinates activities
+  - The Agent Framework: with memory and logging
+  - The UI: In Gradio
+- Agent framework might not be necessary
+  - LLM API might be enough 
+- Serverless AI model delivery
+  - https://modal.com/
+
+### 189. Day 1 - Running Python Locally and in the Cloud with Modal Remote Execution
+- Using uv command to deploy an app to modal
+  - `uv run modal deploy -m pricer_service`
+
+### 190. Day 1 - Setting Up Modal Secrets and Deploying LLaMA Models to the Cloud
+
+### 191. Day 1 - Deploying Fine-Tuned Models to Modal Cloud with Persistent Storage
+
+### 192. Day 1 - Building Your First Agent with Modal Serverless AI
+
+### 193. Day 2 - Building Advanced RAG with ChromaDB and Vector Stores (No LangChain)
+- Agent workflowks
+  - Scanner agnet
+  - Ensemble agent
+    - Specialist agent: estimates prices
+    - Frontier agent: RAG pricer
+    - Neural network agent: estimates prices
+  - Messaging agent
+  - Planning agent
+  - The agent framework
+  - The UI: in Gradio
+
+### 194. Day 2 - Visualizing Chroma Vectors with t-SNE and Building a RAG Pipeline
+```py
+def vector(item):
+    return encoder.encode(item.summary)
+def find_similars(item):
+    vec = vector(item)
+    results = collection.query(query_embeddings=vec.astype(float).tolist(), n_results=5)
+    documents = results['documents'][0][:]
+    prices = [m['price'] for m in results['metadatas'][0][:]]
+    return documents, prices
+find_similars(test[0])
+# We need to give some context to GPT-5.1 by selecting 5 products with similar descriptions
+def make_context(similars, prices):
+    message = "For context, here are some other items that might be similar to the item you need to estimate.\n\n"
+    for similar, price in zip(similars, prices):
+        message += f"Potentially related product:\n{similar}\nPrice is ${price:.2f}\n\n"
+    return message
+documents, prices = find_similars(test[0])
+print(make_context(documents, prices))
+def messages_for(item, similars, prices):
+    message = f"Estimate the price of this product. Respond with the price, no explanation\n\n{item.summary}\n\n"
+    message += make_context(similars, prices)
+    return [{"role": "user", "content": message}]
+documents, prices = find_similars(test[0])
+print(messages_for(test[0], documents, prices)[0]['content'])
+# The function for gpt-5-mini
+def gpt_5__1_rag(item):
+    documents, prices = find_similars(item)
+    response = completion(model="gpt-5.1", messages=messages_for(item, documents, prices), reasoning_effort="none", seed=42)
+    return response.choices[0].message.content
+```
+### 195. Day 2 - RAG with GPT-4o vs Fine-Tuned Models: Building an Ensemble
+- Weighted combination of different models
+  - gpt5.1 x 0.8 + neural network x 0.1 + specialist x 0.1
+
+### 196. Day 2 - Ensemble Model Success: Combining RAG, Neural Networks & Modal
+
+### 197. Day 2 - Building and Testing an Ensemble Agent with Multiple LLM Calls
+
+### 198. Day 3 - Structured Outputs with Pydantic and Constrained Decoding
+- Structured outputs
+  - How it feels
+    - You define a Python class as a subclass of Pydantic Basemodel
+    - The model outputs an instance of this class
+  - How it works
+    - The Pydantic class is used to generate a JSON schema
+    - OpenAI includes the Schema in the system prompt: you must respond with JSON according to this schema
+    - OpenAI client library creates an instance of the Pydantic class and populates with the JSON
+    - And there's a powerful trick - inference time constrained decoding
+
+### 199. Day 3 - Building a Deal Scanner with Structured Outputs and Pydantic
+```py
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+from agents.deals import ScrapedDeal, DealSelection
+import logging
+import requests
+load_dotenv(override=True)
+openai = OpenAI()
+MODEL = 'gpt-5-mini'
+deals = ScrapedDeal.fetch(show_progress=True)
+SYSTEM_PROMPT = """You identify and summarize the 5 most detailed deals from a list, by selecting deals that have the most detailed, high quality description and the most clear price.
+Respond strictly in JSON with no explanation, using this format. You should provide the price as a number derived from the description. If the price of a deal isn't clear, do not include that deal in your response.
+Most important is that you respond with the 5 deals that have the most detailed product description with price. It's not important to mention the terms of the deal; most important is a thorough description of the product.
+Be careful with products that are described as "$XXX off" or "reduced by $XXX" - this isn't the actual price of the product. Only respond with products when you are highly confident about the price. 
+"""
+USER_PROMPT_PREFIX = """Respond with the most promising 5 deals from this list, selecting those which have the most detailed, high quality product description and a clear price that is greater than 0.
+You should rephrase the description to be a summary of the product itself, not the terms of the deal.
+Remember to respond with a short paragraph of text in the product_description field for each of the 5 items that you select.
+Be careful with products that are described as "$XXX off" or "reduced by $XXX" - this isn't the actual price of the product. Only respond with products when you are highly confident about the price. 
+Deals:
+"""
+USER_PROMPT_SUFFIX = "\n\nInclude exactly 5 deals, no more."
+# this makes a suitable user prompt given scraped deals
+def make_user_prompt(scraped):
+    user_prompt = USER_PROMPT_PREFIX
+    user_prompt += '\n\n'.join([scrape.describe() for scrape in scraped])
+    user_prompt += USER_PROMPT_SUFFIX
+    return user_prompt
+# Let's create a user prompt for the deals we just scraped, and look at how it begins
+user_prompt = make_user_prompt(deals)
+print(user_prompt[:2000])
+messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_prompt}]
+response = openai.chat.completions.parse(model=MODEL, messages=messages, response_format=DealSelection, reasoning_effort="minimal")
+results = response.choices[0].message.parsed
+results
+for deal in results.deals:
+    print(deal.product_description)
+    print(deal.price)
+    print(deal.url)
+    print()
+root = logging.getLogger()
+root.setLevel(logging.INFO)
+from agents.scanner_agent import ScannerAgent
+agent = ScannerAgent()
+result = agent.scan()
+```
+- week8/agents/deals.py
+```py
+class Deal(BaseModel):
+    """
+    A class to Represent a Deal with a summary description
+    """
+    product_description: str = Field(
+        description="Your clearly expressed summary of the product in 3-4 sentences. Details of the item are much more important than why it's a good deal. Avoid mentioning discounts and coupons; focus on the item itself. There should be a short paragraph of text for each item you choose."
+    )
+    price: float = Field(
+        description="The actual price of this product, as advertised in the deal. Be sure to give the actual price; for example, if a deal is described as $100 off the usual $300 price, you should respond with $200"
+    )
+    url: str = Field(description="The URL of the deal, as provided in the input")
+class DealSelection(BaseModel):
+    """
+    A class to Represent a list of Deals
+    """
+    deals: List[Deal] = Field(
+        description="Your selection of the 5 deals that have the most detailed, high quality description and the most clear price. You should be confident that the price reflects the deal, that it is a good deal, with a clear description"
+    )
+```
+  - They are all pydantic classes
+
+### 200. Day 3 - Structured Outputs for Parsing & Building a Pushover Notification Agent
+- pushover.net
+
+### 201. Day 4 - Building Agentic AI: Planning Agents with Tool Orchestration
+- The hallmarks of an agentic AI solution
+  - Breaking a larger problem into smaller steps carried out by individual processes/models
+  - Using tools/function calling/structured outputs
+  - An agent environment in which agents can collaborate
+  - A planning agent that coordinates activities
+  - Autonomy & memory - existing beyond a chat with a human
+
+### 202. Day 4 - Building an Autonomous Planner Agent with Tool Calling and GPT-4
+
+### 203. Day 4 - Building an Autonomous Multi-Agent System with Tool Calling and Agent Lo
+
+### 204. Day 4 - Building a Multi-Model AI Platform: 34 Calls Across GPT-5, Claude & Open
+
+### 205. Day 5 - Finalizing Your Agentic Workflow and Becoming an AI Engineer
+
+### 206. Day 5 - Building the Price-Is-Right Agent UI with Gradio and DealAgentFramework
+- week8/price_is_right.py
+
+### 207. Day 5 - Course Wrap-Up: Your Journey to AI Engineer
 
