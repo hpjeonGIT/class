@@ -1113,7 +1113,7 @@ torchmetric_accuracy(y_preds, y_test)
 ### 99. PyTorch Classification: Exercises and Extra-Curriculum
 - https://www.learnpytorch.io/02_pytorch_classification/#exercises
 
-## Section 4: PyTorch Computer Vision
+## Section 5: PyTorch Computer Vision
 
 ### 100. What Is a Computer Vision Problem and What We Are Going to Cover
 - What we're going to cover
@@ -1125,65 +1125,696 @@ torchmetric_accuracy(y_preds, y_test)
     - Picking a loss and optimizer
     - Training a PyTorch computer vision model
     - Evaluating model
-    
-### 101. Computer Vision Input and Output Shapes
 
+### 101. Computer Vision Input and Output Shapes
+- 24-bit RGB images
+- Input and output shapes
+  - [batch_size, height, width, color channels] (NHWC), coloar channels last
+    - In many image types
+  - [batch_size, color channels, height, width] (NCHW), coloar channels first
+    - In PyTorch. Flatten() will assume that the first column is the batch size
+  
 ### 102. What Is a Convolutional Neural Network (CNN)
+- Good at recognizing patterns in image
 
 ### 103. Discussing and Importing the Base Computer Vision Libraries in PyTorch
+- https://github.com/mrdbourke/pytorch-deep-learning/blob/main/video_notebooks/03_pytorch_computer_vision_video.ipynb
+- Computer vision libraries in PyTorch
+  - torchvision: base domain library
+  - torchvision.datasets: get datasets and data loging functions
+  - torchvision.models: get pretrained computer vision models
+  - torchvision.transforms: functions for manipulating vision data to be suitable for use with ML models
+  - torch.utils.data.Dataset: Base dataset class
+  - torch.utils.data.DataLoader: Creates a Python iterable over a dataset
+```py
+import torch
+from torch import nn
+import torchvision
+from torchvision import datasets
+from torchvision import transforms
+from torchvision.transforms import ToTensor
+import matplotlib.pyplot as plt
+print(torch.__version__)
+print(torchvision.__version__)
+```
 
 ### 104. Getting a Computer Vision Dataset and Checking Out Its- Input and Output Shapes
+```py
+# FashionMNIST: greyscale images of clothing
+# Available from github and also from torchvision dataset
+from torchvision import datasets
+train_data = datasets.FashionMNIST(
+  root = "data", # path
+  train = True,  # including training data
+  download=True,
+  transform=torchvision.transforms.ToTensor(),
+  target_transform=None # labels/target transforms
+)
+test_data = datasets.FashionMNIST(
+  root = "data", # path
+  train = False,  # including training data
+  download=True,
+  transform=torchvision.transforms.ToTensor(),
+  target_transform=None # labels/target transforms
+)
+```
+- Downloading 26MB at data/FashionMNIST
+  - They are index and gz files, not images files
+```py
+class_names = train_data.classes
+print(class_names) # ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+class_to_idx = train_data.class_to_idx
+print(class_to_idx) # {'T-shirt/top': 0, 'Trouser': 1, 'Pullover': 2, 'Dress': 3, 'Coat': 4, 'Sandal': 5, 'Shirt': 6, 'Sneaker': 7, 'Bag': 8, 'Ankle boot': 9}
+image, label = train_data[0]
+print(f"Image shape: {image.shape} -> [color_channels, height, width]") #Image shape: torch.Size([1, 28, 28]) -> [color_channels, height, width]
+```
 
 ### 105. Visualizing Random Samples of Data
+```py
+import matplotlib.pyplot as plt
+image,label=train_data[0]
+print(f"Image shape: {image.shape}")
+plt.imshow(image.squeeze(),cmap="gray")
+```
+![ch105](./ch105.png)
 
 ### 106. DataLoader Overview Understanding Mini-Batches
+- Why DataLoader?
+  - Turning data into batches in the size of 32 images
+  - More opportunities for the model to update gradients
+  - Computationally efficient regarding loading images into memory
 
 ### 107. Turning Our Datasets Into DataLoaders
+```py
+from torch.utils.data import DataLoader
+BATCH_SIZE = 32
+train_dataloader = DataLoader(dataset=train_data,
+                              batch_size=BATCH_SIZE,
+                              shuffle=True)
+test_dataloader = DataLoader(dataset=test_data,
+                              batch_size=BATCH_SIZE,
+                              shuffle=False)
+train_features_batch, train_labels_batch = next(iter(train_dataloader))
+print(train_features_batch.shape, train_labels_batch.shape) # torch.Size([32, 1, 28, 28]) torch.Size([32])
+```
 
 ### 108. Model 0: Creating a Baseline Model with Two Linear Layers
+- How Flatten() works:
+```py
+flatten_model = nn.Flatten()
+x = train_features_batch[0]
+x.shape # torch.Size([1, 28, 28])
+# flatten the sample
+output = flatten_model(x)
+print(f"Shape before flattening: {x.shape}") # torch.Size([1, 28, 28])
+print(f"Shape after flattening: {output.shape}") # torch.Size([1, 784])
+```
+  - Assumes that the first column of the tensor is the batch size
+```py
+from torch import nn
+class FashionMNISTModelV0(nn.Module):
+  def __init__(self,
+               input_shape: int,
+               hidden_units: int,
+               output_shape: int):
+    super().__init__()
+    self.layer_stack = nn.Sequential(
+      nn.Flatten(),
+      nn.Linear(in_features=input_shape,
+                out_features=hidden_units),
+      nn.Linear(in_features=hidden_units,
+                out_features=output_shape)      
+    )
+  def forward(self,x):
+    return self.layer_stack(x)
+model_0 = FashionMNISTModelV0(
+  input_shape=784,
+  hidden_units=10,
+  output_shape=len(class_names)
+  ).to("cpu")
+```
 
 ### 109. Creating a Loss Function: an Optimizer for Model 0
+```py
+# from https://github.com/mrdbourke/pytorch-deep-learning/blob/main/helper_functions.py
+def accuracy_fn(y_true, y_pred):
+    correct = torch.eq(y_true, y_pred).sum().item()
+    acc = (correct / len(y_pred)) * 100
+    return acc
+# Loss and optimizer
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(params=model_0.parameters(),lr=0.1)
+```
 
 ### 110. Creating a Function to Time Our Modelling Code
+- What we want to track:
+  1. Model's performance (loss and accuracy values etc)
+  2. How fast it runs
+```py
+from timeit import default_timer as timer
+def print_train_time(start: float,end: float,
+                     device: torch.device =None):
+  total_time = end - start
+  print(f"Train time on {device}: {total_time:.3f} seconds")
+  return total_time
+```
 
 ### 111. Writing Training and Testing Loops for Our Batched Data
+- How tqdm package works:
+```bash
+>>> from tqdm.auto import tqdm
+>>> for i in range(3):
+...   print(i)
+... 
+0
+1
+2
+>>> for i in tqdm(range(3)):
+...   print(i)
+... 
+  0%|                                                               | 0/3 [00:00<?, ?it/s]0
+1
+2
+100%|████████████████████████████████████████████████████| 3/3 [00:00<00:00, 38245.93it/s]
+```
+```py
+from tqdm.auto import tqdm
+torch.manual_seed(123)
+train_time_start_on_cpu = timer()
+epochs=3
+for epoch in tqdm(range(epochs)):
+  print(f"Epoch: {epoch}\n-----")
+  train_loss = 0
+  for batch, (X, y) in enumerate(train_dataloader):
+    model_0.train()
+    y_pred = model_0(X)
+    loss = loss_fn(y_pred,y)
+    train_loss += loss 
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    if batch % 400 == 0:
+      print(f"Looked at {batch * len(X)}/{len(train_dataloader)} samples.")
+  # Divide total train loss by length of train dataloader
+  train_loss /= len(train_dataloader)
+  test_loss, test_acc = 0,0
+  model_0.eval()
+  with torch.inference_mode():
+    for X_test, y_test in test_dataloader:
+      test_pred = model_0(X_test)
+      test_loss += loss_fn(test_pred,y_test)
+      test_acc += accuracy_fn(y_true=y_test, y_pred=test_pred.argmax(dim=1))
+    # avg test_loss
+    test_loss /= len(test_dataloader)      
+    test_acc /= len(test_dataloader)
+  print(f"\nTrain loss: {train_loss:.4f} | Test loss: {test_loss:.4f}, Test acc: {test_acc:.4f}")
+train_time_end_on_cpu = timer()
+total_train_time_mode_0 = print_train_time(start=train_time_start_on_cpu, 
+                                           end=train_time_end_on_cpu, 
+                                           device=str(next(model_0.parameters())))
+```
+- Q: why logits are not applied with activation functions like sigmoid() or softmax()? like BC or multi-class classification
 
 ### 112. Writing an Evaluation Function to Get Our Models Results
+```py
+torch.manual_seed(42)
+def eval_model(model: torch.nn.Module,
+               data_loader:torch.utils.data.dataloader,
+               loss_fn: torch.nn.Module,
+               accuracy_fn):
+  loss,acc = 0,0
+  model.eval()
+  with torch.inference_mode():
+    for X,y in data_loader:
+      X,y = X.to(device), y.to(device)
+      y_pred = model(X)
+      loss += loss_fn(y_pred,y)
+      acc += accuracy_fn(y_true=y,
+                         y_pred=y_pred.argmax(dim=1))
+    loss /= len(data_loader)
+    acc /= len(data_loader)
+  return {"model_name": model.__class__.__name__,
+          "model_loss": loss.item(),
+          "model_acc":acc}
+model_0_results = eval_model(model=model_0,
+                             data_loader=test_dataloader,
+                             loss_fn = loss_fn,
+                             accuracy_fn = accuracy_fn)
+model_0_results #{'model_name': 'FashionMNISTModelV0', 'model_loss': 0.48247453570365906, 'model_acc': 82.82747603833866}
+```
 
 ### 113. Setup Device-Agnostic Code for Running Experiments on the GPU
 
 ### 114. Model 1: Creating a Model with Non-Linear Functions
+```py
+class FashionMNISTModelV1(nn.Module):
+  def __init__(self, 
+               input_shape: int,
+               hidden_units: int,
+               output_shape: int):
+    super().__init__()
+    self.layer_stack = nn.Sequential(
+      nn.Flatten(),
+      nn.Linear(in_features=input_shape,out_features=hidden_units),
+      nn.ReLU(),
+      nn.Linear(in_features=hidden_units,out_features=output_shape),
+      nn.ReLU()
+    )
+  def forward(self,x:torch.Tensor):
+    return self.layer_stack(x)
+torch.manual_seed(42)
+model_1 = FashionMNISTModelV1(input_shape=784,
+                              hidden_units=10,
+                              output_shape=len(class_names)).to(device)
+model_1
+```
 
 ### 115. Mode 1: Creating a Loss Function and Optimizer
-### 116. Turing Our Training Loop into a Function
-### 117. Turing Our Testing Loop into a Function
-### 118. Training and Testing Model 1 with Our Training and Testing Functions
-### 119. Getting a Results Dictionary for Model 1
-### 120. Model 2: Convolutional Neural Networks High Level Overview
-### 121. Model 2: Coding Our First Convolutional Neural Network with PyTorch
-### 122. Model 2: Breaking Down Conv2D Step by Step
-### 123. Model 2: Breaking Down MaxPool2D Step by Step
-### 124. Mode 2: Using a Trick to Find the Input and Output Shapes of Each of Our Layers
-### 125. Model 2: Setting Up a Loss Function and Optimizer
-### 126. Model 2: Training Our First CNN and Evaluating Its Results
-### 127. Comparing the Results of Our Modelling Experiments
-### 128. Making Predictions on Random Test Samples with the Best Trained Model
-### 129. Plotting Our Best Model Predictions on Random Test Samples and Evaluating Them
-### 130. Making Predictions and Importing Libraries to Plot a Confusion Matrix
-### 131. Evaluating Our Best Models Predictions with a Confusion Matrix
-### 132. Saving and Loading Our Best Performing Model
-### 133. Recapping What We Have Covered Plus Exercises and Extra-Curriculum
+```py
+# from https://github.com/mrdbourke/pytorch-deep-learning/blob/main/helper_functions.py
+def accuracy_fn(y_true, y_pred):
+    correct = torch.eq(y_true, y_pred).sum().item()
+    acc = (correct / len(y_pred)) * 100
+    return acc
+# Loss and optimizer
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(params=model_1.parameters(),lr=0.1)
+```
 
-    6min
+### 116. Turning Our Training Loop into a Function
+```py
+def train_step(model: torch.nn.Module,
+               data_loader: torch.utils.data.DataLoader,
+               loss_fn: torch.nn.Module,
+               optimizer: torch.optim.Optimizer,
+               accuracy_fn,
+               device: torch.device=device):
+  train_loss, train_acc = 0,0
+  model.train()
+  for batch, (X, y) in enumerate(train_dataloader):
+    #batch = batch.to(device)
+    X = X.to(device)
+    y = y.to(device)
+    y_pred = model(X)
+    loss = loss_fn(y_pred,y)
+    train_loss += loss 
+    train_acc += accuracy_fn(y_true=y,
+                             y_pred=y_pred.argmax(dim=1))
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    if batch % 400 == 0:
+      print(f"Looked at {batch * len(X)}/{len(train_dataloader)} samples.")
+  # Divide total train loss by length of train dataloader
+  train_loss /= len(data_loader)
+  train_acc /= len(data_loader)
+  print(f"\nTrain loss: {train_loss:.5f} | Train acc: {train_acc:.2f} %")
+```
+
+### 117. Turning Our Testing Loop into a Function
+```py
+def test_step(model: torch.nn.Module,
+              data_loader: torch.utils.data.DataLoader,
+              loss_fn: torch.nn.Module,
+              accuracy_fn,
+              device: torch.device = device):
+  test_loss, test_acc = 0,0
+  model.eval()
+  with torch.inference_mode():
+    for X,y in data_loader:
+      X, y = X.to(device), y.to(device)
+      test_pred = model(X)
+      test_loss += loss_fn(test_pred, y)
+      test_acc += accuracy_fn(y_true=y, y_pred=test_pred.argmax(dim=1))
+    test_loss /= len(data_loader)
+    test_acc /= len(data_loader)
+    print(f"Test loss: {test_loss:.5f} | Test acc: {test_acc: .2f}%\n")
+```
+
+### 118. Training and Testing Model 1 with Our Training and Testing Functions
+```py
+torch.manual_seed(42)
+from timeit import default_timer as Timer
+stime = timer()
+epochs=3
+for epoch in tqdm(range(epochs)):
+  print(f"Epoch: {epoch}\n-----")
+  train_step(model=model_1,
+             data_loader = train_dataloader,
+             loss_fn = loss_fn,
+             optimizer=optimizer,
+             accuracy_fn=accuracy_fn,
+             device=device)
+  test_step(model=model_1,
+            data_loader=test_dataloader,
+            loss_fn=loss_fn,
+            accuracy_fn=accuracy_fn,
+            device=device)
+etime = timer()
+ttime = print_train_time(start=stime, end=etime,device=device)
+```
+- Results
+```bash
+Train loss: 0.67027 | Train acc: 75.94 %
+Test loss: 0.68500 | Test acc:  75.02%
+
+Train time on cuda: 18.314 seconds
+```
+
+### 119. Getting a Results Dictionary for Model 1
+```py
+model_1_results = eval_model(model=model_1, 
+                             data_loader = test_dataloader,
+                             loss_fn = loss_fn,
+                             accuracy_fn = accuracy_fn)
+model_1_results
+```
+
+### 120. Model 2: Convolutional Neural Networks High Level Overview
+- CNNs are well-known for its capability for finding patterns in visual data
+- https://poloclub.github.io/cnn-explainer/
+
+### 121. Model 2: Coding Our First Convolutional Neural Network with PyTorch
+- Max pooling:
+  - Reducing matrix size, show the max only
+  - 2x2->1x1, having max value only
+```py
+class FashionMNISTModelV2(nn.Module):
+  # replicating TinyVGG
+  def __init__(self,input_shape: int, hidden_units: int, output_shape: int):
+    super().__init__()
+    self.conv_block_1 = nn.Sequential(
+      nn.Conv2d(in_channels=input_shape,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1),
+      nn.ReLU(),
+      nn.Conv2d(in_channels=hidden_units,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1),
+      nn.ReLU(),
+      nn.MaxPool2d(kernel_size=2)
+    )
+    self.conv_block_2= nn.Sequential(
+      nn.Conv2d(in_channels=hidden_units,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1),
+      nn.ReLU(),
+      nn.Conv2d(in_channels=hidden_units,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1),
+      nn.ReLU(),
+      nn.MaxPool2d(kernel_size=2)
+    )
+    self.classifier = nn.Sequential(
+      nn.Flatten(),
+      nn.Linear(in_features=hidden_units, # this will be modified
+                out_features=output_shape)
+    )
+  def forward(self,x):
+    x = self.conv_block_1(x)
+    print(x.shape)
+    x = self.conv_block_2(x)
+    print(x.shape)
+    x = self.classifier(x)
+    return x
+torch.manual_seed(42)  
+model_2 = FashionMNISTModelV2(input_shape=1,
+                              hidden_units=10,
+                              output_shape=len(class_names)).to(device)
+```                              
+
+### 122. Model 2: Breaking Down Conv2D Step by Step
+```py
+# Stepping through nn.Conv2d()
+torch.manual_seed(32)
+images = torch.randn(size=(32,3,64,64))
+test_image = images[0]
+print(f"Image batch shape: {images.shape}")
+print(f"Single Image shape: {test_image.shape}")
+print(f"Test image: {test_image}")
+$
+conv_layer = nn.Conv2d(in_channels=3, # same as color channels
+                       out_channels=10, # n. of hidden units
+                       kernel_size=3, # this is equiv. to (3,3)
+                       stride=1, # convolving unit. >1 will reduce output size
+                       padding=1)
+conv_output = conv_layer(test_image.unsqueeze(0))
+conv_output.shape
+```
+- Test with different kernel_size, stride, padding and compare with the original size (3x64x64)
+
+### 123. Model 2: Breaking Down MaxPool2D Step by Step
+- Max Pooling: compressing image, extract features (max)
+```py
+max_pool_layer = nn.MaxPool2d(kernel_size=2)
+test_image_through_conv = conv_layer(test_image.unsqueeze(dim=0))
+print(f"Shape after conv_layer(): {test_image_through_conv.shape}") # Shape after conv_layer(): torch.Size([1, 64, 64, 64])
+test_image_through_conv_and_max_pool = max_pool_layer(test_image_through_conv)
+print(f"Shape after conv_layer() + maxpool(): {test_image_through_conv_and_max_pool.shape}") # Shape after conv_layer() + maxpool(): torch.Size([1, 64, 32, 32])
+```
+
+### 124. Mode 2: Using a Trick to Find the Input and Output Shapes of Each of Our Layers
+```py
+rand_image_tensor = torch.randn(size=(1,28,28))
+model_2(rand_image_tensor.unsqueeze(dim=0).to(device)) # prints torch.Size([1, 10, 14, 14]) \n torch.Size([1, 10, 7, 7])
+# yields: tensor([[ 3.7837,  1.0016, -3.3556,  1.5177,  1.8279, -0.8227,  2.9397, -4.5336,          0.7461, -1.0835]], device='cuda:0', grad_fn=<AddmmBackward0>)
+# Q: How probability can be negative?
+# A: As they are logit. not probability
+#  : CNN keeps looping using logits, not probability. Loss/ACC are from logits
+#  : Actual probability needs softmax()
+class FashionMNISTModelV2(nn.Module):
+  # replicating TinyVGG
+  def __init__(self,input_shape: int, hidden_units: int, output_shape: int):
+    super().__init__()
+    self.conv_block_1 = nn.Sequential(
+      nn.Conv2d(in_channels=input_shape,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1),
+      nn.ReLU(),
+      nn.Conv2d(in_channels=hidden_units,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1),
+      nn.ReLU(),
+      nn.MaxPool2d(kernel_size=2)
+    )
+    self.conv_block_2= nn.Sequential(
+      nn.Conv2d(in_channels=hidden_units,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1),
+      nn.ReLU(),
+      nn.Conv2d(in_channels=hidden_units,
+                out_channels=hidden_units,
+                kernel_size=3,
+                stride=1,
+                padding=1),
+      nn.ReLU(),
+      nn.MaxPool2d(kernel_size=2)
+    )
+    self.classifier = nn.Sequential(
+      nn.Flatten(),
+      nn.Linear(in_features=hidden_units*7*7, # 1x490 
+                out_features=output_shape)
+    )
+  def forward(self,x):
+    x = self.conv_block_1(x) 
+    print(x.shape) # torch.Size([1, 10, 14, 14])
+    x = self.conv_block_2(x)
+    print(x.shape) # torch.Size([1, 10, 7, 7])
+    x = self.classifier(x)
+    return x
+torch.manual_seed(42)  
+model_2 = FashionMNISTModelV2(input_shape=1,
+                              hidden_units=10,
+                              output_shape=len(class_names)).to(device)
+``` 
+
+### 125. Model 2: Setting Up a Loss Function and Optimizer
+```py
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(params=model_2.parameters(), lr=0.1)
+```
+
+### 126. Model 2: Training Our First CNN and Evaluating Its Results
+```py
+torch.manual_seed(42)
+#torch.cuda.manual_seed(42)
+from timeit import default_timer as timer
+stime = timer()
+epochs = 3
+for epoch in tqdm(range(epochs)):
+  print(f"Epoch: {epoch}\n-----")
+  train_step(model=model_2,data_loader=train_dataloader,
+             loss_fn=loss_fn, optimizer=optimizer,
+             accuracy_fn=accuracy_fn, device=device)
+  test_step(model=model_2, data_loader=test_dataloader,
+            loss_fn=loss_fn,accuracy_fn=accuracy_fn,
+            device=device)
+etime = timer()
+total_train_time_model_2 = print_train_time(start=stime, end=etime,device=device)
+```
+- Results:
+```bash
+Train loss: 0.32552 | Train acc: 88.24 %
+Test loss: 0.32816 | Test acc:  88.16%
+
+Train time on cuda: 24.181 seconds
+```
+
+### 127. Comparing the Results of Our Modelling Experiments
+
+|	|model_name |	model_loss	| model_acc |
+|--|----------|---------|-----------------|
+| 0	| FashionMNISTModelV0 |	0.502336 |	82.657748 |
+| 1	| FashionMNISTModelV1	| 0.685001 |	75.019968 |
+| 2	| FashionMNISTModelV2	| 0.328158 |	88.158946 |
+
+### 128. Making Predictions on Random Test Samples with the Best Trained Model
+```py
+def make_predictions(model: torch.nn.Module,
+                     data: list,
+                     device: torch.device=device):
+  pred_probs = []
+  model.to(device)
+  model.eval()
+  with torch.inference_mode():
+    for sample in data:
+      sample = torch.unsqueeze(sample, dim=0).to(device)
+      pred_logit = model(sample)
+      pred_prob = torch.softmax(pred_logit.squeeze(),dim=0)
+      pred_probs.append(pred_prob.cpu())
+  return torch.stack(pred_probs)
+#
+# randomly select and predict
+import random
+random.seed(42)
+test_samples = []
+test_labels = []
+for sample, label in random.sample(list(test_data), k=9):
+  test_samples.append(sample)
+  test_labels.append(label)
+test_samples[0].shape
+plt.imshow(test_samples[0].squeeze())
+#
+pred_probs = make_predictions(model=model_2, data=test_samples)
+pred_probs[:2]
+pred_classes = pred_probs.argmax(dim=1)
+print(pred_classes, test_labels)
+```
+
+### 129. Plotting Our Best Model Predictions on Random Test Samples and Evaluating Them
+```py
+plt.figure(figsize=(9,9))
+nrows=3
+ncols=3
+for i, sample in enumerate(test_samples):
+  plt.subplot(nrows, ncols, i+1)
+  plt.imshow(sample.squeeze(), cmap="gray")
+  pred_label = class_names[pred_classes[i]]
+  truth_label = class_names[test_labels[i]]
+  title_text= f"Pred: {pred_label} | Truth: {truth_label}"
+  if pred_label == truth_label:
+    plt.title(title_text, fontsize=10,c="g")
+  else:
+    plt.title(title_text, fontsize=10, c="r")
+```
+![ch129](./ch129.png)
+
+### 130. Making Predictions and Importing Libraries to Plot a Confusion Matrix
+```py
+from tqdm.auto import tqdm
+y_preds = []
+model_2.eval()
+with torch.inference_mode():
+  for X,y in tqdm(test_dataloader,desc="Making predictions..."):
+    X, y = X.to(device), y.to(device)
+    y_logit = model_2(X)
+    y_pred= torch.softmax(y_logit.squeeze(),dim=0).argmax(dim=1)
+    y_preds.append(y_pred.cpu())
+print(y_preds)
+y_pred_tensor = torch.cat(y_preds)
+y_pred_tensor[:10]
+```
+- pip3 install mlxtend
+
+
+### 131. Evaluating Our Best Models Predictions with a Confusion Matrix
+- `from mlxtend.plotting import plot_confusion_matrix` fails
+
+### 132. Saving and Loading Our Best Performing Model
+```py
+from pathlib import Path
+MODEL_PATH = Path("models")
+MODEL_PATH.mkdir(parents=True,
+                 exist_ok=True)
+MODEL_NAME = "05_pytorch_CV_model_2.pth"
+MODEL_SAVE_PATH = MODEL_PATH/MODEL_NAME
+print(f"Saving model to {MODEL_SAVE_PATH}")
+torch.save(obj=model_2.state_dict(),f=MODEL_SAVE_PATH)
+#
+# Create a new instance
+loaded_model_2 = FashionMNISTModelV2(input_shape=1,
+                                     hidden_units=10,
+                                     output_shape=len(class_names))
+# load in the save state_dict()
+loaded_model_2.load_state_dict(torch.load(f=MODEL_SAVE_PATH))
+loaded_model_2.to(device)
+loaded_model_2_results = eval_model(
+  model=loaded_model_2,
+  data_loader=test_dataloader,
+  loss_fn = loss_fn,
+  accuracy_fn=accuracy_fn
+)
+```
+
+### 133. Recapping What We Have Covered Plus Exercises and Extra-Curriculum
+- https://www.learnpytorch.io/03_pytorch_computer_vision/#exercises
+
+## Section 6: PyTorch Custom Datasets
+
 ### 134. What Is a Custom Dataset and What We Are Going to Cover
+- Custom dataset
+  - Need preprocessing with PyTorch library
+- PyTorch domain libraries
+  - TorchVision
+  - TorchText
+  - TorchAudio 
+  - TorchRec: Recommendation system
+  - TorchData
+- Demo project: FoodVisionMini
+  - Load image files (not from torchvision.datasets)
+  - Build a model
+  - Predict
+
 ### 135. Importing PyTorch and Setting Up Device Agnostic Code
+
 ### 136. Downloading a Custom Dataset of Pizza, Steak and Sushi Images
+
 ### 137. Becoming One With the Data (Part 1): Exploring the Data Format
+
 ### 138. Becoming One With the Data (Part 2): Visualizing a Random Image
+
 ### 139. Becoming One With the Data (Part 3): Visualizing a Random Image with Matplotlib
+
 ### 140. Transforming Data (Part 1): Turning Images Into Tensors
+
 ### 141. Transforming Data (Part 2): Visualizing Transformed Images
+
 ### 142. Loading All of Our Images and Turning Them Into Tensors With ImageFolder
+
 ### 143. Visualizing a Loaded Image From the Train Dataset
 ### 144. Turning Our Image Datasets into PyTorch Dataloaders
 ### 145. Creating a Custom Dataset Class in PyTorch High Level Overview
