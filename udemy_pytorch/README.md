@@ -2552,130 +2552,1769 @@ def pred_and_plot_image(model, image_path, class_names, transform=None, device=d
 ## Section 7: PyTorch Going Modular
 
 ### 171. What Is Going Modular and What We Are Going to Cover
-
+- What is going modular?
+  - Code re-use
+- Command: python train.py -model tinyvgg -batch_size 32 -lr 0.001 -num_epochs 10
+- Sample workflow
+  - Jupyter/colab
+  - Migrate codes to Python scripts
+- Cell mode vs Script mode
+  - Jupyter command `%%write going_modular/model_builder.py` writes the content of the cell into the file
+  - going_module folder must exist beforehand
 
 ### 172. Going Modular Notebook (Part 1): Running It End to End
+- Export cells in the notebook into separate python files
+
 ### 173. Downloading a Dataset
+
 ### 174. Writing the Outline for Our First Python Script to Setup the Data
+
 ### 175. Creating a Python Script to Create Our PyTorch DataLoaders
+
 ### 176. Turning Our Model Building Code into a Python Script
+
 ### 177. Turning Our Model Training Code into a Python Script
+
 ### 178. Turning Our Utility Function to Save a Model into a Python Script
+
 ### 179. Creating a Training Script to Train Our Model in One Line of Code
+
 ### 180. Going Modular: Summary, Exercises and Extra-Curriculum
 
-    6min
+## Section 8: PyTorch Transfer Learning
+
 ### 181. Introduction: What is Transfer Learning and Why Use It
+- Why use transfer learning?
+  - Can leverage an existing neural network architecture proven to work on problems similar to our own
+  - Can leverage a working network architecture which has already learned patterns on similar data to our own 
+
 ### 182. Where Can You Find Pretrained Models and What We Are Going to Cover
+- PyTorch domain libraries
+  - https://docs.pytorch.org/vision/stable/models.html
+- Torch Image Models
+  - https://github.com/rwightman/timm  
+- Paperswithcode SOTA
+  - https://paperswithcode.com/sota
+
 ### 183. Installing the Latest Versions of Torch and Torchvision
+
 ### 184. Downloading Our Previously Written Code from Going Modular
+```py
+# Continue with regular imports
+import matplotlib.pyplot as plt
+import torch
+import torchvision
+
+from torch import nn
+from torchvision import transforms
+
+# Try to get torchinfo, install it if it doesn't work
+try:
+    from torchinfo import summary
+except:
+    print("[INFO] Couldn't find torchinfo... installing it.")
+    !pip install -q torchinfo
+    from torchinfo import summary
+
+# Try to import the going_modular directory, download it from GitHub if it doesn't work
+try:
+    from going_modular.going_modular import data_setup, engine
+except:
+    # Get the going_modular scripts
+    print("[INFO] Couldn't find going_modular scripts... downloading them from GitHub.")
+    !git clone https://github.com/mrdbourke/pytorch-deep-learning
+    !mv pytorch-deep-learning/going_modular .
+    !rm -rf pytorch-deep-learning
+    from going_modular.going_modular import data_setup, engine
+```
+
 ### 185. Downloading Pizza, Steak, Sushi Image Data from Github
+```py
+from pathlib import Path
+data_path = Path("data/")
+image_path = data_path/"pizza_steak_sushi"
+train_dir = image_path / "train"
+test_dir= image_path / "test"
+train_dir
+```
+
 ### 186. Turning Our Data into DataLoaders with Manually Created Transforms
+- https://docs.pytorch.org/vision/0.9/models.html
+  - `All pre-trained models expect input images normalized in the same way`
+  - `mean = [0.485, 0.456, 0.406] and std = [0.229, 0.224, 0.225]`
+```py
+from torchvision import transforms
+normalize = transforms.Normalize(mean=[0.485,0.456,0.406],
+                                 std=[0.229,0.224,0.225])
+manual_transforms = transforms.Compose([
+  transforms.Resize((224,224)),
+  transforms.ToTensor(),
+  normalize])
+from going_modular.going_modular import data_setup
+train_dataloader, test_dataloader, class_names = \
+data_setup.create_dataloaders(train_dir=train_dir, \
+                              test_dir=test_dir, \
+                              transform=manual_transforms, # resize, convert images to between 0 & 1 and normalize them 
+                              batch_size=32) # set mini-batch size to 32   
+```
+
 ### 187. Turning Our Data into DataLoaders with Automatic Created Transforms
+- For model transfer, data you pass through must be transformed in the same way that the data the model was trained on
+  - From the model weights, the corresponding ransforms can be extracted:
+```py
+import torchvision
+torchvision.__version__
+weights = torchvision.models.EfficientNet_B0_Weights.DEFAULT
+print(weights) # EfficientNet_B0_Weights.IMAGENET1K_V1
+auto_transforms = weights.transforms()
+auto_transforms # ImageClassification(    crop_size=[224]    resize_size=[256]    mean=[0.485, 0.456, 0.406]    std=[0.229, 0.224, 0.225]    interpolation=InterpolationMode.BICUBIC)
+train_dataloader,test_dataloader,class_names = data_setup.create_dataloaders(train_dir=train_dir,
+                                                                             test_dir=test_dir,
+                                                                             transform=auto_transforms,
+                                                                             batch_size=32)
+```
+
 ### 188. Which Pretrained Model Should You Use
+- The whole idea of transfer learning: taking an already well-peforming model from a problem space similar to your own and then customize to your own problem
+- Three things to consider:
+  1. Speed
+  2. Size
+  3. Performance
+- https://docs.pytorch.org/vision/main/models.html#table-of-all-available-classification-weights
+
 ### 189. Setting Up a Pretrained Model with Torchvision
+- Using EffNetB0
+   - This is for 1000 classes
+   - How to modify it for 3 classes problem?
+```py
+weights = torchvision.models.EfficientNet_B0_Weights.DEFAULT
+# will download model - online is necessary
+model = torchvision.models.efficientnet_b0(pretrained=True)
+```
+
 ### 190. Different Kinds of Transfer Learning
+```py
+>>> print(model.avgpool)
+AdaptiveAvgPool2d(output_size=1)
+>>> print(model.classifier)
+Sequential(
+  (0): Dropout(p=0.2, inplace=True)
+  (1): Linear(in_features=1280, out_features=1000, bias=True)
+)
+```
+- We customize input/output only, freezing the baseline
+- Fine-tuning may need to update some layers of the baseline
+
 ### 191. Getting a Summary of the Different Layers of Our Model
+- Kinds of transfer learning
+  - Original model (as is)
+  - Feature extraction
+  - Fine tuning
+```py
+from torchinfo import summary
+summary(model=model, input_size=(1,3,224,224),
+        col_names=["input_size", "output_size", "num_params", "trainable"],
+        col_width=20,
+        row_settings=["var_names"])
+============================================================================================================================================
+Layer (type (var_name))                                      Input Shape          Output Shape         Param #              Trainable
+============================================================================================================================================
+EfficientNet (EfficientNet)                                  [1, 3, 224, 224]     [1, 1000]            --                   True
+├─Sequential (features)                                      [1, 3, 224, 224]     [1, 1280, 7, 7]      --                   True
+│    └─Conv2dNormActivation (0)                              [1, 3, 224, 224]     [1, 32, 112, 112]    --                   True
+│    │    └─Conv2d (0)                                       [1, 3, 224, 224]     [1, 32, 112, 112]    864                  True
+│    │    └─BatchNorm2d (1)                                  [1, 32, 112, 112]    [1, 32, 112, 112]    64                   True
+│    │    └─SiLU (2)                                         [1, 32, 112, 112]    [1, 32, 112, 112]    --                   --
+│    └─Sequential (1)                                        [1, 32, 112, 112]    [1, 16, 112, 112]    --                   True
+│    │    └─MBConv (0)                                       [1, 32, 112, 112]    [1, 16, 112, 112]    1,448                True
+│    └─Sequential (2)                                        [1, 16, 112, 112]    [1, 24, 56, 56]      --                   True
+│    │    └─MBConv (0)                                       [1, 16, 112, 112]    [1, 24, 56, 56]      6,004                True
+│    │    └─MBConv (1)                                       [1, 24, 56, 56]      [1, 24, 56, 56]      10,710               True
+│    └─Sequential (3)                                        [1, 24, 56, 56]      [1, 40, 28, 28]      --                   True
+│    │    └─MBConv (0)                                       [1, 24, 56, 56]      [1, 40, 28, 28]      15,350               True
+│    │    └─MBConv (1)                                       [1, 40, 28, 28]      [1, 40, 28, 28]      31,290               True
+│    └─Sequential (4)                                        [1, 40, 28, 28]      [1, 80, 14, 14]      --                   True
+│    │    └─MBConv (0)                                       [1, 40, 28, 28]      [1, 80, 14, 14]      37,130               True
+│    │    └─MBConv (1)                                       [1, 80, 14, 14]      [1, 80, 14, 14]      102,900              True
+│    │    └─MBConv (2)                                       [1, 80, 14, 14]      [1, 80, 14, 14]      102,900              True
+│    └─Sequential (5)                                        [1, 80, 14, 14]      [1, 112, 14, 14]     --                   True
+│    │    └─MBConv (0)                                       [1, 80, 14, 14]      [1, 112, 14, 14]     126,004              True
+│    │    └─MBConv (1)                                       [1, 112, 14, 14]     [1, 112, 14, 14]     208,572              True
+│    │    └─MBConv (2)                                       [1, 112, 14, 14]     [1, 112, 14, 14]     208,572              True
+│    └─Sequential (6)                                        [1, 112, 14, 14]     [1, 192, 7, 7]       --                   True
+│    │    └─MBConv (0)                                       [1, 112, 14, 14]     [1, 192, 7, 7]       262,492              True
+│    │    └─MBConv (1)                                       [1, 192, 7, 7]       [1, 192, 7, 7]       587,952              True
+│    │    └─MBConv (2)                                       [1, 192, 7, 7]       [1, 192, 7, 7]       587,952              True
+│    │    └─MBConv (3)                                       [1, 192, 7, 7]       [1, 192, 7, 7]       587,952              True
+│    └─Sequential (7)                                        [1, 192, 7, 7]       [1, 320, 7, 7]       --                   True
+│    │    └─MBConv (0)                                       [1, 192, 7, 7]       [1, 320, 7, 7]       717,232              True
+│    └─Conv2dNormActivation (8)                              [1, 320, 7, 7]       [1, 1280, 7, 7]      --                   True
+│    │    └─Conv2d (0)                                       [1, 320, 7, 7]       [1, 1280, 7, 7]      409,600              True
+│    │    └─BatchNorm2d (1)                                  [1, 1280, 7, 7]      [1, 1280, 7, 7]      2,560                True
+│    │    └─SiLU (2)                                         [1, 1280, 7, 7]      [1, 1280, 7, 7]      --                   --
+├─AdaptiveAvgPool2d (avgpool)                                [1, 1280, 7, 7]      [1, 1280, 1, 1]      --                   --
+├─Sequential (classifier)                                    [1, 1280]            [1, 1000]            --                   True
+│    └─Dropout (0)                                           [1, 1280]            [1, 1280]            --                   --
+│    └─Linear (1)                                            [1, 1280]            [1, 1000]            1,281,000            True
+============================================================================================================================================
+Total params: 5,288,548
+Trainable params: 5,288,548
+Non-trainable params: 0
+Total mult-adds (Units.MEGABYTES): 385.87
+============================================================================================================================================
+Input size (MB): 0.60
+Forward/backward pass size (MB): 107.89
+Params size (MB): 21.15
+Estimated Total Size (MB): 129.64
+============================================================================================================================================
+```
+- All layers are tunable - how to freeze them?
+
 ### 192. Freezing the Base Layers of Our Model and Updating the Classifier Head
+```py
+for param in model.features.parameters():
+  param.requires_grad = False
+summary(model=model, input_size=(1,3,224,224),
+        col_names=["input_size", "output_size", "num_params", "trainable"],
+        col_width=20,
+        row_settings=["var_names"])  
+============================================================================================================================================
+Layer (type (var_name))                                      Input Shape          Output Shape         Param #              Trainable
+============================================================================================================================================
+EfficientNet (EfficientNet)                                  [1, 3, 224, 224]     [1, 1000]            --                   Partial
+├─Sequential (features)                                      [1, 3, 224, 224]     [1, 1280, 7, 7]      --                   False
+│    └─Conv2dNormActivation (0)                              [1, 3, 224, 224]     [1, 32, 112, 112]    --                   False
+│    │    └─Conv2d (0)                                       [1, 3, 224, 224]     [1, 32, 112, 112]    (864)                False
+│    │    └─BatchNorm2d (1)                                  [1, 32, 112, 112]    [1, 32, 112, 112]    (64)                 False
+│    │    └─SiLU (2)                                         [1, 32, 112, 112]    [1, 32, 112, 112]    --                   --
+│    └─Sequential (1)                                        [1, 32, 112, 112]    [1, 16, 112, 112]    --                   False
+│    │    └─MBConv (0)                                       [1, 32, 112, 112]    [1, 16, 112, 112]    (1,448)              False
+│    └─Sequential (2)                                        [1, 16, 112, 112]    [1, 24, 56, 56]      --                   False
+│    │    └─MBConv (0)                                       [1, 16, 112, 112]    [1, 24, 56, 56]      (6,004)              False
+│    │    └─MBConv (1)                                       [1, 24, 56, 56]      [1, 24, 56, 56]      (10,710)             False
+│    └─Sequential (3)                                        [1, 24, 56, 56]      [1, 40, 28, 28]      --                   False
+│    │    └─MBConv (0)                                       [1, 24, 56, 56]      [1, 40, 28, 28]      (15,350)             False
+│    │    └─MBConv (1)                                       [1, 40, 28, 28]      [1, 40, 28, 28]      (31,290)             False
+│    └─Sequential (4)                                        [1, 40, 28, 28]      [1, 80, 14, 14]      --                   False
+│    │    └─MBConv (0)                                       [1, 40, 28, 28]      [1, 80, 14, 14]      (37,130)             False
+│    │    └─MBConv (1)                                       [1, 80, 14, 14]      [1, 80, 14, 14]      (102,900)            False
+│    │    └─MBConv (2)                                       [1, 80, 14, 14]      [1, 80, 14, 14]      (102,900)            False
+│    └─Sequential (5)                                        [1, 80, 14, 14]      [1, 112, 14, 14]     --                   False
+│    │    └─MBConv (0)                                       [1, 80, 14, 14]      [1, 112, 14, 14]     (126,004)            False
+│    │    └─MBConv (1)                                       [1, 112, 14, 14]     [1, 112, 14, 14]     (208,572)            False
+│    │    └─MBConv (2)                                       [1, 112, 14, 14]     [1, 112, 14, 14]     (208,572)            False
+│    └─Sequential (6)                                        [1, 112, 14, 14]     [1, 192, 7, 7]       --                   False
+│    │    └─MBConv (0)                                       [1, 112, 14, 14]     [1, 192, 7, 7]       (262,492)            False
+│    │    └─MBConv (1)                                       [1, 192, 7, 7]       [1, 192, 7, 7]       (587,952)            False
+│    │    └─MBConv (2)                                       [1, 192, 7, 7]       [1, 192, 7, 7]       (587,952)            False
+│    │    └─MBConv (3)                                       [1, 192, 7, 7]       [1, 192, 7, 7]       (587,952)            False
+│    └─Sequential (7)                                        [1, 192, 7, 7]       [1, 320, 7, 7]       --                   False
+│    │    └─MBConv (0)                                       [1, 192, 7, 7]       [1, 320, 7, 7]       (717,232)            False
+│    └─Conv2dNormActivation (8)                              [1, 320, 7, 7]       [1, 1280, 7, 7]      --                   False
+│    │    └─Conv2d (0)                                       [1, 320, 7, 7]       [1, 1280, 7, 7]      (409,600)            False
+│    │    └─BatchNorm2d (1)                                  [1, 1280, 7, 7]      [1, 1280, 7, 7]      (2,560)              False
+│    │    └─SiLU (2)                                         [1, 1280, 7, 7]      [1, 1280, 7, 7]      --                   --
+├─AdaptiveAvgPool2d (avgpool)                                [1, 1280, 7, 7]      [1, 1280, 1, 1]      --                   --
+├─Sequential (classifier)                                    [1, 1280]            [1, 1000]            --                   True
+│    └─Dropout (0)                                           [1, 1280]            [1, 1280]            --                   --
+│    └─Linear (1)                                            [1, 1280]            [1, 1000]            1,281,000            True
+============================================================================================================================================
+Total params: 5,288,548
+Trainable params: 1,281,000
+Non-trainable params: 4,007,548
+Total mult-adds (Units.MEGABYTES): 385.87
+============================================================================================================================================
+Input size (MB): 0.60
+Forward/backward pass size (MB): 107.89
+Params size (MB): 21.15
+Estimated Total Size (MB): 129.64
+============================================================================================================================================
+```        
+- Now trainable params are reduced from 5.288M to 1.281M
+- Dropout
+  - Drop a node in the connections
+  - One of avoiding over-fitting techniques
+- We replace the classifier
+```py
+from torch import nn
+model.classifier = nn.Sequential(
+  nn.Dropout(p=0.2, inplace=True),
+  nn.Linear(in_features=1280,
+            out_features=len(class_names)))
+#model.classifier
+...
+│    │    └─BatchNorm2d (1)                                  [1, 1280, 7, 7]      [1, 1280, 7, 7]      (2,560)              False
+│    │    └─SiLU (2)                                         [1, 1280, 7, 7]      [1, 1280, 7, 7]      --                   --
+├─AdaptiveAvgPool2d (avgpool)                                [1, 1280, 7, 7]      [1, 1280, 1, 1]      --                   --
+├─Sequential (classifier)                                    [1, 1280]            [1, 3]               --                   True
+│    └─Dropout (0)                                           [1, 1280]            [1, 1280]            --                   --
+│    └─Linear (1)                                            [1, 1280]            [1, 3]               3,843                True
+============================================================================================================================================
+```
+- Now output shape is 1x3
+
 ### 193. Training Our First Transfer Learning Feature Extractor Model
+- As parameters of classifiers are not trainable, we need to re-train them
+```py
+device="cpu"
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+from going_modular.going_modular import engine
+torch.manual_seed(42)
+from timeit import default_timer as timer
+stime = timer()
+results = engine.train(model=model,
+                       train_dataloader=train_dataloader,
+                       test_dataloader=test_dataloader,
+                       optimizer=optimizer,
+                       loss_fn=loss_fn,
+                       epochs=5,
+                       device=device)
+etime = timer()
+print(f"Total training time: {etime - stime: .3f}seconds")
+Epoch: 1 | train_loss: 1.0762 | train_acc: 0.4297 | test_loss: 0.9220 | test_acc: 0.6619
+Epoch: 2 | train_loss: 0.8909 | train_acc: 0.6719 | test_loss: 0.8533 | test_acc: 0.6506
+Epoch: 3 | train_loss: 0.8095 | train_acc: 0.7734 | test_loss: 0.7129 | test_acc: 0.8769
+Epoch: 4 | train_loss: 0.7424 | train_acc: 0.7578 | test_loss: 0.7121 | test_acc: 0.7841
+Epoch: 5 | train_loss: 0.6157 | train_acc: 0.7969 | test_loss: 0.6655 | test_acc: 0.8258
+Total training time:  82.129seconds
+```
+
 ### 194. Plotting the Loss curves of Our Transfer Learning Model
+
 ### 195. Outlining the Steps to Make Predictions on the Test Images
+
 ### 196. Creating a Function Predict On and Plot Images
+```py
+from typing import List, Tuple
+from PIL import Image
+# 1. Take in a trained model, class names, image path, image size, a transform and target device
+def pred_and_plot_image(model: torch.nn.Module,
+                        image_path: str, 
+                        class_names: List[str],
+                        image_size: Tuple[int, int] = (224, 224),
+                        transform: torchvision.transforms = None,
+                        device: torch.device=device):
+    # 2. Open image
+    img = Image.open(image_path)
+    # 3. Create transformation for image (if one doesn't exist)
+    if transform is not None:
+        image_transform = transform
+    else:
+        image_transform = transforms.Compose([
+            transforms.Resize(image_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225]),
+        ])
+    ### Predict on image ### 
+    # 4. Make sure the model is on the target device
+    model.to(device)
+    # 5. Turn on model evaluation mode and inference mode
+    model.eval()
+    with torch.inference_mode():
+      # 6. Transform and add an extra dimension to image (model requires samples in [batch_size, color_channels, height, width])
+      transformed_image = image_transform(img).unsqueeze(dim=0)
+      # 7. Make a prediction on image with an extra dimension and send it to the target device
+      target_image_pred = model(transformed_image.to(device))
+    # 8. Convert logits -> prediction probabilities (using torch.softmax() for multi-class classification)
+    target_image_pred_probs = torch.softmax(target_image_pred, dim=1)
+    # 9. Convert prediction probabilities -> prediction labels
+    target_image_pred_label = torch.argmax(target_image_pred_probs, dim=1)
+    # 10. Plot image with predicted label and probability 
+    plt.figure()
+    plt.imshow(img)
+    plt.title(f"Pred: {class_names[target_image_pred_label]} | Prob: {target_image_pred_probs.max():.3f}")
+    plt.axis(False);
+```
+
 ### 197. Making and Plotting Predictions on Test Images
+```py
+import random
+num_images_to_plot = 3
+test_image_path_list = list(Path(test_dir).glob("*/*.jpg"))
+test_image_path_sample = random.sample(population=test_image_path_list,
+                                       k=num_images_to_plot)
+for image_path in test_image_path_sample:
+  pred_and_plot_image(model=model,
+                      image_path=image_path,
+                      class_names=class_names,
+                      image_size=(214,214)
+                      )
+```
+
 ### 198. Making a Prediction on a Custom Image
+```py
+custom_image_path = data_path / '../pizza.jpg'
+pred_and_plot_image(model=model,
+                    image_path=custom_image_path,
+                    class_names=class_names)
+```
+
 ### 199. Main Takeaways, Exercises and Extra- Curriculum
+- Transfer learning often allows you to get good results with a relatively small amount of custom data
+- Ask at the start of every problem, "does an existing well-performing model exist for my problem?"
 
-    3min
+## Section 9: PyTorch Experiment Tracking
+
 ### 200. What Is Experiment Tracking and Why Track Experiments
-### 201. Getting Setup by Importing Torch Libraries and Going Modular Code
-### 202. Creating a Function to Download Data
-### 203. Turning Our Data into DataLoaders Using Manual Transforms
-### 204. Turning Our Data into DataLoaders Using Automatic Transforms
-### 205. Preparing a Pretrained Model for Our Own Problem
-### 206. Setting Up a Way to Track a Single Model Experiment with TensorBoard
-### 207. Training a Single Model and Saving the Results to TensorBoard
-### 208. Exploring Our Single Models Results with TensorBoard
-### 209. Creating a Function to Create SummaryWriter Instances
-### 210. Adapting Our Train Function to Be Able to Track Multiple Experiments
-### 211. What Experiments Should You Try
-### 212. Discussing the Experiments We Are Going to Try
-### 213. Downloading Datasets for Our Modelling Experiments
-### 214. Turning Our Datasets into DataLoaders Ready for Experimentation
-### 215. Creating Functions to Prepare Our Feature Extractor Models
-### 216. Coding Out the Steps to Run a Series of Modelling Experiments
-### 217. Running Eight Different Modelling Experiments in 5 Minutes
-### 218. Viewing Our Modelling Experiments in TensorBoard
-### 219. Loading the Best Model and Making Predictions on Random Images from the Test Set
-### 220. Making a Prediction on Our Own Custom Image with the Best Model
-### 221. Main Takeaways, Exercises and Extra- Curriculum
+- Different ways to track experiments
+  - CSV
+  - Tensorboard
+  - Weights and Biases
+  - MLflow
 
-    4min
+### 201. Getting Setup by Importing Torch Libraries and Going Modular Code
+```py
+import matplotlib.pyplot as plt
+import torch
+import torchvision
+
+from torch import nn
+from torchvision import transforms
+```
+
+### 202. Creating a Function to Download Data
+
+### 203. Turning Our Data into DataLoaders Using Manual Transforms
+```py
+from pathlib import Path
+image_path = Path('data/pizza_steak_sushi')
+# Setup directories
+train_dir = image_path / "train"
+test_dir = image_path / "test"
+# Setup ImageNet normalization levels (turns all images into similar distribution as ImageNet)
+normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+# Create transform pipeline manually
+manual_transforms = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    normalize
+])           
+print(f"Manually created transforms: {manual_transforms}")
+from going_modular.going_modular import data_setup
+# Create data loaders
+train_dataloader, test_dataloader, class_names = data_setup.create_dataloaders(
+    train_dir=train_dir,
+    test_dir=test_dir,
+    transform=manual_transforms, # use manually created transforms
+    batch_size=32
+)
+train_dataloader, test_dataloader, class_names
+```
+
+### 204. Turning Our Data into DataLoaders Using Automatic Transforms
+```py
+# Setup dirs
+train_dir = image_path / "train"
+test_dir = image_path / "test"
+# Setup pretrained weights (plenty of these available in torchvision.models)
+weights = torchvision.models.EfficientNet_B0_Weights.DEFAULT
+# Get transforms from weights (these are the transforms that were used to obtain the weights)
+automatic_transforms = weights.transforms() 
+print(f"Automatically created transforms: {automatic_transforms}")
+# Create data loaders
+train_dataloader, test_dataloader, class_names = data_setup.create_dataloaders(
+    train_dir=train_dir,
+    test_dir=test_dir,
+    transform=automatic_transforms, # use automatic created transforms
+    batch_size=32
+)
+train_dataloader, test_dataloader, class_names
+```
+
+### 205. Preparing a Pretrained Model for Our Own Problem
+```py
+# Note: This is how a pretrained model would be created in torchvision > 0.13, it will be deprecated in future versions.
+# model = torchvision.models.efficientnet_b0(pretrained=True).to(device) # OLD 
+# Download the pretrained weights for EfficientNet_B0
+weights = torchvision.models.EfficientNet_B0_Weights.DEFAULT # NEW in torchvision 0.13, "DEFAULT" means "best weights available"
+# Setup the model with the pretrained weights and send it to the target device
+model = torchvision.models.efficientnet_b0(weights=weights).to(device)
+# View the output of the model
+# model
+# Freeze all base layers by setting requires_grad attribute to False
+for param in model.features.parameters():
+    param.requires_grad = False
+# Since we're creating a new layer with random weights (torch.nn.Linear), 
+# let's set the seeds
+set_seeds() 
+# Update the classifier head to suit our problem
+model.classifier = torch.nn.Sequential(
+    nn.Dropout(p=0.2, inplace=True),
+    nn.Linear(in_features=1280, 
+              out_features=len(class_names),
+              bias=True).to(device))
+from torchinfo import summary
+summary(model,
+        input_size=(32,3,224,224),
+        verbose=0,
+        col_names=["input_size","output_size", "num_params","trainable"],
+         col_width=20,
+         row_settings=["var_names"]
+)
+```
+
+### 206. Setting Up a Way to Track a Single Model Experiment with TensorBoard
+- Tensorboard
+  - TensorFlow's visualization toolkit
+  - pip3 install tensorboard
+  - In PyTorcy, use SummaryWriter to interact with TensorBoard
+```py
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=0.001)
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
+# Rewriting trai() with SummaryWRiter()
+from typing import Dict, List
+from tqdm.auto import tqdm
+from going_modular.going_modular.engine import train_step, test_step
+# Import train() function from: 
+# https://github.com/mrdbourke/pytorch-deep-learning/blob/main/going_modular/going_modular/engine.py
+def train(model: torch.nn.Module, 
+          train_dataloader: torch.utils.data.DataLoader, 
+          test_dataloader: torch.utils.data.DataLoader, 
+          optimizer: torch.optim.Optimizer,
+          loss_fn: torch.nn.Module,
+          epochs: int,
+          device: torch.device) -> Dict[str, List]:
+    """Trains and tests a PyTorch model.
+    Passes a target PyTorch models through train_step() and test_step()
+    functions for a number of epochs, training and testing the model
+    in the same epoch loop.
+    Calculates, prints and stores evaluation metrics throughout.
+    Args:
+      model: A PyTorch model to be trained and tested.
+      train_dataloader: A DataLoader instance for the model to be trained on.
+      test_dataloader: A DataLoader instance for the model to be tested on.
+      optimizer: A PyTorch optimizer to help minimize the loss function.
+      loss_fn: A PyTorch loss function to calculate loss on both datasets.
+      epochs: An integer indicating how many epochs to train for.
+      device: A target device to compute on (e.g. "cuda" or "cpu").      
+    Returns:
+      A dictionary of training and testing loss as well as training and
+      testing accuracy metrics. Each metric has a value in a list for 
+      each epoch.
+      In the form: {train_loss: [...],
+                train_acc: [...],
+                test_loss: [...],
+                test_acc: [...]} 
+      For example if training for epochs=2: 
+              {train_loss: [2.0616, 1.0537],
+                train_acc: [0.3945, 0.3945],
+                test_loss: [1.2641, 1.5706],
+                test_acc: [0.3400, 0.2973]} 
+    """
+    # Create empty results dictionary
+    results = {"train_loss": [],
+               "train_acc": [],
+               "test_loss": [],
+               "test_acc": []
+    }
+    # Loop through training and testing steps for a number of epochs
+    for epoch in tqdm(range(epochs)):
+        train_loss, train_acc = train_step(model=model,
+                                           dataloader=train_dataloader,
+                                           loss_fn=loss_fn,
+                                           optimizer=optimizer,
+                                           device=device)
+        test_loss, test_acc = test_step(model=model,
+                                        dataloader=test_dataloader,
+                                        loss_fn=loss_fn,
+                                        device=device)
+        # Print out what's happening
+        print(
+          f"Epoch: {epoch+1} | "
+          f"train_loss: {train_loss:.4f} | "
+          f"train_acc: {train_acc:.4f} | "
+          f"test_loss: {test_loss:.4f} | "
+          f"test_acc: {test_acc:.4f}"
+        )
+        # Update results dictionary
+        results["train_loss"].append(train_loss)
+        results["train_acc"].append(train_acc)
+        results["test_loss"].append(test_loss)
+        results["test_acc"].append(test_acc)
+        ### New: Experiment tracking ###
+        # Add loss results to SummaryWriter
+        writer.add_scalars(main_tag="Loss", 
+                           tag_scalar_dict={"train_loss": train_loss,
+                                            "test_loss": test_loss},
+                           global_step=epoch)
+        # Add accuracy results to SummaryWriter
+        writer.add_scalars(main_tag="Accuracy", 
+                           tag_scalar_dict={"train_acc": train_acc,
+                                            "test_acc": test_acc}, 
+                           global_step=epoch)        
+        # Track the PyTorch model architecture
+        writer.add_graph(model=model, 
+                         # Pass in an example input
+                         input_to_model=torch.randn(32, 3, 224, 224).to(device))    
+    # Close the writer
+    writer.close()   
+    ### End new ###
+    # Return the filled results at the end of the epochs
+    return results
+```
+
+### 207. Training a Single Model and Saving the Results to TensorBoard
+```py
+results = train(model=model,
+                train_dataloader=train_dataloader,
+                test_dataloader=test_dataloader,
+                optimizer=optimizer,
+                loss_fn=loss_fn,
+                epochs=5,
+                device=device)
+```
+
+### 208. Exploring Our Single Models Results with TensorBoard
+- In the jupyter notebook:
+```
+%load_ext tensorboard
+%tensorboard --logdir runs
+```
+  - No GUI at VS code
+  - Install Tensorboard extension for VScode thent it works OK
+
+### 209. Creating a Function to Create SummaryWriter Instances
+- By default, ouir `SummaryWriter()` class saves to `log_dir`
+  - `./runs` folder as default
+- What if we want to save different experiments at different folders?
+  - Create a helper function to build SummaryWriter() instances
+```py
+def create_writer(experiment_name: str, 
+                  model_name: str, 
+                  extra: str=None) -> torch.utils.tensorboard.writer.SummaryWriter():
+    """Creates a torch.utils.tensorboard.writer.SummaryWriter() instance saving to a specific log_dir.
+    log_dir is a combination of runs/timestamp/experiment_name/model_name/extra.
+    Where timestamp is the current date in YYYY-MM-DD format.
+    Args:
+        experiment_name (str): Name of experiment.
+        model_name (str): Name of model.
+        extra (str, optional): Anything extra to add to the directory. Defaults to None.
+    Returns:
+        torch.utils.tensorboard.writer.SummaryWriter(): Instance of a writer saving to log_dir.
+    Example usage:
+        # Create a writer saving to "runs/2022-06-04/data_10_percent/effnetb2/5_epochs/"
+        writer = create_writer(experiment_name="data_10_percent",
+                               model_name="effnetb2",
+                               extra="5_epochs")
+        # The above is the same as:
+        writer = SummaryWriter(log_dir="runs/2022-06-04/data_10_percent/effnetb2/5_epochs/")
+    """
+    from datetime import datetime
+    import os
+    # Get timestamp of current date (all experiments on certain day live in same folder)
+    timestamp = datetime.now().strftime("%Y-%m-%d") # returns current date in YYYY-MM-DD format
+    if extra:
+        # Create log directory path
+        log_dir = os.path.join("runs", timestamp, experiment_name, model_name, extra)
+    else:
+        log_dir = os.path.join("runs", timestamp, experiment_name, model_name)        
+    print(f"[INFO] Created SummaryWriter, saving to: {log_dir}...")
+    return SummaryWriter(log_dir=log_dir)
+# Create an example writer
+example_writer = create_writer(experiment_name="data_10_percent",
+                               model_name="effnetb0",
+                               extra="5_epochs")
+```
+
+### 210. Adapting Our Train Function to Be Able to Track Multiple Experiments
+```py
+from typing import Dict, List
+from tqdm.auto import tqdm
+# Add writer parameter to train()
+def train(model: torch.nn.Module, 
+          train_dataloader: torch.utils.data.DataLoader, 
+          test_dataloader: torch.utils.data.DataLoader, 
+          optimizer: torch.optim.Optimizer,
+          loss_fn: torch.nn.Module,
+          epochs: int,
+          device: torch.device, 
+          writer: torch.utils.tensorboard.writer.SummaryWriter # new parameter to take in a writer
+          ) -> Dict[str, List]:
+    """Trains and tests a PyTorch model.
+    Passes a target PyTorch models through train_step() and test_step()
+    functions for a number of epochs, training and testing the model
+    in the same epoch loop.
+    Calculates, prints and stores evaluation metrics throughout.
+    Stores metrics to specified writer log_dir if present.
+    Args:
+      model: A PyTorch model to be trained and tested.
+      train_dataloader: A DataLoader instance for the model to be trained on.
+      test_dataloader: A DataLoader instance for the model to be tested on.
+      optimizer: A PyTorch optimizer to help minimize the loss function.
+      loss_fn: A PyTorch loss function to calculate loss on both datasets.
+      epochs: An integer indicating how many epochs to train for.
+      device: A target device to compute on (e.g. "cuda" or "cpu").
+      writer: A SummaryWriter() instance to log model results to.
+    Returns:
+      A dictionary of training and testing loss as well as training and
+      testing accuracy metrics. Each metric has a value in a list for 
+      each epoch.
+      In the form: {train_loss: [...],
+                train_acc: [...],
+                test_loss: [...],
+                test_acc: [...]} 
+      For example if training for epochs=2: 
+              {train_loss: [2.0616, 1.0537],
+                train_acc: [0.3945, 0.3945],
+                test_loss: [1.2641, 1.5706],
+                test_acc: [0.3400, 0.2973]} 
+    """
+    # Create empty results dictionary
+    results = {"train_loss": [],
+               "train_acc": [],
+               "test_loss": [],
+               "test_acc": []
+    }
+    # Loop through training and testing steps for a number of epochs
+    for epoch in tqdm(range(epochs)):
+        train_loss, train_acc = train_step(model=model,
+                                          dataloader=train_dataloader,
+                                          loss_fn=loss_fn,
+                                          optimizer=optimizer,
+                                          device=device)
+        test_loss, test_acc = test_step(model=model,
+          dataloader=test_dataloader,
+          loss_fn=loss_fn,
+          device=device)
+        # Print out what's happening
+        print(
+          f"Epoch: {epoch+1} | "
+          f"train_loss: {train_loss:.4f} | "
+          f"train_acc: {train_acc:.4f} | "
+          f"test_loss: {test_loss:.4f} | "
+          f"test_acc: {test_acc:.4f}"
+        )
+        # Update results dictionary
+        results["train_loss"].append(train_loss)
+        results["train_acc"].append(train_acc)
+        results["test_loss"].append(test_loss)
+        results["test_acc"].append(test_acc)
+        ### New: Use the writer parameter to track experiments ###
+        # See if there's a writer, if so, log to it
+        if writer:
+            # Add results to SummaryWriter
+            writer.add_scalars(main_tag="Loss", 
+                               tag_scalar_dict={"train_loss": train_loss,
+                                                "test_loss": test_loss},
+                               global_step=epoch)
+            writer.add_scalars(main_tag="Accuracy", 
+                               tag_scalar_dict={"train_acc": train_acc,
+                                                "test_acc": test_acc}, 
+                               global_step=epoch)
+
+            # Close the writer
+            writer.close()
+        else:
+            pass
+    ### End new ###
+    # Return the filled results at the end of the epochs
+    return results
+```    
+
+### 211. What Experiments Should You Try
+- Setting up a series of modelling experiments
+
+### 212. Discussing the Experiments We Are Going to Try
+
+### 213. Downloading Datasets for Our Modelling Experiments
+- When you have inifinite computing power and time, then select the largest model and largest data
+
+### 214. Turning Our Datasets into DataLoaders Ready for Experimentation
+```py
+data_10_percent_path = Path('./data/pizza_steak_sushi')
+data_20_percent_path = Path('./data/pizza_steak_sushi_20percent')
+# Setup training directory paths
+train_dir_10_percent = data_10_percent_path / "train"
+train_dir_20_percent = data_20_percent_path / "train"
+# Setup testing directory paths (note: use the same test dataset for both to compare the results)
+test_dir = data_10_percent_path / "test"
+# Check the directories
+print(f"Training directory 10%: {train_dir_10_percent}")
+print(f"Training directory 20%: {train_dir_20_percent}")
+print(f"Testing directory: {test_dir}")
+from torchvision import transforms
+# Create a transform to normalize data distribution to be inline with ImageNet
+normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], # values per colour channel [red, green, blue]
+                                 std=[0.229, 0.224, 0.225]) # values per colour channel [red, green, blue]
+# Compose transforms into a pipeline
+simple_transform = transforms.Compose([
+    transforms.Resize((224, 224)), # 1. Resize the images
+    transforms.ToTensor(), # 2. Turn the images into tensors with values between 0 & 1
+    normalize # 3. Normalize the images so their distributions match the ImageNet dataset 
+])
+BATCH_SIZE = 32
+# Create 10% training and test DataLoaders
+train_dataloader_10_percent, test_dataloader, class_names = data_setup.create_dataloaders(train_dir=train_dir_10_percent,
+    test_dir=test_dir, 
+    transform=simple_transform,
+    batch_size=BATCH_SIZE
+)
+# Create 20% training and test data DataLoders
+train_dataloader_20_percent, test_dataloader, class_names = data_setup.create_dataloaders(train_dir=train_dir_20_percent,
+    test_dir=test_dir,
+    transform=simple_transform,
+    batch_size=BATCH_SIZE
+)
+# Find the number of samples/batches per dataloader (using the same test_dataloader for both experiments)
+print(f"Number of batches of size {BATCH_SIZE} in 10 percent training data: {len(train_dataloader_10_percent)}")
+print(f"Number of batches of size {BATCH_SIZE} in 20 percent training data: {len(train_dataloader_20_percent)}")
+print(f"Number of batches of size {BATCH_SIZE} in testing data: {len(test_dataloader)} (all experiments will use the same test set)")
+print(f"Number of classes: {len(class_names)}, class names: {class_names}")
+```
+
+### 215. Creating Functions to Prepare Our Feature Extractor Models
+1. `torchvisio.models.efficentnet_b0() feature with a frozen backbone/base layers and a custom classifier
+2. `torchvisio.models.efficentnet_b2() feature with a frozen backbone/base layers and a custom classifier
+```py
+def set_seeds(seed: int=42):
+  torch.manual_seed(seed)
+#  
+from torchinfo import summary
+# 1. Create an instance of EffNetB2 with pretrained weights
+effnetb2_weights = torchvision.models.EfficientNet_B2_Weights.DEFAULT # "DEFAULT" means best available weights
+effnetb2 = torchvision.models.efficientnet_b2(weights=effnetb2_weights)
+# # 2. Get a summary of standard EffNetB2 from torchvision.models (uncomment for full output)
+# summary(model=effnetb2, 
+#         input_size=(32, 3, 224, 224), # make sure this is "input_size", not "input_shape"
+#         # col_names=["input_size"], # uncomment for smaller output
+#         col_names=["input_size", "output_size", "num_params", "trainable"],
+#         col_width=20,
+#         row_settings=["var_names"]
+# ) 
+# 3. Get the number of in_features of the EfficientNetB2 classifier layer
+print(f"Number of in_features to final layer of EfficientNetB2: {len(effnetb2.classifier.state_dict()['1.weight'][0])}")
+import torchvision
+from torch import nn
+# Get num out features (one for each class pizza, steak, sushi)
+OUT_FEATURES = len(class_names)
+# Create an EffNetB0 feature extractor
+def create_effnetb0():
+    # 1. Get the base model with pretrained weights and send to target device
+    weights = torchvision.models.EfficientNet_B0_Weights.DEFAULT
+    model = torchvision.models.efficientnet_b0(weights=weights).to(device)
+    # 2. Freeze the base model layers
+    for param in model.features.parameters():
+        param.requires_grad = False
+    # 3. Set the seeds
+    set_seeds()
+    # 4. Change the classifier head
+    model.classifier = nn.Sequential(
+        nn.Dropout(p=0.2),
+        nn.Linear(in_features=1280, out_features=OUT_FEATURES)
+    ).to(device)
+    # 5. Give the model a name
+    model.name = "effnetb0"
+    print(f"[INFO] Created new {model.name} model.")
+    return model
+# Create an EffNetB2 feature extractor
+def create_effnetb2():
+    # 1. Get the base model with pretrained weights and send to target device
+    weights = torchvision.models.EfficientNet_B2_Weights.DEFAULT
+    model = torchvision.models.efficientnet_b2(weights=weights).to(device)
+    # 2. Freeze the base model layers
+    for param in model.features.parameters():
+        param.requires_grad = False
+    # 3. Set the seeds
+    set_seeds()
+    # 4. Change the classifier head
+    model.classifier = nn.Sequential(
+        nn.Dropout(p=0.3),
+        nn.Linear(in_features=1408, out_features=OUT_FEATURES)
+    ).to(device)
+    # 5. Give the model a name
+    model.name = "effnetb2"
+    print(f"[INFO] Created new {model.name} model.")
+    return model
+effnetb0 = create_effnetb0() 
+effnetb2 = create_effnetb2()    
+```
+
+### 216. Coding Out the Steps to Run a Series of Modelling Experiments
+```py
+# 1. Create epochs list
+num_epochs = [5, 10]
+# 2. Create models list (need to create a new model for each experiment)
+models = ["effnetb0", "effnetb2"]
+# 3. Create dataloaders dictionary for various dataloaders
+train_dataloaders = {"data_10_percent": train_dataloader_10_percent,
+                     "data_20_percent": train_dataloader_20_percent}
+%%time
+from going_modular.going_modular.utils import save_model
+# 1. Set the random seeds
+set_seeds(seed=42)
+# 2. Keep track of experiment numbers
+experiment_number = 0
+# 3. Loop through each DataLoader
+for dataloader_name, train_dataloader in train_dataloaders.items():
+    # 4. Loop through each number of epochs
+    for epochs in num_epochs: 
+        # 5. Loop through each model name and create a new model based on the name
+        for model_name in models:
+            # 6. Create information print outs
+            experiment_number += 1
+            print(f"[INFO] Experiment number: {experiment_number}")
+            print(f"[INFO] Model: {model_name}")
+            print(f"[INFO] DataLoader: {dataloader_name}")
+            print(f"[INFO] Number of epochs: {epochs}")  
+            # 7. Select the model
+            if model_name == "effnetb0":
+                model = create_effnetb0() # creates a new model each time (important because we want each experiment to start from scratch)
+            else:
+                model = create_effnetb2() # creates a new model each time (important because we want each experiment to start from scratch)
+            # 8. Create a new loss and optimizer for every model
+            loss_fn = nn.CrossEntropyLoss()
+            optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
+            # 9. Train target model with target dataloaders and track experiments
+            train(model=model,
+                  train_dataloader=train_dataloader,
+                  test_dataloader=test_dataloader, 
+                  optimizer=optimizer,
+                  loss_fn=loss_fn,
+                  epochs=epochs,
+                  device=device,
+                  writer=create_writer(experiment_name=dataloader_name,
+                                       model_name=model_name,
+                                       extra=f"{epochs}_epochs"))
+            # 10. Save the model to file so we can get back the best model
+            save_filepath = f"07_{model_name}_{dataloader_name}_{epochs}_epochs.pth"
+            save_model(model=model,
+                       target_dir="models",
+                       model_name=save_filepath)
+            print("-"*50 + "\n")
+```
+
+### 217. Running Eight Different Modelling Experiments in 5 Minutes
+
+### 218. Viewing Our Modelling Experiments in TensorBoard
+```py
+%load_ext tensorboard
+%tensorboard --logdir runs
+```
+- Sharing resulits at TensorBoard.dev
+
+### 219. Loading the Best Model and Making Predictions on Random Images from the Test Set
+```py
+# Setup the best model filepath
+best_model_path = "models/07_effnetb2_data_20_percent_10_epochs.pth"
+# Instantiate a new instance of EffNetB2 (to load the saved state_dict() to)
+best_model = create_effnetb2()
+# Load the saved best model state_dict()
+best_model.load_state_dict(torch.load(best_model_path))
+# Check the model file size
+from pathlib import Path
+# Get the model size in bytes then convert to megabytes
+effnetb2_model_size = Path(best_model_path).stat().st_size // (1024*1024)
+print(f"EfficientNetB2 feature extractor model size: {effnetb2_model_size} MB") # 29MB
+#
+# Import function to make predictions on images and plot them 
+# See the function previously created in section: https://www.learnpytorch.io/06_pytorch_transfer_learning/#6-make-predictions-on-images-from-the-test-set
+from going_modular.going_modular.predictions import pred_and_plot_image
+# Get a random list of 3 images from 20% test set
+import random
+num_images_to_plot = 3
+test_image_path_list = list(Path(data_20_percent_path / "test").glob("*/*.jpg")) # get all test image paths from 20% dataset
+test_image_path_sample = random.sample(population=test_image_path_list,
+                                       k=num_images_to_plot) # randomly select k number of images
+# Iterate through random test image paths, make predictions on them and plot them
+for image_path in test_image_path_sample:
+    pred_and_plot_image(model=best_model,
+                        image_path=image_path,
+                        class_names=class_names,
+                        image_size=(224, 224))
+```
+
+### 220. Making a Prediction on Our Own Custom Image with the Best Model
+```py
+custom_image_path = Path("./pizza.jpg")
+# Predict on custom image
+pred_and_plot_image(model=model,
+                    image_path=custom_image_path,
+                    class_names=class_names)
+```
+
+### 221. Main Takeaways, Exercises and Extra- Curriculum
+- https://www.learnpytorch.io/07_pytorch_experiment_tracking/#exercises
+
+## Section 10: PyTorch Paper Replicating
+
 ### 222. What Is a Machine Learning Research Paper?
+
 ### 223. Why Replicate a Machine Learning Research Paper?
+- For fun
+- For skill development
+
 ### 224. Where Can You Find Machine Learning Research Papers and Code?
+- https://arxiv.org
+- AK twitter
+- https://paperswithcode.com
+- https://github.com/lucidrains/vit-pytorch
+
 ### 225. What We Are Going to Cover
+- Replicating the Vision Transformer paper (ViT paper)
+- Training a custom ViT
+- Feature extraction with a pretrained ViT
+- Ref: https://arxiv.org/abs/2010.11929
+  - An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale by A. Dosovitskiy et al 2020
+
 ### 226. Getting Setup for Coding in Google Colab
+```py
+# Continue with regular imports
+import matplotlib.pyplot as plt
+import torch
+import torchvision
+from torch import nn
+from torchvision import transforms
+from torchinfo import summary
+from going_modular.going_modular import data_setup, engine
+from helper_functions import download_data, set_seeds, plot_loss_curves
+device = "cuda" if torch.cuda.is_available() else "cpu"
+device
+```
+
 ### 227. Downloading Data for Food Vision Mini
+```py
+from pathlib import Path
+image_path=Path("./data/pizza_steak_sushi/")
+train_dir = image_path / "train"
+test_dir = image_path / "test"
+```
+
 ### 228. Turning Our Food Vision Mini Images into PyTorch DataLoaders
+```py
+# Create image size (from Table 3 in the ViT paper)
+IMG_SIZE = 224
+# Create transform pipeline manually
+manual_transforms = transforms.Compose([
+    transforms.Resize((IMG_SIZE, IMG_SIZE)),
+    transforms.ToTensor(),
+])
+print(f"Manually created transforms: {manual_transforms}")
+# Set the batch size
+BATCH_SIZE = 32 # this is lower than the ViT paper but it's because we're starting small
+# Create data loaders
+train_dataloader, test_dataloader, class_names = data_setup.create_dataloaders(
+    train_dir=train_dir,
+    test_dir=test_dir,
+    transform=manual_transforms, # use manually created transforms
+    batch_size=BATCH_SIZE
+)
+train_dataloader, test_dataloader, class_names
+```
+
 ### 229. Visualizing a Single Image
+```py
+# Get a batch of images
+image_batch, label_batch = next(iter(train_dataloader))
+# Get a single image from the batch
+image, label = image_batch[0], label_batch[0]
+# View the batch shapes
+image.shape, label
+plt.imshow(image.permute(1,2,0))
+```
+
 ### 230. Replicating a Vision Transformer - High Level Overview
+- We build ViT-Base
+- Batch size = 4096
+- Image size = 224x224
+![transformer](./ch230.png)
+- Break down
+  - inputs
+  - Outputs
+  - Layers
+  - Blocks
+  - Model
+
 ### 231. Breaking Down Figure 1 of the ViT Paper
+
 ### 232. Breaking Down the Four Equations Overview and a Trick for Reading Papers
+
 ### 233. Breaking Down Equation 1
+```python
+x_input = [class_token, image_patch_1, ... image_patch_N] + [class_token_pos, image_patch_1_pos, ... image_patch_N_pos]
+```
+
 ### 234. Breaking Down Equation 2 and 3
+
 ### 235. Breaking Down Equation 4
+
 ### 236. Breaking Down Table 1
+
 ### 237. Calculating the Input and Output Shape of the Embedding Layer by Hand
+```py
+# Create example values
+height = 224 # H ("The training resolution is 224.")
+width = 224 # W
+color_channels = 3 # C
+patch_size = 16 # P
+# Calculate N (number of patches)
+number_of_patches = int((height * width) / patch_size**2)
+print(f"Number of patches (N) with image height (H={height}), width (W={width}) and patch size (P={patch_size}): {number_of_patches}")
+# Input shape (this is the size of a single image)
+embedding_layer_input_shape = (height, width, color_channels)
+
+# Output shape
+embedding_layer_output_shape = (number_of_patches, patch_size**2 * color_channels)
+
+print(f"Input shape (single 2D image): {embedding_layer_input_shape}")
+print(f"Output shape (single 2D image flattened into patches): {embedding_layer_output_shape}")
+```
+
 ### 238. Turning a Single Image into Patches (Part 1: Patching the Top Row)
+```py
+# Change image shape to be compatible with matplotlib (color_channels, height, width) -> (height, width, color_channels)
+image_permuted = image.permute(1, 2, 0)
+
+# Index to plot the top row of patched pixels
+patch_size = 16
+plt.figure(figsize=(patch_size, patch_size))
+plt.imshow(image_permuted[:patch_size, :, :]);
+# Setup hyperparameters and make sure img_size and patch_size are compatible
+img_size = 224
+patch_size = 16
+num_patches = img_size/patch_size
+assert img_size % patch_size == 0, "Image size must be divisible by patch size"
+print(f"Number of patches per row: {num_patches}\nPatch size: {patch_size} pixels x {patch_size} pixels")
+
+# Create a series of subplots
+fig, axs = plt.subplots(nrows=1,
+                        ncols=img_size // patch_size, # one column for each patch
+                        figsize=(num_patches, num_patches),
+                        sharex=True,
+                        sharey=True)
+
+# Iterate through number of patches in the top row
+for i, patch in enumerate(range(0, img_size, patch_size)):
+    axs[i].imshow(image_permuted[:patch_size, patch:patch+patch_size, :]); # keep height index constant, alter the width index
+    axs[i].set_xlabel(i+1) # set the label
+    axs[i].set_xticks([])
+    axs[i].set_yticks([])
+```
+
 ### 239. Turning a Single Image into Patches (Part 2: Patching the Entire Image)
+```py
+# Setup hyperparameters and make sure img_size and patch_size are compatible
+img_size = 224
+patch_size = 16
+num_patches = img_size/patch_size
+assert img_size % patch_size == 0, "Image size must be divisible by patch size"
+print(f"Number of patches per row: {num_patches}\
+        \nNumber of patches per column: {num_patches}\
+        \nTotal patches: {num_patches*num_patches}\
+        \nPatch size: {patch_size} pixels x {patch_size} pixels")
+
+# Create a series of subplots
+fig, axs = plt.subplots(nrows=img_size // patch_size, # need int not float
+                        ncols=img_size // patch_size,
+                        figsize=(num_patches, num_patches),
+                        sharex=True,
+                        sharey=True)
+
+# Loop through height and width of image
+for i, patch_height in enumerate(range(0, img_size, patch_size)): # iterate through height
+    for j, patch_width in enumerate(range(0, img_size, patch_size)): # iterate through width
+
+        # Plot the permuted image patch (image_permuted -> (Height, Width, Color Channels))
+        axs[i, j].imshow(image_permuted[patch_height:patch_height+patch_size, # iterate through height
+                                        patch_width:patch_width+patch_size, # iterate through width
+                                        :]) # get all color channels
+
+        # Set up label information, remove the ticks for clarity and set labels to outside
+        axs[i, j].set_ylabel(i+1,
+                             rotation="horizontal",
+                             horizontalalignment="right",
+                             verticalalignment="center")
+        axs[i, j].set_xlabel(j+1)
+        axs[i, j].set_xticks([])
+        axs[i, j].set_yticks([])
+        axs[i, j].label_outer()
+
+# Set a super title
+fig.suptitle(f"{class_names[label]} -> Patchified", fontsize=16)
+plt.show()
+```
+
 ### 240. Creating Patch Embeddings with a Convolutional Layer
+```py
+from torch import nn
+# Set the patch size
+patch_size=16
+# Create the Conv2d layer with hyperparameters from the ViT paper
+conv2d = nn.Conv2d(in_channels=3, # number of color channels
+                   out_channels=768, # from Table 1: Hidden size D, this is the embedding size
+                   kernel_size=patch_size, # could also use (patch_size, patch_size)
+                   stride=patch_size,
+                   padding=0)
+```
+
 ### 241. Exploring the Outputs of Our Convolutional Patch Embedding Layer
+```py
+# Plot random 5 convolutional feature maps
+import random
+random_indexes = random.sample(range(0, 758), k=5) # pick 5 numbers between 0 and the embedding size
+print(f"Showing random convolutional feature maps from indexes: {random_indexes}")
+
+# Create plot
+fig, axs = plt.subplots(nrows=1, ncols=5, figsize=(12, 12))
+
+# Plot random image feature maps
+for i, idx in enumerate(random_indexes):
+    image_conv_feature_map = image_out_of_conv[:, idx, :, :] # index on the output tensor of the convolutional layer
+    axs[i].imshow(image_conv_feature_map.squeeze().detach().numpy())
+    axs[i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[]);
+# Get a single feature map in tensor form
+single_feature_map = image_out_of_conv[:, 0, :, :]
+single_feature_map, single_feature_map.requires_grad
+```
+- Learnable embedding of images
+
 ### 242. Flattening Our Convolutional Feature Maps into a Sequence of Patch Embeddings
+```py
+# Create flatten layer
+flatten = nn.Flatten(start_dim=2, # flatten feature_map_height (dimension 2)
+                     end_dim=3) # flatten feature_map_width (dimension 3)
+# 1. View single image
+plt.imshow(image.permute(1, 2, 0)) # adjust for matplotlib
+plt.title(class_names[label])
+plt.axis(False);
+print(f"Original image shape: {image.shape}")
+
+# 2. Turn image into feature maps
+image_out_of_conv = conv2d(image.unsqueeze(0)) # add batch dimension to avoid shape errors
+print(f"Image feature map shape: {image_out_of_conv.shape}")
+
+# 3. Flatten the feature maps
+image_out_of_conv_flattened = flatten(image_out_of_conv)
+print(f"Flattened image feature map shape: {image_out_of_conv_flattened.shape}")
+```
+
 ### 243. Visualizing a Single Sequence Vector of Patch Embeddings
+```py
+# Get flattened image patch embeddings in right shape
+image_out_of_conv_flattened_reshaped = image_out_of_conv_flattened.permute(0, 2, 1) # [batch_size, P^2•C, N] -> [batch_size, N, P^2•C]
+print(f"Patch embedding sequence shape: {image_out_of_conv_flattened_reshaped.shape} -> [batch_size, num_patches, embedding_size]")
+# Get a single flattened feature map
+single_flattened_feature_map = image_out_of_conv_flattened_reshaped[:, :, 0] # index: (batch_size, number_of_patches, embedding_dimension)
+
+# Plot the flattened feature map visually
+plt.figure(figsize=(22, 22))
+plt.imshow(single_flattened_feature_map.detach().numpy())
+plt.title(f"Flattened feature map shape: {single_flattened_feature_map.shape}")
+plt.axis(False);
+```
+
 ### 244. Creating the Patch Embedding Layer with PyTorch
+```py
+
+
+# 1. Create a class which subclasses nn.Module
+class PatchEmbedding(nn.Module):
+    """Turns a 2D input image into a 1D sequence learnable embedding vector.
+
+    Args:
+        in_channels (int): Number of color channels for the input images. Defaults to 3.
+        patch_size (int): Size of patches to convert input image into. Defaults to 16.
+        embedding_dim (int): Size of embedding to turn image into. Defaults to 768.
+    """
+    # 2. Initialize the class with appropriate variables
+    def __init__(self,
+                 in_channels:int=3,
+                 patch_size:int=16,
+                 embedding_dim:int=768):
+        super().__init__()
+
+        # 3. Create a layer to turn an image into patches
+        self.patcher = nn.Conv2d(in_channels=in_channels,
+                                 out_channels=embedding_dim,
+                                 kernel_size=patch_size,
+                                 stride=patch_size,
+                                 padding=0)
+
+        # 4. Create a layer to flatten the patch feature maps into a single dimension
+        self.flatten = nn.Flatten(start_dim=2, # only flatten the feature map dimensions into a single vector
+                                  end_dim=3)
+
+    # 5. Define the forward method
+    def forward(self, x):
+        # Create assertion to check that inputs are the correct shape
+        image_resolution = x.shape[-1]
+        assert image_resolution % patch_size == 0, f"Input image size must be divisible by patch size, image shape: {image_resolution}, patch size: {patch_size}"
+
+        # Perform the forward pass
+        x_patched = self.patcher(x)
+        x_flattened = self.flatten(x_patched)
+        # 6. Make sure the output shape has the right order
+        return x_flattened.permute(0, 2, 1) # adjust so the embedding is on the final dimension [batch_size, P^2•C, N] -> [batch_size, N, P^2•C]
+set_seeds()
+#
+# Create an instance of patch embedding layer
+patchify = PatchEmbedding(in_channels=3,
+                          patch_size=16,
+                          embedding_dim=768)
+
+# Pass a single image through
+print(f"Input image shape: {image.unsqueeze(0).shape}")
+patch_embedded_image = patchify(image.unsqueeze(0)) # add an extra batch dimension on the 0th index, otherwise will error
+print(f"Output patch embedding shape: {patch_embedded_image.shape}")
+```
+
 ### 245. Creating the Class Token Embedding
+```py
+# Create random input sizes
+random_input_image = (1, 3, 224, 224)
+random_input_image_error = (1, 3, 250, 250) # will error because image size is incompatible with patch_size
+# # Get a summary of the input and outputs of PatchEmbedding (uncomment for full output)
+# summary(PatchEmbedding(),
+#         input_size=random_input_image, # try swapping this for "random_input_image_error"
+#         col_names=["input_size", "output_size", "num_params", "trainable"],
+#         col_width=20,
+#         row_settings=["var_names"])
+# View the patch embedding and patch embedding shape
+print(patch_embedded_image)
+print(f"Patch embedding shape: {patch_embedded_image.shape} -> [batch_size, number_of_patches, embedding_dimension]")
+# Get the batch size and embedding dimension
+batch_size = patch_embedded_image.shape[0]
+embedding_dimension = patch_embedded_image.shape[-1]
+# Create the class token embedding as a learnable parameter that shares the same size as the embedding dimension (D)
+class_token = nn.Parameter(torch.ones(batch_size, 1, embedding_dimension), # [batch_size, number_of_tokens, embedding_dimension]
+                           requires_grad=True) # make sure the embedding is learnable
+# Show the first 10 examples of the class_token
+print(class_token[:, :, :10])
+# Print the class_token shape
+print(f"Class token shape: {class_token.shape} -> [batch_size, number_of_tokens, embedding_dimension]")
+# Add the class token embedding to the front of the patch embedding
+patch_embedded_image_with_class_embedding = torch.cat((class_token, patch_embedded_image),
+                                                      dim=1) # concat on first dimension
+# Print the sequence of patch embeddings with the prepended class token embedding
+print(patch_embedded_image_with_class_embedding)
+print(f"Sequence of patch embeddings with class token prepended shape: {patch_embedded_image_with_class_embedding.shape} -> [batch_size, number_of_patches, embedding_dimension]")
+```
+
 ### 246. Creating the Class Token Embedding - Less Birds
+```py
+# View the sequence of patch embeddings with the prepended class embedding
+patch_embedded_image_with_class_embedding, patch_embedded_image_with_class_embedding.shape
+```
+
 ### 247. Creating the Position Embedding
+```py
+# Calculate N (number of patches)
+number_of_patches = int((height * width) / patch_size**2)
+# Get embedding dimension
+embedding_dimension = patch_embedded_image_with_class_embedding.shape[2]
+# Create the learnable 1D position embedding
+position_embedding = nn.Parameter(torch.ones(1,
+                                             number_of_patches+1,
+                                             embedding_dimension),
+                                  requires_grad=True) # make sure it's learnable
+# Show the first 10 sequences and 10 position embedding values and check the shape of the position embedding
+print(position_embedding[:, :10, :10])
+print(f"Position embedding shape: {position_embedding.shape} -> [batch_size, number_of_patches, embedding_dimension]")
+# Add the position embedding to the patch and class token embedding
+patch_and_position_embedding = patch_embedded_image_with_class_embedding + position_embedding
+print(patch_and_position_embedding)
+print(f"Patch embeddings, class token prepended and positional embeddings added shape: {patch_and_position_embedding.shape} -> [batch_size, number_of_patches, embedding_dimension]")
+```
+
 ### 248. Equation 1: Putting it All Together
+```py
+set_seeds()
+# 1. Set patch size
+patch_size = 16
+# 2. Print shape of original image tensor and get the image dimensions
+print(f"Image tensor shape: {image.shape}")
+height, width = image.shape[1], image.shape[2]
+# 3. Get image tensor and add batch dimension
+x = image.unsqueeze(0)
+print(f"Input image with batch dimension shape: {x.shape}")
+# 4. Create patch embedding layer
+patch_embedding_layer = PatchEmbedding(in_channels=3,
+                                       patch_size=patch_size,
+                                       embedding_dim=768)
+# 5. Pass image through patch embedding layer
+patch_embedding = patch_embedding_layer(x)
+print(f"Patching embedding shape: {patch_embedding.shape}")
+# 6. Create class token embedding
+batch_size = patch_embedding.shape[0]
+embedding_dimension = patch_embedding.shape[-1]
+class_token = nn.Parameter(torch.ones(batch_size, 1, embedding_dimension),
+                           requires_grad=True) # make sure it's learnable
+print(f"Class token embedding shape: {class_token.shape}")
+# 7. Prepend class token embedding to patch embedding
+patch_embedding_class_token = torch.cat((class_token, patch_embedding), dim=1)
+print(f"Patch embedding with class token shape: {patch_embedding_class_token.shape}")
+# 8. Create position embedding
+number_of_patches = int((height * width) / patch_size**2)
+position_embedding = nn.Parameter(torch.ones(1, number_of_patches+1, embedding_dimension),
+                                  requires_grad=True) # make sure it's learnable
+# 9. Add position embedding to patch embedding with class token
+patch_and_position_embedding = patch_embedding_class_token + position_embedding
+print(f"Patch and position embedding shape: {patch_and_position_embedding.shape}")
+```
+
 ### 249. Equation 2: Multihead Attention Overview
+- Multihead self-attention
+
 ### 250. Equation 2: Layernorm Overview
+- Query, Key, Value
+  - q/k/v vector
+
 ### 251. Turning Equation 2 into Code
+```py
+# 1. Create a class that inherits from nn.Module
+class MultiheadSelfAttentionBlock(nn.Module):
+    """Creates a multi-head self-attention block ("MSA block" for short).
+    """
+    # 2. Initialize the class with hyperparameters from Table 1
+    def __init__(self,
+                 embedding_dim:int=768, # Hidden size D from Table 1 for ViT-Base
+                 num_heads:int=12, # Heads from Table 1 for ViT-Base
+                 attn_dropout:float=0): # doesn't look like the paper uses any dropout in MSABlocks
+        super().__init__()
+
+        # 3. Create the Norm layer (LN)
+        self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim)
+
+        # 4. Create the Multi-Head Attention (MSA) layer
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=embedding_dim,
+                                                    num_heads=num_heads,
+                                                    dropout=attn_dropout,
+                                                    batch_first=True) # does our batch dimension come first?
+
+    # 5. Create a forward() method to pass the data through the layers
+    def forward(self, x):
+        x = self.layer_norm(x)
+        attn_output, _ = self.multihead_attn(query=x, # query embeddings
+                                             key=x, # key embeddings
+                                             value=x, # value embeddings
+                                             need_weights=False) # do we need the weights or just the layer outputs?
+        return attn_output
+```
+
 ### 252. Checking the Inputs and Outputs of Equation
+```py
+# Create an instance of MSABlock
+multihead_self_attention_block = MultiheadSelfAttentionBlock(embedding_dim=768, # from Table 1
+                                                             num_heads=12) # from Table 1
+
+# Pass patch and position image embedding through MSABlock
+patched_image_through_msa_block = multihead_self_attention_block(patch_and_position_embedding)
+print(f"Input shape of MSA block: {patch_and_position_embedding.shape}")
+print(f"Output shape MSA block: {patched_image_through_msa_block.shape}")
+```
+
 ### 253. Equation 3: Replication Overview
+- MLP layer
+
 ### 254. Turning Equation 3 into Code
+```py
+# 1. Create a class that inherits from nn.Module
+class MLPBlock(nn.Module):
+    """Creates a layer normalized multilayer perceptron block ("MLP block" for short)."""
+    # 2. Initialize the class with hyperparameters from Table 1 and Table 3
+    def __init__(self,
+                 embedding_dim:int=768, # Hidden Size D from Table 1 for ViT-Base
+                 mlp_size:int=3072, # MLP size from Table 1 for ViT-Base
+                 dropout:float=0.1): # Dropout from Table 3 for ViT-Base
+        super().__init__()
+        # 3. Create the Norm layer (LN)
+        self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim)
+        # 4. Create the Multilayer perceptron (MLP) layer(s)
+        self.mlp = nn.Sequential(
+            nn.Linear(in_features=embedding_dim,
+                      out_features=mlp_size),
+            nn.GELU(), # "The MLP contains two layers with a GELU non-linearity (section 3.1)."
+            nn.Dropout(p=dropout),
+            nn.Linear(in_features=mlp_size, # needs to take same in_features as out_features of layer above
+                      out_features=embedding_dim), # take back to embedding_dim
+            nn.Dropout(p=dropout) # "Dropout, when used, is applied after every dense layer.."
+        )
+    # 5. Create a forward() method to pass the data through the layers
+    def forward(self, x):
+        x = self.layer_norm(x)
+        x = self.mlp(x)
+        return x
+```
+
 ### 255. Transformer Encoder Overview
+
 ### 256. Combining equation 2 and 3 to Create the Transformer Encoder
+```py
+# 1. Create a class that inherits from nn.Module
+class TransformerEncoderBlock(nn.Module):
+    """Creates a Transformer Encoder block."""
+    # 2. Initialize the class with hyperparameters from Table 1 and Table 3
+    def __init__(self,
+                 embedding_dim:int=768, # Hidden size D from Table 1 for ViT-Base
+                 num_heads:int=12, # Heads from Table 1 for ViT-Base
+                 mlp_size:int=3072, # MLP size from Table 1 for ViT-Base
+                 mlp_dropout:float=0.1, # Amount of dropout for dense layers from Table 3 for ViT-Base
+                 attn_dropout:float=0): # Amount of dropout for attention layers
+        super().__init__()
+        # 3. Create MSA block (equation 2)
+        self.msa_block = MultiheadSelfAttentionBlock(embedding_dim=embedding_dim,
+                                                     num_heads=num_heads,
+                                                     attn_dropout=attn_dropout)
+        # 4. Create MLP block (equation 3)
+        self.mlp_block =  MLPBlock(embedding_dim=embedding_dim,
+                                   mlp_size=mlp_size,
+                                   dropout=mlp_dropout)
+    # 5. Create a forward() method
+    def forward(self, x):
+        # 6. Create residual connection for MSA block (add the input to the output)
+        x =  self.msa_block(x) + x
+        # 7. Create residual connection for MLP block (add the input to the output)
+        x = self.mlp_block(x) + x
+        return x
+# Create an instance of TransformerEncoderBlock
+transformer_encoder_block = TransformerEncoderBlock()
+# # Print an input and output summary of our Transformer Encoder (uncomment for full output)
+# summary(model=transformer_encoder_block,
+#         input_size=(1, 197, 768), # (batch_size, num_patches, embedding_dimension)
+#         col_names=["input_size", "output_size", "num_params", "trainable"],
+#         col_width=20,
+#         row_settings=["var_names"])
+```
+
 ### 257. Creating a Transformer Encoder Layer with In-Built PyTorch Layer
+```py
+# Create the same as above with torch.nn.TransformerEncoderLayer()
+torch_transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=768, # Hidden size D from Table 1 for ViT-Base
+                                                             nhead=12, # Heads from Table 1 for ViT-Base
+                                                             dim_feedforward=3072, # MLP size from Table 1 for ViT-Base
+                                                             dropout=0.1, # Amount of dropout for dense layers from Table 3 for ViT-Base
+                                                             activation="gelu", # GELU non-linear activation
+                                                             batch_first=True, # Do our batches come first?
+                                                             norm_first=True) # Normalize first or after MSA/MLP layers?
+torch_transformer_encoder_layer
+# # Get the output of PyTorch's version of the Transformer Encoder (uncomment for full output)
+# summary(model=torch_transformer_encoder_layer,
+#         input_size=(1, 197, 768), # (batch_size, num_patches, embedding_dimension)
+#         col_names=["input_size", "output_size", "num_params", "trainable"],
+#         col_width=20,
+#         row_settings=["var_names"])
+```
+
 ### 258. Bringing Our Own Vision Transformer to Life - Part 1: Gathering the Pieces
+```py
+# 1. Create a ViT class that inherits from nn.Module
+class ViT(nn.Module):
+    """Creates a Vision Transformer architecture with ViT-Base hyperparameters by default."""
+    # 2. Initialize the class with hyperparameters from Table 1 and Table 3
+    def __init__(self,
+                 img_size:int=224, # Training resolution from Table 3 in ViT paper
+                 in_channels:int=3, # Number of channels in input image
+                 patch_size:int=16, # Patch size
+                 num_transformer_layers:int=12, # Layers from Table 1 for ViT-Base
+                 embedding_dim:int=768, # Hidden size D from Table 1 for ViT-Base
+                 mlp_size:int=3072, # MLP size from Table 1 for ViT-Base
+                 num_heads:int=12, # Heads from Table 1 for ViT-Base
+                 attn_dropout:float=0, # Dropout for attention projection
+                 mlp_dropout:float=0.1, # Dropout for dense/MLP layers
+                 embedding_dropout:float=0.1, # Dropout for patch and position embeddings
+                 num_classes:int=1000): # Default for ImageNet but can customize this
+        super().__init__() # don't forget the super().__init__()!
+        # 3. Make the image size is divisible by the patch size
+        assert img_size % patch_size == 0, f"Image size must be divisible by patch size, image size: {img_size}, patch size: {patch_size}."
+        # 4. Calculate number of patches (height * width/patch^2)
+        self.num_patches = (img_size * img_size) // patch_size**2
+        # 5. Create learnable class embedding (needs to go at front of sequence of patch embeddings)
+        self.class_embedding = nn.Parameter(data=torch.randn(1, 1, embedding_dim),
+                                            requires_grad=True)
+        # 6. Create learnable position embedding
+        self.position_embedding = nn.Parameter(data=torch.randn(1, self.num_patches+1, embedding_dim),
+                                               requires_grad=True)
+        # 7. Create embedding dropout value
+        self.embedding_dropout = nn.Dropout(p=embedding_dropout)
+        # 8. Create patch embedding layer
+        self.patch_embedding = PatchEmbedding(in_channels=in_channels,
+                                              patch_size=patch_size,
+                                              embedding_dim=embedding_dim)
+        # 9. Create Transformer Encoder blocks (we can stack Transformer Encoder blocks using nn.Sequential())
+        # Note: The "*" means "all"
+        self.transformer_encoder = nn.Sequential(*[TransformerEncoderBlock(embedding_dim=embedding_dim,
+                                                                            num_heads=num_heads,
+                                                                            mlp_size=mlp_size,
+                                                                            mlp_dropout=mlp_dropout) for _ in range(num_transformer_layers)])
+        # 10. Create classifier head
+        self.classifier = nn.Sequential(
+            nn.LayerNorm(normalized_shape=embedding_dim),
+            nn.Linear(in_features=embedding_dim,
+                      out_features=num_classes)
+        )
+    # 11. Create a forward() method
+    def forward(self, x):
+        # 12. Get batch size
+        batch_size = x.shape[0]
+        # 13. Create class token embedding and expand it to match the batch size (equation 1)
+        class_token = self.class_embedding.expand(batch_size, -1, -1) # "-1" means to infer the dimension (try this line on its own)
+        # 14. Create patch embedding (equation 1)
+        x = self.patch_embedding(x)
+        # 15. Concat class embedding and patch embedding (equation 1)
+        x = torch.cat((class_token, x), dim=1)
+        # 16. Add position embedding to patch embedding (equation 1)
+        x = self.position_embedding + x
+        # 17. Run embedding dropout (Appendix B.1)
+        x = self.embedding_dropout(x)
+        # 18. Pass patch, position and class embedding through transformer encoder layers (equations 2 & 3)
+        x = self.transformer_encoder(x)
+        # 19. Put 0 index logit through classifier (equation 4)
+        x = self.classifier(x[:, 0]) # run on each sample in a batch at 0 index
+        return x
+```
+
 ### 259. Bringing Our Own Vision Transformer to Life - Part 2: The Forward Method
+
 ### 260. Getting a Visual Summary of Our Custom Vision Transformer
+```py
+# Example of creating the class embedding and expanding over a batch dimension
+batch_size = 32
+class_token_embedding_single = nn.Parameter(data=torch.randn(1, 1, 768)) # create a single learnable class token
+class_token_embedding_expanded = class_token_embedding_single.expand(batch_size, -1, -1) # expand the single learnable class token across the batch dimension, "-1" means to "infer the dimension"
+# Print out the change in shapes
+print(f"Shape of class token embedding single: {class_token_embedding_single.shape}")
+print(f"Shape of class token embedding expanded: {class_token_embedding_expanded.shape}")
+set_seeds()
+# Create a random tensor with same shape as a single image
+random_image_tensor = torch.randn(1, 3, 224, 224) # (batch_size, color_channels, height, width)
+# Create an instance of ViT with the number of classes we're working with (pizza, steak, sushi)
+vit = ViT(num_classes=len(class_names))
+# Pass the random image tensor to our ViT instance
+vit(random_image_tensor)
+```
+
 ### 261. Creating a Loss Function and Optimizer from the ViT Paper
+```py
+from going_modular.going_modular import engine
+# Setup the optimizer to optimize our ViT model parameters using hyperparameters from the ViT paper
+optimizer = torch.optim.Adam(params=vit.parameters(),
+                             lr=3e-3, # Base LR from Table 3 for ViT-* ImageNet-1k
+                             betas=(0.9, 0.999), # default values but also mentioned in ViT paper section 4.1 (Training & Fine-tuning)
+                             weight_decay=0.3) # from the ViT paper section 4.1 (Training & Fine-tuning) and Table 3 for ViT-* ImageNet-1k
+# Setup the loss function for multi-class classification
+loss_fn = torch.nn.CrossEntropyLoss()
+# Set the seeds
+set_seeds()
+# Train the model and save the training results to a dictionary
+results = engine.train(model=vit,
+                       train_dataloader=train_dataloader,
+                       test_dataloader=test_dataloader,
+                       optimizer=optimizer,
+                       loss_fn=loss_fn,
+                       epochs=10,
+                       device=device)
+```
+
 ### 262. Training our Custom ViT on Food Vision Mini
+
 ### 263. Discussing what Our Training Setup Is Missing
+- We replicated the model but training may miss some setup
+- PyTorch Gradient Clipping
+
 ### 264. Plotting a Loss Curve for Our ViT Model
+
 ### 265. Getting a Pretrained Vision Transformer from Torchvision and Setting it Up
+```py
+# 1. Get pretrained weights for ViT-Base
+pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT # requires torchvision >= 0.13, "DEFAULT" means best available
+# 2. Setup a ViT model instance with pretrained weights
+pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
+# 3. Freeze the base parameters
+for parameter in pretrained_vit.parameters():
+    parameter.requires_grad = False
+# 4. Change the classifier head (set the seeds to ensure same initialization with linear head)
+set_seeds()
+pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
+# pretrained_vit # uncomment for model output
+```
+
 ### 266. Preparing Data to Be Used with a Pretrained ViT
+```py
+# Setup train and test directory paths
+train_dir = image_path / "train"
+test_dir = image_path / "test"
+train_dir, test_dir
+```
+
 ### 267. Training a Pretrained ViT Feature Extractor Model for Food Vision Mini
+```py
+from going_modular.going_modular import engine
+# Create optimizer and loss function
+optimizer = torch.optim.Adam(params=pretrained_vit.parameters(),
+                             lr=1e-3)
+loss_fn = torch.nn.CrossEntropyLoss()
+# Train the classifier head of the pretrained ViT feature extractor model
+set_seeds()
+pretrained_vit_results = engine.train(model=pretrained_vit,
+                                      train_dataloader=train_dataloader_pretrained,
+                                      test_dataloader=test_dataloader_pretrained,
+                                      optimizer=optimizer,
+                                      loss_fn=loss_fn,
+                                      epochs=10,
+                                      device=device)
+```
+
 ### 268. Saving Our Pretrained ViT Model to File and Inspecting Its Size
+```py
+# Save the model
+from going_modular.going_modular import utils
+utils.save_model(model=pretrained_vit,
+                 target_dir="models",
+                 model_name="08_pretrained_vit_feature_extractor_pizza_steak_sushi.pth")
+from pathlib import Path
+# Get the model size in bytes then convert to megabytes
+pretrained_vit_model_size = Path("models/08_pretrained_vit_feature_extractor_pizza_steak_sushi.pth").stat().st_size // (1024*1024) # division converts bytes to megabytes (roughly)
+print(f"Pretrained ViT feature extractor model size: {pretrained_vit_model_size} MB")
+```
+
 ### 269. Discussing the Trade-Offs Between Using a Larger Model for Deployments
+- ViT feature extractor model is 327MB, and might be too large for a mobile device
+
 ### 270. Making Predictions on a Custom Image with Our Pretrained ViT
+
 ### 271. PyTorch Paper Replicating: Main Takeaways, Exercises and Extra-Curriculum
 
-    7min
+## Section 11: PyTorch Model Deployment
+
 ### 272. What is Machine Learning Model Deployment - Why Deploy a Machine Learning Model
+- ML model deployment
+  - Let others use your model
+
 ### 273. Three Questions to Ask for Machine Learning Model Deployment
+
 ### 274. Where Is My Model Going to Go?
+
 ### 275. How Is My Model Going to Function?
+
 ### 276. Some Tools and Places to Deploy Machine Learning Models
+
 ### 277. What We Are Going to Cover
+- Deploy our FoodVision Mini machine learning model
+- Setup code
+- Introduction to ML model deployment with PyTorch
+- Deploy FoodVision Mini as a useable web application
+- Experimenting with multiple models
+
 ### 278. Getting Setup to Code
+
 ### 279. Downloading a Dataset for Food Vision Mini
+
 ### 280. Outlining Our Food Vision Mini Deployment Goals and Modelling Experiments
+
 ### 281. Creating an EffNetB2 Feature Extractor Model
+
 ### 282. Create a Function to Make an EffNetB2 Feature Extractor Model and Transforms
+
 ### 283. Creating DataLoaders for EffNetB2
+
 ### 284. Training Our EffNetB2 Feature Extractor and Inspecting the Loss Curves
+
 ### 285. Saving Our EffNetB2 Model to File
+
 ### 286. Getting the Size of Our EffNetB2 Model in Megabytes
 ### 287. Collecting Important Statistics and Performance Metrics for Our EffNetB2 Model
 ### 288. Creating a Vision Transformer Feature Extractor Model
@@ -2720,38 +4359,219 @@ def pred_and_plot_image(model, image_path, class_names, transform=None, device=d
 ### 327. Deploying Food Vision Big to Hugging Face Spaces
 ### 328. PyTorch Mode Deployment: Main Takeaways, Extra-Curriculum and Exercises
 
-    6min
-### 329. Introduction to PyTorch 2.0
-### 330. What We Are Going to Cover and PyTorch 2 Reference Materials
-### 331. Getting Started with PyTorch 2 in Google Colab
-### 332. PyTorch 2.0 - 30 Second Intro
-### 333. Getting Setup for PyTorch 2
-### 334. Getting Info from Our GPUs and Seeing if They're Capable of Using PyTorch 2
-### 335. Setting the Default Device in PyTorch 2
-### 336. Discussing the Experiments We Are Going to Run for PyTorch 2
-### 337. Introduction to PyTorch 2
-### 338. Creating a Function to Setup Our Model and Transforms
-### 339. Discussing How to Get Better Relative Speedups for Training Models
-### 340. Setting the Batch Size and Data Size Programmatically
-### 341. Getting More Potential Speedups with TensorFloat-32
-### 342. Downloading the CIFAR10 Dataset
-### 343. Creating Training and Test DataLoaders
-### 344. Preparing Training and Testing Loops with Timing Steps for PyTorch 2.0 timing
-### 345. Experiment 1 - Single Run without torch.compile
-### 346. Experiment 2 - Single Run with torch.compile
-### 347. Comparing the Results of Experiment 1 and 2
-### 348. Saving the Results of Experiment 1 and 2
-### 349. Preparing Functions for Experiment 3 and 4
-### 350. Experiment 3 - Training a Non-Compiled Model for Multiple Runs
-### 351. Experiment 4 - Training a Compiled Model for Multiple Runs
-### 352. Comparing the Results of Experiment 3 and 4
-### 353. Potential Extensions and Resources to Learn More
+## Section 12: Introduction to PyTorch 2.0 and torch.compile
 
-    6min
+### 329. Introduction to PyTorch 2.0
+- Operator fusion: reducing memory-gpu time
+- Graph capture: memorizes operation order (?)
+
+### 330. What We Are Going to Cover and PyTorch 2 Reference Materials
+- New features such as torch.compile()
+
+### 331. Getting Started with PyTorch 2 in Google Colab
+
+### 332. PyTorch 2.0 - 30 Second Intro
+```py
+import torch
+import torchvision
+model = torchvision.models.resne50()
+compiled_model = torch.compile(model)
+```
+
+### 333. Getting Setup for PyTorch 2
+
+### 334. Getting Info from Our GPUs and Seeing if They're Capable of Using PyTorch 2
+- For GPUs with CC 8.0+, they can leverage most of the PyTorch 2.0 features
+```py
+import torch
+torch.cuda.get_device_capability() # 7.5 
+```
+
+### 335. Setting the Default Device in PyTorch 2
+- Previously:
+  - `model.to(device)`
+  - `X.to(device)`
+- PyTorch 2.0+
+  - Context manager
+```py
+import torch
+device = "cuda" if torch.cuda.is_available() else "cpu"
+with torch.device(device):
+  layer = torch.nn.Linear(20,30)
+  print(f"Layer device: {layer.weight.device}") # Layer device: cuda:0
+  print(f"Layer creating data on device: {layer(torch.randn(128,20)).device}") # Layer creating data on device: cuda:0
+```  
+  - Global device configuration
+```py
+import torch
+device = "cuda" if torch.cuda.is_available() else "cpu"
+torch.set_default_device(device)
+```  
+
+### 336. Discussing the Experiments We Are Going to Run for PyTorch 2
+
+### 337. Introduction to PyTorch 2
+
+### 338. Creating a Function to Setup Our Model and Transforms
+```py
+model_weights = torchvision.models.ResNet50_Weights.IMAGENET1K_V2
+model = torchvision.models.resnet50(weights=model_weights)
+#
+total_params = sum(
+  param.numel() for param in model.parameters()
+)
+total_params # 25557032
+def create_model(num_classes=10):
+  model_weights = torchvision.models.ResNet50_Weights.DEFAULT
+  transforms = model_weights.transforms()
+  model = torchvision.models.resnet50(weights=model_weights)
+  model.fc = torch.nn.Linear(in_features=2048,
+                              out_features=num_classes)
+  return model, transforms
+model, transforms = create_model()
+transforms # ImageClassification(    crop_size=[224]    resize_size=[232]    mean=[0.485, 0.456, 0.406]    std=[0.229, 0.224, 0.225]    interpolation=InterpolationMode.BILINEAR)
+```
+
+### 339. Discussing How to Get Better Relative Speedups for Training Models
+- Speedups are most noticeable when a large portion of the GPU is being used
+  - Increasing the batch size
+    - 32 => 128,256,512,...
+  - Increasing the datasize
+    - 32x32 -> 224x224 or 336x336
+  - Increase the model size
+  - Decrease the data transfer
+- https://sebastianraschka.com/blog/2023/pytorch-faster.html
+
+### 340. Setting the Batch Size and Data Size Programmatically
+```py
+total_free_gpu_memory, total_gpu_memory = torch.cuda.mem_get_info()
+```
+
+### 341. Getting More Potential Speedups with TensorFloat-32
+- Nvidia TensorFloat32 (TF32)
+  - New data type on Ampere (A100) and newer GPUs
+  - Blends FP32 with FP16
+
+### 342. Downloading the CIFAR10 Dataset
+```py
+import torchvision
+train_dataset= torchvision.datasets.CIFAR10(root=".",
+                                            train = True,
+                                            download=True,
+                                            transform=transforms)
+# Downloading 170MB
+import torchvision
+test_dataset= torchvision.datasets.CIFAR10(root=".",
+                                            train = False,
+                                            download=True,
+                                            transform=transforms)
+train_len = len(train_dataset)
+test_len=len(test_dataset)
+train_len, test_len # 50k, 10k
+```           
+
+### 343. Creating Training and Test DataLoaders
+```py
+from torch.utils.data import DataLoader
+import os
+NUM_WORKERS = os.cpu_count() - 1
+NUM_WORKERS
+BATCH_SIZE=128
+train_dataloader = DataLoader(dataset=train_dataset,
+                               batch_size=BATCH_SIZE,
+                              shuffle=True,
+                              num_workers=NUM_WORKERS)
+test_dataloader = DataLoader(dataset=test_dataset,
+                              batch_size=BATCH_SIZE,
+                              shuffle=False,
+                              num_workers=NUM_WORKERS)
+```
+
+### 344. Preparing Training and Testing Loops with Timing Steps for PyTorch 2.0 timing
+- `torch.inference_mode()` -> `torch.no_grad()`
+  - inference_mode() still works OK on this machine
+  
+### 345. Experiment 1 - Single Run without torch.compile
+```py
+from going_modular.going_modular import engine
+
+NUM_EPOCHS=5
+LEARNING_RATE=0.003
+model,_ = create_model()
+model.to(device)
+loss_fn=torch.nn.CrossEntropyLoss()
+optimizer=torch.optim.Adam(model.parameters(),
+                           lr=LEARNING_RATE)
+single_run_no_compile_results= engine.train(model=model,
+                                     train_dataloader=train_dataloader,
+                                     test_dataloader=test_dataloader,
+                                     loss_fn=loss_fn,
+                                     optimizer=optimizer,
+                                     epochs=NUM_EPOCHS,device=device)
+```
+- Blew memory and swapped. May try when > 16GB memory is available or reduce the batch size
+
+### 346. Experiment 2 - Single Run with torch.compile
+```py
+NUM_EPOCHS=5
+LEARNING_RATE=0.003
+model,_ = create_model()
+model.to(device)
+loss_fn=torch.nn.CrossEntropyLoss()
+optimizer=torch.optim.Adam(model.parameters(),
+                           lr=LEARNING_RATE)
+import time
+stime = time.time()
+compile_model = torch.compile(model)
+etime = time.time()
+```
+
+### 347. Comparing the Results of Experiment 1 and 2
+```py
+NUM_EPOCHS=5
+LEARNING_RATE=0.003
+model,_ = create_model()
+model.to(device)
+loss_fn=torch.nn.CrossEntropyLoss()
+optimizer=torch.optim.Adam(model.parameters(),
+                           lr=LEARNING_RATE)
+import time
+stime = time.time()
+compile_model = torch.compile(model)
+compile_model.to(device)
+etime = time.time()
+single_run_no_compile_results= engine.train(model=compile_model,
+                                     train_dataloader=train_dataloader,
+                                     test_dataloader=test_dataloader,
+                                     loss_fn=loss_fn,
+                                     optimizer=optimizer,
+                                     epochs=NUM_EPOCHS,device=device)
+```
+
+### 348. Saving the Results of Experiment 1 and 2
+
+### 349. Preparing Functions for Experiment 3 and 4
+
+### 350. Experiment 3 - Training a Non-Compiled Model for Multiple Runs
+
+### 351. Experiment 4 - Training a Compiled Model for Multiple Runs
+
+### 352. Comparing the Results of Experiment 3 and 4
+
+### 353. Potential Extensions and Resources to Learn More
+- Automatic Mixed Precision (AMP) training
+- Transformer based models may see more speed up
+
+## Section 13: Bonus Section
+
 ### 354. Special Bonus Lecture
 
-    1min
+## Section 14: Where To Go From Here ?
+
 ### 355. Thank You!
+
 ### 356. Become An Alumni
+
 ### 357. Endorsements on LinkedIn
+
 ### 358. Learning Guideline
