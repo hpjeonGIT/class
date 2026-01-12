@@ -1084,65 +1084,1023 @@ containers:
   - Gradient checkpointing: trade computation for memory by recomputing activations during backpropagation - computing is cheaper than memory consumption
 
 ### 47. 46. Multi-GPU Scaling and Interconnects (NVLink)
+- Data parallelism
+  - Mini batches are split across multiple GPUs
+  - Each GPU has a comlete model copy
+  - GRaidents computed independently on each device
+  - Periodic sync
+- Model parallelism
+  - Beyond memory constraints
+  - Pipeline parallelism: GPipe, PipeDream, DeepSpeed
+  - Tensor parallelism: splitting individual layers
+  - Sequence parallelism: distributing sequence dimensions
+- NVLink architecture
+  - Direct memory access b/w GPUs
+  - Elimination of GPU as communication middleman
+  - Support for unified memory address
+- NVSwitch
+  - For multiple nodes
+- Best practices for multi-GPU scaling
+  - Prioritize NVLink/NVSwitch enabled HW when budge allows
+  - Optimize batch size
+  - Implement mixed precision
+  - Leverage NCCL for topology-aware collective operations
+  - Benchmark at small scale before deploying to hundreds of GPUs
 
 ### 48. 47. Multi-Instance GPU (MIG) Configurations
+- Oversubscription of GPUs
+- Why multi-instance GPUs?
+  - Small workloads waste GPU resources
+  - Multi-tenant requirements
+- Multi-Instance GPU (MIG)
+  - HW partitioning: divides a physical GPU into isolated slices
+    - Provided by HW, not SW
+  - Dedicated resources: each slice has its own memroy and compute resource
+  - Complete isolation: 
+- Example of A100 MIG profiles
+  - 1g.5gb: 1 compute slice with 5GB memory. ~1/7 of full GPU
+  - 2g.10gb: 2 compute slices with 10GB memory. ~2/7 of full GPU
+  - 3g.20gb: 3 compute slices with 20GB memory. ~3/7 of full GPU
+  - 7g.40gb: 7 compute slices with 40GB memory. Full GP
+- Benefits of MIG
+  - Cost efficiency
+  - Multi-tenancy
+  - Higher utilization
+  - Fault isolation
+- MIG use cases
+  - Inference mircoservices
+  - Small-scale training
+  - Multi-tenant GPU clusters
+  - AI SaaS applications
+- Enabling MIG
+   - sudo nvidia-smi -mig 1 # enable MIG mode
+   - sudo nvidia-smi -cgi 19,19 -C # create GPU instances
+   - nvidia-smi -L # list MIG devices
+- MIG + Kubernetes
+  - Kubernetes scheduler views MIG instances as distinct GPUs
+  - Automates MIG instance lifecycle management
+  - Compatible with Slurm and other HPC schedulers
+- Limitations of MIG
+  - Limited HW support (A100, H100, L40S)
+  - No NVLink b/w instances
+  - Not for large models
 
 ### 49. 48. Benchmarking AI Workloads on GPUs
+- Why benchmark?
+  - Performance varies by task
+  - Informed decision making
+  - Deployment strategy
+  - Future planning
+- Types of GPU benchmarks
+  - Synthetic: raw FLOPS, memory bandwidth
+  - AI framework: Tensorflow/PyTorch training speed on standard datasets
+  - Model-specific: ResNet, BERT, GPT benchmarks with real architecture
+  - Inference: latency & throughput tests under production conditions
+- Key metrics to track
+  - Flops
+  - Throughput: samples/sec or tokens/sec procssed during training or inference
+  - Latency
+  - Memory: vram utilization per batch
+  - Energy efficiency
+- Benchmarking tools
+  - MLPerf
+  - Nvidia Nsight
+  - Pytorch/tensorflow profilers
+  - nvidia-smi
+- GPU memory benchmarks
+  - Bandwidth tests: copy b/w host/device or device/device
+  - VRAM capacity: maximum batch size
+  - Memory fragmentation
+  - Profiling tools
+- Benchmarking multi-GPU scaling
+  - Linear vs actual scaling
+  - communication fabric
+  - Distributed training: DDP(DistributedData Parallel) and model parallelism efficiencies  
 
 ### 50. 49. Lab – Run a Model on GPU with CUDA
 
 ## Section 9: Week 8: Distributed Training Basics
 
 ### 51. 50. Why Distributed Training Is Needed
+- The scale of Modern AI
+  - Requires peta bytes of training data across text, images, and video
+  - A single GPU will take months or years to train them
+- Why scale training across GPUs?
+  - Accelerated training
+  - Model capacity: fit larger models
+  - Fault tolerance  
+- Parallelism in training
+  - Data parallelism: split batches across GPUs, combine gradients
+  - Model parallelism: split layers across GPUs
+  - Pipeline parallelism: stage execution like assembly line
+- Compute vs communication tradeoff
+  - Training speed = compute throughput - communication overhead
+  - High speed interconnects are critical for minimizing overhead
+- Challenges of distributed training
+  - Communication bottlenecks
+  - Straggler problem: the slowest node decides the training speed
+  - Debugging complexity  
+
 ### 52. 51. Data Parallelism vs Model Parallelism
+- Why parallelism matters in AI
+  - Too large and too computationally expensive
+- Two fundamental approaches
+  - Data parallelism (DP)
+  - Model parallelism (MP)
+- Data parallelism
+  - Complete model copy on each GPU
+  - Different mini-batches processed in parallel
+  - Synchronized gradient updates via AllReduce  
+  - PyTorch DDP, TensorFlow MirroredStrategy
+- Data parallelism workflow
+  - Split and distribute
+  - Parallel computation
+  - Gradient synchronization
+  - Model update
+  - Repeat
+- Strengths of data parallelism
+  - Implementation simplicity
+  - Linear scaling
+  - Model compatibility
+  - HW optimization
+- Weakness of data parallelism
+  - Memory constraint: each model must fit in a single GPU memory
+  - Communication bottleneck: gradient sync creates network overhead
+  - Straggler problem: the training speed is determined by the slowest node
+  - Diminishing returns: communication overhead leads to efficiency drops at extreme scale (>1000 GPUs)
+  - Batch size challenges: Larger batch size may harm model generalization
+- Model parallelism
+  - Each GPU holds specific layers or components  
+  - Forward/backward passes flow sequentially across devices
+  - Required when model size is larger than a single GPU memory
+- Model parallelism workflow
+  - Layer distribution: partition model layers across available GPUs
+  - Sequential forward pass
+  - Continue chain
+  - Backward pass
+  - Memory optimization
+- Strength of model parallelism
+  - Enables ultra-large models
+  - Memory efficiency
+  - Pipeline integration
+  - Advanced techniques: supports memory optimization strategies like Zero Redundancy Optimizer and Fuilly Sharded Data Parallel
+- Weakness of model parallelism
+  - Implementation complexity
+  - Partitioning challenges
+  - Communication overhead
+  - Load balancing
+  - Training time increase
+- Modern best practice
+  - Hybrid approaches combining data parallelism, model parallelism and pipeline parallelism to maximize efficiency
+
 ### 53. 52. PyTorch Distributed Training
+- PyTorch distributed architecture
+  - torch.distributed
+  - DistrubtedDataParallel (DDP)
+  - RPC framework
+- Communication backends
+  - NCCL
+  - Gloo: meta only. Both CPU and GPU  
+  - MPI
+- Distributed Data Parallel (DDP)
+  - PyTorch's flagship distributed training paradigm
+  - Replicates the entire model across all GPUs
+  - Signficantly more efficent than legacy DataParallel
+- DDP workflow
+  - Initialize process group
+  - Wrap model in DDP
+  - Configure data sampling
+  - Train with gradient sync
+  - Save distributed checkpoints
+- Common challenges
+  - Process synchronization issues
+  - Communication overhead
+  - Hyperparameter adaptation
+  - Distributed debugging complexity
+- Best practices
+  - Backend selection: Use NCCL
+  - GPU bidning: pin each process to specific GPU using `device_ids=[rank]`
+  - Monitoring
+  - CUDA optimization: `torch.backends.cudnn.benchmark=True`
+  - Mixed precision: use automatic mixed precision (AMP)to reduce communication volume
+
 ### 54. 53. TensorFlow Multi-GPU Training
+- Why Tensorflow multi-GPU training?
+  - Resource efficiency
+  - Built-in solutions
+  - Scalability: single GPU-> multi GPUs -> multinodes environment scales seamlessly
+- Distribution strategies in TensorFlow
+  - MirroredStrategy
+    - Single node multi-GPUs
+    - Creates an exact model replica on each available GPU
+    - Automatically slits input batch across devices
+    - Graidents are reduced and averaged across replicas
+    - `tf.distribute.MirroredStrategy()`
+  - MultiWorkerMirroredStrategy
+    - Extends MirroredStrategy across multiple servers
+    - Uses collective communication operations for gradient synchronization
+    - Each work runs identical model replica
+    - Requires TF_CONFIG environment variable for cluster configuration
+    - Best for on-premise cluster with 10-100 GPUs
+  - ParameterServerStrategy
+    - Asynchronous training across distributed workers
+    - Dedicated parameter servers store and update model variables
+    - Workers compute gradients an dpush updates to paramter servers
+    - ~ 1000 GPUs/CPUs
+  - TPUStrategy  
+
 ### 55. 54. Horovod and AllReduce Explained
+- Why Horovod?
+  - Seamless integration with TensorFlow, PyTorch, and MXNet
+  - Built around AllReduce for efficient gradient synchronization
+  - Scales smoothly up to 1000+ GPUs with minimal code changes
+- AllReduce example
+  - Step 1: Local computation
+  - Step 2: Sum all gradient
+  - Step 3: Broadcast results
+  - Step 4: Weight update
+- Ring AllReduce in Horovod
+  - GPUs are arranged in a logical ring topology
+  - EAch GPU communicates only with its neighbors
+  - Partial gradients are exchanged in multiple steps
+  - Communication overlaps with computation for efficiency
+  - Bandwidth utilization is maximized while avoiding central bottlenecks
+- Benefits of Horovod
+  - Simplicity
+  - Framework-agnostic
+  - Efficiency
+  - Scalability
+  - Adoption
+- Limitations of Horovod
+  - Demands high speed interconnects like NVLink or Infiniband
+  - Not suitable for model parallelism
+  - PyTorch DDP may yield better results  
+
 ### 56. 55. Fault Tolerance in Distributed Training
+- Why fault tolerance matters
+  - Failures become inevitable
+  - Without proper fault tolerances, entire jobs must restart from scratch
+- Types of failures
+  - HW
+    - GPU overheating
+    - VRAM corruption
+    - Power fluctuation
+    - Disk failures
+  - SW
+    - Memory leaks
+    - CUDA driver bugs
+    - Framework deadlocks
+    - OOM (Out-Of-Memory) exception
+  - Network
+    - Node communication failures
+    - Intermittent packet loss
+    - Bandwidth saturation
+    - NIC failures
+  - Scheduler/cluster
+    - Kubernetes pod evictions
+    - Slurm job preemptions
+    - Resource contention
+    - Maintenance downtime
+- Checkpointing
+  - Periodically save model weights + optimizer state
+  - Enables resuming trainig from last checkpoint
+  - Frequency tradeoff: overhead vs potential data loss
+- Elastic training
+  - Next generation fault tolerance
+  - Dynamic adaptation
+  - Resizable jobs
+  - Failure resilience
+  - PyTorch elastic, TorchElastic, Horovod Elastic, Ray Train, DeepSpeed Elastic
+- Infrastructure level fault tolerance
+  - Kubernetes: pod auto-restarts +  rescheduling policies
+  - Slurm: job retries + checkpoint continuation
+  - Cluster Managers: automatic task reassignment + GPU health monitoring
+- Challenges in fault tolerance
+  - Storage bottlenecks
+  - Model parallelism complexity
+  - Restart overhead
+  - Performance safety tradeoff
+- Best practices
+  - Automate checkpointing
+  - Incremental checkpoints
+  - Test recovery flows
+  - Multi-level resilience
+
 ### 57. 56. Lab – Train ResNet Across Multiple GPUs
 
 ## Section 10: Week 9: Workflow Automation & Experiment Tracking
 
 ### 58. 57. Why Tracking ML Experiments Matters
+- The challenge of ML development
+  - Hundreds of experiments with varying:
+    - Hyperparameters
+    - Dataset compositions and preprocessing steps
+    - Model architecture and feature engineering
+- Experiment tracking
+  - Systematic logging
+  - Dataset versioning
+  - Run comparison
+- Experiment tracking forms the core foundation of MLOps best practices, making your AI work truly reproducible and scientific
+- Key things to track
+  - Code version
+  - Data version
+  - Hyperparameters: batch size, learning rate, optimizer choice, regularization values
+  - Metrics: accuracy, loss, precision/recall, inference latency
+  - Artifacts: trained model weights, logs, visualization plots
+- Benefits of experiment tracking
+  - Reproducibility
+  - Transparency
+  - Scalability
+  - Knowledge sharing
+- Popular tools for tracking
+  - MLflow
+  - Weights and biases
+  - comet.ml
+  - TensorBoard
+  - Auzre ML, AWS SageMaker, Google Vertex AI
+
 ### 59. 58. Introduction to MLflow
+- Why MLflow?
+  - Framework-agnostic
+    - Compatible with PyTorch, Tensorflow, Scikit-learn, ...
+  - Industry standard
+  - Flexible deployment
+- Core components of MLFlow
+  - Tracking
+    - Automatically logs everything you need
+      - Hyperparametres
+      - Performance metrics
+      - Artifacts: model files, visualiztion, feature importance
+      - Environment details: python version, library dependencies
+  - Projects
+    - Defines reproducible ML workflows that can be shared and executed
+    - Environment management through conda.yaml or requirements.txt
+    - Standardized entry points
+    - Git integration
+  - Models
+    - A standard format for packaging ML models that works with diverse serving tools
+    - Supports flavors: TensorFlow, PyTorch, scikit-learn, ONNX
+  - Model registry
+    - ML governance layer
+    - Version control
+    - STage transitions
+    - Metadata tracking
+```py
+import mlflow
+mlflow.start_run()
+mlflow.log_param("lr", 0.01)
+mlflow.log_metric("accuracy",0.92)
+mlflow.log_artifact("model.pth")
+...
+mlflow.end_run()
+```
+- MLflow UI
+  - Browsing all experiment runs
+  - Comparing metrics and visualizations across multiple experiments
+  - Searching and filtering by parameters
+  - Examining artifacts and model details
+
 ### 60. 59. Logging Metrics and Artifacts
+- Why logging matters
+  - Lost results
+  - Performance tracking
+  - Reproducibility
+- Logging creates the essential foundation for **scientific reproducibility** in AI/ML development
+- Metrics
+  - Quality metrics: Accuracy, F1, Precision, Recall, AUC
+  - Training metrics: Loss, perplexity, gradient norms
+  - Performance metrics: Latency, throughput, memory usage  
+- Artifacts: Files generated during experiments that provide context and reproducibility  
+  - Model artifacts: trained weights, checkpoints, serialized models
+  - Visualization artifacts: loss curves, confusion matrices, embedding projections
+  - Data artifacts: preprocssed datasets, feature statistics, sample predictions
+- Logging metrics
+```py
+import mlflow
+with mlflow.start_run():
+    mlflow.log_param("lr",0.01)
+    mlflow.log_metric("loss",0.345)
+    mlflow.log_metric("accuracy",0.89)
+```
+  - Tracks metrics for each experiment run
+  - Supports multiple metrics per run
+  - Automatic experiment organization
+- Logging artifacts
+```py
+import mlflow
+with mlflow.start_run():
+    mlflow.log_artifact("confusion_matrix.png")      
+    mlflow.log_artifact("model.pth)
+```
+  - Artifacts are stored alongside run history
+  - Downloadable for later comparison
+  - Organized by experiment ID
+- Common mistakes to avoid
+  - Insufficient metrics
+  - Missing checkpoints
+  - Unversioned storage
+  - Log overwriting
+  - Poor tagging
+
 ### 61. 60. Versioning Data, Models, and Parameters
+- Why versioning matters
+  - Experiment complexity
+  - Regulatory requirements
+  - Team collaboration
+- Three pillars of ML versioning
+  - Data: raw and processed ataset
+  - Models: trained weights, architectures, frameworks, and inference code
+  - Parameters: configuration, hyperparameters, random seeds, and environment settings
+- Versioning data
+  - Track with unique identifiers
+  - Version control solutions
+    - DVC (Data Version Control)  
+    - Git LFS
+    - LakeFS
+  - Log transformations: always document preprocessing steps and feature engineering trnasformations
+- Versioning models
+  - Save complete artifacts
+  - Implement registry system
+  - Enable model lifecycle
+- Versioning parameters
+  - Track hyperparameters: learning rates, batch sizes, loss functions, optimizer configurations
+  - Use config files: JSON/YAML
+  - Log random seeds
+- Benefits of comprehensive versioning
+  - Debugging
+  - Reproducibility
+  - Collaboration
+  - Compliance
+  - CI/CD for ML
+- Common tools for versioning
+  - MLflow Registry
+  - DVC and Git LFS
+  - Weight & Biases
+  - LakeFS
+- Challenges in versioning    
+  - Storage costs
+  - Syncing components
+  - Environment consistency
+  - Governance vs. Flexibility
+
 ### 62. 61. Weights & Biases vs MLflow Comparison
+- MLflow
+  - Created by Databricks
+  - Four integrated components
+    - Tracking, projects, models, and registry
+  - End-to-end ML lifecycle focus
+- Weights & Biases
+  - SaaS-First approach: cloud native platform
+  - Rich visual interfaces
+  - Framework integration
+  - Research optimization
+
 ### 63. 62. Automating Training Pipelines
+- Why automate training pipeline?
+  - Manual training processes lead to:
+    - Inconsitent results:
+    - Error-prone workflows
+    - Significant time waste
+    - Limited scalability
+- What is a training pipeline?
+  - Data ingestion and preprocessing
+  - Training and validation
+  - Evaluation and logging
+  - Deployment (optional)
+- Benefits of automation
+  - Consistency
+  - Scalability
+  - Speed
+  - Reliability
+  - Reproducibility
+- Core tools for automation
+  -  Orchestration tools
+    - Apache Airflow - DAG based orchestraiton with extensive connectors
+    - Kubeflow Pipelines
+    - Perfect/Dagster
+  - ML-specific platforms
+    - MLflow projects
+    - SAgemaker pipelines
+    - Vertex AI
+- Example: training pipeline stages
+  - Data ingestion
+  - Feature engineering
+   - Model training
+   - Evalulation
+   - Registry Update
+   - Deployment
+- Autmating retraining
+  - Data-driven triggers
+  - Performance-based triggers
+  - Schedule-based triggers
+- Automated retraining is essential for **real-time AI applications** such as fraud detection, recommendation systems, and programmatic advertising where data patterns evolve rapidly
+- Best practices
+  - Version everything
+  - Build fault tolerance
+  - Modularize components
+  - Monitor everything
+  - Secure your pipeline 
+
 ### 64. 63. Lab – Track Experiments with MLflow
 
-
-##
+## Section 11: Week 10: CI/CD for AI Models
 
 ### 65. 64. What Is MLOps and CI/CD for AI?
+- Why MLOps matters?
+  - ML models are dynamic
+  - Traditional DevOps Falls short
+  - MLOps bridges the gap from DevOps
+- What is MLOps?
+  - Combines ML with DevOps practices
+  - Data engineering
+  - Model development
+  - Deployment
+  - Monitoring
+  - Automation: creating CI/CD pipelines for the entire process
+- Core pillars of MLOps
+  - Data management
+  - Model training & tracking
+  - Deployement and serving
+  - Monitoring and Governance
+  - Collaboration
+- What is CI/CD in AI?
+  - Continuous Integration (CI)
+    - Automatically test and validate changes to:
+      - ML code & algorithm
+      - Data preprocessing
+      - Model performance
+      - Integration with other systems
+  - Continuous Deployment (CD)
+    - Automate the release process for:
+      - Model artifacts and weights
+      - Serving infrastructure
+      - Configuration updates
+      - A/B testing new models
+- CI/CD workflow for ML
+  - Code commit
+  - Data pipeline
+  - Model training
+  - Testing
+  - Registry
+  - Deployment
+- Tools for CI/CD in AI
+  - Pipeline automation
+    - Github actions
+    - Gitlab CI
+    - Jenkins
+    - CircleCI
+  - Experiment & versioning
+    - MLflow
+    - DVC 
+    - Wandb
+    - Neptune.ai
+  - Workflow orchestration
+    - Kubeflow pipelines
+    - Apache Airflow
+    - Prefect
+    - Metaflow
+  - Deployment Infrastructure
+    - Docker
+    - Kubernetes
+    - Seldon core
+    - KServe
+- Cloud native options
+  - AWS Sagemaker pipelines
+  - Google Vertex AI
+  - Azure ML
+  - Databricks MLflow
+- Benefits of MLOps + CI/CD
+  - Accelerated innovation
+  - Reliability at scale
+  - Cross-functional collaboration
+  - Continuous value delivery
+- Challenges in AI CI/CD
+  - Data dependency complexity
+  - Resource intenstive training
+  - Testing complexity
+  - Organizational alignment
+
 ### 66. 65. GitHub Actions Basics for ML Projects
+- Why github actions for ML?
+  - Native automation
+  - ML pipeline ready
+  - Accessible
+- What are github actions?
+  - An event driven automation platform
+  - Triggered by
+    - Code pushes or pull requests
+    - Scheduled jobs using cron syntax
+    - Manual triggers vial GitHub UI
+  - All workflows defined in `.github/workflows/` folder as YAML files
+- GitHub Actions for ML lifecycle
+  - Data validation: verify schema consistency, check for missing values
+  - Unit tests: preprocessing pipelines 
+  - Model training
+  - Artifact logging
+  - Deployment
+- Runners for ML workload
+  - GitHub-hosted runners: cpu only with 2 core processors
+  - Self-hosted runners: use your own GPU servers for training. Requires infrastructure management
+  - Cloud integration: critical for deep learning CI/CD
+- Benefits of GitHub Actions
+  - Integrated
+  - Reusable
+  - Scalable
+  - Secure
+  - Extensible
+- Challenges and limitations
+  - HW constraints
+  - Time limits
+  - Cost considerations
+  - Workflow complexity
+  - Infrastructure needs
+      
 ### 67. 66. GitLab CI and Jenkins Pipelines
+- Why CI/CD matters for ML
+  - Frequent retraining and redeployment cycles as data or requirements evolve
+  - Complex testing requirements for both code and model performance
+  - Resource-intensive workflow requiring specialied HW
+- GitLab CI
+  - Native integration
+  - YAML based workflows
+  - Runners Architecture
+  - Security Focus
+- GitLab CI for ML
+  - GPU support
+  - ML pipeline stages
+  - Container registry
+  - Artifact management  
+- Jenkins
+  - Open-source legacy
+  - Extensive plugin ecosystem
+  - Groovy-based pipelines
+  - Enterprise adaptability
+- Jenkins for ML projects
+  - Source integration
+  - Compute orchestration
+  - Deployement automation
+- Jenkins is popular in regulated industries like finance, healthcare, and telecommunications
+
+| Feature | GitLab CI |  Jenkins |
+|----------|-------------|---------|
+| Hosting options | SaaS + self-hosted | self-hosted only|
+| Configuration| YAML (declarative) | Groovy DSL(programmatic) |
+| GPU support | Via GitLab runners |  Via custom agents|
+|Ease of Setup | Simple, built-in | Flexible, but complex |
+| ML Integration| Container registry, artifacts | Rich plugin ecosystem |
+| Best suited for | Cloud-native ML teams | Enterprise hybrid infrastructure |
+
 ### 68. 67. Testing Models Before Deployment
+- Why test ML models?
+  - Compared to SW development, ML needs validation stage
+- What to test in ML models
+  - Data
+  - Training process
+  - Performance metrics
+  - Robustness
+  - Fairness & bias
+- Unit tesing for ML
+  - Data processing functions verification
+  - Feature engineering steps validation
+  - Random seed consistency checks
+  - Small dataset mocks for rapid iteration
+- Integration testing for ML
+  - Data ingestion
+  - Preprocessing
+  - Training
+  - Inference
+- Model validation metrics
+  - Classification metrics: Accuracy, precision, recall, F1-score, ROC-AUC
+  - Regression & system metrics: RMSE/MAE, R2 Latency, throughput, memory usage
+- Robustness testing
+  - Noisy input testing
+  - Adversarial testing
+  - Load testing
+  - Drift simulation
+- Fairness and bias testing
+  - Use specialized tools: AIF360, Fairlearn, What-If Tool
+  - Apply multiple fairness metrics
+  - This is mandatory in regulated business
+- Automation in CI/CD
+  - Commit code
+  - Run unit tests
+  - Train model
+  - Evaluate metrics
+  - Log results
+  - Deploy or Fail
+- Best practices
+  - Data management
+    - Version control your test datasets
+    - Maintain separate validation and test sets
+    - Create specialized test cases for known edge cases
+    - Generate synthetic data for rare scenarios
+  - Testing strategy
+    - Set minimum performance thresholds based on business impact
+    - Test under simulated realworld conditions
+    - Implement A/B testing for production validation
+    - Monitor continuously post-deployment
+
 ### 69. 68. Automating Docker Builds for AI Apps
+- Why docker for AI applications?
+  - Consistent environments
+  - Complete packaging
+  - Scalable deployment
+
 ### 70. 69. Canary Deployments and Rollbacks
+- Canary deployment: a new version is rolled out into a small subet of users before a full launch
+- Why Canary deployments?
+  - Reduce risk
+  - Detect issues early
+  - Minimize downtime
+- Canary workflow for AI models
+  - Deploy canary
+  - Route limited traffic: 5-10% of production traffic
+  - Monitor key metrics
+  - Increase traffic gradually
+  - Rollback if necessary
+- Example with Kubernetes
+```yaml
+spec:
+  traffic:
+  - revisionName: model-v1
+    percent: 90
+  - revisionName: model-v2
+    percent: 10
+```
+- Benefits of Canary for ML
+  - Safety first
+  - Real-world validation
+  - Shadow testing
+  - A/B testing support
+  - Accelerated feedback      
+- Monitoring Canary deployments
+  - System metrics: latency, throughput, error rate & exceptions, resource utilization
+  - ML-specific metrics: prediction quality, inference confidence, data drift detection, model bias indicators
+  - Tooling: Prometheus + Grafana, EvidentlyAI, Seldon Alibi Detect, Custom dashboards
+- Rollbacks in ML CI/CD
+  - Detect issue
+  - Initiate rollback
+  - Restore Previous version
+  - Analyze failure
+- Immediate rollback vs gradual rollback
+  - Issues are critical vs significant
+
 ### 71. 70. Lab – CI/CD Pipeline for Model Deployment
 
-    2min
+## Section 12: Week 11: Advanced Kubernetes for AI
 
 ### 72. 71. GPU Scheduling in Kubernetes
+- Kubernetes and GPU support
+  - Nvidia device plugin: enables Kubernetes to recognize GPUs as schedulable resources
+  - Resource requests: Pods request GPUs like CPUs or memory
+  - Cluster support
+```yaml
+resources:
+  limits:
+    nvidia.com/gpu: 1
+```
+- Nvidia Device plugin
+  - Deploys as a Daemonset across all GPU nodes
+  - Advertises available GPUs to the Kubernetes scheduler
+  - Available in A100, H100 and other datacenter GPUs
+  - Multi-instance GPU (MIG) technology
+- Scheduling across nodes
+  - Node selectors
+  - Tains and tolerations
+  - Affinity rules  
+- Monitoring GPU usage in Kubernetes
+  - Basic monitoring
+    - `kubectl describe node`: node configuration and status
+    - `kubecetl describe pod`: pod configuration and status
+  - Advanced monitoring
+    - Nvidia DCGM exporter -> Prometheus metrics
+    - Grafana dashboards
+    - Custom alert
+
 ### 73. 72. StatefulSets for Data-Heavy Workloads
+- A statefulSet is a Kubernetes API object used to manage stateful applications, which require stable network identities, persistent storage, and ordered deployment and scaling
+  - Stable identity
+  - Persistent storage
+  - Ordered operations
+- Benefits for Data-heavy workloads
+  - Consistent identity
+  - Data sharding
+  - High availability
+  - Long-running jobs
+
+| Feature | Deployment | StatefulSet |
+|-----------|-----------|------------|
+| Pod identity |  Random, replaceable | stable, sequential |
+| storage: shared or ephemeral | persistent per pod|
+| Use case | stateless application | data-heavy ML infrastructure |
+| Scaling behavior | any order, parallel | ordered, predicatable |
+| Pod replacement|  Completely new instance |  Same identity, storage retained |
+| Network Requirements | Basic | Headless Service recommended |
+
+- Challenges with StatefulSets
+  - Increased complexity
+  - Recovery complexity
+  - Storage cost scaling
+  - Network requirements
+  - Sequential operations
+  - Cloud-provider limitations
+- Best practices
+  - Use when appropriate
+  - Headless services
+  - Storage management
+  - Backup strategies
+  - Pod disruption budgets  
+
 ### 74. 73. Kubernetes Operators for ML
+- What is Kubernetes operator?
+  - Extensions of the Kubernetes control plane
+  - Uses Custom Resource Definitions (CRDs)
+  - Reconciliation loop
+  - Operational knowledge as code
+- Why ML needs operators
+  - Automates distributed training
+  - Simplifies model serving
+  - Manages ML infrastructure
+  - Reduces DevOps overhead
+- Example of ML operators
+  - Kubeflow TFJob
+  - PyTorchJob Operator
+  - KFServing/KServe
+  - MLflow Operator
+  - Ray Operator
+- Benefits of ML operators
+  - Declarative ML workloads
+  - Seamless scaling
+  - Automated fault recovery
+  - Infrastructure-as-code
+- Operators in model serving
+  - KFServing/Kserve: Deploy models with YAML
+    - Advanced deployment strategies: A/B testing, canary rollouts, and autoscaling
+    - Framework agnostic
+    - Integrated monitoring
+- Challenges with operators
+  - Learning curve
+  - Resource overhead
+  - Debugging complexity
+  - Framework coverage
+  - Kubernetes expertise
+- Best practices
+  - Start with community operators
+  - Keep configs in Git
+  - Monitor operator health
+  - Focus on scalable infrastructure  
+
 ### 75. 74. Helm Advanced Templates for AI Apps
+- Why Helm?
+  - K8 is too complex
+
 ### 76. 75. Scaling AI Training with Kubeflow
+- Kubeflow provides a specialized platform for ML that addresses the unique challenges of AI workloads
+  - Native Kubernetes integration
+  - Simplified distributed training
+  - Enterprise-scal MLOps
+- Kubeflow
+  - Opensource ML toolkit
+  - Modular components
+  - MLOps simplification
+- Kubeflow training operators
+  - TFJob
+  - PyTorchJob
+  - MXNetJob
+  - XGBoostJob
+- Benefits of Kubeflow training
+  - Declarative ML workloads
+  - Automatic resource scheduling
+  - Seamless scaling
+  - Fault tolerance
+  - Multi-Cloud compatibility
+- Katib: Kubeflow's AutoML component for hyperparameter optimization
+  - Runs parallel experiments across multiple GPUs/clusters
+
 ### 77. 76. Kubernetes Security Best Practices
+- Why security in Kubernetes
+  - High value targets
+  - Complex attack surface
+  - Constly consequences
+- Common security vulnerabilities in Kubernetes
+  - Critical weaknesses
+    - Exposed API servers
+    - Container escapes
+    - Plaintext secrets
+  - Operational gaps
+    - Privilege escalation
+    - Unvetted images
+    - Misconfigured network polices
+- Implementing the Principle of Least Privilege (PoLP)
+  - Key practices
+    - Define granular roles with specific verbs (get, list, watch)
+    - Avoid wildcard permissions and cluster-wide access
+    - Regularly audit role bindings and clean up unused acounts
+- Implement pod security admission with the restricted profile 
+- Read-only filesystems prevent attackers from modifying inference logic
+- Network security for AI clusters
+  - Default deny
+  - Workload segmentation
+  - Encryption in transit
+- Container image security
+  - Secure base images
+    - Use official, minimal images from trusted sources
+    - Nvidia NGC containers for GPU workload
+    - Official PyTorch/Tensorflow images
+    - Distroless containers where possible
+  - Continuous scanning
+    - Implement automated vulnerability scanning
+- Monitoring and detection for AI workloads
+  - API server audit logs
+  - Runtime security
+  - Resource anomalies
+- Multi-tenancy security for shared AI platforms
+  - Isolation mechanisms
+    - Namespace boundaries
+    - Pod security admission
+    - Network segmentation
+    - Custom admission controllers
+
 ### 78. 77. Lab – Deploy MLflow on Kubernetes
 
-    3min
+## Section 13: Week 12: Resource & Cost optimization
 
 ### 79. 78. Why AI Infrastructure Costs Spike
+- Compute cost
+  - GPU/TPU expenses scale dramaically
+  - Training complexity grows exponentially: doubling parameters can increase compute needs by 4-8x
+  - Idle GPU time
+  - Cloud over-provisioning: too many reserved nodes
+- Data & storage: petabyte challenge
+  - Typical cost for petabyte-scale ML data storage with high availability: $150K monthly
+  - Data transfer b/w regions: $20K monthly
+- Networking: the hidden cost multiplier
+  - Distributed training: high-bandwidth, low latency interconnection costs 3-5x more thant standard networking tiers
+  - Cross-region traffic
+  - Inference scaling: As users grow, API calls and network usage scale linearly with volume
+  - Latency requirements: low-latency networks cost more
+- Operational inefficiencies: wasted resources
+  - Poor workload scheduling
+  - Lack of granual monitoring
+  - Duplicate experiments
+  - Optimization oppportunities missed
+- Beyond HW: human and organization costs
+  - Higher salary for ML engineers
+  - FRagmented workflows
+  - Vendor lock-in
+  - Compliance and Governance
+
 ### 80. 79. Using Spot Instances for AI Training
+- Cutting costs with cloud's hidden discounts
+- Spot instances
+  - Unused capacity
+  - Massive savings: 70-90% cheaper than on-demand instances
+  - Training focus: training job can handle occasional disruption
+- How spot instances work
+  - The cloud provider can reclaim these resources at any time when demand increases
+  - Preemption reality: your workload might be stopped with minimal notice  
+- Challenge and risks
+  - Interruption management
+  - Checkpoint discpline
+  - Regional variability
+  - Inference mismatch: generally unsuitable for latency-sensitive inference workloads
+- Best practices for spot success
+  - Checkpoint everything
+  - Hybrid deployment
+  - Use management tools
+  - Monitor availability
+- A well-architected spot strategy is required
+
 ### 81. 80. Autoscaling AI Clusters in Cloud
+- Static provisioning may lead to:
+  - Over-provisioning
+  - Under-provisioning
+- Elasticity is the cornerstone of cloud efficiency
+- Types of autoscaling for AI clusters
+  - Horizontal scaling: adds or removes nodes
+  - Veritical scaling: Adjust resources (CPU, memory, GPU) allocated to existing nodes
+  - Cluster autoscaler
+  - Pod autoscaler
+- Challenges and tradeoffs in AI autoscaling
+  - Cold start latency
+  - GPU scarcity
+  - Training complexity
+  - Configuration risks
+- Best practices for AI cluster autoscaling
+  - Define clear scaling metrics
+  - Implement buffer capacity
+  - Optimize instance mix
+  - Monitor and refine
+
 ### 82. 81. Monitoring Resource Utilization
+
 ### 83. 82. Storage Cost Optimization Strategies
+
 ### 84. 83. Multi-Tenant Cost Allocation in Teams
+
 ### 85. 84. Lab – Optimize Cloud AI Workload Costs
 
-    4min
+## Section 14: Week 13: Networking for AI Systems
 
 ### 86. 85. Fundamentals of Data Center Networking
 ### 87. 86. Software Defined Networking (SDN) for AI
