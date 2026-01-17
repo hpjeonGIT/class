@@ -1891,7 +1891,7 @@ resources:
 | Feature | Deployment | StatefulSet |
 |-----------|-----------|------------|
 | Pod identity |  Random, replaceable | stable, sequential |
-| storage: shared or ephemeral | persistent per pod|
+| storage | shared or ephemeral | persistent per pod|
 | Use case | stateless application | data-heavy ML infrastructure |
 | Scaling behavior | any order, parallel | ordered, predicatable |
 | Pod replacement|  Completely new instance |  Same identity, storage retained |
@@ -2093,31 +2093,454 @@ resources:
   - Monitor and refine
 
 ### 82. 81. Monitoring Resource Utilization
+- Why resource monitoring?
+  - Preventing resource waste
+  - Early bottleneck detection
+  - Efficient scaling
+- Critical resources to monitor
+  - Compute usage
+    - Core utilization
+    - CUDA memory allocation
+    - Temperature and power draw
+  - Memory usage
+    - System RAM
+    - VRAM usage
+    - Memory leak detection
+  - Storage & IO
+    - Disk IOPS & throughput
+    - Storage capacity usage
+    - Cache hit ratios
+  - Network traffic  
+    - Inter-node bandwidth
+    - Packet loss rates
+    - Data transfer latency
+- Essential monitoring tools
+  - Prometheus
+  - Grafana
+  - Nvidia DCGM: Deep GPU health monitoring
+- Common monitoring challenges
+  - Metrics overlad
+  - GPU complexity
+  - Fragment visibility
+  - Alert fatigue
+- Monitoring Best Practices
+  - Define clear KPIs
+  - Implement tiered alerting
+  - Build purpose built dashboards
+  - Integrate with MLOps workflow
 
 ### 83. 82. Storage Cost Optimization Strategies
+- Storage: the hidden cost driver in AI
+  - Training datasets grow exponentially
+  - Model checkpoints accumulate rapidly
+  - Logs and debugging artifacts
+  - Finished models require versioning and redundancy
+- Common storage cost drivers
+  - Excessive hot storage
+  - Dataset redundancy
+  - Inefficient versioning
+  - Transfer fees
+- Implement a tiered storage approach
+  - Hot storage
+    - Active datasets, current model training
+    - High performance, low latency
+    - NVME/SSD, high IOPS block storage
+  - Warm stroage
+    - Recent projects, validated datasets
+    - Balanced performance
+    - Standard SSD, object storage with frequent access tiers
+  - Cold storage
+    - Archival, compliance
+    - Slow retrieval
+    - Glacier, archive storage, tape systems
+- Space-saving techniques
+  - Lossless compression
+  - Format-specific compression (jpeg->WEBP)
+  - Delta storage (stores change only)
+  - Content-based deduplication
+- Best practices
+  - Establish regular storage audits
+  - Automate lifecycle management
+  - Implement shared feature stores
+  - Factor all storage costs into planning
 
 ### 84. 83. Multi-Tenant Cost Allocation in Teams
+- The challenge of shared infrastructure
+  - Opaque costs
+  - Limited accountability
+  - Resource contention
+- Why cost allocation matters
+  - Prevents Tragedy of the commons
+  - Financial visibilty
+  - Resource optimization
+  - Business alignment
+- Methods of cost allocation
+  - Resource tagging & labeling
+  - Quotas and resource limits
+  - Usage-based metering
+  - Cost transparency dashboards
+- Tools and platforms for implementation
+  - Kubernetes native controls
+  - Kubecost
+  - Cloud provider tools: AWS Cost Explorer, GCP Billing, Azure Cost Management
+  - Custom BI solutions      
+- Implementation challenges
+  - Attributing shared resources
+  - Workload variation
+  - Multi-cloud complexity
+  - Cost-benefit balance
+- Best practices
+  - Align with organization structure
+  - Start with showback, then chargeback
+  - Automate from day one
+  - Create shared incentives
 
 ### 85. 84. Lab – Optimize Cloud AI Workload Costs
 
 ## Section 14: Week 13: Networking for AI Systems
 
 ### 86. 85. Fundamentals of Data Center Networking
+- Clos/Spine-Leaf Underlay: a scalable high-performance data center architecture, using two layers of switches (spines and leaves)
+  - Core architecture
+    - Leaf switches: connect directly to servers
+    - Spine switches: interconnect all leaf switches
+    - Layer-3 fabric with ECMP (Equal-Cost Multi-Path) routing
+    - Typically 2-3 hops maximum b/w any two endpoints
+  - Implementation considerations
+    - Plan oversubscription ratio based on workload (1:1 for AI training)
+    - Achieve modular scale without redesigning the fabric
+    - Isolate faults to minimize blast radius
+    - Ensure deterministic performance with consistent hop count
+- L2/L3 segmentation & overlays
+  - Layer 2: VLAns
+  - Layer 3: VRFs
+  - VXLAN + EVPN
+  - Micro-segmentation    
+- Transport and congestion control
+  - Transport protocols
+    - TCP
+    - RDMA/RoCEv2
+  - Congestion management
+    - PFC (Priority Flow control): creates lossless traffic classes
+    - ECN/RED: early congestion notification
+    - DCQCN: data center quantized congestion notification
+  - Optimization techniques
+    - Jumbo frames: Reduce CPU/Interrupt overhead (9000 MTU)
+    - Buffer tuning
+    - End-to-end QoS
+- Links & Interconnect Choices
+  - Ethernet 
+  - Infiniband
+  - Cabling considerations
+    - DAC: < 5m, lowest cost/power
+    - AOC: < 30m, moderate cost
+    - Optics: up to 10km_, highest cost
+- AI workload patterns
+  - Dominant communication pattern: All-Reduce
+  - Toplogy considerations
+    - Ring algorithm scale linearly (N)
+    - Tree algorithms scale logarithmically (log N)
+    - Mesh/all-to-all operations stress bisection
+  - Framework implementation
+    - NCCL
+    - GLOO
+    - MPI
+    - HOROVOD
+- Service networking & load balancing
+  - Load balancing approaches
+    - L4 (Transport)
+    - L7 (Application)
+  - In cluster networking
+    - CNI: Container Network Interface
+    - eBPF: Extended Berkeley Packet Filter for high-performance datapaths
+    - Service Mesh: optional mTLS, traffic management, observability
+  - Global traffic management
+    - Anycast: same IP advertised from multiple locations
+    - Ingress/Egress: smart traffic routing based an application semantics
+    - Protection: rate limiters, circuit breakers for backend
+- Observability and troubleshooting
+  - Data collection methods
+    - Streaming telemetry
+    - sFlow/NetFlow/IPFIX
+    - SNMP
+  - Key performance indicators
+    - Latency heatmaps
+    - Packet drops
+    - Queue occupancy
+    - Buffer utilization
+  - Troubleshooting toolkit
+    - Ping/tracepath
+    - iperf3
+    - SPAN/ERSPAN
+    - tcpdump/wireshark
+- Security and resilience
+  - Zero-Trust security
+  - Link & Path resilience
+  - Advanced Protection
+- Design Best Practices
+  - Keep the Underlay simple
+  - Align end-to-end parameters
+  - Separate traffic classes
+  - Document everything
+
 ### 87. 86. Software Defined Networking (SDN) for AI
+- Why SDN for AI?
+  - AI traffic challenges
+    - Many to many communicatins
+    - Extremely latency-sensitive workloads
+    - Constantly shifting resource demands
+  - Static networks fall short
+    - Can't adapt to rapid job churn
+    - Unable to scale
+    - Manual configuration create bottlenecks
+  - SDN advantage
+    - Centralized intent definition
+    - Automated policy enforcement
+    - Delivers higher throughput, lower jitter, better utilization
+- SDN fundamentals
+  - Architecture split
+  - Southbound protocols
+  - Network structure
+  - Policy as code
+- AI-aware traffic engineering
+  - Flow intellgence
+    - Distinguish high-volume "elephant" flows from frequent but small "mice" flows
+    - Apply appropriate routing strategies based on flow classification
+  - Optimization goal
+    - Maximize bisection bandwidth for collective operations
+    - Dynamically adjust path selection using ECMP baising or SRv6
+    - Leverage congestion signals (ECN/DCQCN) to inform controller decisions
+- QoS & class isolation
+  - Training: high bandwidth, moderate latency
+  - Inference: low bandwidth, extreme latency
+  - Storage: high bandwidth, medium latency
+  - Control: low bandwidth, high reliability
+- Multi-tenant segmentation
+  - Tenant isolation
+  - Intent definition
+  - Micro segmentation
+- Kubernetes and SDN
+  - CNI options
+  - GitOps deployment
+  - Topology awareness
+- Tooling and ecosystem
+  - Controllers: ACI, Apstra, CloudVision
+  - Infrastructur as code: Terraform, ansible, and CI/CD pipelines
+  - MLOps integration
+  - Observability: Grafana dashboards, Hubble for visualization
+- Security with SDN
+  - Zero-trust architecture
+  - Encryption capabilities
+  - Automated protections
+  - Change management
+- Best practice
+  - Build AI-ready networks
+  - Architecturaly simplicity
+  - Policy as code
+  - Closed-loop operations
+  - Business outcomes
+
 ### 88. 87. Infiniband and High-Speed Interconnects
+- How to maximize bisection bandwidth and predicatability at scale
+- IB vs ethernet
+  - Infiniband 
+    - Purpose built for HPC
+    - HW based flow control
+    - Deterministic low latency performance
+    - Mature collective operations support
+  - Ethernet + RoCEv2
+    - Ubiquitous enterprise technology
+    - Flexible deployment options
+    - Requires tight QoS/congestion tuning
+    - Broader ecosystem cokmpatibility
+    - Typically lower HW costs
+- IB generations & speeds
+  - FDR: 56 Gbps
+  - EDR: 100 Gbps
+  - HDR: 200 Gbps
+  - NDR: 400 Gpbs
+  - XDR: 800 Gpbs
+- RDMA fundamentals
+  - Remote direct Memory Access
+  - Zero copy data transfer b/w newtwork connected systems
+  - Kernel bypass eliminates OS overhead
+  - Minimal CPU utilization during transfers
+  - Verbs API model with send/receive, RDMA read/write operations
+- AI accelerants on IB
+  - NCCL over IB
+  - GPUDirect RDMA
+  - In-network comkpute: SHARP style offlads
+- Fabric topology and routing
+  - Network topologies
+    - Fat-TREE/Clos: non-blocking fabrics with full bisection bandwidth
+    - Dragonfly: optimized for scale & cost with controlled oversubscription
+  - Traffic management
+    - Adaptive routing to dynamically dodge hot spots
+    - ECMP-like path diversity for traffic distribution
+    - QoS/Service Levels (SLs) to separate traffic classes
+- HW building blocks
+  - HCAs/NICs & DPUs
+  - Switches
+  - Cabling infrastructure
+- Kubernetes integration
+  - RDMA device plugin + SR-IOV
+  - Container network interface with eBPF datapaths
+- IB diagnotics
+  - `ibdiagnet` for topology validation
+  - `perfquery` for performance statistics
+  - `ibstat` for port status
+- Workload tests
+  - `nccl-tests` (all_reduce_pef) for collective operations
+  - `ib_write_bw` and `ib_send_lat` for baseline performance verification
+- Best practices
+  - Technology selection: IB or RoCE
+  - Co-designed architecture
+  - Quality of Service
+  - Continuous validation
+
 ### 89. 88. Load Balancing for AI Inference
+- Why load balancing for AI?
+  - Inference traffic exhibits spiky, unpredictable patterns
+  - GPU backends have complex batching and concurrency
+- Load balancing layers and options
+  - L4: TCP/UDP - Google Maglev, Linux IPVS, Anycast routing
+  - L7: HTTP/HTTP2/gRPC - envoy proxy, NGINX, HAProxy
+  - Global: cross-region
+  - In-cluster: Kubernetes
+- Core load balancing algorithms
+  - Round robin/Weighted RR
+  - Least request/EWMA: routes to the least busy servers
+  - Consistent hashing: mapping based on key
+  - Priority/weighted pools: direct traffic to preferred backends
+- GPU-aware considerations
+  - Expose concurrency metrics: route based on available GPU slots and queue depth
+  - Coordinate with batching
+  - Handle GPU heterogeneity
+- Sticky vs stateless load balancing
+  - Prefer statelss when possible
+  - Use session affinity judiciously
+  - Smart key selection
+  - Plan for failures
+- Multi-region patterns
+  - Active/active: run full capacity in multple regions using anycast or latency-based DNS
+  - Smart traffic steering: client latency, regional capacity, and infrastructure cost
+  - Regional circuit breakers: implement regional isolation to contain failures, preventing cascading issues across global footprint
+  - Failover planning
+
 ### 90. 89. Network Bottlenecks in Distributed Training
+- Symptoms of network bottleneck
+  - Low GPU utilization
+  - Scaling plateaus
+  - Step-time variance
+  - Collective delays
+- Topology and placement matter
+  - Keep worker nodes within the same rack/reaf when possible
+  - `nvidia-smi topo -m` to verify and align GPU-NIC with NUMA domains
+  - Set CPU affinity for
+    - GPU NUMA locality
+    - NIC PCIe attachment
+    - Memory controller access
+- Transport tuning
+  - Enable RDMA
+  - Set MTU 9000 jumbo frame
+  - Congestion control: configure ECN/DCQCN and use PFC on lossless traffic classes
+  - Watch buffers
+- NCCL/Horovod knobs  
+  - Framework settings
+    - PyTorch DDP: tune `bucket_cap_mb` (25-100MB), set `static_graph=True`
+    - Horovd: Adjust `HOROVOD_FUSION_THRESHOLD`, `HOROVOD_CYCLE_TIME`
+    - Use `no_sync()` for gradient accumulation
+    - Overlap compute/communication (DDP default)
+  - Environment variables
+```bash
+# interface selection
+NCCL_SOCKET_IFNAME=ib0,eth1
+NCCL_IB_HCA=mlx5_0,mlx5_1
+# protocol settings
+NCCL_IB_GID_INDEX=3 # RoCEv2
+NCCL_PROTO=LL128 # small msgs
+NCCL_NET_GDR_LEVEL=2 # enable GDR
+```
+
 ### 91. 90. Security in Networked AI Systems
+- AI security threat landscape
+  - Data exfiltration & training data theft
+  - Model endpoint abuse & scraping
+  - Lateral movement in clusters
+  - Supply-chain risks
+  - DDoS & cost-exhaustion attacks
+- Zero-trust principles
+  - Never trust: always verify
+  - Strong identity everywhere
+  - Continuous policy enforcement
+  - Assume breach
+- Identity, authentication & authorization
+  - Identity standards
+    - OIDC/OAuth2 for human users
+    - SPIFFE/PSIRE for workloads
+    - Federated identity across clouds
+  - Access controls
+    - Short-lived credentials
+    - Just-in-time (JIT) access
+    - Break-glass emergency procedures
+  - Permission models
+    - RBAC for role-based permissions
+    - ABAC for attribute-based controls
+    - Fine-grained policy enforcement
+- Best practices
+  - Default-deny architecture
+  - Response automation
+  - Encryption and authentication
+  - Tenant isolation
+  - Continuous monitoring
+
 ### 92. 91. Lab – Configure Load Balancer for AI API
 
-    3min
+## Section 15: Week 14: Model Serving Basics
 
 ### 93. 92. From Training to Serving – The Deployment Gap
+- Deployment gap
+  - Environment mismatch
+  - Missing requirements
+  - Undefined process
+
 ### 94. 93. REST vs gRPC for Model APIs
+- Protocol fundamentals
+  - REST
+    - HTTP/1.1 or HTTP/2 + JSON payloads
+    - Resource oriented 
+    - Human readable data format
+  - gRPC
+    - Built on HTTP/2 + Protocol buffers
+    - Contract-first development approach
+    - Streaming capabilities built-in
+    - Designed for service-to-service comms
+    - Binary protocol buffers prodcue smaller payloads
+- When REST shines
+  - Public API compatibility
+  - Rapid development
+  - Rich ecosystem
+  - Debugging ease
+- When gRPC shines
+  - Performance-critical systems
+  - Advanced streaming capabilities
+  - Strong schema enforcement
+  - Polygot development
+- Model serving patterns
+  - Synchronous inference: Either REST or gRPC
+  - Batch/streaming inference: gRPC preferred
+  - Large embedding vectors: gRPC
+  - Browser-facing applications: REST frontend -> internal gRPC hop
+  - Multi-model inference pipelines: gRPC
+  
 ### 95. 94. TensorFlow Serving for AI Models
+
 ### 96. 95. TorchServe for PyTorch Models
+
 ### 97. 96. Deploying Models with FastAPI
+
 ### 98. 97. Scaling Model Serving with Kubernetes
+
 ### 99. 98. Lab – Serve an Image Classifier with FastAPI
 
     2min
