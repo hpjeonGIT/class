@@ -1359,26 +1359,617 @@ axes[1].imshow(passed_images[n])
 ![ch100_repro](./ch100_repro.png)
 
 ### 101. Autoencoder for Images - Part Two - Noise Removal
+- Add noise then remove noise using autoencoder
+```py
+from tensorflow.keras.layers import GaussianNoise
+sample = GaussianNoise(0.2)
+noisey = sample(X_test[:10], training=True)
+n = 0
+print("ORIGINAL/NOISEY version")
+fig,axes = plt.subplots(nrows=1,ncols=2)
+axes[0].imshow(X_test[n])
+axes[1].imshow(noisey[n])
+```
+![ch101_noisy](./ch101_noisy.png)
+```py
+import tensorflow as tf
+tf.random.set_seed(101)
+encoder = Sequential()
+encoder.add(Flatten(input_shape=[28,28]))
+encoder.add(GaussianNoise(0.2))
+encoder.add(Dense(400,activation='relu'))
+encoder.add(Dense(200,activation='relu'))
+encoder.add(Dense(100,activation='relu'))
+encoder.add(Dense(50,activation='relu'))
+encoder.add(Dense(25,activation='relu'))
+# 25/784 = 0.0318 -> 3% out of the original image
+decoder = Sequential()
+decoder.add(Dense(50, input_shape=[25], activation='relu'))
+decoder.add(Dense(100,activation='relu'))
+decoder.add(Dense(200,activation='relu'))
+decoder.add(Dense(400,activation='relu'))
+decoder.add(Dense(784,activation='sigmoid'))
+decoder.add(Reshape([28,28]))
+noise_remover = Sequential([encoder,decoder])
+noise_remover.compile(loss='binary_crossentropy',
+                    optimizer='adam',
+                    metrics=['accuracy'])
+noise_remover.fit(X_train, X_train, epochs=8)
+#
+ten_noisey_images = sample(X_test[:10], training=True)
+denoised = noise_remover(ten_noisey_images)
+print("ORIGINAL/NOISE ADDED /NOISE removed")
+fig,axes = plt.subplots(nrows=1,ncols=3)
+n=0
+axes[0].imshow(X_test[n])
+axes[1].imshow(ten_noisey_images[n])
+axes[2].imshow(denoised[n])
+```
+![ch101_denoised](./ch101_denoised.png)
 
 ### 102. Autoencoder Exercise Overview
+- How to find which candidate has the most drastically different data?
+- Dimensional reduction
 
 ### 103. Autoencoder Exercise - Solutions
+```py
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+df = pd.read_csv('./tmp/DATA/UK_foods.csv', index_col='Unnamed: 0')
+df = df.transpose()
+df.head()
+'''
+        Cheese	Carcass_meat	Other_meat	Fish	Fats_and_oils	Sugars	Fresh_potatoes	Fresh_Veg	Other_Veg	Processed_potatoes	Processed_Veg	Fresh_fruit	Cereals	Beverages	Soft_drinks	Alcoholic_drinks	Confectionery
+England	105	245	685	147	193	156	720	253	488	198	360	1102	1472	57	1374	375	54
+Wales	103	227	803	160	235	175	874	265	570	203	365	1137	1582	73	1256	475	64
+Scotland	103	242	750	122	184	147	566	171	418	220	337	957	1462	53	1572	458	62
+N.Ireland	66	267	586	93	209	139	1033	143	355	187	334	674	1494	47	1506	135	41
 
-    11min
+'''
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import SGD
+encoder = Sequential()
+encoder.add(Flatten(input_shape=[17]))
+encoder.add(Dense(8,activation='relu'))
+encoder.add(Dense(4,activation='relu'))
+encoder.add(Dense(2,activation='relu'))
+decoder = Sequential()
+encoder.add(Flatten(input_shape=[2]))
+decoder.add(Dense(units=4,activation='relu'))
+decoder.add(Dense(units=8,activation='relu'))
+decoder.add(Dense(units=17,activation='relu'))
+autoencoder = Sequential([encoder,decoder])
+autoencoder.compile(loss='mse', optimizer=SGD(learning_rate=1.5))
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+scaled_df = scaler.fit_transform(df.values)
+scaled_df.shape # (4, 17)
+# 
+autoencoder.fit(scaled_df,scaled_df, epochs=15)
+# after training, we use encoder only for dimensional reduction
+encoded_2dim = encoder.predict(scaled_df)
+df.index
+results = pd.DataFrame(data=encoded_2dim,index=df.index, columns=['C1','C2'])
+results
+'''
+            	C1	C2
+England	0.309264	1.606499
+Wales	0.482425	2.400198
+Scotland	0.281934	1.204633
+N.Ireland	0.000000	1.080878
+'''
+```
+- This shows that N.Ireland is drastically different
+
+## Section 12: Generative Adversarial Networks
 
 ### 104. GANs Overview
-### 105. Creating a GAN - Part One- The Data
-### 106. Creating a GAN - Part Two - The Model
-### 107. Creating a GAN - Part Three - Model Training
-### 108. DCGAN - Deep Convolutional Generative Adversarial Networks
+- Invented by Ian Goodfellow 2014
+- Two networks compete each other
+- Generator
+  - Receives random noise (Gaussian distribution)
+  - Outputs data (often an image)
+- Discriminator
+  - Takes a data set consisting of real images from the real data and fake images from the generator
+  - Attempts to classify real vs fake images (always binary classificaton)
+- Generator tries to fool discriminator using fake images
+- Discriminator tries to figure real or fake (1 or 0)
+- After many trials, generator can create images that actually fool the discriminator
+- Training phases
+  - Phase 1 - train discriminator
+    - Real images (=1) are combined with fake images from generator (=0)
+    - Discriminator trains to distinguish real from fake
+  - Phase 2 - train generator
+    - Produces fake images with generator
+    - Feeds only these fake images to the generator with all labels set as real (=1)
+    - This causes the generator to attempt to produce images that the discriminator believes to be real
+    - Because we feed in fake images all with labeled 1, we only perform backpropagation on the generator weights in this step
+- Generator NEVER gets to see the actual real images
+  - It generates convincing images only based off gradients flowing back through the discriminator
+- Difficulties with GANs
+  - Training resources
+  - Mode collapse
+    - A few images from generator fool the discriminator
+    - DCGANs (Deep Convolutional GANs) might be used to avoid mod collapse
+  - Instability
+    - It is difficult to ascertain performance and appropriate training epochs as generated images are all "fake"
+    - Oscillation b/w performance of generator and discriminator
+    - Hyperparameters experiment is necessary
 
-    7min
+### 105. Creating a GAN - Part One- The Data
+```py
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from tensorflow.keras.datasets import mnist
+(X_train,y_train),(X_test, y_test) = mnist.load_data()
+#plt.imshow(X_train[0])
+only_zeros = X_train[y_train==0]
+only_zeros.shape # (5923, 28, 28)
+X_train.shape # (60000, 28, 28)
+#plt.imshow(only_zeros[10])
+```
+
+### 106. Creating a GAN - Part Two - The Model
+```py
+import tensorflow as tf
+from tensorflow.keras.layers import Dense,Reshape,Flatten
+from tensorflow.keras.models import Sequential
+discriminator = Sequential()
+discriminator.add(Flatten(input_shape=[28,28]))
+discriminator.add(Dense(150,activation='relu'))
+discriminator.add(Dense(100,activation='relu'))
+# final output layer
+discriminator.add(Dense(1, activation='sigmoid'))
+discriminator.compile(loss='binary_crossentropy', optimizer='adam')
+codings_size = 100
+# 784 -> 150 -> 100 -> 150 -> 784
+generator = Sequential()
+generator.add(Flatten(input_shape=[codings_size]))
+generator.add(Dense(100,activation='relu'))
+generator.add(Dense(150,activation='relu'))
+generator.add(Dense(784,activation='relu'))
+generator.add(Reshape([28,28]))
+GAN = Sequential([generator,discriminator])
+discriminator.trainable = False
+GAN.compile(loss='binary_crossentropy', optimizer='adam')
+```
+
+### 107. Creating a GAN - Part Three - Model Training
+```py
+batch_size = 32
+# my_data = X_train
+my_data = only_zeros
+dataset = tf.data.Dataset.from_tensor_slices(my_data).shuffle(buffer_size=1000)
+type(dataset)
+dataset = dataset.batch(batch_size,drop_remainder=True) # 5923/32 = 185.09 => 185 sets
+epochs = 1
+print(GAN.layers[0].layers) # generator, [<Flatten name=flatten_3, built=True>, <Dense name=dense_9, built=True>, <Dense name=dense_10, built=True>, <Dense name=dense_11, built=True>, <Reshape name=reshape_1, built=True>]
+print(GAN.layers[1].layers) # discriminiator, [<Flatten name=flatten_2, built=True>, <Dense name=dense_6, built=True>, <Dense name=dense_7, built=True>, <Dense name=dense_8, built=True>]
+print(GAN.layers[0].summary())
+'''
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ flatten_3 (Flatten)             │ (None, 100)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_9 (Dense)                 │ (None, 100)            │        10,100 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_10 (Dense)                │ (None, 150)            │        15,150 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_11 (Dense)                │ (None, 784)            │       118,384 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ reshape_1 (Reshape)             │ (None, 28, 28)         │             0 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 143,634 (561.07 KB)
+ Trainable params: 143,634 (561.07 KB)
+ Non-trainable params: 0 (0.00 B)
+'''
+print(GAN.layers[1].summary())
+'''
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ flatten_2 (Flatten)             │ (None, 784)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_6 (Dense)                 │ (None, 150)            │       117,750 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_7 (Dense)                 │ (None, 100)            │        15,100 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_8 (Dense)                 │ (None, 1)              │           101 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 132,951 (519.34 KB)
+ Trainable params: 0 (0.00 B)
+ Non-trainable params: 132,951 (519.34 KB)
+'''
+print([[0.0]]*5, [[0.0]*5])# [[0.0], [0.0], [0.0], [0.0], [0.0]] [[0.0, 0.0, 0.0, 0.0, 0.0]]
+generator,discriminator = GAN.layers
+# train loop
+for epoch in range(epochs):
+  print(f"Currently on Epochs {epoch+1}")
+  i = 0
+  for X_batch in dataset:
+    i = i + 1
+    if i%100 == 0:
+      print(f"\t Currently on batch number {i} of {len(my_data)//batch_size}")
+    # discriminator
+    noise = tf.random.normal(shape = [batch_size,codings_size])
+    gen_images = generator(noise)
+    X_fake_vs_real = tf.concat([gen_images,tf.dtypes.cast(X_batch,tf.float32)], axis=0)
+    y1 = tf.constant([[0.0]]*batch_size + [[1.0]]*batch_size) # 0.0 (False) as many as of gen_images, 1.0 (True) as many as X_batch
+    discriminator.trainable = True
+    discriminator.train_on_batch(X_fake_vs_real,y1)
+    # train generator
+    noise = tf.random.normal(shape=[batch_size,codings_size])
+    y2 = tf.constant([[1.0]]*batch_size)
+    discriminator.trainable = False
+    GAN.train_on_batch(noise,y2)
+'''
+Currently on Epochs 1
+	 Currently on batch number 100 of 185
+2026-01-30 09:46:38.244292: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
+'''    
+noise = tf.random.normal(shape=[10,codings_size])
+noise.shape # TensorShape([10, 100])
+#plt.imshow(noise)
+images = generator(noise)
+plt.imshow(images[0])
+```
+![ch107_gen](./ch107_noise0.png)
+- Compare images[0] with other image [1,2,3,..]
+  - All are similar => **Mode collapse**
+  - How to resolve this issue? DCGAN
+  
+### 108. DCGAN - Deep Convolutional Generative Adversarial Networks
+- GAN with convolutional layers
+```py
+(X_train,y_train),(X_test, y_test) = mnist.load_data()
+X_train = X_train/255
+X_train = X_train.reshape(-1,28,28,1)*2-1.
+X_train.min() # np.float64(-1.0)
+X_train.max() # np.float64(1.0)
+only_zeros = X_train[y_train==0]
+only_zeros.shape # (5923, 28, 28, 1)
+import tensorflow as tf
+from tensorflow.keras.layers import Dense,Reshape,Dropout,LeakyReLU,Flatten,BatchNormalization,Conv2D,Conv2DTranspose
+from tensorflow.keras.models import Sequential
+np.random.seed(42)
+tf.random.set_seed(42)
+codings_size = 100
+generator = Sequential()
+generator.add(Flatten(input_shape=[codings_size]))
+generator.add(Dense(7*7*128))
+generator.add(Reshape([7,7,128]))
+generator.add(BatchNormalization())
+generator.add(Conv2DTranspose(64,kernel_size=5,strides=2,
+                              padding="same",activation="relu"))
+generator.add(BatchNormalization())
+generator.add(Conv2DTranspose(1,kernel_size=5,strides=2,
+                             padding="same",activation="tanh"))
+discriminator = Sequential()
+discriminator.add(Conv2D(64,kernel_size=5,strides=2,
+                         padding="same",activation=LeakyReLU(0.3),
+                         input_shape=[28,28,1]))
+discriminator.add(Dropout(0.5))
+discriminator.add(Conv2D(128,kernel_size=5,strides=2,
+                         padding="same",activation=LeakyReLU(0.3)))
+discriminator.add(Dropout(0.5))
+discriminator.add(Flatten())
+discriminator.add(Dense(1,activation="sigmoid"))
+GAN = Sequential([generator,discriminator])
+discriminator.compile(loss="binary_crossentropy", optimizer="adam")
+discriminator.trainable = False
+GAN.compile(loss="binary_crossentropy", optimizer="adam")
+GAN.summary()
+'''
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ sequential_3 (Sequential)       │ (None, 28, 28, 1)      │       840,705 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ sequential_4 (Sequential)       │ (None, 1)              │       212,865 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 1,053,570 (4.02 MB)
+ Trainable params: 840,321 (3.21 MB)
+ Non-trainable params: 213,249 (833.00 KB)
+'''
+batch_size = 32
+my_data = only_zeros
+dataset = tf.data.Dataset.from_tensor_slices(my_data).shuffle(buffer_size=1000)
+type(dataset) # tensorflow.python.data.ops.shuffle_op._ShuffleDataset
+dataset = dataset.batch(batch_size,drop_remainder=True).prefetch(1)
+epochs = 20
+# Training
+# Grab the seprate components
+generator, discriminator = GAN.layers
+# For every epcoh
+for epoch in range(epochs):
+    print(f"Currently on Epoch {epoch+1}")
+    i = 0
+    # For every batch in the dataset
+    for X_batch in dataset:
+        i=i+1
+        if i%20 == 0:
+            print(f"\tCurrently on batch number {i} of {len(my_data)//batch_size}")
+        #####################################
+        ## TRAINING THE DISCRIMINATOR ######
+        ###################################
+        # Create Noise
+        noise = tf.random.normal(shape=[batch_size, codings_size])
+        # Generate numbers based just on noise input
+        gen_images = generator(noise)
+        # Concatenate Generated Images against the Real Ones
+        # TO use tf.concat, the data types must match!
+        X_fake_vs_real = tf.concat([gen_images, tf.dtypes.cast(X_batch,tf.float32)], axis=0)
+        # Targets set to zero for fake images and 1 for real images
+        y1 = tf.constant([[0.]] * batch_size + [[1.]] * batch_size)
+        # This gets rid of a Keras warning
+        discriminator.trainable = True
+        # Train the discriminator on this batch
+        discriminator.train_on_batch(X_fake_vs_real, y1)
+        #####################################
+        ## TRAINING THE GENERATOR     ######
+        ###################################
+        # Create some noise
+        noise = tf.random.normal(shape=[batch_size, codings_size])
+        # We want discriminator to belive that fake images are real
+        y2 = tf.constant([[1.]] * batch_size)
+        # Avois a warning
+        discriminator.trainable = False
+        GAN.train_on_batch(noise, y2)
+print("TRAINING COMPLETE")           
+noise = tf.random.normal(shape=[10,codings_size])
+noise.shape # TensorShape([10, 100])
+#plt.imshow(noise)
+images = generator(noise)
+fig,axes = plt.subplots(nrows=1,ncols=2)
+axes[0].imshow(images[0])
+axes[1].imshow(images[1])
+```
+![ch108_dcgan](./ch108_dcgan.png)
+- Mode collapse is prevented
+
+## Section 13: Deployment
 
 ### 109. Introduction to Deployment
+- Steps
+  - Create a model
+  - Exporting a model
+  - Creating a callable API
+  - Calling the API with Postman
+  - Calling the API with Python
+  - Calling a model through Flask
+  - Launching a full ML App to the web
+- We assume that you're familiar with Web API
+
 ### 110. Creating the Model
+```py
+import numpy as np
+import pandas as pd
+iris = pd.read_csv("./tmp/DATA/iris.csv")
+X = iris.drop('species',axis=1)
+y = iris['species']
+from sklearn.preprocessing import LabelBinarizer
+encoder = LabelBinarizer()
+y = encoder.fit_transform(y)
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=101)
+scaler = MinMaxScaler()
+scaler.fit(X_train)
+scaled_X_train = scaler.transform(X_train)
+scaled_X_test = scaler.transform(X_test)
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+model = Sequential()
+model.add(Dense(units=4,activation='relu',input_shape=[4,]))
+# Last layer for multi-class classification of 3 species
+model.add(Dense(units=3,activation='softmax'))
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',metrics=['accuracy'])
+from tensorflow.keras.callbacks import EarlyStopping
+early_stop = EarlyStopping(patience=10)
+model.fit(x=scaled_X_train, 
+          y=y_train, 
+          epochs=300,
+          validation_data=(scaled_X_test, y_test), verbose=1 ,callbacks=[early_stop]         )
+metrics = pd.DataFrame(model.history.history)
+metrics[['loss','val_loss']].plot()
+model.evaluate(scaled_X_test,y_test,verbose=0) # [0.48823851346969604, 0.8666666746139526]
+# We reached 86% prediction
+# retraining for deployment
+epochs = len(metrics)
+scaled_X = scaler.fit_transform(X)
+model = Sequential()
+model.add(Dense(units=4,activation='relu'))
+# Last layer for multi-class classification of 3 species
+model.add(Dense(units=3,activation='softmax'))
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',metrics=['accuracy'])
+model.fit(scaled_X,y,epochs=epochs)
+model.save("final_iris_model.h5")
+import joblib
+joblib.dump(scaler,'iris_scaler.pkl')
+```
+
 ### 111. Model Prediction Function
+- Following codes are exported:
+```py
+# how to load models
+from tensorflow.keras.models import load_model
+import numpy as np
+import joblib
+flower_model = load_model('final_iris_model.h5')
+flower_scaler = joblib.load("iris_scaler.pkl")
+#flower_example = {"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}
+def return_prediction(model,scaler,sample_json):
+  s_len = sample_json["sepal_length"]
+  s_wid = sample_json["sepal_width"]
+  p_len = sample_json["petal_length"]
+  p_wid = sample_json["petal_width"]
+  flower = [[s_len,s_wid,p_len,p_wid]]
+  classes = np.array(['setosa','versicolor','virginica'])
+  flower = scaler.transform(flower)
+  class_id = np.argmax((model.predict(flower)[0]),axis=0)
+  return classes[class_id]
+#return_prediction(flower_model,flower_scaler, flower_example)  # 0 -> setosa
+```
+
 ### 112. Running a Basic Flask Application
+- ch112.py:
+```py
+from flask import Flask
+app = Flask(__name__)
+@app.route("/")
+def index():
+    return '<h1> FLASK app is running </h1>'
+if __name__ == "__main__":
+    app.run()
+```
+
 ### 113. Flask Postman API
+- Couple the prediction function abve with Flask
+```py
+from flask import Flask,request,jsonify
+import numpy as np
+from tensorflow.keras.models import load_model
+import joblib
+flower_model = load_model('final_iris_model.h5')
+flower_scaler = joblib.load("iris_scaler.pkl")
+def return_prediction(model,scaler,sample_json):
+    s_len = sample_json["sepal_length"]
+    s_wid = sample_json["sepal_width"]
+    p_len = sample_json["petal_length"]
+    p_wid = sample_json["petal_width"]
+    flower = [[s_len,s_wid,p_len,p_wid]]
+    classes = np.array(['setosa','versicolor','virginica'])
+    flower = scaler.transform(flower)
+    class_id = np.argmax((model.predict(flower)[0]),axis=0)
+    return classes[class_id]
+app = Flask(__name__)
+@app.route("/")
+def index():
+    return '<h1> FLASK app is running </h1>'
+@app.route('/api/flower',methods=['POST'])
+def flower_prediction():
+    content = request.json
+    result = return_prediction(flower_model,flower_scaler,content)
+    return jsonify(result)
+if __name__ == "__main__":
+    app.run()
+```
+- Run as `python3 ch113.py`
+
 ### 114. Flask API - Using Requests Programmatically
+- From jupyter or python interface
+```py
+import requests
+flower_example = {
+  "sepal_length":5.1,
+  "sepal_width":3.5,
+  "petal_length":1.4,
+  "petal_width":0.2
+}
+result = requests.post("http://127.0.0.1:5000/api/flower", json=flower_example)
+result.status_code # 200 means successful
+print(result.text) # "setosa"
+```
+
 ### 115. Flask Front End
+- Prerequisites: HTML and Jinja templates
+- App
+  - Connect to .html files
+    - Use Flask to create an HTML form and inject to home.html
+    - Use Flask to accept submitted HTML form data
+    - Use Flask to return prediction to prediction.html
+- Home.html
+  - Simple html file that uses a Flask based form to accept user input
+- Prediction.html
+  - Returns back predictions
+- pip install flask_wtf  
+- server.py:
+```py
+from flask import Flask,render_template,session,url_for,redirect
+from flask_wtf import FlaskForm
+import numpy as np
+from wtforms import StringField,SubmitField
+from tensorflow.keras.models import load_model
+import joblib
+flower_model = load_model('final_iris_model.h5')
+flower_scaler = joblib.load("iris_scaler.pkl")
+def return_prediction(model,scaler,sample_json):
+    s_len = sample_json["sepal_length"]
+    s_wid = sample_json["sepal_width"]
+    p_len = sample_json["petal_length"]
+    p_wid = sample_json["petal_width"]
+    flower = [[s_len,s_wid,p_len,p_wid]]
+    classes = np.array(['setosa','versicolor','virginica'])
+    flower = scaler.transform(flower)
+    class_id = np.argmax((model.predict(flower)[0]),axis=0)
+    return classes[class_id]
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'myscecretkey'
+class FlowerForm(FlaskForm):
+    sep_len = StringField("Sepal Length")
+    sep_wid = StringField("Sepal Width")
+    pet_len = StringField("Petal Length")
+    pet_wid = StringField("Petal Width")
+    submit = SubmitField("Analyze")    
+@app.route("/",methods=['GET', 'POST'])
+def index():
+    form = FlowerForm()
+    if form.validate_on_submit():
+        session['sep_len'] = form.sep_len.data
+        session['sep_wid'] = form.sep_wid.data
+        session['pet_len'] = form.pet_len.data
+        session['pet_wid'] = form.pet_wid.data
+        return redirect(url_for("prediction")) # to def prediction()
+    return render_template('home.html',form=form)
+@app.route('/prediction')
+def prediction():
+    content = {}
+    content['sepal_length'] = float(session['sep_len'])
+    content['sepal_width'] = float(session['sep_wid'])
+    content['petal_length'] = float(session['pet_len'])
+    content['petal_width'] = float(session['pet_wid'])
+    result = return_prediction(flower_model,flower_scaler,content)
+    return render_template('prediction.html',results=result)
+if __name__ == "__main__":
+    app.run()
+```  
+- template/home.html:
+```html
+<h1>FLASK APP RUNNING</h1>
+<h2>Please enter your flower measurements below:</h2>
+<form  method="POST">
+    {# This hidden_tag is a CSRF security feature. #}
+    {{ form.hidden_tag() }}
+    {{ form.sep_len.label }} {{form.sep_len}}
+    <br>
+    {{ form.sep_wid.label}} {{form.sep_wid}}
+    <br>
+    {{form.pet_len.label}}{{form.pet_len}}
+    <br>
+    {{form.pet_wid.label}}{{form.pet_wid}}
+    <br>
+    {{ form.submit() }}
+</form>
+```
+- template/prediction.html:
+```html
+<h1>Thank You. Here is the Information You Gave:</h1>
+<ul>
+	<li>Sepal Length: {{session['sep_len']}}</li>
+	<li>Sepal Width:  {{session['sep_wid']}}</li>
+	<li>Petal Length: {{session['pet_len']}}</li>
+	<li>Petal Width:  {{session['pet_wid']}}</li>
+</ul>
+<h2>Your Predicted Flower Class is: {{results}}</h2>
+```
+![ch115_before](./ch115_before.png)
+![ch115_after](./ch115_after.png)
+
 ### 116. Live Deployment to the Web
+- Heroku account: https://www.heroku.com/
