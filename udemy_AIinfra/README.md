@@ -2534,33 +2534,494 @@ NCCL_NET_GDR_LEVEL=2 # enable GDR
   - Multi-model inference pipelines: gRPC
   
 ### 95. 94. TensorFlow Serving for AI Models
+- Endpoints and ports
+  - gRPC endpoint
+    - Default port: 8500
+    - API methods: predict, classify, regress
+    - Optimized for internal service-to-service
+    - Higher performance with binary protocol
+  - REST endpoint
+    - Default port: 8501
+    - API path: /v1/models/;predict
+    - Better for external/edge services
+    - JSON based for easier debugging
+- Model versioning and policies
+  - Directory based version control
+  - Make all versions available through diffferent endpoints
+- Multi-model config
+  - Ex: text model + image classification
+  - May jeopardize resource
+- Batching & throughput
+  - `--enable-batching=true`
+- Performance tips
+  - Protocol optimization: gRPC + protobuf 
+  - Warm requests: eliminate cold-start latency
+  - Precision otimization: float16/bfloat16
+  - Resource management: Pinning CPUs  
 
 ### 96. 95. TorchServe for PyTorch Models
+- Why Torchserve?
+  - Official PyTorch solution
+  - Built-in APIs: REST and gRPC
+  - Multi-model support: hosts multiple models simultaneously
+  - Production features
+    - Logging, metrics collection, batch inference, and A/B testing support
+- Core components
+  - Model Archive (MAR)
+  - TorchServe Process
+  - Management API
+  - Inference API
+- Creating a Model Archive (MAR)  
+  - Export model to .pt or a scripted/traced format
+  - Bundle with a handler
+  - Use torch-model-archiver to create MAR fiel
+- Starting TorchServe
+  - Launch the server: `torchserve --start --model-store model_store --models resnet50=resnmet50.mar`
+  - Access Inference API:
+    - REST endpoint: `POST /predictions/resnet50`
+    - gRPC service: `service InferenceAPIsService { rpc Predictions(PredictionsRequest)} returns (PredictionResponse); }`
+- Configurations and options
+  - Config.properties
+  - Worker scaling
+  - Batch inference
+  - Multi-model hosting
+- Common pitfalls
+  - Oversized model archives
+  - Resource contention
+  - Hidden latency
+  - Batch size neglect
 
 ### 97. 96. Deploying Models with FastAPI
+- Why FastAPI?
+  - Modern Python Framework
+  - High Performance
+  - ML Library Integration
+  - Built-in OpenAPI docs
+- Core workflow
+  - Load your trained model
+  - Create FastAPI app
+  - Add Pre/Post processing
+  - Deploy
+- Minimal example:
+```py
+from fastapi imprt FastAPI
+import joblib
+app = FastAPI()
+model = joblib.load("model.pkl")
+@app.post("/predict")
+def predict(features:dict):
+    return {"prediction":model.predict([list(features.values())])[0]}
+```
+  - Run `uvicorn main:app --host 0.0.0.0 --port 8000`
+- Adding pydantic models
+  - Use `BaseModel` for request/response schemas to ensure validation and enhance API docs
+```py
+from fastapi import FastAPI
+from pydantic import BaseModel
+class Input(BaseModel):
+    age: int
+    income: float
+    credit_score: int
+    has_debt: bool
+class Output(BaseModel):
+    prediction: float
+    probability: float
+  @app.post("/predict",response_model=Output)
+  def predict(data: input):
+      # process with model
+      return Output(...)
+```
+- Containerization
+  - Consistent environments
+  - Dependency isolation
+  - Easy deployment
+  - Versioning support
+- Scaling & Production
+  - Concurrency: Use Gunicorn workers to handle multiple requests simultaneously
+  - Orchestration: deploy on kubernetes with horizontal pod autoscaling
+  - Load balancing
+  - Caching: Add Redis layer for caching frequent inference requests
+- Advanced patterns
+  - Async endpoints
+```py
+@app.post("/predict")
+async def predict(data: input):
+    result = await run_inference(data)
+    return result
+```  
+  - Streaming responses
+```py
+@app.post("/generate")
+async def generate(prompt: str):
+    async def token_generator():
+        for token in model.generate(prompt):
+            yield {"token":token}
+    return StreamingResponse(token_generator())
+```
 
 ### 98. 97. Scaling Model Serving with Kubernetes
+- Autoscaling options
+  - Horizontal Pod Autoscaler (HPA)
+    - Scales number of inference pods based on CPU/GPU utilization or custom metrics
+  - Veritcal Pod Autoscaler (VPA)
+    - Dynamically adjusts CPU/memory resources allocated to containers
+  - Cluster Autoscaler
+    - Adds or removes worker nodes when pods can't be scheduled
+  - Custom Metric Scaling
+    - Scale on business metrics: queries per second, inference latency, queue depth
+- Cost optimization
+  - Right size resources
+  - Leverage spot/preemptible instances
+  - Efficient autoscaling
+  - Separate training and inference
+- Common pitfalls
+  - Resource misconfiguration   
+  - Incomplete scaling metrics
+  - Poor GPU utilization
+  - Cold start latency surprises
+- Best practice
+  - Scalable infrastructure
+  - Multi-layer scaling
+  - SLO-driven operations
+  - Separation of concerns
 
 ### 99. 98. Lab – Serve an Image Classifier with FastAPI
 
-    2min
+## Section 16: Week 15: Advanced Model Serving
 
 ### 100. 99. NVIDIA TensorRT Optimization
+- TensorRT: Nvidia's specialized SDK for high-performance inference
+  - Lower latency
+  - Reduced cost
+  - Higher throughput
+- Core optimization
+  - Layer fusion
+  - Precision calibration: automatically converts FP32 into FP16/INT8
+  - Kernel auto-tuning
+  - Memory optimization
+- Supported model formats
+  - TensorFlow
+  - PyTorch
+  - ONNX
+    - `trtexec --onnx=model.onnx --saveEngine=model.engine`
+  - TensorRT Engine
+- Precision Modes
+  - FP32: 1x
+  - FP16: 2x
+  - INT8: 4x
+  - FP8: 6x
+- TensorRT workflow overview
+  - Export model
+  - Optimize with TensorRT
+  - Select precision
+  - Deploy engine
+  - Benchmark Performance    
+- Deployment options
+  - Standalone TensorRT
+  - Nvidia Triton server
+  - Kubernetes integration
+  - Edge deployment
+    - Jetson devices with TensorRT runtime
+- Performance optimization tips
+  - Static vs dynamic shapes
+  - Engine warm-up
+  - GPU friendly dimensions: align input shapes with multiple sof 8/16/32 to maximize tensor core utilization
+  - Performance metrics: monitor both p95/p99 latency and throughput
+- Observability and debugging
+  - TensorRT profiling tools
+    - TensorRT verbose logs
+    - Nsight systems
+    - Nsight compute
+  - Key metrics to monitor
+    - SM utilization
+    - Memory throughput
+    - Kernel duration
+    - Accuracy comparison
+- Common pitfalls and solutions
+  - Unsupported operations
+    - Exotic ONNX ops cause fallback -> implement custom plugins or replace with supported alternatives
+  - Calibration issues
+    - Poor INT8 accuracy due to inadequate calibration dataset -> use representative dataset with 100+ samples covering the input distribution
+  - Precision problems
+    - Over-aggressive precision causing unstable predictions -> set precision per layer with TensorRT API for sensitive operations
+  - Batch size neglect  
+    - Default batch size leads to underutilized GPU -> profile different batch sizes to find optimal throughput/latency balance
+
 ### 101. 100. Triton Inference Server Basics
+- Triton
+  - An open-source model serving platform
+  - Supports multiple ML framekworks: PyTorch, TensorFlow, ONNX, TensorRT, XGBoost, and more
+  - Provides gRPC/REST APIs for easy integraiton
+  - Enables dynamic bathcing
+  - Facilitates multi-model hosting
+- Why Triton?
+  - Unified serving
+  - GPU optimization
+  - Advanced features
+  - Monitoring
+- Deployment options
+  - Docker containers: official Nvidia container images
+  - Kubernetes: Scale with Helm charts and NGC containers for orchestrated deployments across clusters
+  - Edge devices
+  - Integration options
+- Model repository structure
+```bash
+models/
+└──resnet50/
+   └── v1/
+       ├── model.onnx
+       └── config.pbtxt
+```       
+  - One directory per model (resnet50)
+  - Versioned subfolders (v1)
+  - config.pbtxt defines critical model parameters  
+    - Input/output specifications
+    - Batching configuraiton
+    - Backend selection
+- Launching Triton server
+  - `docker run --gpus all -it --rm -p 8000:8000 -p 8001:8001 -p 8002:8002 -v $PWD/models:/models nvcr.io/nvidia/tritonserver:24.05-py3 tritonserver --model-repository=/models`
+  - HTTP/REST (8000)
+  - gRPC (8001)
+  - Metrics (8002): Prometheus-compatible endpoint
+- Making client requests
+  - REST API ex: `POST http://localhost:8000/v2/models/resnet50/infer`
+- Dyanmic batching
+  - Triton can automatically combine multiple inference requests into a single batch operation, significantly improving GPU utilization and throughput
+  - Particularly effective for high-volume inference workloads where individual requests arrive rapidly but asynchronously
+- Model ensembles
+  - Chain multiple models into a unified inference pipeline, reducing IO overhead and simplifying orchestration
+  - Steps
+    - Preprocessing
+    - Core inference
+    - Post processing
+- Common pitfalls to avoid
+  - Configuration errors: incorrect config.pbtxt
+  - Resource allocation: Oversized batch configuration
+  - Version compatibility: Mismatching CUDA/cuDNN versions b/w training and inference environments
+  - Oversubscription: Running too many models per GPU
+
 ### 102. 101. Batch Inference vs Online Inference
+- Batch inference
+  - Large volumes of predictions processed in bulk jobs
+  - Typically run on a schedule
+  - Optimized for throughput and cost efficiency
+  - Ex: churn prediction, risk scoring, recommendation refresh
+- Online inference
+  - Predictions served on-demand in real time
+  - Must meet strict p95/p99 latency SLOs
+  - Optimized for responsiveness and availabilty
+  - Ex: fraud detection, ads ranking, chatbot responses
+- Batch inference characteristics
+  - Hough throughput
+  - Large clusters
+  - Result storage
+  - Cost efficiency
+- Online inference characteristics
+  - Low latency/jitter
+  - Needs autoscaling
+  - REST/gRPC APIs
+  - Modern infrastructure: Kubernetes + GPU/CPU optimized nodes + sophisticated load balancing
+- Infrastructure trade-offs
+  - Batch  
+    - Cost efficient for non-urgent jobs
+    - Fault tolerance
+    - Resource optimization
+  - Online
+    - Higher operational costs
+    - Reliability engineering
+    - Complex scaling
+- Common pitfalls 
+  - Using online inference when batch suffices: overspending
+  - Ignoring feature skew b/w offline batch vs online service
+  - Not monitoring tail latency in real-time APIs
+  - Overloading online infra with requests better suited for batch
+- Decision matrix
+  - Choose batch when:
+    - Workload tolerates latency of minutes to hours
+    - Throughput + cost > real-time needs
+    - Predict once, reuse many times
+    - Processing window is predictable
+    - Resource efficiency is priortized
+  - Choose online when:
+    - Requires resonse in ms to sec
+    - Latency + SLA-driven workloads
+    - Predictions tied to user interactions
+    - Immediate decisions are needed
+    - User experience depends on speed
+- Best practices
+  - Define SLOs before choosing mode
+  - Use feature stores for consistency
+  - Monitor both accuracy drift and infra metrics
+  - Design clear ownership b/w batch +  online pipelines
+
 ### 103. 102. Caching for Fast Inference
+- Why caching matters
+  - Many inference requests are repeated or highly similar
+  - Strategic caching delivers following benefits
+    - Latency
+    - Cost
+    - Load
+- Levels of caching
+  - Client-side
+  - Edge/CDN
+  - API gateway: Cache REST/gRPC calls
+  - Application layer: Redis/Memcached store
+  - Feature/model cache: store embeddings
+- What to cache?
+  - Full API responses
+  - Model outputs for identical inputs
+  - Precomputed embeddings
+  - Preprocessing results
+- Cache keys and strategies
+  - Deterministic keys
+  - Input normalization
+  - Version tagging
+  - Time-to-Live (TTL): balance freshness vs cost savings by setting expriation periods
+- Tools and implementation
+  - In-Memory stores: Redis/Memcached
+  - Edge solutions: Cloudflare, Akamai, ASWS CloudFront
+  - Gateway Layers: Envoy, NGINX
+  - Vector databases: FAISS, Pinecone, Weaviate
+- Inference-specific patterns
+  - LLMs: Cache prompts
+  - Computer Vision: Cache image fingerprints
+  - Recommendation: Cache top-N recommendation lists
+  - Search: cache embedding
+- Challenges and pitfalls
+  - Staleness
+  - Memory pressure
+  - Cache invalidation
+  - Metric masking
+- Best practices
+  - Version everything
+  - Implement tiered caching
+  - Monitor aggressively
+  - Balance TTL settings
+  - Quantify benefits
+- Strategically implemented caching dramatically reduces latency, cost, and stress on GPU clusters
+- Compbine multiple cache layers for maximum efficiency and resilience
+
 ### 104. 103. Multi-Model Serving Strategies
+- Why multi-model serving?
+  - Modern enterprises often manage hundreds or thousands of production ML models
+  - Need to balance cost, latency, isolation and manageability
+- Key approaches
+  - Single model containers
+    - One pod = one model
+    - Pros: strong isolation, easy debugging, single deployment
+    - Cons: Poor GPU/CPU utilization, higher overhead, resource waste
+  - Multi-model servers
+    - Serve multiple models in one process (e.g., Triton, TorchServe)
+    - Pros: Resource sharing, dynamic/loading/unloading, better utilization
+    - Cons: Noisy-neighbor risks, complex configurations, harder to debug
+- Dynamic model loading
+  - Load models on demand
+  - Useful for long-tail models (rarely used but required)
+- Scaling patterns
+  - Horizontal scaling: replicate pods across nodes
+  - Weighted routing: split traffic per model version
+  - Popularity-based autoscaling: scale resources based on per-model traffic patterns
+- Resource sharing strategies
+  - Co-locate models with similar resource footprints to avoid imbalance
+  - Use GPU partitioning (MIG) to isolate resource intensive models
+  - Monitor per-model latency and QPS
+  - Apply granual quota 
+- Resource strategies
+  - Static routing: fixed URL path per model
+  - Dynamic routing: model ID in request path
+  - Ensemble routing: chain models in pipelines
+- Common pitfalls 
+  - Memory thrashing
+  - Startup bloat
+  - Environment mixing
+  - Missing SLOs
+- Best practices
+  - Criical model isolation: start with single-model per pod for high-value applications with strict SLAs
+  - Scale with multi-model servers
+  - Optimize for the long trail
+  - Instrument everything
+
 ### 105. 104. A/B Testing Model Endpoints
+- Why A/B test models?
+  - Real-world validation
+  - Risk reduction
+  - Business impact measurement
+- Core concepts
+  - Control model (A)  
+  - Candidate model (B)
+  - Comparison: collect metrics from both models to determine promotion or rollback
+- Traffic splitting methods
+  - Weighted routing: 90%/10% for A/B, Best for initial testing with minimal risk
+  - User/session-based: ensures users get consistent experience
+  - Header-based: gradual rollout strategies
+  - Progressive rollout: balances risk and data collection needs
+- Infrastructure patterns
+  - Traffic management
+    - API Gateway
+    - Service mesh
+    - Proxy servers
+  - Model serving
+    - Inference servers (Triton, TorchServe)
+    - Custom endpoints (FastAPI, Flask)
+    - Load balancers for scaling
+  - Observability and safety
+    - Metrics collectoin (Prometheus)
+    - Visualization (Grafana)
+    - Automated canary analysis and rollback
+- What to measure
+  - Technical metrics: latency, error rate & exceptions, throughput, resource utilization
+  - Model metrics: accuracy/precision/recall, confidence scores, feature drift indicators, fairness metrics
+  - Business KPIs: conversion rates, click-through rates, revenue impact, user engagement
+- Statistical considerations
+  - Sample size determination
+  - Statistical testing
+  - Avoid premature conclusions
+  - Monitor for bias
+- Observability Practices
+  - Implementation techniques
+    - Tag everything with model version and request ID
+    - Export per-model metrics
+    - Create side-by-side dashboards
+    - Set up automated alerts
+    - Implement automatic rollback triggers
+  - Essential dashboards
+    - Traffic distribution
+    - Latency comparison
+    - Error rate
+    - Business KPI
+    - Statistical significance
+    - Feature drift
+- Security and governance
+  - Authentication & rate limiting
+  - Documentation & auditing
+  - Data protection
+- Common pitfalls
+  - Insufficient traffic
+  - Traffic mix mismatch
+  - Inconsistent routing
+  - Tunnel vision: focusing only on ML metrics while ignoring business KPIs
+- Best practices
+  - Start small, scale gradually
+  - Implement sticky routing
+  - Define success criteria upfront
+  - Automate deployment pipeline
+
 ### 106. 105. Lab – Deploy a Model on Triton Server
 
-    3min
+## Section 17: Week 16: Observability in AI infrastructure
 
 ### 107. 106. Why Monitoring AI Systems Matters
+
 ### 108. 107. GPU Monitoring with DCGM
+
 ### 109. 108. Metrics Collection with Prometheus
+
 ### 110. 109. Visualization Dashboards with Grafana
+
 ### 111. 110. Tracing AI Requests with OpenTelemetry
+
 ### 112. 111. Building Alerts for AI System Failures
+
 ### 113. 112. Lab – Monitor GPU Cluster with Prometheus
 
     5min
