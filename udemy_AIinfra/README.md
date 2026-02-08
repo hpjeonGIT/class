@@ -96,6 +96,233 @@
   - Cost-performance optimization
 
 ### 8. 7. Lab – Spin Up Your First AI VM
+- Goal: Launch a cloud VM with a GPU, connect via SSH, install a basic ML stack, and verify the GPU is usable from Python.
+- What you’ll build: A Ubuntu-based VM with CUDA drivers + PyTorch ready to run GPU workloads.
+- Estimated time: 60–90 minutes (including account setup).
+- Cost guardrails: Use entry-level GPU flavors; stop the VM when not in use.
+- Prerequisites (once per cloud account)
+  - A credit-card verified AWS or Google Cloud account.
+  - SSH client (macOS/Linux have it; on Windows use PowerShell or Windows Terminal).
+  - A stable network; allow outbound HTTPS.
+- Path A — AWS EC2 (Deep Learning AMI, GPU)
+  - Why this path? AWS’s Deep Learning AMIs come pre-loaded with GPU drivers and popular frameworks, so you minimize setup time.
+```
+A1) Create key pair (for SSH)
+
+    Go to EC2 → Key pairs → Create key pair.
+
+    Type a name (e.g., ai-lab-key), type = RSA, file format = .pem (for macOS/Linux) or .ppk (for PuTTY).
+
+    Save the file securely.
+
+        Why: This private key is how you authenticate via SSH.
+
+A2) Check GPU instance quotas
+
+    In EC2 → Limits/Quotas, ensure you have capacity for g5 or g4dn.
+
+    If not, Request limit increase (choose a small size like g5.xlarge).
+
+        Why: Many accounts start with zero GPU quota.
+
+A3) Launch the instance
+
+    EC2 → Instances → Launch instances.
+
+    Name: ai-lab-aws.
+
+    AMI: search and select “Deep Learning AMI (Ubuntu)” (GPU version).
+
+    Instance type: g5.xlarge (entry-level GPU with 1x NVIDIA A10G).
+
+    Key pair: choose ai-lab-key.
+
+    Network settings: Create/choose a security group:
+
+        Allow SSH (22) from My IP only.
+
+    Storage: set 100 GB gp3 (room for datasets).
+
+    Click Launch instance.
+
+        Why: The DLAMI includes CUDA/NVIDIA drivers and Conda envs out of the box.
+
+A4) Connect via SSH
+
+    From Instances list, copy Public IPv4 address.
+
+    In terminal (macOS/Linux):
+
+        chmod 400 ~/Downloads/ai-lab-key.pem
+        ssh -i ~/Downloads/ai-lab-key.pem ubuntu@<PUBLIC_IP>
+
+        Why: chmod 400 protects your key; AWS requires it.
+
+A5) Verify GPU & drivers
+
+    nvidia-smi
+
+    You should see GPU model, driver, memory, and processes.
+
+    If not present: Your AMI likely isn’t the GPU DLAMI or quota gave you a CPU instance—terminate and relaunch correctly.
+
+A6) Update and prepare Conda
+
+DLAMI usually includes Conda; check with:
+
+    conda --version || echo "Conda not found"
+
+    If present:
+
+        conda create -n ai python=3.10 -y
+        conda activate ai
+
+    If not present (rare on DLAMI): install Miniconda:
+
+        wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+        echo 'export PATH="$HOME/miniconda/bin:$PATH"' >> ~/.bashrc
+        source ~/.bashrc
+        conda create -n ai python=3.10 -y && conda activate ai
+
+A7) Install PyTorch with CUDA and verify
+
+    python -V
+    pip install --upgrade pip
+    # Example install; adjust to current CUDA wheel per PyTorch docs if needed:
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    python - <<'PY'
+    import torch
+    print("CUDA available:", torch.cuda.is_available())
+    if torch.cuda.is_available():
+        print("GPU:", torch.cuda.get_device_name(0))
+        x = torch.rand(1024,1024, device='cuda')
+        y = torch.mm(x, x)
+        print("Matmul OK, y shape:", y.shape)
+    PY
+
+    Why: Confirms PyTorch sees the GPU and runs a tiny kernel.
+```
+- Path B — Google Cloud (Compute Engine, GPU)
+  - Why this path? GCP offers a one-click GPU driver install and modern GPU types like L4 (g2) and A100 (a2).
+```
+B1) Project & API
+
+    In Google Cloud Console, create/select a Project.
+
+    Enable the Compute Engine API.
+
+        Why: VMs require this API.
+
+B2) Request GPU quota
+
+    IAM & Admin → Quotas. Filter by NVIDIA L4 or A100 in your region (e.g., us-central1).
+
+    EDIT QUOTAS → request 1 GPU for g2 (L4) or a2 (A100).
+
+        Why: GPU quota is not enabled by default.
+
+B3) Create the VM
+
+    Compute Engine → VM instances → Create instance.
+
+    Name: ai-lab-gcp, Region/Zone: pick a zone with your GPU quota.
+
+    Machine family:
+
+        g2-standard-8 (1×L4) for cost-effective start, or
+
+        a2-highgpu-1g (1×A100) if available.
+
+    CPU platform: default.
+
+    GPU: click CPU platform and GPU → Add GPU → select NVIDIA L4 (g2) or A100 (a2).
+
+    Boot disk: Ubuntu 22.04 LTS, 100 GB.
+
+    Firewall: allow SSH (HTTP/HTTPS optional).
+
+    Click Create.
+
+B4) Install NVIDIA drivers (one-click)
+
+    After the VM is running, open it in the console; click “Install GPU driver” (if visible on the VM details page).
+
+        OR SSH in and install manually:
+
+            sudo apt-get update
+            sudo apt-get install -y ubuntu-drivers-common
+            sudo ubuntu-drivers autoinstall
+            sudo reboot
+
+        Why: Proper driver + CUDA install exposes the GPU to frameworks.
+
+B5) Verify GPU & set up Conda
+
+    SSH back in (from console SSH or your terminal):
+
+        nvidia-smi
+
+        You should see L4 or A100 listed.
+
+    Install Miniconda and environment (if you prefer Conda):
+
+        wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+        echo 'export PATH="$HOME/miniconda/bin:$PATH"' >> ~/.bashrc
+        source ~/.bashrc
+        conda create -n ai python=3.10 -y && conda activate ai
+
+B6) Install PyTorch with CUDA and verify
+
+    pip install --upgrade pip
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    python - <<'PY'
+    import torch
+    print("CUDA available:", torch.cuda.is_available())
+    if torch.cuda.is_available():
+        print("GPU:", torch.cuda.get_device_name(0))
+        x = torch.rand(1024,1024, device='cuda')
+        y = torch.mm(x, x)
+        print("Matmul OK, y shape:", y.shape)
+    PY
+
+Optional: Jupyter via SSH tunnel (either cloud)
+
+    Use this to get a browser notebook without opening public ports.
+
+    # On the VM:
+    conda activate ai
+    pip install jupyter
+    jupyter notebook --no-browser --port 8888
+
+From your local machine (replace host/IP accordingly):
+
+    ssh -i ~/Downloads/ai-lab-key.pem -N -L 8888:localhost:8888 ubuntu@<AWS_PUBLIC_IP>
+    # or for GCP:
+    ssh -N -L 8888:localhost:8888 <gcp-username>@<GCP_EXTERNAL_IP>
+
+Then open http://localhost:8888 in your browser and paste the token shown in the VM terminal.
+Troubleshooting Cheatsheet
+
+    Permission denied (publickey): wrong key, wrong user, or key file permissions. Use ubuntu@host for Ubuntu images and chmod 400 the key.
+
+    nvidia-smi not found: wrong image (CPU-only) or drivers not installed; reinstall drivers or recreate instance with DLAMI (AWS) or the GPU driver tool (GCP).
+
+    PyTorch says CUDA not available: version mismatch (driver/CUDA/toolkit). Reinstall PyTorch for the CUDA version supported by your driver, or update the driver.
+
+    Slow downloads or installs: run sudo apt-get update && sudo apt-get upgrade -y first; try a closer region next time.
+
+Cleanup (avoid surprise charges)
+
+    Stop the VM when not in use (you can restart later).
+
+    If done with the lab, Delete the VM and any attached disks or static IPs.
+
+    Remove any snapshots you created.
+
+    Keep your SSH key safe; rotate if it leaked.
+```
 
 ## Section 3: Week 2: Linux Foundations for AI Engineers
 
@@ -124,6 +351,212 @@
 ### 14. 13. Scripting for Automation in AI Workflows
 
 ### 15. 14. Lab – Set Up Ubuntu for AI Development
+- Goal: A clean Ubuntu box with Python envs, GPU driver (if available), PyTorch, JupyterLab, and Docker (+ NVIDIA runtime) — verified end-to-end.
+```
+0) Check OS, user, and hardware
+
+    lsb_release -a           # confirm Ubuntu 22.04 (Jammy)
+    whoami                   # your user
+    lspci | grep -i nvidia || echo "No NVIDIA GPU detected"
+
+    If you don’t see NVIDIA above, you can still proceed (CPU setup).
+
+    If you’re on a cloud GPU VM, prefer a GPU image (e.g., AWS DLAMI) and skip driver steps below.
+
+1) Update & base system hygiene
+
+    sudo apt update && sudo apt -y upgrade
+    sudo apt -y install build-essential git curl wget unzip zip tar ca-certificates \
+      htop iotop iftop tree tmux pkg-config software-properties-common \
+      nano vim neovim apt-transport-https gnupg lsb-release
+    sudo reboot
+
+Why: brings packages current, installs compilers/tools you’ll use constantly.
+2) (Optional but recommended) Secure basics
+
+    # Enable uncomplicated firewall (keeps SSH open)
+    sudo ufw allow OpenSSH
+    sudo ufw enable
+    sudo ufw status
+
+Why: sensible default protection, especially on cloud VMs.
+3) Git + SSH keys + global config
+
+    git --version
+    git config --global user.name "Your Name"
+    git config --global user.email "you@example.com"
+     
+    # Create an SSH key (press Enter to accept defaults, set a passphrase if you like)
+    ssh-keygen -t ed25519 -C "you@example.com"
+    eval "$(ssh-agent -s)"
+    ssh-add ~/.ssh/id_ed25519
+    cat ~/.ssh/id_ed25519.pub   # add this to GitHub/GitLab settings
+
+Why: seamless cloning/pushing and signed access.
+4) Python environment manager (Miniconda)
+
+    Fast, reliable, isolated environments for ML.
+
+    cd ~
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+    echo 'export PATH="$HOME/miniconda/bin:$PATH"' >> ~/.bashrc
+    source ~/.bashrc
+    conda init bash
+    exec $SHELL -l
+    conda --version
+
+Create your main env:
+
+    conda create -n ai python=3.10 -y
+    conda activate ai
+    python -V
+
+(Alternative: python3 -m venv .venv && source .venv/bin/activate if you prefer venv.)
+5) Core Python stack
+
+    pip install --upgrade pip wheel setuptools
+    pip install numpy pandas scipy scikit-learn matplotlib jupyterlab ipywidgets \
+      black isort flake8 pre-commit rich tqdm
+
+Why: essentials for analysis, notebooks, and code quality.
+6) NVIDIA GPU driver (only if you have an NVIDIA GPU & you’re not on a DLAMI)
+
+    Do not install full CUDA toolkit unless you know you need it; PyTorch wheels ship with the CUDA runtime.
+
+    # Detect & install the recommended proprietary driver
+    sudo apt -y install ubuntu-drivers-common
+    sudo ubuntu-drivers autoinstall
+    sudo reboot
+
+Verify after reboot:
+
+    nvidia-smi
+
+You should see driver version and your GPU. If not, recheck hardware/VM type.
+7) PyTorch install (GPU or CPU)
+
+    GPU path (CUDA 12.1 runtime wheel):
+
+    conda activate ai
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+    CPU-only path:
+
+    conda activate ai
+    pip install torch torchvision torchaudio
+
+Verify GPU access (works for CPU too):
+
+    python - <<'PY'
+    import torch
+    print("CUDA available:", torch.cuda.is_available())
+    print("Torch version:", torch.__version__)
+    if torch.cuda.is_available():
+        print("GPU:", torch.cuda.get_device_name(0))
+        x = torch.rand((2048,2048), device='cuda')
+        y = x @ x
+        print("Matmul OK:", y.shape)
+    PY
+
+8) JupyterLab setup & quick test
+
+    conda activate ai
+    jupyter lab --version
+    jupyter lab --no-browser --port 8888
+
+    From your local machine, use an SSH tunnel if this is a remote server:
+
+        ssh -N -L 8888:localhost:8888 <user>@<server-ip>
+
+    Open http://localhost:8888, paste token, create a notebook, and run:
+
+        import torch, pandas as pd
+        torch.cuda.is_available(), pd.__version__
+
+9) (Optional) OpenCV, Pillow, & extras
+
+    pip install opencv-python pillow seaborn plotly ipykernel
+    python -m ipykernel install --user --name ai --display-name "Python (ai)"
+
+Why: common CV/visualization tools; kernel makes the env selectable in Jupyter.
+10) Docker Engine (for reproducible runs)
+
+    # Add Docker’s official GPG key & repo
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+      sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) stable" | \
+      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+     
+    sudo apt update
+    sudo apt -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    sudo usermod -aG docker $USER
+    newgrp docker
+    docker --version
+    docker run hello-world
+
+Why: containers = portable, reproducible environments.
+11) NVIDIA Container Toolkit (GPU in Docker)
+
+    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+      sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+    curl -fsSL https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+      sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+    sudo apt update
+    sudo apt -y install nvidia-container-toolkit
+    sudo nvidia-ctk runtime configure --runtime=docker
+    sudo systemctl restart docker
+
+Test GPU inside a container:
+
+    docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi
+
+You should see your GPU in the container output.
+12) Quality-of-life setup (nice to have)
+
+    # tmux quickstart
+    tmux new -s work
+    # split: Ctrl-b then "
+    # detach: Ctrl-b then d
+     
+    # Pre-commit hooks in repos
+    cd /path/to/your/repo
+    pre-commit install
+
+Why: tmux keeps long trainings alive; pre-commit enforces consistent code.
+13) Create a project template
+
+    mkdir -p ~/projects/ai-starter/{data,notebooks,scripts,models,logs}
+    cd ~/projects/ai-starter
+    echo "numpy\npandas\nscikit-learn\ntorch\ntorchvision\n" > requirements.txt
+
+Why: a standard layout speeds up every new project.
+14) Verification checklist (what to confirm)
+
+    nvidia-smi shows your GPU (if present).
+
+    python test shows CUDA available: True (if GPU) and successful matmul.
+
+    jupyter lab opens and can run a Python cell.
+
+    docker run hello-world works.
+
+    docker run --gpus all ... nvidia-smi shows GPU inside Docker.
+
+15) Troubleshooting quick hits
+
+    Driver mismatch / CUDA not available: ensure you installed proprietary NVIDIA driver and rebooted; reinstall PyTorch wheel for cu121.
+
+    Conda not found after install: ensure PATH export in ~/.bashrc, then source ~/.bashrc.
+
+    Docker needs sudo: you didn’t add your user to docker group; run sudo usermod -aG docker $USER && newgrp docker.
+
+    Jupyter inaccessible on remote: use SSH port forward (-L 8888:localhost:8888) and keep Jupyter on --no-browser.
+```
 
 ## Section 4: Week 3: Cloud Infrastructure Basics
 
@@ -285,10 +718,404 @@
   - AWS EFS, Azure Files, Google Cloud Filestore
 
 ### 20. 19. Hands-On with AWS EC2 for AI
+- Goal: Launch an AWS EC2 GPU instance, install drivers/frameworks, run a quick PyTorch GPU test.
+- Time: ~60–90 minutes
+- Cost: A few dollars depending on instance type (be sure to stop/terminate after use).
+```
+1️⃣ Prerequisites
+
+    An AWS account (credit card verified).
+
+    Basic knowledge of Linux shell (Day 9–13 content).
+
+    AWS CLI installed locally (optional but recommended).
+
+2️⃣ Create a Key Pair (SSH Access)
+
+    In AWS Console, go to EC2 → Key Pairs → Create key pair.
+
+    Select: Name: ai-keypair, Type: RSA, File format: .pem (Linux/Mac).
+
+    Save the .pem file to ~/.ssh/ai-keypair.pem.
+
+    Run locally:
+
+        chmod 400 ~/.ssh/ai-keypair.pem
+
+    ✅ Why: Protects your key file so SSH will accept it.
+
+3️⃣ Check GPU Quotas
+
+    Navigate to Service Quotas → EC2 → Running On-Demand G and P instances.
+
+    If quota is 0, request a limit increase (e.g., 1 for g5.xlarge).
+    ✅ Why: By default, new AWS accounts often have no GPU quota.
+
+4️⃣ Launch a GPU Instance
+
+    In AWS Console: EC2 → Launch Instance.
+
+    Name: ai-ec2-lab.
+
+    AMI: choose Deep Learning AMI (Ubuntu 22.04) GPU Optimized.
+
+        Preinstalled: CUDA, PyTorch, TensorFlow.
+
+    Instance type: g5.xlarge (NVIDIA A10G GPU, 4 vCPUs, 16 GB RAM).
+
+    Key Pair: choose ai-keypair.
+
+    Network Settings:
+
+        Security Group → allow SSH (22) from My IP.
+
+        (Optional) allow HTTP/HTTPS if serving models.
+
+    Storage: set to 100 GB (default 8 GB too small for datasets).
+
+    Click Launch Instance.
+
+5️⃣ Connect to Your Instance
+
+    From Instances list, copy Public IPv4 address.
+
+    SSH in:
+
+        ssh -i ~/.ssh/ai-keypair.pem ubuntu@<INSTANCE_PUBLIC_IP>
+
+    ✅ Why: You’re now inside a cloud GPU server.
+
+6️⃣ Verify GPU
+
+Inside the VM, run:
+
+    nvidia-smi
+
+Expected: a table showing NVIDIA A10G GPU, driver version, memory usage.
+
+    If you don’t see it → you launched CPU-only instance (terminate & retry).
+
+7️⃣ Activate a Conda Environment
+
+The DLAMI comes with Conda preinstalled.
+
+    conda env list               # list prebuilt envs
+    conda activate pytorch       # activate PyTorch-ready env
+
+✅ Why: Saves you from manually installing CUDA & drivers.
+8️⃣ Run a PyTorch GPU Test
+
+    python - <<'PY'
+    import torch
+    print("CUDA available:", torch.cuda.is_available())
+    print("Torch version:", torch.__version__)
+    if torch.cuda.is_available():
+        print("GPU:", torch.cuda.get_device_name(0))
+        x = torch.rand((2048,2048), device='cuda')
+        y = x @ x
+        print("Matmul OK:", y.shape)
+    PY
+
+✅ Expected output:
+
+    CUDA available: True
+
+    GPU name (e.g., NVIDIA A10G)
+
+    Matmul OK: torch.Size([2048, 2048])
+
+9️⃣ (Optional) JupyterLab on EC2
+
+    Install if missing:
+
+        pip install jupyterlab
+
+    Launch on VM:
+
+        jupyter lab --no-browser --port 8888
+
+    On local machine, forward port:
+
+        ssh -i ~/.ssh/ai-keypair.pem -L 8888:localhost:8888 ubuntu@<INSTANCE_PUBLIC_IP>
+
+    Open http://localhost:8888 → run GPU-enabled notebooks.
+
+🔟 Cleanup (to avoid charges)
+
+    In AWS Console, stop instance if you’ll reuse it.
+
+    Or terminate if finished.
+
+    Delete unused volumes & security groups.
+```
 
 ### 21. 20. Hands-On with Google Cloud GPU Instances
+- Goal: Launch a Google Cloud VM with a GPU, install drivers + PyTorch, and verify GPU access.
+- Time: ~60–90 minutes
+- Cost: A few dollars depending on GPU type (stop VM after use).
+```
+1️⃣ Prerequisites
+
+    A Google Cloud account with billing enabled.
+
+    A new project created in the GCP Console.
+
+    gcloud CLI installed locally (optional, for advanced users).
+
+2️⃣ Enable Compute Engine API
+
+    In the Console, go to APIs & Services → Enable APIs and Services.
+
+    Search and enable Compute Engine API.
+    ✅ Why: You can’t create VMs without it.
+
+3️⃣ Request GPU Quotas
+
+    In Console → IAM & Admin → Quotas.
+
+    Filter by GPUs in your target region (e.g., us-central1).
+
+    Request at least 1 GPU (L4 = g2 instances, A100 = a2 instances).
+    ✅ Why: GPU usage is disabled by default in new accounts.
+
+4️⃣ Create a VM with GPU
+
+    Console → Compute Engine → VM instances → Create Instance.
+
+    Name: ai-gcp-lab.
+
+    Region/Zone: pick one with available GPU quota.
+
+    Machine type:
+
+        g2-standard-8 (1×L4 GPU, cost-effective), OR
+
+        a2-highgpu-1g (1×A100 GPU, high performance).
+
+    CPU platform: leave default.
+
+    GPU: click CPU platform and GPU → Add GPU → NVIDIA L4 or A100.
+
+    Boot disk: Ubuntu 22.04 LTS, at least 100 GB.
+
+    Firewall: allow SSH; (HTTP/HTTPS optional if serving APIs).
+
+    Click Create.
+
+5️⃣ Install NVIDIA Drivers
+
+    Once VM is running, SSH in from Console:
+
+        gcloud compute ssh ai-gcp-lab --zone=us-central1-a
+
+    Run one-click GPU driver installer:
+
+        sudo apt-get update
+        sudo apt-get install -y ubuntu-drivers-common
+        sudo ubuntu-drivers autoinstall
+        sudo reboot
+
+✅ Why: Ensures GPU is visible to frameworks like PyTorch.
+6️⃣ Verify GPU
+
+After reboot, reconnect via SSH:
+
+    nvidia-smi
+
+Expected: Table showing L4 or A100, driver version, and usage.
+
+    If missing → driver not installed or wrong VM type.
+
+7️⃣ Install Conda & Python Environment
+
+    # Download and install Miniconda
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+    echo 'export PATH="$HOME/miniconda/bin:$PATH"' >> ~/.bashrc
+    source ~/.bashrc
+     
+    # Create and activate environment
+    conda create -n ai python=3.10 -y
+    conda activate ai
+
+✅ Why: Isolated env for ML dependencies.
+8️⃣ Install PyTorch with GPU Support
+
+    For CUDA 12.1 runtime (works with L4/A100):
+
+    pip install --upgrade pip
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+9️⃣ Run a PyTorch GPU Test
+
+    python - <<'PY'
+    import torch
+    print("CUDA available:", torch.cuda.is_available())
+    print("Torch version:", torch.__version__)
+    if torch.cuda.is_available():
+        print("GPU:", torch.cuda.get_device_name(0))
+        x = torch.rand((2048,2048), device='cuda')
+        y = x @ x
+        print("Matmul OK:", y.shape)
+    PY
+
+✅ Expected:
+
+    CUDA available: True
+
+    GPU name (e.g., “NVIDIA L4” / “A100”)
+
+    Matmul OK: torch.Size([2048, 2048])
+
+🔟 (Optional) JupyterLab Setup
+
+    pip install jupyterlab
+    jupyter lab --no-browser --port 8888
+
+On your local machine, tunnel to the VM:
+
+    gcloud compute ssh ai-gcp-lab --zone=us-central1-a -- -L 8888:localhost:8888
+
+Then open → http://localhost:8888.
+1️⃣1️⃣ Cleanup (Avoid Charges)
+
+    In Console → Stop the VM if you plan to reuse.
+
+    Or Delete VM, attached disk, and static IP.
+
+    Always shut down when not in use.
+```
 
 ### 22. 21. Lab – Compare Cost & Performance Across Clouds
+- Goal: Deploy GPU instances across AWS, Google Cloud, and Azure, run a simple PyTorch benchmark, and compare cost vs performance.
+- Time: 90–120 minutes
+- Cost: A few dollars per provider (use spot/preemptible instances where possible, terminate after use).
+```
+1️⃣ Prerequisites
+
+    Active accounts on AWS, GCP, and Azure (all with billing enabled).
+
+    Quotas for at least 1 GPU VM in each cloud (AWS g5.xlarge, GCP g2-standard-8, Azure NCas T4_v3).
+
+    SSH access working (previous labs cover setup).
+
+    A shared dataset or script for consistency.
+
+2️⃣ Define the Benchmark Task
+
+We’ll use a matrix multiplication stress test in PyTorch.
+
+    import torch, time
+     
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    x = torch.rand((10000, 10000), device=device)
+     
+    # Warmup
+    y = x @ x
+     
+    # Benchmark
+    start = time.time()
+    for _ in range(10):
+        y = x @ x
+    torch.cuda.synchronize()
+    end = time.time()
+     
+    print(f"Device: {torch.cuda.get_device_name(0) if device=='cuda' else 'CPU'}")
+    print("Time taken:", round(end-start, 3), "seconds")
+
+✅ Why: Matrix multiplication is core to deep learning training (dense linear algebra).
+3️⃣ Launch Instances Across Clouds
+
+A) AWS (g5.xlarge)
+
+    AMI: Deep Learning AMI (Ubuntu 22.04).
+
+    GPU: 1×A10G.
+
+    Setup: conda activate pytorch → run benchmark.
+
+B) Google Cloud (g2-standard-8)
+
+    GPU: 1×L4 GPU.
+
+    OS: Ubuntu 22.04, install drivers + PyTorch (pip install torch --index-url https://download.pytorch.org/whl/cu121).
+
+    Run benchmark.
+
+C) Azure (NCas T4_v3, Standard_NC4as_T4_v3)
+
+    GPU: 1×T4 GPU.
+
+    Image: Azure ML DLVM Ubuntu (includes CUDA + PyTorch).
+
+    Run benchmark.
+
+4️⃣ Record Performance Results
+
+For each provider, capture:
+
+    GPU model (from nvidia-smi)
+
+    Benchmark runtime (seconds)
+
+    PyTorch version used
+
+Example results table:
+
+Cloud GPU Time (10 matmuls) Cost/hr (on-demand) AWS A10G 12.4 sec $1.20/hr GCP L4 10.8 sec $0.95/hr Azure T4 17.6 sec $0.90/hr
+5️⃣ Compare Costs
+
+Check on-demand pricing from each provider:
+
+    AWS g5.xlarge: ~$1.20/hr
+
+    GCP g2-standard-8: ~$0.95/hr
+
+    Azure NCas T4_v3: ~$0.90/hr
+
+✅ Cost varies by region and discount type (spot/preemptible).
+6️⃣ Analysis
+
+    Performance per dollar = (benchmark runtime ÷ cost/hr).
+
+    Which GPU gives best absolute performance?
+
+    Which gives best value for money?
+
+    Consider reliability of spot vs on-demand.
+
+7️⃣ Deliverables
+
+    Screenshots of nvidia-smi for each cloud instance.
+
+    Benchmark script output (time taken).
+
+    A completed comparison table.
+
+    Short written reflection:
+
+        “Which provider gave me the best performance?”
+
+        “Which provider gave me the best value?”
+
+        “Which one would I choose for a large AI project and why?”
+
+8️⃣ Cleanup (Critical ⚠️)
+
+    Stop or terminate all 3 GPU instances.
+
+    Delete any persistent disks or IPs.
+
+    Verify billing dashboards show no active charges.
+
+✅ By completing this lab, learners will:
+
+    Understand real differences in GPU performance across clouds.
+
+    Learn how to evaluate performance vs cost tradeoffs.
+
+    Build intuition for choosing infra in real-world AI projects.
+```
 
 ## Section 5: Week 4: Containerization Foundations
 
@@ -518,6 +1345,153 @@ model:
   - Match CUDA versions
 
 ### 29. 28. Lab – Containerize a PyTorch Model
+- Goal: Package a simple PyTorch model inside a Docker container, expose it as an API, and run predictions.
+- Time: ~60–90 minutes
+- Cost: Free (local Docker) or minimal (cloud VM with Docker + GPU).
+```
+1️⃣ Prerequisites
+
+    Docker installed (docker --version to confirm).
+
+    NVIDIA Container Toolkit (if using GPU).
+
+    PyTorch installed locally (for saving model).
+
+2️⃣ Step 1 – Train and Save a Model
+
+Create train_model.py:
+
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torchvision import datasets, transforms, models
+     
+    # Simple pretrained model (ResNet18)
+    model = models.resnet18(pretrained=True)
+    model.fc = nn.Linear(model.fc.in_features, 10)  # 10 classes
+     
+    # Fake training: just save weights for demo
+    torch.save(model, "model.pt")
+    print("✅ Model saved as model.pt")
+
+Run once locally:
+
+    python train_model.py
+
+✅ Creates model.pt for deployment.
+3️⃣ Step 2 – Build the FastAPI Inference App
+
+Create app.py:
+
+    from fastapi import FastAPI, UploadFile
+    from PIL import Image
+    import torch
+    import torchvision.transforms as T
+     
+    app = FastAPI()
+     
+    # Load model
+    model = torch.load("model.pt", map_location="cpu")
+    model.eval()
+     
+    transform = T.Compose([
+        T.Resize((224,224)),
+        T.ToTensor()
+    ])
+     
+    @app.post("/predict")
+    async def predict(file: UploadFile):
+        img = Image.open(file.file).convert("RGB")
+        x = transform(img).unsqueeze(0)
+        with torch.no_grad():
+            y = model(x)
+        pred = y.argmax().item()
+        return {"prediction": int(pred)}
+
+✅ Minimal API for predictions.
+4️⃣ Step 3 – Define Dependencies
+
+Create requirements.txt:
+
+    fastapi==0.103.0
+    uvicorn==0.23.2
+    torch==2.1.0
+    torchvision==0.16.0
+    pillow==10.0.0
+
+5️⃣ Step 4 – Create Dockerfile
+
+    FROM python:3.10-slim
+     
+    # Set working directory
+    WORKDIR /app
+     
+    # Install system deps
+    RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+     
+    # Copy requirements and install
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+     
+    # Copy model + code
+    COPY model.pt app.py ./
+     
+    # Expose port
+    EXPOSE 8000
+     
+    # Run FastAPI app
+    CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+6️⃣ Step 5 – Build Docker Image
+
+    docker build -t pytorch-api:latest .
+
+✅ Creates image pytorch-api:latest.
+
+Check with:
+
+    docker images
+
+7️⃣ Step 6 – Run the Container
+
+    docker run -it -p 8000:8000 pytorch-api:latest
+
+✅ Starts FastAPI server at http://localhost:8000/docs.
+8️⃣ Step 7 – Test API
+
+Open browser:
+
+    Go to http://localhost:8000/docs
+
+    Try /predict endpoint → upload an image (e.g., cat.jpg).
+
+    Response:
+
+    {"prediction": 3}
+
+Or test via curl:
+
+    curl -X POST "http://localhost:8000/predict" \
+      -F "file=@cat.jpg"
+
+9️⃣ (Optional) GPU Support
+
+Run container with GPU:
+
+    docker run --gpus all -it -p 8000:8000 pytorch-api:latest
+
+✅ Requires NVIDIA toolkit installed.
+✅ Learning Outcomes
+
+    Build + save PyTorch model for inference
+
+    Package model + API inside a container
+
+    Run reproducible AI inference anywhere
+
+    Understand containerized AI app workflow
+```
 
 ## Section 6: Week 5: Kubernetes Fundamentals
 
@@ -726,6 +1700,130 @@ containers:
     - Makes AI infrastructure modular
 
 ### 36. 35. Lab – Deploy a Model on Minikube
+- Goal: Run a PyTorch model API on Kubernetes using Minikube.
+- Time: ~90 minutes
+- Requirements: Docker, Minikube, kubectl installed.
+```
+1️⃣ Start Minikube
+
+    minikube start --memory=4096 --cpus=4
+
+    Allocates resources for the cluster
+
+    Check cluster status:
+
+    kubectl get nodes
+
+✅ You should see 1 ready node.
+2️⃣ Build a Model API Container
+
+Re-use the FastAPI PyTorch app from Day 28 (app.py, model.pt, requirements.txt, Dockerfile).
+
+Build image inside Minikube’s Docker:
+
+    eval $(minikube docker-env)
+    docker build -t ai-model:latest .
+    docker images | grep ai-model
+
+✅ Confirms the image is available to Minikube.
+3️⃣ Create Deployment YAML
+
+deployment.yaml:
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ai-model-deployment
+    spec:
+      replicas: 2
+      selector:
+        matchLabels:
+          app: ai-model
+      template:
+        metadata:
+          labels:
+            app: ai-model
+        spec:
+          containers:
+          - name: ai-model
+            image: ai-model:latest
+            ports:
+            - containerPort: 8000
+
+    Runs 2 replicas of the model API
+
+    Ensures self-healing + scalability
+
+Apply it:
+
+    kubectl apply -f deployment.yaml
+    kubectl get pods
+
+✅ Pods should transition to Running.
+4️⃣ Expose Service
+
+service.yaml:
+
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: ai-model-service
+    spec:
+      selector:
+        app: ai-model
+      ports:
+      - protocol: TCP
+        port: 80
+        targetPort: 8000
+      type: NodePort
+
+Apply it:
+
+    kubectl apply -f service.yaml
+    kubectl get svc
+
+✅ You’ll see a NodePort assigned (e.g., :30080).
+5️⃣ Access the API
+
+Get service URL:
+
+    minikube service ai-model-service --url
+
+Example: http://127.0.0.1:30080
+
+Open in browser → /docs to see FastAPI Swagger UI.
+✅ Try /predict with an image file.
+6️⃣ Scale Deployment
+
+    kubectl scale deployment ai-model-deployment --replicas=4
+    kubectl get pods
+
+✅ You should see 4 pods running your API.
+7️⃣ Inspect Logs
+
+    kubectl logs <pod-name>
+
+    Shows FastAPI server logs
+
+    Useful for debugging inference requests
+
+8️⃣ Cleanup
+
+    kubectl delete -f service.yaml
+    kubectl delete -f deployment.yaml
+    minikube stop
+
+✅ Frees resources after the lab.
+🎯 Learning Outcomes
+
+    Deploy a containerized PyTorch model on Kubernetes
+
+    Expose it via a Service for user access
+
+    Scale replicas with kubectl scale
+
+    Gain first hands-on experience with AI on Kubernetes
+```
 
 ## Section 7: Week 6: Data storage for AI
 
@@ -1007,6 +2105,180 @@ containers:
   - Security culture
 
 ### 43. 42. Lab – Build a Data Ingestion Pipeline
+- Goal: Create a pipeline that ingests raw data (CSV), stores it in object storage, streams updates through Kafka (or Pub/Sub), and lands curated data into a database for AI use.
+- Time: ~90–120 minutes
+- Tools: Python, Docker, Kafka (or GCP Pub/Sub), PostgreSQL, S3/MinIO
+```
+1️⃣ Set Up the Environment
+
+    Install Docker & Docker Compose
+
+    Clone starter repo (or create working dir):
+
+    mkdir ai-ingestion-lab && cd ai-ingestion-lab
+
+    Services we’ll run:
+
+        MinIO (S3-compatible storage)
+
+        Kafka broker
+
+        PostgreSQL database
+
+2️⃣ Run Infra Services with Docker Compose
+
+docker-compose.yml:
+
+    version: "3.9"
+    services:
+      minio:
+        image: minio/minio
+        command: server /data
+        environment:
+          MINIO_ROOT_USER: admin
+          MINIO_ROOT_PASSWORD: password
+        ports:
+          - "9000:9000"
+          - "9001:9001"
+     
+      kafka:
+        image: bitnami/kafka:latest
+        environment:
+          KAFKA_ENABLE_KRAFT: yes
+          KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+          KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+        ports:
+          - "9092:9092"
+     
+      postgres:
+        image: postgres:14
+        environment:
+          POSTGRES_USER: aiuser
+          POSTGRES_PASSWORD: aipass
+          POSTGRES_DB: aidb
+        ports:
+          - "5432:5432"
+
+Start services:
+
+    docker-compose up -d
+
+✅ Now you have local object storage, a Kafka broker, and a database running.
+3️⃣ Ingest Raw Data into Object Storage
+
+Python script ingest_to_minio.py:
+
+    from minio import Minio
+    import os
+     
+    client = Minio(
+        "localhost:9000",
+        access_key="admin",
+        secret_key="password",
+        secure=False
+    )
+     
+    # Ensure bucket exists
+    bucket = "rawdata"
+    if not client.bucket_exists(bucket):
+        client.make_bucket(bucket)
+     
+    # Upload file
+    client.fput_object(bucket, "transactions.csv", "transactions.csv")
+    print("✅ Uploaded transactions.csv to MinIO")
+
+Run:
+
+    pip install minio
+    python ingest_to_minio.py
+
+✅ Raw CSV now stored in MinIO (simulating S3).
+4️⃣ Stream Updates via Kafka
+
+Python producer kafka_producer.py:
+
+    from kafka import KafkaProducer
+    import json, time, random
+     
+    producer = KafkaProducer(
+        bootstrap_servers="localhost:9092",
+        value_serializer=lambda v: json.dumps(v).encode("utf-8")
+    )
+     
+    for i in range(10):
+        record = {"user_id": i, "amount": random.randint(10,1000)}
+        producer.send("transactions", record)
+        print("Produced:", record)
+        time.sleep(1)
+     
+    producer.flush()
+
+Run:
+
+    pip install kafka-python
+    python kafka_producer.py
+
+✅ Messages streaming into topic transactions.
+5️⃣ Consume and Store in Database
+
+Consumer kafka_consumer.py:
+
+    from kafka import KafkaConsumer
+    import json, psycopg2
+     
+    consumer = KafkaConsumer(
+        "transactions",
+        bootstrap_servers="localhost:9092",
+        value_deserializer=lambda m: json.loads(m.decode("utf-8"))
+    )
+     
+    conn = psycopg2.connect(
+        dbname="aidb", user="aiuser", password="aipass", host="localhost", port=5432
+    )
+    cur = conn.cursor()
+     
+    cur.execute("CREATE TABLE IF NOT EXISTS transactions (user_id INT, amount INT);")
+     
+    for msg in consumer:
+        record = msg.value
+        cur.execute("INSERT INTO transactions (user_id, amount) VALUES (%s, %s)",
+                    (record["user_id"], record["amount"]))
+        conn.commit()
+        print("Inserted:", record)
+
+Run:
+
+    pip install psycopg2 kafka-python
+    python kafka_consumer.py
+
+✅ Streaming messages now land into PostgreSQL.
+6️⃣ Verify Pipeline End-to-End
+
+    Check object storage: open http://localhost:9001 (MinIO console).
+
+    Inspect Kafka messages: logs from producer/consumer.
+
+    Query database:
+
+    docker exec -it <postgres-container> psql -U aiuser -d aidb -c "SELECT * FROM transactions;"
+
+✅ You should see streamed data in the DB table.
+7️⃣ Cleanup
+
+    docker-compose down -v
+
+✅ Stops services & removes volumes.
+🎯 Learning Outcomes
+
+    Store raw datasets in object storage (MinIO/S3)
+
+    Stream data into pipelines with Kafka
+
+    Land curated data into a relational DB
+
+    Understand data ingestion architecture for AI pipelines
+```
 
 ## Section 8: Week 7: GPU Hardware Deep Dive
 
@@ -1178,6 +2450,146 @@ containers:
   - Distributed training: DDP(DistributedData Parallel) and model parallelism efficiencies  
 
 ### 50. 49. Lab – Run a Model on GPU with CUDA
+- Goal: Train and run a simple deep learning model on a GPU using CUDA.
+- Time: ~60–90 minutes
+- Tools: Python, PyTorch, CUDA-enabled GPU, nvidia-smi
+```
+1️⃣ Verify GPU and CUDA Availability
+
+Check GPU devices:
+
+    nvidia-smi
+
+    Shows GPU type (e.g., A100, RTX 3090) and memory usage.
+
+    Confirms drivers are working.
+
+Check CUDA in PyTorch:
+
+    import torch
+    print(torch.cuda.is_available())   # Should be True
+    print(torch.cuda.device_count())   # Number of GPUs
+    print(torch.cuda.get_device_name(0))  # GPU name
+
+✅ Output should confirm CUDA-enabled GPU is available.
+2️⃣ Load a Dataset
+
+We’ll use MNIST (handwritten digits) for speed.
+
+    import torch
+    import torchvision
+    import torchvision.transforms as transforms
+     
+    transform = transforms.Compose([transforms.ToTensor()])
+    trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True)
+
+✅ Dataset prepared for training.
+3️⃣ Define a Simple Neural Network
+
+    import torch.nn as nn
+    import torch.nn.functional as F
+     
+    class Net(nn.Module):
+        def __init__(self):
+            super(Net, self).__init__()
+            self.fc1 = nn.Linear(28*28, 128)
+            self.fc2 = nn.Linear(128, 64)
+            self.fc3 = nn.Linear(64, 10)
+     
+        def forward(self, x):
+            x = x.view(-1, 28*28)
+            x = F.relu(self.fc1(x))
+            x = F.relu(self.fc2(x))
+            return self.fc3(x)
+     
+    model = Net()
+
+✅ Basic 3-layer MLP defined.
+4️⃣ Move Model to GPU
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+
+✅ Model is now using GPU if available.
+5️⃣ Define Optimizer & Loss Function
+
+    import torch.optim as optim
+     
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+6️⃣ Training Loop on GPU
+
+    for epoch in range(2):  # Run 2 epochs
+        running_loss = 0.0
+        for images, labels in trainloader:
+            images, labels = images.to(device), labels.to(device)
+     
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+     
+            running_loss += loss.item()
+     
+        print(f"Epoch {epoch+1}, Loss: {running_loss/len(trainloader)}")
+
+✅ Model trains on GPU with CUDA acceleration.
+7️⃣ Monitor GPU Usage During Training
+
+Run in a separate terminal:
+
+    watch -n 1 nvidia-smi
+
+    Check GPU utilization %, memory usage, and processes.
+
+    Confirms training jobs are actively using CUDA.
+
+8️⃣ Test Model Inference on GPU
+
+    testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False)
+     
+    correct, total = 0, 0
+    with torch.no_grad():
+        for images, labels in testloader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+     
+    print(f"✅ Accuracy on test data: {100 * correct / total:.2f}%")
+
+✅ Model makes predictions on GPU, improving speed.
+9️⃣ Experiment: CPU vs GPU Speed
+
+    Run training with device = "cpu" and note time.
+
+    Run training with device = "cuda" and compare.
+
+    Expect 2–10x speedup depending on GPU.
+
+🔟 Cleanup
+
+If using cloud (AWS, GCP, Colab):
+
+    Stop instances to save cost.
+
+    Clear dataset if needed.
+
+🎯 Learning Outcomes
+
+    Verify CUDA + GPU setup for AI workloads
+
+    Train and test a PyTorch model on GPU
+
+    Compare CPU vs GPU training performance
+
+    Monitor GPU utilization in real time
+```
 
 ## Section 9: Week 8: Distributed Training Basics
 
@@ -1387,6 +2799,153 @@ containers:
   - Multi-level resilience
 
 ### 57. 56. Lab – Train ResNet Across Multiple GPUs
+- Goal: Train ResNet-18 on the CIFAR-10 dataset using PyTorch Distributed Data Parallel (DDP) across multiple GPUs.
+- Time: ~90 minutes
+- Tools: Python, PyTorch, CUDA-enabled system with 2+ GPUs
+```
+1️⃣ Verify Environment
+
+Check GPU availability:
+
+    nvidia-smi
+
+    Confirm at least 2 GPUs.
+
+Check PyTorch with CUDA:
+
+    import torch
+    print(torch.cuda.device_count())   # should be >= 2
+    print(torch.cuda.is_available())   # should be True
+
+2️⃣ Setup CIFAR-10 Dataset
+
+    import torch
+    import torchvision
+    import torchvision.transforms as transforms
+     
+    transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(32, padding=4),
+        transforms.ToTensor()
+    ])
+     
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transforms.ToTensor())
+
+3️⃣ Define ResNet-18 Model
+
+    import torchvision.models as models
+    import torch.nn as nn
+     
+    def build_model():
+        model = models.resnet18(weights=None, num_classes=10)
+        return model
+
+4️⃣ DDP Training Script
+
+Create file train_ddp.py:
+
+    import os, torch, torch.distributed as dist
+    import torch.multiprocessing as mp
+    import torch.nn as nn, torch.optim as optim
+    import torchvision
+    import torchvision.transforms as transforms
+    import torchvision.models as models
+    from torch.nn.parallel import DistributedDataParallel as DDP
+     
+    def setup(rank, world_size):
+        dist.init_process_group("nccl", rank=rank, world_size=world_size)
+        torch.cuda.set_device(rank)
+     
+    def cleanup():
+        dist.destroy_process_group()
+     
+    def train(rank, world_size):
+        setup(rank, world_size)
+     
+        transform = transforms.Compose([transforms.ToTensor()])
+        trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, num_replicas=world_size, rank=rank)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, sampler=train_sampler)
+     
+        model = models.resnet18(weights=None, num_classes=10).to(rank)
+        model = DDP(model, device_ids=[rank])
+     
+        criterion = nn.CrossEntropyLoss().to(rank)
+        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+     
+        for epoch in range(2):  # keep short for demo
+            train_sampler.set_epoch(epoch)
+            running_loss = 0.0
+            for inputs, labels in trainloader:
+                inputs, labels = inputs.to(rank), labels.to(rank)
+                optimizer.zero_grad()
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                running_loss += loss.item()
+            print(f"[GPU {rank}] Epoch {epoch+1}, Loss: {running_loss/len(trainloader)}")
+     
+        cleanup()
+     
+    def main():
+        world_size = torch.cuda.device_count()
+        mp.spawn(train, args=(world_size,), nprocs=world_size, join=True)
+     
+    if __name__ == "__main__":
+        main()
+
+5️⃣ Launch Distributed Training
+
+    python -m torch.distributed.run --nproc_per_node=2 train_ddp.py
+
+    --nproc_per_node=2 → runs across 2 GPUs (adjust as needed).
+
+    Each GPU runs its own process.
+
+✅ Output should show parallel loss logs per GPU.
+6️⃣ Monitor GPU Utilization
+
+Run in separate terminal:
+
+    watch -n 1 nvidia-smi
+
+    See multiple processes using GPUs.
+
+    Confirms GPUs are busy training in parallel.
+
+7️⃣ Evaluate Trained Model
+
+(Optional) Save checkpoint in script:
+
+    if rank == 0:  # only one process saves
+        torch.save(model.state_dict(), "resnet_ddp.pth")
+
+Load for testing:
+
+    model = models.resnet18(weights=None, num_classes=10)
+    model.load_state_dict(torch.load("resnet_ddp.pth"))
+    model.eval()
+
+8️⃣ Cleanup
+
+    Kill all training processes if needed:
+
+    pkill -f train_ddp.py
+
+    Free GPU memory after run.
+
+🎯 Learning Outcomes
+
+    Understand how to run DDP with PyTorch
+
+    Train ResNet across multiple GPUs efficiently
+
+    Monitor GPU scaling & utilization
+
+    Learn practical multi-GPU AI infra skills
+```
 
 ## Section 10: Week 9: Workflow Automation & Experiment Tracking
 
@@ -1602,6 +3161,155 @@ with mlflow.start_run():
   - Secure your pipeline 
 
 ### 64. 63. Lab – Track Experiments with MLflow
+- Goal: Learn how to log parameters, metrics, and artifacts of a PyTorch model training run using MLflow Tracking.
+- Time: ~60–90 minutes
+- Tools: Python, PyTorch, MLflow, CUDA-enabled GPU (optional)
+```
+1️⃣ Install and Launch MLflow
+
+Install MLflow:
+
+    pip install mlflow[extras]
+
+Run MLflow tracking server locally:
+
+    mlflow ui
+
+    Default: http://127.0.0.1:5000
+
+    Web UI → experiment dashboard
+
+2️⃣ Verify Environment
+
+    import mlflow
+    print("MLflow version:", mlflow.__version__)
+
+✅ Confirms MLflow installed and available.
+3️⃣ Load Dataset (MNIST Example)
+
+    import torch, torchvision
+    import torchvision.transforms as transforms
+     
+    transform = transforms.ToTensor()
+    trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True)
+
+4️⃣ Define Model
+
+    import torch.nn as nn
+    import torch.nn.functional as F
+     
+    class Net(nn.Module):
+        def __init__(self):
+            super(Net, self).__init__()
+            self.fc1 = nn.Linear(28*28, 128)
+            self.fc2 = nn.Linear(128, 64)
+            self.fc3 = nn.Linear(64, 10)
+     
+        def forward(self, x):
+            x = x.view(-1, 28*28)
+            x = F.relu(self.fc1(x))
+            x = F.relu(self.fc2(x))
+            return self.fc3(x)
+
+5️⃣ Train with MLflow Logging
+
+    import torch.optim as optim
+    import mlflow.pytorch
+     
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = Net().to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+     
+    with mlflow.start_run():
+        mlflow.log_param("lr", 0.001)
+        mlflow.log_param("batch_size", 64)
+     
+        for epoch in range(2):  
+            running_loss = 0.0
+            for images, labels in trainloader:
+                images, labels = images.to(device), labels.to(device)
+                optimizer.zero_grad()
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                running_loss += loss.item()
+     
+            avg_loss = running_loss / len(trainloader)
+            mlflow.log_metric("loss", avg_loss, step=epoch)
+            print(f"Epoch {epoch+1}, Loss: {avg_loss}")
+     
+        mlflow.pytorch.log_model(model, "model")
+
+✅ Logs:
+
+    Params → learning rate, batch size
+
+    Metrics → loss per epoch
+
+    Artifacts → trained model
+
+6️⃣ Check Results in MLflow UI
+
+    Open: http://127.0.0.1:5000
+
+    Explore experiment → see params, metrics, model files
+
+    Compare multiple runs side by side
+
+7️⃣ Log Artifacts (Optional)
+
+    import matplotlib.pyplot as plt
+     
+    # Example artifact: loss curve
+    losses = [0.9, 0.5, 0.3]
+    plt.plot(losses)
+    plt.savefig("loss_curve.png")
+    mlflow.log_artifact("loss_curve.png")
+
+✅ Artifact uploaded to MLflow → viewable in UI.
+8️⃣ Compare Multiple Runs
+
+    Change hyperparams (e.g., learning rate = 0.01 vs 0.001)
+
+    Run training again
+
+    Compare results in MLflow dashboard
+
+    Identify best-performing config
+
+9️⃣ Save and Load Model from MLflow
+
+    model_uri = "runs:/{run_id}/model"
+    loaded_model = mlflow.pytorch.load_model(model_uri)
+
+    Replace {run_id} with your experiment’s run ID
+
+    Test loaded model → confirms reproducibility
+
+🔟 Cleanup
+
+Stop MLflow server:
+
+    CTRL+C
+
+(Optional) Clear logs:
+
+    rm -rf mlruns/
+
+
+🎯 Learning Outcomes
+
+    Set up & run MLflow tracking server
+
+    Log params, metrics, and artifacts during training
+
+    Compare runs to pick best configs
+
+    Save and load models with MLflow
+```
 
 ## Section 11: Week 10: CI/CD for AI Models
 
@@ -1846,6 +3554,158 @@ spec:
   - Issues are critical vs significant
 
 ### 71. 70. Lab – CI/CD Pipeline for Model Deployment
+- Goal: Create a CI/CD pipeline that trains a PyTorch model, containerizes it with Docker, and deploys it via GitHub Actions (or GitLab/Jenkins alternative).
+- Time: ~90–120 minutes
+- Tools: GitHub Actions (or GitLab/Jenkins), Docker Hub, Kubernetes/Heroku (for deployment)
+```
+1️⃣ Prepare Repository
+
+    Create new repo (GitHub or GitLab).
+
+    Add files:
+
+        train.py → trains & saves model
+
+        app.py → Flask/FastAPI inference service
+
+        Dockerfile → container definition
+
+        .github/workflows/cicd.yml → pipeline config
+
+✅ Repo structured for ML + deployment.
+2️⃣ Train a Simple Model (train.py)
+
+    import torch, torchvision, torchvision.transforms as transforms
+    import torch.nn as nn, torch.optim as optim
+     
+    trainset = torchvision.datasets.MNIST("./data", train=True, download=True, transform=transforms.ToTensor())
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True)
+     
+    class Net(nn.Module):
+        def __init__(self): super().__init__()
+        self.fc1, self.fc2, self.fc3 = nn.Linear(28*28,128), nn.Linear(128,64), nn.Linear(64,10)
+        def forward(self,x): x=x.view(-1,28*28); return self.fc3(torch.relu(self.fc2(torch.relu(self.fc1(x)))))
+     
+    model = Net()
+    criterion, optimizer = nn.CrossEntropyLoss(), optim.Adam(model.parameters(), lr=0.001)
+     
+    for epoch in range(1):
+        for images, labels in trainloader:
+            optimizer.zero_grad(); outputs=model(images)
+            loss=criterion(outputs, labels); loss.backward(); optimizer.step()
+     
+    torch.save(model.state_dict(), "model.pth")
+    print("✅ Model trained and saved")
+
+3️⃣ Inference API (app.py)
+
+    from flask import Flask, request, jsonify
+    import torch, torch.nn as nn
+     
+    app = Flask(__name__)
+     
+    class Net(nn.Module):
+        def __init__(self): super().__init__()
+        self.fc1, self.fc2, self.fc3 = nn.Linear(28*28,128), nn.Linear(128,64), nn.Linear(64,10)
+        def forward(self,x): x=x.view(-1,28*28); return self.fc3(torch.relu(self.fc2(torch.relu(self.fc1(x)))))
+     
+    model = Net(); model.load_state_dict(torch.load("model.pth")); model.eval()
+     
+    @app.route("/predict", methods=["POST"])
+    def predict():
+        data = torch.tensor(request.json["input"])
+        output = model(data.float())
+        _, predicted = torch.max(output, 1)
+        return jsonify({"prediction": predicted.item()})
+
+4️⃣ Dockerfile
+
+    FROM python:3.9-slim
+    WORKDIR /app
+    COPY requirements.txt .
+    RUN pip install -r requirements.txt
+    COPY . .
+    CMD ["python", "app.py"]
+
+✅ Containerizes training + inference service.
+5️⃣ GitHub Actions Workflow (.github/workflows/cicd.yml)
+
+    name: ML CI/CD Pipeline
+    on: [push]
+     
+    jobs:
+      build-deploy:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+     
+          - name: Set up Python
+            uses: actions/setup-python@v4
+            with:
+              python-version: "3.9"
+     
+          - name: Install dependencies
+            run: pip install -r requirements.txt
+     
+          - name: Train Model
+            run: python train.py
+     
+          - name: Build Docker image
+            run: docker build -t myrepo/ai-model:latest .
+     
+          - name: Login to Docker Hub
+            uses: docker/login-action@v2
+            with:
+              username: ${{ secrets.DOCKER_USER }}
+              password: ${{ secrets.DOCKER_PASS }}
+     
+          - name: Push Docker Image
+            run: docker push myrepo/ai-model:latest
+
+6️⃣ Deploy to Kubernetes (Optional)
+
+Add deploy step to workflow:
+
+          - name: Deploy to K8s
+            run: |
+              kubectl set image deployment/ai-app ai-app=myrepo/ai-model:latest
+
+✅ Updates live deployment with new model.
+7️⃣ Validate CI/CD Pipeline
+
+    Push changes to repo → pipeline triggers automatically
+
+    Training, Docker build, and push to registry
+
+    (Optional) Auto-deploys to Kubernetes or Heroku
+
+8️⃣ Monitor Pipeline Runs
+
+    GitHub Actions tab → see logs of each stage
+
+    Validate model artifacts + image build success
+
+    Check deployed service endpoint /predict
+
+9️⃣ Rollback if Needed
+
+    Keep older Docker image tags
+
+    Roll back in K8s:
+
+    kubectl rollout undo deployment ai-app
+
+✅ Ensures safe recovery from bad deployment.
+🎯 Learning Outcomes
+
+    Automate training + deployment pipeline with CI/CD
+
+    Use Docker + GitHub Actions for ML apps
+
+    Deploy trained models seamlessly to production
+
+    Learn rollback strategy for safe ML infra
+```
 
 ## Section 12: Week 11: Advanced Kubernetes for AI
 
@@ -2022,6 +3882,279 @@ resources:
     - Custom admission controllers
 
 ### 78. 77. Lab – Deploy MLflow on Kubernetes
+- Goal: Stand up MLflow Tracking Server on Kubernetes with:
+  - PostgreSQL as the backend store (metrics/params/runs)
+  - MinIO (S3-compatible) as the artifact store
+  - Persistent volumes, Service, and Ingress for access
+- Time: ~90–120 minutes
+- You need: A K8s cluster (kind/Minikube/cloud), kubectl, helm, and docker (if you build images).
+- Namespace: mlops
+```
+1) Create Namespace & StorageClass (if needed)
+
+    kubectl create namespace mlops
+    # If your cluster lacks a default StorageClass, set or create one (example for kind/minikube usually not needed).
+    kubectl get storageclass
+
+2) Install MinIO (Artifact Store)
+
+Option A – Helm (recommended):
+
+    helm repo add minio https://charts.min.io/
+    helm repo update
+     
+    helm install minio minio/minio \
+      --namespace mlops \
+      --set rootUser=admin \
+      --set rootPassword=admin12345 \
+      --set resources.requests.memory=256Mi \
+      --set mode=standalone \
+      --set replicas=1
+
+Port-forward to access MinIO console (temporarily):
+
+    kubectl -n mlops port-forward svc/minio 9000:9000 9001:9001
+
+    Console: http://localhost:9001 (user: admin, pass: admin12345)
+
+Create a bucket for MLflow artifacts (e.g., mlflow-artifacts). You can also do this from CLI later.
+3) Install PostgreSQL (Backend Store)
+
+Option A – Helm (Bitnami):
+
+    helm repo add bitnami https://charts.bitnami.com/bitnami
+    helm install pg bitnami/postgresql \
+      --namespace mlops \
+      --set global.postgresql.auth.postgresPassword=pgpass \
+      --set global.postgresql.auth.username=mlflow \
+      --set global.postgresql.auth.password=mlflowpass \
+      --set global.postgresql.auth.database=mlflowdb \
+      --set primary.persistence.size=5Gi
+
+Fetch connection info:
+
+    PG_HOST=$(kubectl -n mlops get svc pg-postgresql -o jsonpath='{.spec.clusterIP}')
+    echo $PG_HOST
+
+4) Create Secrets for MLflow
+
+We’ll store DB creds and MinIO keys in a single secret.
+
+    kubectl -n mlops create secret generic mlflow-secrets \
+      --from-literal=BACKEND_URI="postgresql://mlflow:mlflowpass@pg-postgresql.mlops.svc.cluster.local:5432/mlflowdb" \
+      --from-literal=ARTIFACT_URI="s3://mlflow-artifacts" \
+      --from-literal=AWS_ACCESS_KEY_ID="admin" \
+      --from-literal=AWS_SECRET_ACCESS_KEY="admin12345" \
+      --from-literal=MLFLOW_TRACKING_USERNAME="admin" \
+      --from-literal=MLFLOW_TRACKING_PASSWORD="changeme"
+
+    Note: We’ll use MinIO’s S3 endpoint env var to point MLflow’s boto client.
+
+5) (Optional) Create the Bucket via Job (if not created in console)
+
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: mkbucket
+      namespace: mlops
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: mc
+            image: minio/mc:latest
+            env:
+            - name: MC_HOST_minio
+              value: http://admin:admin12345@minio.mlops.svc.cluster.local:9000
+            command: ["sh","-c"]
+            args:
+              - |
+                mc ls minio || true
+                mc mb -p minio/mlflow-artifacts || true
+
+    kubectl apply -f mkbucket.yaml
+    kubectl -n mlops logs job/mkbucket
+
+6) Persistent Volume Claim for MLflow (optional but nice)
+
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: mlflow-pvc
+      namespace: mlops
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 5Gi
+
+    kubectl apply -f mlflow-pvc.yaml
+
+7) Deploy MLflow Tracking Server
+
+Deployment + Service:
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: mlflow
+      namespace: mlops
+    spec:
+      replicas: 1
+      selector:
+        matchLabels: { app: mlflow }
+      template:
+        metadata:
+          labels: { app: mlflow }
+        spec:
+          containers:
+          - name: mlflow
+            image: ghcr.io/mlflow/mlflow:v2.14.1
+            imagePullPolicy: IfNotPresent
+            ports:
+            - containerPort: 5000
+            envFrom:
+            - secretRef:
+                name: mlflow-secrets
+            env:
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: http://minio.mlops.svc.cluster.local:9000
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: MLFLOW_TRACKING_USERNAME
+              valueFrom: { secretKeyRef: { name: mlflow-secrets, key: MLFLOW_TRACKING_USERNAME } }
+            - name: MLFLOW_TRACKING_PASSWORD
+              valueFrom: { secretKeyRef: { name: mlflow-secrets, key: MLFLOW_TRACKING_PASSWORD } }
+            command: ["mlflow"]
+            args:
+              - server
+              - "--host=0.0.0.0"
+              - "--port=5000"
+              - "--backend-store-uri=$(BACKEND_URI)"
+              - "--default-artifact-root=$(ARTIFACT_URI)"
+            volumeMounts:
+            - name: mlflow-data
+              mountPath: /mlflow
+          volumes:
+          - name: mlflow-data
+            persistentVolumeClaim:
+              claimName: mlflow-pvc
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: mlflow
+      namespace: mlops
+    spec:
+      type: ClusterIP
+      selector: { app: mlflow }
+      ports:
+      - name: http
+        port: 5000
+        targetPort: 5000
+
+    kubectl apply -f mlflow-deploy.yaml
+    kubectl -n mlops get pods,svc
+
+8) Expose with Ingress (or Port-Forward)
+
+Quick test via port-forward:
+
+    kubectl -n mlops port-forward svc/mlflow 5000:5000
+    # Visit: http://localhost:5000
+
+Ingress (requires an ingress controller like NGINX):
+
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: mlflow
+      namespace: mlops
+      annotations:
+        nginx.ingress.kubernetes.io/auth-type: basic
+        nginx.ingress.kubernetes.io/auth-secret: mlflow-basic-auth
+    spec:
+      rules:
+      - host: mlflow.localtest.me
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mlflow
+                port:
+                  number: 5000
+
+Create a basic auth secret (optional hardening):
+
+    # Create htpasswd file (requires apache2-utils or busybox)
+    htpasswd -bc htpasswd admin changeme
+    kubectl -n mlops create secret generic mlflow-basic-auth --from-file=auth=htpasswd
+    kubectl apply -f mlflow-ingress.yaml
+    # Update /etc/hosts if needed for mlflow.localtest.me -> ingress IP
+
+9) Verify End-to-End
+
+    Open MLflow UI (port-forward or Ingress URL).
+
+    Create a quick client run (from laptop or a cluster pod):
+
+    import mlflow, os
+    os.environ["MLFLOW_TRACKING_USERNAME"]="admin"
+    os.environ["MLFLOW_TRACKING_PASSWORD"]="changeme"
+    mlflow.set_tracking_uri("http://localhost:5000")  # or Ingress URL
+     
+    with mlflow.start_run():
+        mlflow.log_param("lr", 0.001)
+        mlflow.log_metric("loss", 0.42, step=1)
+        with open("hello.txt","w") as f: f.write("artifact test")
+        mlflow.log_artifact("hello.txt")
+
+    In UI, confirm:
+
+        Run visible with param/metric
+
+        Artifact hello.txt stored in MinIO bucket (mlflow-artifacts)
+
+10) (Optional) Secure the DB and MinIO
+
+    Restrict MinIO via NetworkPolicy to only MLflow pod.
+
+    Rotate MinIO and DB credentials; store in an external secrets manager.
+
+    Enable TLS on Ingress and MinIO (cert-manager).
+
+Troubleshooting
+
+    Artifacts not saving? Check MLFLOW_S3_ENDPOINT_URL, bucket exists, and creds match.
+
+    DB connection errors? Confirm BACKEND_URI host/port & service DNS.
+
+    UI blank/timeout? Verify Service, port-forward/Ingress, and pod logs:
+
+        kubectl -n mlops logs deploy/mlflow
+
+    Permissions denied on bucket? Verify MinIO policies and access keys.
+
+Cleanup
+
+    helm -n mlops uninstall minio
+    helm -n mlops uninstall pg
+    kubectl delete ns mlops
+
+
+🎯 Learning Outcomes
+
+    Deploy MLflow Tracking with persistent stores on Kubernetes.
+
+    Wire up PostgreSQL backend + S3/MinIO artifact store.
+
+    Expose the service via Ingress and secure with basic auth.
+
+    Validate end-to-end experiment logging from a client.
+```
 
 ## Section 13: Week 12: Resource & Cost optimization
 
@@ -2196,6 +4329,307 @@ resources:
   - Create shared incentives
 
 ### 85. 84. Lab – Optimize Cloud AI Workload Costs
+- Goal: Cut end-to-end training/inference costs by 40–80% while maintaining (or improving) throughput and accuracy.
+- You’ll do: baseline → instrument → optimize (compute, storage, network, scheduling) → measure → report.
+```
+0) Prerequisites
+
+    A cloud account (AWS or GCP or Azure).
+
+    One GPU instance (on-demand) and permission to launch spot/preemptible.
+
+    Docker + Kubernetes cluster (managed or self-hosted) or VM-only path.
+
+    CLI: aws or gcloud or az; kubectl (if using K8s).
+
+    Sample project: PyTorch ResNet-50 on CIFAR-10 (training) + FastAPI/Triton (inference).
+
+    Tip: Keep your dataset/model fixed across runs so cost deltas are attributable to infra changes.
+
+1) Design the Experiment
+
+Define the baseline (row 2 in the Excel):
+
+    Cloud/Region: (e.g., AWS us-east-1)
+
+    Instance: 1× GPU (A10/T4/V100 class) on-demand
+
+    Storage: local NVMe + object store (S3/GCS/Blob) in same region
+
+    No autoscaling, no spot, FP32, batch size 128
+
+KPIs to record (per run):
+
+    Throughput/s, Latency (p50/p95), GPU util %, Time to train, Accuracy, Cost (compute/storage/network), TotalCostUSD, Savings vs baseline %.
+
+Use the worksheet to log each run: one change per row.
+2) Instrumentation & Visibility (Baseline + All Runs)
+A. VM-level quick check
+
+    # GPU + memory + power
+    nvidia-smi --query-gpu=name,utilization.gpu,utilization.memory,memory.total,pstate,power.draw --format=csv -l 5
+    # Disk & network
+    iostat -xz 5
+    ifstat 5
+
+B. Kubernetes (recommended)
+
+    Prometheus + Grafana for metrics, NVIDIA DCGM Exporter for GPU.
+
+    # Add DCGM exporter (Helm)
+    helm repo add nvidia https://nvidia.github.io/dcgm-exporter
+    helm install dcgm nvidia/dcgm-exporter -n monitoring --create-namespace
+
+    Optional: Kubecost for $ visibility.
+
+    helm repo add kubecost https://kubecost.github.io/cost-analyzer/
+    helm install kubecost kubecost/cost-analyzer -n kubecost --create-namespace
+
+C. Tag everything for cost attribution
+
+    AWS: --tag-specifications 'ResourceType=instance,Tags=[{Key=Project,Value=Lab84},{Key=Owner,Value=Vivian}]'
+
+    GCP: --labels=project=lab84,owner=vivian
+
+    Azure: --tags Project=Lab84 Owner=Vivian
+
+3) Baseline Run (On-Demand)
+A. Launch (pick your cloud)
+
+AWS (GPU on-demand example)
+
+    aws ec2 run-instances \
+      --image-id ami-... \
+      --instance-type g5.2xlarge \
+      --key-name yourkey \
+      --count 1 \
+      --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":200}}]' \
+      --tag-specifications 'ResourceType=instance,Tags=[{Key=Project,Value=Lab84}]'
+
+GCP (on-demand)
+
+    gcloud compute instances create lab84-ondemand \
+      --zone=us-central1-a --machine-type=a2-highgpu-1g \
+      --accelerator=count=1,type=nvidia-tesla-a100 \
+      --boot-disk-size=200GB --labels=project=lab84
+
+Azure (on-demand)
+
+    az vm create -g rg-lab84 -n lab84-ondemand \
+      --image Ubuntu2204 --size Standard_NC4as_T4_v3 \
+      --storage-sku Premium_LRS --tags Project=Lab84
+
+B. Train (FP32, no optimizations yet)
+
+    Use your standard ResNet-50 script, e.g., PyTorch CIFAR-10.
+
+    Record: Throughput/s, GPU util %, Training time, Accuracy, Costs.
+
+Fill row 2 (baseline) in the Excel.
+4) Optimization Levers (Run one lever per row)
+4.1 Spot/Preemptible Instances (+ Checkpointing)
+
+Enable resilient training first:
+
+PyTorch (automatic mixed precision optional later):
+
+    # train.py (snippet)
+    from torch.cuda.amp import autocast, GradScaler
+    scaler = GradScaler()
+    start_step = load_checkpoint_if_exists(model, optimizer, scaler)  # your function
+     
+    for step, (x, y) in enumerate(loader, start=start_step):
+        optimizer.zero_grad(set_to_none=True)
+        with autocast(enabled=False):  # keep False for pure baseline; set True in AMP step
+            yhat = model(x.cuda(non_blocking=True))
+            loss = criterion(yhat, y.cuda(non_blocking=True))
+        loss.backward()
+        optimizer.step()
+        if step % CKPT_EVERY == 0:
+            save_checkpoint(model, optimizer, scaler, step)  # lightweight, atomic
+
+Launch Spot/Preemptible:
+
+    AWS Spot:
+
+    aws ec2 run-instances \
+      --instance-market-options 'MarketType=spot' \
+      --instance-type g5.2xlarge --image-id ami-... \
+      --tag-specifications 'ResourceType=instance,Tags=[{Key=Project,Value=Lab84}]'
+
+    GCP Spot / Preemptible:
+
+    gcloud compute instances create lab84-spot \
+      --zone=us-central1-a --machine-type=a2-highgpu-1g \
+      --provisioning-model=SPOT --boot-disk-size=200GB \
+      --labels=project=lab84
+
+    Azure Spot:
+
+    az vm create -g rg-lab84 -n lab84-spot \
+      --image Ubuntu2204 --size Standard_NC4as_T4_v3 \
+      --priority Spot --max-price -1 --eviction-policy Deallocate \
+      --tags Project=Lab84
+
+Measure & log a new row (expect large compute $ drop).
+4.2 Autoscaling (K8s)
+
+    Cluster Autoscaler enabled on your managed cluster.
+
+    HPA for inference pods:
+
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata: { name: inference-hpa, namespace: ai }
+    spec:
+      scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: inference-api
+      minReplicas: 2
+      maxReplicas: 50
+      metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target: { type: Utilization, averageUtilization: 70 }
+
+Log costs before/after a load test.
+4.3 Mixed Precision (AMP) for Training
+
+Turn autocast(enabled=True) + GradScaler:
+
+    with autocast(True):
+        yhat = model(x.cuda(non_blocking=True))
+        loss = criterion(yhat, y.cuda(non_blocking=True))
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()
+
+Usually boosts throughput and reduces time → lower compute cost.
+4.4 Batch Size & Gradient Accumulation
+
+Increase BatchSize and add GradAccumSteps to keep memory in check.
+Record throughput & accuracy; keep the best trade-off.
+4.5 Right-Sizing & Utilization
+
+    If GPU util < 50%, you’re probably I/O-bound.
+
+        Cache dataset on local NVMe.
+
+        Pin dataloader workers, enable async I/O.
+
+    loader = DataLoader(ds, batch_size=B, shuffle=True, num_workers=8, pin_memory=True, persistent_workers=True)
+
+4.6 Storage Lifecycle Policies
+
+Move old checkpoints/logs to cold storage automatically.
+
+AWS S3 (lifecycle JSON example):
+
+    {
+      "Rules": [{
+        "ID": "MoveOlderArtifacts",
+        "Filter": { "Prefix": "experiments/" },
+        "Status": "Enabled",
+        "Transitions": [{ "Days": 14, "StorageClass": "STANDARD_IA" },
+                        { "Days": 45, "StorageClass": "GLACIER" }],
+        "NoncurrentVersionTransitions": [{ "NoncurrentDays": 30, "StorageClass": "GLACIER" }]
+      }]
+    }
+
+GCP and Azure offer similar policies—configure equivalent rules.
+Log storage and egress cost changes in the sheet.
+4.7 Data Locality (Avoid Cross-Region Egress)
+
+Keep compute and object storage in the same region.
+If you were cross-region, redo the run same-region and record the network $ drop.
+4.8 Container & Runtime Optimizations
+
+    Base images: use slim CUDA runtimes, remove build tools from runtime image.
+
+    Enable torch.compile() (PyTorch 2) or TensorRT for inference if supported.
+
+    # training (safe when model is stable)
+    model = torch.compile(model)  # often improves throughput
+
+4.9 Inference Cost Cuts (Triton)
+
+Enable dynamic batching and model-level optimization.
+
+config.pbtxt (snippet):
+
+    max_batch_size: 64
+    dynamic_batching { preferred_batch_size: [ 4, 8, 16, 32 ] max_queue_delay_microseconds: 1000 }
+    instance_group [{ kind: KIND_GPU, count: 1 }]
+
+Add a Redis cache layer for idempotent requests (e.g., embeddings).
+4.10 Reservations/Commitments (Analysis Step)
+
+Not a live change for the lab, but simulate:
+
+    If a fixed baseline footprint runs 24/7 (e.g., inference), estimate Reserved Instances / Savings Plans (AWS) or Committed Use Discounts (GCP) and log the hypothetical monthly savings in the sheet’s notes for planning.
+
+5) Kubernetes: Spot-Aware Scheduling (Optional but Powerful)
+
+    Create node pools: on-demand and spot.
+
+    Taint spot nodes: spot=true:NoSchedule.
+
+    Tolerate in your training job and add PodDisruptionBudget.
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata: { name: trainer, namespace: ai }
+    spec:
+      replicas: 1
+      template:
+        metadata: { labels: { app: trainer } }
+        spec:
+          tolerations:
+          - key: "spot" operator: "Equal" value: "true" effect: "NoSchedule"
+          nodeSelector: { lifecycle: spot }
+          containers:
+          - name: trainer
+            image: yourrepo/trainer:latest
+            resources:
+              limits: { nvidia.com/gpu: "1" }
+
+This keeps stateful services on on-demand and ephemeral training on spot.
+6) Run, Measure, Record (Repeat)
+
+For each lever:
+
+    Apply exactly one change.
+
+    Run training/inference.
+
+    Capture metrics & costs.
+
+    Fill a new row in the Excel (it auto-sums TotalCost; Savings% compares to baseline).
+
+    Keep short notes on what changed.
+
+    Target sequence: Spot → AMP → Batch/GA → Data Locality → Lifecycle → Autoscale → Runtime/Compile → Inference batching/cache.
+
+7) Analyze & Decide
+
+    Plot TotalCostUSD vs Throughput/s to spot Pareto-optimal settings.
+
+    Confirm that accuracy remains within your tolerance window.
+
+    Promote the top configuration to your default pipeline.
+
+What “Good” Looks Like (Typical Wins)
+
+    Spot/Preemptible + checkpointing: 60–80% compute cost cut
+
+    AMP + larger batches: 20–40% time cut at same accuracy
+
+    Same-region storage + lifecycle: double-digit % storage/network savings
+
+    Triton dynamic batching + cache: big inference $ drop with stable latency
+```
 
 ## Section 14: Week 13: Networking for AI Systems
 
@@ -2495,6 +4929,179 @@ NCCL_NET_GDR_LEVEL=2 # enable GDR
   - Continuous monitoring
 
 ### 92. 91. Lab – Configure Load Balancer for AI API
+- Goal: Expose an AI inference API through a resilient, scalable load balancer with health checks, rate limits, canary rollout, and observability.
+- Outcome: A working L4/L7 LB in Kubernetes, plus configs you can adapt to EKS/GKE/AKS or bare metal.
+- Download the ready-made files:
+  - Kubernetes Manifests (FastAPI app + Services + HPA + Ingress + Canary)
+  - Envoy Proxy (L7 LB with retries, outlier detection, circuit breaking)
+  - README – quick commands
+```
+0) Prerequisites
+
+    A Kubernetes cluster (EKS/GKE/AKS or local with a LoadBalancer solution).
+
+    kubectl configured, and an Ingress controller if you want L7 (e.g., ingress-nginx).
+
+    Optional: a DNS name (e.g., api.example.com) and TLS certs for HTTPS.
+
+1) What You’ll Deploy (Architecture)
+
+    Inference API (FastAPI) with /healthz, /readyz, /v1/echo.
+
+    Service (ClusterIP) for in-cluster access.
+
+    Service (LoadBalancer, L4) for a cloud LB (NLB/ELB on AWS, similar on GKE/AKS).
+
+    Ingress (L7) via NGINX Ingress for TLS, routing, basic rate limits.
+
+    HPA to autoscale pods by CPU (you can adapt to custom metrics).
+
+    Canary Ingress (10% traffic) to validate new versions safely.
+
+    (Optional) Envoy config as an alternative L7 LB with retries and outlier detection.
+
+2) Deploy the Stack
+
+    # Apply everything (Namespace, ConfigMap, Deployment, Services, HPA, Ingress, Canary)
+    kubectl apply -f lab91_k8s_inference_fastapi.yaml
+     
+    # If using Ingress + TLS, create the TLS secret (replace paths)
+    kubectl -n ai create secret tls inference-tls --cert=server.crt --key=server.key
+
+Verify:
+
+    kubectl -n ai get pods,svc,ingress,hpa
+
+3) Test Locally First
+
+If your LB isn’t provisioned yet, port-forward to the ClusterIP:
+
+    kubectl -n ai port-forward svc/inference-svc 8080:80
+    curl -s http://localhost:8080/healthz
+    curl -s -X POST http://localhost:8080/v1/echo \
+      -H "Content-Type: application/json" \
+      -d '{"text":"hello"}'
+
+4) Test the Cloud Load Balancer (L4)
+
+When inference-lb shows an external IP/DNS:
+
+    kubectl -n ai get svc inference-lb
+    curl -s http://<EXTERNAL_LB> /healthz
+
+This is straight L4 (TCP) balancing to your pods via K8s Service.
+5) Add L7 Features with Ingress (NGINX)
+
+    TLS termination, per-path routing, and rate limits are pre-wired in the manifest.
+
+    Point api.example.com DNS to the L4 LB hostname/IP.
+
+    # After DNS and TLS secret are ready:
+    curl -s https://api.example.com/healthz
+    curl -s -X POST https://api.example.com/v1/echo \
+      -H "Content-Type: application/json" -d '{"text":"gamma"}'
+
+What’s included (already in the YAML):
+
+    nginx.ingress.kubernetes.io/limit-rps: "100" + burst multiplier
+
+    60s proxy timeouts for long-running inference
+
+    TLS via inference-tls secret
+
+6) Canary Release (10% Traffic)
+
+The inference-ingress-canary routes 10% of requests to inference-api-canary.
+Test by issuing many requests and watching some hit faster canary pods:
+
+    for i in {1..50}; do
+      curl -s https://api.example.com/healthz | jq .
+    done
+
+Adjust canary weight by changing nginx.ingress.kubernetes.io/canary-weight.
+7) Autoscaling (HPA)
+
+HPA is set to CPU 70%, min 2 pods, max 50. Generate load and watch scaling:
+
+    kubectl -n ai get hpa -w
+
+You can switch to GPU utilization or custom metrics in advanced labs.
+8) Optional: Envoy as Smart L7 LB
+
+Use the provided lab91_envoy.yaml if you want an Envoy front proxy with:
+
+    LEAST_REQUEST LB policy
+
+    Retries and per-try timeouts
+
+    Outlier detection (auto-eject unhealthy backends)
+
+    Circuit breakers (caps connections/requests)
+
+Typical deployment patterns:
+
+    Run Envoy as a DaemonSet or sidecar, or as a standalone Deployment fronting inference-svc.
+
+    Point your public LB at Envoy (port 8080), which then routes to the service.
+
+9) Health Checks, Backpressure & Resilience
+
+    Readiness/Liveness are wired (/readyz, /healthz) → LB only routes to ready pods.
+
+    Rate limiting: protects backends during spikes.
+
+    Canary: de-risk releases and enable quick rollback.
+
+    Retries + outlier detection (Envoy path): eject flaking pods to reduce tail latency.
+
+10) Observability (Minimum Viable)
+
+    App exposes /metrics placeholder; in real infra, expose Prometheus metrics.
+
+    Capture p50/p95/p99 latency, error rate, RPS, and backend queue depth.
+
+    For L7: use NGINX or Envoy metrics dashboards; add OpenTelemetry tracing across LB → app.
+
+11) Load & Failure Testing
+
+Load tests (choose one on your laptop/runner):
+
+    # hey
+    hey -z 60s -q 50 -c 100 -m POST -H "Content-Type: application/json" \
+      -d '{"text":"load"}' https://api.example.com/v1/echo
+     
+    # wrk
+    wrk -t4 -c100 -d60s -s post.lua https://api.example.com/v1/echo
+
+Failure drills:
+
+    # Kill a pod and watch the LB keep SLOs
+    kubectl -n ai delete pod -l app=inference-api --wait=false
+
+12) Clean Up
+
+    kubectl delete -f lab91_k8s_inference_fastapi.yaml
+
+What to Capture for Your Lab Report
+
+    External LB endpoint (or domain) and screenshots of success responses.
+
+    HPA scaling events during load test.
+
+    p95/p99 latency before/after enabling rate limits or Envoy.
+
+    Canary rollout notes (weight used, observed behavior).
+
+    Any resilience behavior during pod kill tests.
+
+Pro Tips / Extensions
+
+    Add JWT auth at the Ingress (or Envoy ext_authz) before exposing public endpoints.
+
+    Make LB GPU-aware by exporting backend queue depth/concurrency and feeding it to a smarter router.
+
+    Use Gateway API (K8s) as a more future-proof alternative to classic Ingress.
+```
 
 ## Section 15: Week 14: Model Serving Basics
 
@@ -2686,6 +5293,170 @@ async def generate(prompt: str):
   - Separation of concerns
 
 ### 99. 98. Lab – Serve an Image Classifier with FastAPI
+- 🎯 Goal: Deploy a pretrained image classification model (ResNet18 by default) behind a FastAPI REST API. You’ll run it locally, send images for prediction, and optionally containerize it with Docker or deploy it on Kubernetes.
+```
+Step 0 – Prerequisites
+
+    Python 3.10+
+
+    pip or conda
+
+    uvicorn for serving
+
+    GPU optional (CUDA used automatically if available)
+
+Step 1 – Project Setup
+
+Create a folder lab98_fastapi_classifier/ and inside it add:
+
+    lab98_fastapi_classifier/
+    ├── app/
+    │   └── main.py
+    ├── scripts/
+    │   └── client.py
+    ├── requirements.txt
+    ├── Dockerfile
+    └── README.md
+
+Step 2 – Install Dependencies
+
+requirements.txt:
+
+    fastapi==0.112.2
+    uvicorn[standard]==0.30.6
+    pillow==10.4.0
+    torch==2.3.1
+    torchvision==0.18.1
+    pydantic==2.8.2
+    python-multipart==0.0.9
+
+Install them:
+
+    pip install -r requirements.txt
+
+Step 3 – FastAPI App (main.py)
+
+app/main.py:
+
+    import io, os, time
+    from typing import List
+     
+    import torch, torchvision
+    from torchvision import transforms
+    import torch.nn.functional as F
+    from PIL import Image
+     
+    from fastapi import FastAPI, UploadFile, File, HTTPException, Query
+    from pydantic import BaseModel
+     
+    # ---- App ----
+    app = FastAPI(title="Image Classifier API")
+     
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    MODEL = torchvision.models.resnet18(weights="DEFAULT").to(DEVICE).eval()
+    PREPROCESS = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
+    ])
+    LABELS = [l.strip() for l in open("imagenet_classes.txt").readlines()]
+     
+    class Prediction(BaseModel):
+        index: int
+        label: str
+        probability: float
+     
+    class PredictResponse(BaseModel):
+        model: str
+        device: str
+        top_k: int
+        time_ms: float
+        predictions: List[Prediction]
+     
+    @app.get("/healthz")
+    def healthz():
+        return {"status": "ok", "device": DEVICE}
+     
+    @app.post("/predict", response_model=PredictResponse)
+    async def predict(image: UploadFile = File(...), top_k: int = Query(5, ge=1, le=20)):
+        if image.content_type not in {"image/jpeg", "image/png"}:
+            raise HTTPException(415, f"Unsupported file type: {image.content_type}")
+     
+        raw = await image.read()
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        tensor = PREPROCESS(img).unsqueeze(0).to(DEVICE)
+     
+        t0 = time.perf_counter()
+        with torch.inference_mode():
+            probs = F.softmax(MODEL(tensor), dim=1)
+            top_p, top_i = probs.topk(top_k, dim=1)
+        elapsed = (time.perf_counter() - t0) * 1000
+     
+        preds = [Prediction(index=int(i), label=LABELS[i], probability=float(p))
+                 for p, i in zip(top_p[0], top_i[0])]
+        return PredictResponse(model="resnet18", device=DEVICE,
+                               top_k=top_k, time_ms=elapsed, predictions=preds)
+
+Download ImageNet labels:
+
+    wget https://raw.githubusercontent.com/pytorch/hub/master/imagenet_classes.txt
+
+Step 4 – Run the API
+
+    uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+Test health:
+
+    curl http://localhost:8000/healthz
+
+Step 5 – Test Prediction
+
+scripts/client.py:
+
+    import sys, requests
+     
+    url = "http://localhost:8000/predict"
+    img_path = sys.argv[1]
+     
+    with open(img_path, "rb") as f:
+        files = {"image": (img_path, f, "image/jpeg")}
+        r = requests.post(url, files=files, params={"top_k": 5})
+        print(r.json())
+
+Run:
+
+    python scripts/client.py path/to/image.jpg
+
+Step 6 – Dockerize (Optional)
+
+Dockerfile:
+
+    FROM python:3.11-slim
+    WORKDIR /app
+    COPY requirements.txt .
+    RUN pip install -r requirements.txt
+    COPY app/ ./app/
+    COPY imagenet_classes.txt .
+    EXPOSE 8000
+    CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+Build & run:
+
+    docker build -t fastapi-cls .
+    docker run -p 8000:8000 fastapi-cls
+
+✅ Learning Outcomes
+
+    Built a FastAPI model server for image classification
+
+    Served predictions via /predict endpoint
+
+    Integrated PyTorch + Torchvision models
+
+    Tested locally and containerized for deployment
+```
 
 ## Section 16: Week 15: Advanced Model Serving
 
@@ -3007,44 +5778,1777 @@ models/
   - Automate deployment pipeline
 
 ### 106. 105. Lab – Deploy a Model on Triton Server
+- 🎯 Goal: Export a model to ONNX, create a Triton model repository, run Triton in Docker, and send real inference requests. Optional: TensorRT, batching, K8s, metrics.
+```
+0) Prerequisites
+
+    Docker installed
+
+    (Optional GPU) NVIDIA driver + nvidia-container-toolkit
+
+    Python 3.10+ (pip install torch torchvision pillow numpy requests)
+
+    Ports 8000/8001/8002 available (HTTP/gRPC/metrics)
+
+1) Create a Triton model repository layout
+
+    mkdir -p ~/lab105/models/resnet50_onnx/1
+    cd ~/lab105
+
+Triton expects:
+
+    models/
+     └─ resnet50_onnx/
+         ├─ config.pbtxt
+         └─ 1/
+            └─ model.onnx      # you'll export this next
+
+Create models/resnet50_onnx/config.pbtxt:
+
+    name: "resnet50_onnx"
+    platform: "onnxruntime_onnx"
+    max_batch_size: 16
+     
+    input [
+      { name: "input",  data_type: TYPE_FP32, dims: [3,224,224] }
+    ]
+    output [
+      { name: "logits", data_type: TYPE_FP32, dims: [1000] }
+    ]
+     
+    instance_group [ { kind: KIND_GPU, count: 1 } ]
+     
+    dynamic_batching {
+      preferred_batch_size: [4, 8, 16]
+      max_queue_delay_microseconds: 1000
+    }
+
+2) Export a pretrained ResNet50 to ONNX
+
+Create export_onnx.py in ~/lab105:
+
+    import torch, torchvision as tv
+     
+    def main():
+        model = tv.models.resnet50(weights="DEFAULT").eval()
+        dummy = torch.randn(1, 3, 224, 224)
+        torch.onnx.export(
+            model, dummy, "models/resnet50_onnx/1/model.onnx",
+            input_names=["input"], output_names=["logits"],
+            dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
+            opset_version=17
+        )
+        print("Exported to models/resnet50_onnx/1/model.onnx")
+     
+    if __name__ == "__main__":
+        main()
+
+Run it:
+
+    python export_onnx.py
+
+3) Start Triton (Docker)
+
+Pick a tag (e.g., latest or a specific 23.xx-py3):
+
+    export TRITON_TAG=latest
+    docker run --rm -it \
+      --gpus all \
+      -p8000:8000 -p8001:8001 -p8002:8002 \
+      -v $PWD/models:/models \
+      nvcr.io/nvidia/tritonserver:${TRITON_TAG} tritonserver \
+        --model-repository=/models \
+        --strict-model-config=false \
+        --exit-on-error=false
+
+No GPU? Omit --gpus all (slower but fine for testing).
+
+Health/metadata checks (in another terminal):
+
+    curl -s http://localhost:8000/v2/health/ready && echo
+    curl -s http://localhost:8000/v2/models/resnet50_onnx | jq
+
+Metrics (Prometheus format):
+
+    curl -s http://localhost:8002/metrics | head
+
+4) Send a real inference request (HTTP/JSON)
+
+Quick Python client (client_http.py) in ~/lab105:
+
+    import argparse, numpy as np, requests
+    from PIL import Image
+     
+    def preprocess(img):
+        img = img.convert("RGB").resize((256,256))
+        o = (256-224)//2; img = img.crop((o,o,o+224,o+224))
+        x = np.asarray(img).astype("float32")/255.0
+        mean = np.array([0.485,0.456,0.406],dtype=np.float32)
+        std  = np.array([0.229,0.224,0.225],dtype=np.float32)
+        x = (x-mean)/std
+        x = np.transpose(x,(2,0,1))[None, ...]  # NCHW
+        return x
+     
+    if __name__ == "__main__":
+        ap = argparse.ArgumentParser()
+        ap.add_argument("image_path")
+        ap.add_argument("--url", default="http://localhost:8000/v2/models/resnet50_onnx/infer")
+        args = ap.parse_args()
+     
+        x = preprocess(Image.open(args.image_path))
+        payload = {
+          "inputs": [{
+            "name": "input",
+            "shape": list(x.shape),
+            "datatype": "FP32",
+            "data": x.flatten().tolist()
+          }],
+          "outputs": [{"name": "logits"}]
+        }
+     
+        r = requests.post(args.url, json=payload, timeout=60)
+        r.raise_for_status()
+        out = r.json()["outputs"][0]["data"]
+        logits = np.array(out, dtype=np.float32).reshape((x.shape[0],1000))
+     
+        exps = np.exp(logits - logits.max(axis=1, keepdims=True))
+        probs = exps / exps.sum(axis=1, keepdims=True)
+        top5 = probs[0].argsort()[-5:][::-1]
+        print("Top-5 indices:", top5.tolist())
+        print("Top-5 probs:", probs[0][top5].tolist())
+
+Run:
+
+    pip install pillow requests numpy
+    python client_http.py path/to/image.jpg
+
+5) (Optional) Use TensorRT for speed
+
+Build an FP16 TensorRT engine:
+
+    trtexec --onnx=models/resnet50_onnx/1/model.onnx \
+            --saveEngine=models/resnet50_trt/1/model.plan \
+            --explicitBatch --fp16
+
+Create models/resnet50_trt/config.pbtxt:
+
+    name: "resnet50_trt"
+    platform: "tensorrt_plan"
+    max_batch_size: 16
+    input:  { name: "input",  data_type: TYPE_FP32, dims: [3,224,224] }
+    output: { name: "logits", data_type: TYPE_FP32, dims: [1000] }
+    instance_group [ { kind: KIND_GPU, count: 1 } ]
+    dynamic_batching { preferred_batch_size: [4,8,16], max_queue_delay_microseconds: 1000 }
+
+Restart Triton (or run with repository polling) and infer against resnet50_trt.
+6) Tune throughput & latency
+
+    More copies per GPU:
+
+        instance_group [ { kind: KIND_GPU, count: 2 } ]
+
+    Adjust preferred_batch_size/max_queue_delay_microseconds to meet p95 latency targets.
+
+    Drive load (e.g., hey, Locust) to validate batching benefits.
+
+7) (Optional) Minimal Kubernetes deployment
+
+Create k8s-triton.yaml:
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata: { name: triton }
+    spec:
+      replicas: 1
+      selector: { matchLabels: { app: triton } }
+      template:
+        metadata: { labels: { app: triton } }
+        spec:
+          containers:
+          - name: triton
+            image: nvcr.io/nvidia/tritonserver:latest
+            args: ["tritonserver","--model-repository=/models"]
+            ports:
+            - { containerPort: 8000 }
+            - { containerPort: 8001 }
+            - { containerPort: 8002 }
+            volumeMounts:
+            - { name: model-repo, mountPath: /models }
+            resources:
+              limits: { nvidia.com/gpu: 1 }
+          volumes:
+          - name: model-repo
+            hostPath: { path: /path/on/node/models }  # or PVC
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata: { name: triton-svc }
+    spec:
+      selector: { app: triton }
+      type: NodePort
+      ports:
+      - { name: http,    port: 8000, targetPort: 8000 }
+      - { name: grpc,    port: 8001, targetPort: 8001 }
+      - { name: metrics, port: 8002, targetPort: 8002 }
+
+Apply:
+
+    kubectl apply -f k8s-triton.yaml
+
+8) Troubleshooting
+
+    Model fails to load: check Triton logs for input/output name/shape mismatches → fix config.pbtxt or ONNX export names.
+
+    400 on infer: ensure request uses "input", shape [N,3,224,224], datatype:"FP32".
+
+    Low throughput: enable dynamic batching, raise instance_group count, switch to TensorRT.
+
+    CPU run slow: expected; use GPU/TensorRT for real perf.
+
+    Labels: this lab prints top-5 indices; map indices to ImageNet labels if needed.
+
+✅ You accomplished
+
+    Exported a model → built a Triton model repo
+
+    Served it over HTTP/gRPC with Prometheus metrics
+
+    Sent real inference requests
+
+    Learned batching, scaling, and TensorRT optimization paths
+```
 
 ## Section 17: Week 16: Observability in AI infrastructure
 
 ### 107. 106. Why Monitoring AI Systems Matters
+- Mindset
+  - AI != traditional apps
+  - Visibility into black-box models
+  - Detect issues early
+- Why AI is different
+  - Non-determinism
+  - Data dependency
+  - Model drift: accuracy degrades over time as the world changes
+  - Infrastructure sensitivity
+- Dimensions to monitor
+  - Infrastructure metrics: CPU/GPU utilization, memory consumption, network throughput
+  - Model performance: accuracy and F1 score, drift detection metrics
+  - Operational metrics: latency, request throughput, error and failure assets
+  - Business KPIs: conversion rates, fraud detection accuracy, customer satisfaction
+- Failure modes without monitoring
+  - Silent performance drops
+  - Infrastructure bottlenecks
+  - Data pipeline errors
+  - Compliance violations  
+- Monitoring across the lifecycle
+  - Training
+    - Loss curves and convergence
+    - Resource utilizawtion metrics
+    - Reproducibilty checks
+  - Deployment
+    - Endpoint health and availability
+    - Latency profiles under load
+    - Autoscaling performance
+  - Post-deployment
+    - Concept drift detection
+    - Bias and fairness metrics
+    - Real-world accuracy tracking
+  - Continuous learning
+    - Feedback loop capture
+    - Automated retraining triggers
+    - Performance improvement tracking
+- Tools & ecosystem
+  - Infrastructure: Prometheus, Grafana, DCGM
+  - Model operations: MLflow, wandb, EveidentlyAI
+  - Observability: OpenTelemetry, ELK stack, Datadog
+  - Business layer: Custom dashboards
+- Best practices
+  - Define clear SLOs
+  - Monitor distribution, not averages
+  - Combine signal types
+  - Build alerts and playbooks  
 
 ### 108. 107. GPU Monitoring with DCGM
+- Data Center GPU Management is Nvidia's low-level toolkit for comprehensive GPU telemetry and management
+  - Natively integrates with Prometheus, Kubernetes, Slrum, and DCGM expoter
+- Why DCGM?
+  - GPUs are the bottleneck
+  - CPU monitoring is insufficient
+  - Comprehensive detection
+- Key metrics
+  - Utilization: GPU core percentage, memory utilization, SM occupancy
+  - Memory: Used vs free memory, bandwidth throughput, memory controller utilization
+  - Power & thermals: wattage consumption, throttling events, Fan speed and temperature
+  - Errors and process stats: ECC memory errors, PCIe/NVLink connectivity issues, PID-to-GPU resource mapping
+- DCGM deployment modes
+  - Embedded mode: library integrated inside application with C and Python bindings for custom monitoring solutions
+  - DCGM exporter: Prometheus-compatible metrics endpoint
+  - Standalone mode: CLI (dcgmi) for system adminstrators to perform on-demand diagnotics and checks
+  - Kubernetes integraiton
+- CLI examples with dcgmi
+```
+dcgmi discovery # list all GPUs
+dcgmi stats --gpu 0 # get stats of GPU 0
+dcgmi diag -r 1 # run short diagnostics
+dcgmi health --set 1 # enable health monitoring group
+```
+- DCGM exporter for Prometheus
+  - Run a DaemonSet on every GPU node
+  - Exposes `/metrics` endpoint for Prometheus scaping
+  - Example metrics exposed:
+    - `DCGM_FI_DEV_GPU_UTIL`: GPU utilizatino percentage
+    - `DCGM_FI_DEV_MEM_COPY_UTIL`: memory controller activity
+    - `DCGM_FI_DEV_POER_USAGE`: power consumption in watts
+- Kubernetes integration
+  - Nvidia GPU Operator includes DCGM exporter by default
+  - Auto-labeling
+  - Scaling integration
+- Nvidia provides ready-to-use Grafana dashboards for DCGM metrics
+- Best practices
+  - Deploy DCGM exporter in all GPU clusters
+  - Track utilization efficiency
+  - Implement proactive alerting
+  - Use metrics for capacity planning 
 
 ### 109. 108. Metrics Collection with Prometheus
+- Prometheus
+  - Metrics monitoring system
+  - PromQL Query Language
+  - Cloud-native architecture
+- Why Prometheus for AI ?
+  - Unified observability
+  - High-Cardinality support
+  - Rich ecosystem integraion: seamless works with DCGM, Triton, and Kubernetes
+  - Actionable Insights  
+- Core Prometheus Concepts
+  - Metrics
+    - Counter: cumulative metrics
+    - Gauge: current value metrics
+    - Histogram
+    - Summary: calculates quantiles client-side
+  - Labels
+  - PromQL
+  - Scrape Targets
+- Scrape configuration example
+  - prometheus.yml:
+```yaml
+scrape_configs:
+ - job_name: 'gpu-metrics'
+   static_configs:
+    - targets: ["node1:9400","node2:9400"]
+ - job_name: "triton"
+   static_configs:
+    - targets:["triton-svc:8002"]    
+```
+- PromQL in action
+  - GPU utilization (avg per cluster): `avg(DCGM_FI_DEV_GPU_UTIL)`
+  - Model inference QPS (per model): `rate(nv_inference_count[1m]) by (model)`
+  - P95 latency: `histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))`
+- Integration with Kubernetes  
+  - Automated discovery and configuration
+  - Pod annotations for auto-discovery
+```
+annotations:
+  prometheus.io/scrape:"true"
+  prometheus.io/port:"8002"
+```
+- Metrics storage and retention
+  - Local TSDB
+  - Remote storage: long term retention
+  - Model performance history
+- Best practices
+  - Meaningful labels
+  - Percentile monitoring
+  - Cardinality management
+  - Security controls
 
 ### 110. 109. Visualization Dashboards with Grafana
+- Grafana
+  - Open source analytics and visualization platform
+  - Connects seamlessly to Prometheus, Loki, Elastic, CloudWatch and others
+- Why Grafana?
+  - Unified visualization
+  - Faster anomaly detection
+  - Cross-team visibility
+  - Integrated alerting
+- Core building blocks
+  - Data sources
+  - Panels
+  - Dashboards
+  - Alerts
+- Prometheus + Grafana setup
+  - Add Prometheus as Data source
+  - Create PromQL queries
+  - Configure auto-refresh
+- Visualization types
+  - Time-series graphs
+  - Single stat gauges
+  - Heatmaps
+  - Tables
+- Dashboards in Kubernetes
+  - Deployment options
+    - Run Grafana via Helm chart or Operator for K8 native management
+    - Import Nvidia GPU + Triton dashboards from community templates
+    - Configure persistent storage for dashboard definitions
+  - Organization
+    - Integrate with K8 RBAC for team-based access control
+    - Use folders to group dashboards by domain
+    - Implement namespace-based segregation for multi-tenant setups
+- Advanced features
+  - Annotations
+  - Variables
+  - Drilldowns
+  - Alerting 2.0
+- Best practices
+  - Audience-focused design
+  - Prioritize key metrics
+  - Embrace templating
+  - Implement GitOps: store dashboard JSON in version control and automate provisioning via CI/CD pipeline
 
 ### 111. 110. Tracing AI Requests with OpenTelemetry
+- OpenTelemetry
+  - Open-source observability framework
+  - Unified standard: collects traces, metrics, logs
+  - Ecosystem integration with Prometheus, Grafana, Jaeger, Datadog
+  - Multi-language support: Python, Java, C++, Go, and many others
+- Why tracing matters for AI
+  - Multi-layer complexity
+  - Hidden failure points
+  - Root-cause visibility
+  - Tail latency detection
+- Core tracing concepts
+  - Trace
+  - Span
+  - Context propagation
+  - Attributes and events
+- AI pipeline example trace
+  - Request & FastAPI
+  - TRiton server
+  - Feature store
+  - Post-processing
+  - Response  
+- Instrumenting AI services
+  - Python SDK for AI Frameworks
+    - Add opentelemetry API into FastAPI, Flask, TorchServe, etc
+    - Auto-instruments HTTP endpoints, database calls, and external dependencies
+  - Key implementation steps
+    - Install OpenTelemetry SDK and instrumentation package
+    - Configure trace exporter to your backend
+    - Add auto-instrumentation for your framework
+    - Create custom spans for model-specific operation
+    - Attach trace IDs to logs for correlation
+- Exports and backends
+  - Open source tracking backends: Jaeger & Tempo
+  - Unified Observability: Grafana + Temp + Loki
+  - Cloud-native: AWS X-Ray, GCP Trace, Azure Monitor
+- Tracing GPU & model layers
+  - Model execution spans
+  - Rich context attributes: model version, batch size, GPU ID, ...
+- Sampling strategies
+  - 100% always-on: Complete but expensive
+  - 1-10% probabilistic: predictable overhead but may miss specific issues
+  - p95+ tail-based: captures problementic requests but requires dynamic sampling implementation
+- Best practices
+  - End-to-end propagation
+  - Consistent tagging
+  - Strategic sampling
+  - Integrated observability
 
 ### 112. 111. Building Alerts for AI System Failures
+- Why alerts matter
+  - AI systems fail in subtle & silent ways
+  - Early detection prevents:
+    - Customer-facing outages
+    - Model drift going unnoticed
+    - Expensive infrastructure waste
+- Types of failures to alert on
+  - Infrastructure
+    - GPU out-of-memory errors
+    - Thermal throttling
+    - Node crashes or restart
+    - Network connectivity issues
+  - Operation
+    - High p95/p99 latency spikes
+    - Error rate increases
+    - Request throughput anomalies
+    - Batch job failures
+  - Model-level
+    - Accuracy/precision drops
+    - Feature drift signals
+    - Bias or fairness issues
+    - Prediction confidence changes
+  - Business-level
+    - KPI degradation
+    - Fraud rate increases
+    - Customer churn signals
+    - Revenue impact indicators
+- Anatomy of a good alert
+  - Signal
+  - Threshold
+  - Actionability
+  - Context
+- Routing alerts
+  - Use Alertmanager for deduplication and intelligent routing
+  - Use severity levels to determine urgency
+    - Critical: immediate action (PagerDuty)
+    - Warning: attention needed (Slack)
+    - Info: Awareness only (email)
+- Avoiding alert fatigue
+  - Focus on SLOs, not every metric
+  - Use multi-window thresholds
+  - Group related alerts
+  - Regular alert hygiene
+  * Having 5-8 actionable alerts per day will make folks ignore them
+- AI-specific alerting patterns
+  - Model-drift detection
+  - GPU underutilization
+  - Data pipeline stalls
+  - Shadow model disagreement: when canary/shadow models diverge signficantly from production model
+- Incident playbooks
+  - Each alert should link to a detailed runbook with step-by-step troubleshooting instructions
+- Best practices
+  - Define multi-layer coverage
+  - Use SLO-based thresholds
+  - Establish clear on-call practices
+  - Test before production
 
 ### 113. 112. Lab – Monitor GPU Cluster with Prometheus
+- Here’s a practical, end-to-end lab to monitor a Kubernetes GPU cluster with Prometheus (plus Grafana dashboards and basic alerts). You’ll deploy NVIDIA’s DCGM Exporter to expose GPU metrics, scrape them with Prometheus, visualize in Grafana, and add alert rules.
+```
+0) What you’ll build (mental model)
 
-    5min
+    GPU nodes run DCGM Exporter (DaemonSet) → exposes GPU metrics on port 9400.
+
+    Prometheus scrapes those metrics + standard cluster metrics (node exporter, kube-state-metrics).
+
+    Grafana visualizes everything (dashboards).
+
+    Alertmanager (bundled) routes alerts (we’ll add a few sample rules).
+
+1) Prerequisites
+
+    A Kubernetes cluster with at least one NVIDIA GPU node (drivers installed).
+
+    kubectl and Helm configured for the cluster.
+
+    NVIDIA device plugin installed (commonly used on GPU nodes).
+
+    Cluster admin privileges.
+
+    Tip: If your cluster isn’t already GPU-ready, install the NVIDIA device plugin first:
+
+    helm repo add nvidia https://nvidia.github.io/k8s-device-plugin
+    helm repo update
+    kubectl create ns gpu-operator --dry-run=client -o yaml | kubectl apply -f -
+    helm install nvidia-device-plugin nvidia/k8s-device-plugin -n gpu-operator
+
+2) Create a dedicated namespace
+
+We’ll keep everything in one place.
+
+    kubectl create namespace monitoring
+
+3) Install Prometheus, Grafana, and friends (kube-prometheus-stack)
+
+This Helm chart deploys Prometheus, Grafana, Alertmanager, node-exporter, and kube-state-metrics.
+
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm repo update
+    helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring
+
+Why this route? It’s the fastest way to get a production-worthy Prometheus stack with CRDs (ServiceMonitor/PrometheusRule) that make scraping and alerting clean and declarative.
+4) Label your GPU nodes (for clean scheduling)
+
+We’ll schedule the DCGM exporter only on GPU nodes.
+
+    # Replace <node-name> with each GPU node
+    kubectl label nodes <node-name> gpu=true
+
+Why? It ensures the exporter runs only where GPUs exist. If you already have useful labels (e.g., from NFD), adjust the selector in the YAML later.
+5) Deploy NVIDIA DCGM Exporter (DaemonSet)
+
+This exposes GPU metrics (utilization, memory, temperature, power, ECC, clocks, etc.) per node/GPU.
+
+Create dcgm-exporter.yaml:
+
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: dcgm-exporter
+      namespace: monitoring
+      labels:
+        app: dcgm-exporter
+    spec:
+      selector:
+        matchLabels:
+          app: dcgm-exporter
+      template:
+        metadata:
+          labels:
+            app: dcgm-exporter
+        spec:
+          nodeSelector:
+            gpu: "true"
+          hostPID: false
+          hostNetwork: false
+          tolerations:
+            - effect: NoSchedule
+              operator: Exists
+            - effect: NoExecute
+              operator: Exists
+          containers:
+            - name: dcgm-exporter
+              # Pin to a known-good tag in your environment; 'latest' shown for simplicity
+              image: nvcr.io/nvidia/k8s/dcgm-exporter:latest
+              imagePullPolicy: IfNotPresent
+              ports:
+                - name: metrics
+                  containerPort: 9400
+              securityContext:
+                privileged: true
+              env:
+                # Optional: adjust sampling interval if needed
+                - name: DCGM_EXPORTER_KUBERNETES
+                  value: "true"
+              volumeMounts:
+                # Provides per-pod GPU accounting when available (useful with MIG)
+                - name: pod-resources
+                  mountPath: /var/lib/kubelet/pod-resources
+                  readOnly: true
+          volumes:
+            - name: pod-resources
+              hostPath:
+                path: /var/lib/kubelet/pod-resources
+                type: Directory
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: dcgm-exporter
+      namespace: monitoring
+      labels:
+        app: dcgm-exporter
+    spec:
+      clusterIP: None  # headless so Prometheus scrapes each pod endpoint
+      selector:
+        app: dcgm-exporter
+      ports:
+        - name: metrics
+          port: 9400
+          targetPort: metrics
+
+Apply it:
+
+    kubectl apply -f dcgm-exporter.yaml
+    kubectl -n monitoring get pods -l app=dcgm-exporter -o wide
+
+Why headless Service? Prometheus will discover each DaemonSet pod and scrape metrics per node, not just round-robin through a single service IP.
+6) Tell Prometheus to scrape DCGM Exporter (ServiceMonitor)
+
+Create dcgm-servicemonitor.yaml:
+
+    apiVersion: monitoring.coreos.com/v1
+    kind: ServiceMonitor
+    metadata:
+      name: dcgm-exporter
+      namespace: monitoring
+      labels:
+        release: monitoring    # must match your Helm release name
+    spec:
+      selector:
+        matchLabels:
+          app: dcgm-exporter
+      namespaceSelector:
+        matchNames: ["monitoring"]
+      endpoints:
+        - port: metrics
+          interval: 15s
+          path: /metrics
+
+Apply it:
+
+    kubectl apply -f dcgm-servicemonitor.yaml
+
+Why ServiceMonitor? kube-prometheus-stack watches these CRDs and dynamically updates Prometheus scraping config.
+7) Sanity-check: see the raw GPU metrics
+
+Port-forward to any DCGM exporter pod and curl /metrics:
+
+    POD=$(kubectl -n monitoring get pod -l app=dcgm-exporter -o jsonpath='{.items[0].metadata.name}')
+    kubectl -n monitoring port-forward pod/$POD 9400:9400
+    # in another terminal:
+    curl -s localhost:9400/metrics | head -n 40
+
+You should see metrics like DCGM_FI_DEV_GPU_UTIL, DCGM_FI_DEV_GPU_TEMP, DCGM_FI_DEV_FB_USED, etc., with labels for GPU index, UUID, instance (MIG), and node.
+8) Open Prometheus UI and run a few PromQL queries
+
+Find the Prometheus service name:
+
+    kubectl -n monitoring get svc | grep prometheus
+
+Port-forward (replace with your service name if different):
+
+    kubectl -n monitoring port-forward svc/monitoring-kube-prometheus-prometheus 9090
+
+Open http://localhost:9090 → Graph.
+
+Try queries (adjust label names if needed in your environment):
+
+    GPU Utilization (%)
+
+        avg by (instance, gpu) (DCGM_FI_DEV_GPU_UTIL)
+
+    Memory Utilization (%)
+
+        100 * (DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_TOTAL)
+
+    GPU Temperature (°C)
+
+        max by (instance, gpu) (DCGM_FI_DEV_GPU_TEMP)
+
+    Power (W)
+
+        avg by (instance, gpu) (DCGM_FI_DEV_POWER_USAGE)
+
+If no results, check:
+
+    ServiceMonitor metadata.labels.release matches the Helm release (monitoring above).
+
+    DCGM Service/labels/port names match the ServiceMonitor selector and endpoints.port.
+
+9) Access Grafana and import a GPU dashboard
+
+Get the Grafana admin password and port-forward:
+
+    # Password (decodes the secret created by the chart)
+    kubectl -n monitoring get secret monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 -d; echo
+     
+    kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+
+Open http://localhost:3000 → login admin / (password above).
+
+Create a GPU dashboard (quick start):
+
+    Create a new Dashboard → Add Panel.
+
+    Panel 1 (GPU Util %):
+
+        avg by (instance, gpu) (DCGM_FI_DEV_GPU_UTIL)
+
+    Panel 2 (FB Memory %):
+
+        100 * (DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_TOTAL)
+
+    Panel 3 (Temperature °C):
+
+        max by (instance, gpu) (DCGM_FI_DEV_GPU_TEMP)
+
+    Panel 4 (Power W):
+
+        avg by (instance, gpu) (DCGM_FI_DEV_POWER_USAGE)
+
+    Add a repeating variable for instance and gpu if you want per-node/per-GPU drilldown.
+
+    Note: If your DCGM exporter uses different metric names/prefixes (some builds prefix with nvidia_dcgm_...), use Grafana’s query editor autocompletion to confirm names. The /metrics output is the source of truth.
+
+10) Add alert rules (PrometheusRule)
+
+Create gpu-alerts.yaml with a few pragmatic alerts:
+
+    apiVersion: monitoring.coreos.com/v1
+    kind: PrometheusRule
+    metadata:
+      name: gpu-alerts
+      namespace: monitoring
+      labels:
+        release: monitoring
+    spec:
+      groups:
+        - name: gpu.rules
+          rules:
+            - alert: GPUScrapeMissing
+              expr: up{job="dcgm-exporter"} == 0
+              for: 10m
+              labels: { severity: warning }
+              annotations:
+                summary: "DCGM exporter scrape failing"
+                description: "Prometheus cannot scrape DCGM exporter targets for 10m."
+     
+            - alert: GPUHighTemperature
+              expr: max by (instance, gpu) (DCGM_FI_DEV_GPU_TEMP) > 80
+              for: 5m
+              labels: { severity: warning }
+              annotations:
+                summary: "GPU temperature high (>80°C)"
+                description: "Instance {{ $labels.instance }} GPU {{ $labels.gpu }} too hot."
+     
+            - alert: GPUMemoryPressure
+              expr: 100 * (DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_TOTAL) > 90
+              for: 10m
+              labels: { severity: warning }
+              annotations:
+                summary: "GPU memory > 90% for 10m"
+                description: "Sustained memory pressure on {{ $labels.instance }} GPU {{ $labels.gpu }}."
+     
+            - alert: GPUECCErrorsSpike
+              expr: rate(DCGM_FI_DEV_ECC_SBE_VOL_TOTAL[5m]) > 0
+              for: 5m
+              labels: { severity: critical }
+              annotations:
+                summary: "ECC single-bit errors increasing"
+                description: "ECC SBE rate > 0 on {{ $labels.instance }} GPU {{ $labels.gpu }}."
+
+Apply:
+
+    kubectl apply -f gpu-alerts.yaml
+
+Wire up notifications: Edit the Alertmanager config in the chart values or via the alertmanager Secret to send to Slack, email, etc.
+11) (Optional) Attribute GPU usage to Pods/Namespaces
+
+If you mounted /var/lib/kubelet/pod-resources (we did), newer DCGM Exporter can label samples with pod, namespace, and container for per-tenant views (esp. with MIG). In Grafana, add panels grouped by namespace/pod to see who is using the GPUs.
+12) Troubleshooting checklist
+
+    No metrics in Prometheus: Verify ServiceMonitor label release: monitoring matches your Helm release; ensure the Service/port name is metrics and matches the ServiceMonitor endpoint.
+
+    Exporter CrashLoopBackOff: Check GPU driver presence on the node: nvidia-smi (via a debug pod or SSH). Ensure privileged: true.
+
+    MIG visibility issues: Confirm MIG mode and driver/DCGM support. If using MIG, ensure the pod-resources path is mounted as shown.
+
+    Grafana empty: Select the Prometheus datasource (Prometheus from the stack) and check PromQL autocompletion to confirm metric names.
+
+13) Clean up
+
+    kubectl -n monitoring delete -f gpu-alerts.yaml
+    kubectl -n monitoring delete -f dcgm-servicemonitor.yaml
+    kubectl -n monitoring delete -f dcgm-exporter.yaml
+    helm -n monitoring uninstall monitoring
+    kubectl delete ns monitoring
+
+What you should see in the end
+
+    Prometheus targets for each GPU node’s DCGM exporter are UP.
+
+    Grafana dashboards show GPU Util, Memory %, Temperature, Power per node/GPU.
+
+    Alerts fire if temps exceed threshold, memory is saturated, or exporter scrapes fail.
+```
+
+## Section 18: Week 17: Model & Data Drift
 
 ### 114. 113. What Is Concept Drift vs Data Drift?
-### 115. 114. Why Drift Destroys AI Performance
-### 116. 115. Tools for Drift Detection (EvidentlyAI)
-### 117. 116. Real-Time Drift Monitoring Pipelines
-### 118. 117. Human-in-the-Loop Drift Evaluation
-### 119. 118. Mitigation Strategies – Retraining & Rebalancing
-### 120. 119. Lab – Build a Drift Detection Pipeline
+- Why drift matters
+  - The assumption of training data == real-world data breaks down over time
+- What is data drift
+  - Statistical properties of your input features change over time
+  - Visual inputs: image resolution, new camera sensors, lighting variations, updated mobile phone cameras
+  - Text data: Vocabulary trends, shifts in language usage patterns
+  - User demographics: distribution of age, location, and behavior profiles
+- What is concept drift?
+  - Relationship b/w inputs and outputs changes
+  - Medical diagnosis: new disease
+  - Fraud detection
+  - Sentiment analysis: cultural context shifts
+- Comparing data vs concept drift
 
-    1min
+Aspect | Data drift | Concept drift 
+-------|------------|----------------
+What changes | Input distribution | input-> label mapping
+Detection methods | Statistical tests, histogram comparisons| Accuracy monitoring, error rate tracking
+Fix approach | Update preprocessing, retrain on new data distribution | Retrain with newly labeled data, revise model logic
+- Types of concept drift
+  - Sudden drift: fraudsters' new tactics after a security patch
+  - Increment drift: User preferences for content recommendation
+  - Recurring drift: Seasonal shopping behavior
+- Detecing drift
+  - Data drift detection
+    - Distribution monitoring with looks like EvidentlyAI
+    - Statistical tests such as Kolmogorov-Smirnov test or Population Stability Index (PSI)
+    - Feature histogram comparisons against training baseline
+    - Dimensionality reduction to visualize high-dimensional drift
+  - Concept drift detection
+    - Accuracy tracking on labeled validation samples
+    - Error rate monitoring with delayed ground truth
+    - Prediction distribution analysis for shifts in output patterns
+    - Model confidence metrics to identify uncertainty increases
+- Real world examples
+  - Data drift: location services by Covid19 lock-down
+  - Concept drift: fraud detection
+  - Both types: recommendation systems
+- Why both matters
+  - Data drift: your model sees "unfamiliar" inuts that it wasn't trained to handle
+  - Concept drift: your model makes "wrong assumptions" about inputs
+  - Both require:
+    - Continuous monitoring systems
+    - Alert thresholds and triggers
+    - Retraining pipelines and strategies
+    - Model versioning and rollback capabilities
+
+### 115. 114. Why Drift Destroys AI Performance
+- The nature of drift
+  - ML model's fundamental assumption: training data and production data must follow similar patterns
+  - When this assumption breaks, drift begins
+- Performance degradation path
+  - Training phase
+  - Deployment
+  - Drift accumulates
+  - Business KPIs collapse
+- Effects of data drift
+  - Loss of predictive power
+  - Real-world examples
+    - New slang terms in NLP
+    - Senior recalibration shifts numeric ranges
+    - Image distributions change with camera upgrades
+  - Consequences: higher error rates and algorithmic bias
+- Effects of concept drift
+  - Fraud detection
+  - Consumer behavior
+  - Financial markets: economic regime changes
+- Hidden risks of drift
+  - Silent failures damage your model's reputation
+  - Compliance risk increases
+  - Fairness issues as certain groups are disproportionally impacted
+  - Computation waste
+- Drift accelerators
+  - Dynamic domains like finance, security, and healthcare domains
+  - Cyclical patterns: seasonal or periodic data
+  - User-generated content: evolving language, norms, and behaviors in social platforms
+  - Feedback loops: chained actions
+- Why drift is particularly dangerous
+  - Gradual and invisible
+  - Infrastructure resistant
+  - Requires intervention
+  - Erodes trust
+
+### 116. 115. Tools for Drift Detection (EvidentlyAI)
+- EvidentlyAI
+  - An open-source Python library and dashboard
+  - Data and concept drift
+  - Model quality
+  - Interactive reports
+- Why EvidentlyAI?
+  - Accessible and interpretable
+  - Versatile deployment
+  - Bridges teams
+- Comprehensive drift dtection suite
+  - Data drift report: comparison against baseline dataset
+  - TArget drift report: monitors changes in the label distribution over time
+  - Prediction drift report: tracks shifts in the model's output distributions
+```py
+from evidently.report import Report
+from evidently.metric_preset import DataDriftPreset
+report = Report(metrics=[DataDriftPreset()])
+report.run(reference_data = train_df,current_data=prod_df)
+report.show(mode="inline")
+```
+- Powerful statistical foundation
+  - Feature-level detection
+  - Population stability index
+  - Jensen-Shannon divergence
+  - Kolmogorov-Smirnov test
+- Seamless integration options
+  - Data science notebooks
+  - ML pipelines
+  - Visualization dashboards
+  - Alerting systems
+- Beyond drift: comprehensive ML monitoring
+  - Data quality checks
+  - Target analysis: tracks class balanace shifts
+  - Performance monitoring
+  - Fairness & bias detection
+- Strength and limitations
+  - Strengths
+    - Low adoption barrier
+    -  Rich visual reports
+    - Statistical rigor
+    - Works with structured data
+    - Open source flexibility
+  - Limitations
+    - Limited support for unstructured data like images and video
+    - Requires external systems
+    - Processing overhead
+    - Some customization needs
+
+### 117. 116. Real-Time Drift Monitoring Pipelines
+- Drift is continuous, not occasional
+- Realtime pipelines detect and alert as drift happens
+- Critical for domains like fraud detection, financial trading, healthcare diagnostics
+- Pipeline architecture
+  - Data ingestion
+  - Feature store/preprocessing
+  - Drift detection engine
+  - Metrics export
+  - Dashboards and alerts
+- Streaming data sources
+  - User events
+  - Sensor data
+  - Inference logs
+  - Embedding streams
+- Drift detections in streaming
+  - Statistical approach
+    - Sliding window monitoring
+    - Compare against reference baseline
+    - Apply statistical tests on-the-fly to detect significant shifts
+  - Common tests
+    - KS test, PSI, chi-square for categorical features
+    - Jensen-Shannon divergence for probability distributions
+    - ADWIN, DDM for gradual vs sudden concept shift
+- Prometheus/Grafana integration
+  - Metric exposure: drift metrics exported as counters/gauges in Prometheus format
+  - Visualization: Trend lines and heat maps
+  - Alerting
+- Scaling the pipeline
+  - Enterprise-grade infrastructure
+    - Use Flink/Spark streaming for large-scale drift checks across multiple models
+    - Store drift logs in time-series databases for audit trails and retraining triggers
+    - Integrate with CI/CD pipelines for automatically trigger retraining when thresholds are exceeded
+- Best practices
+  - Monitor both inputs + outputs
+  - Window size selection
+  - Automate feedback loops
+  - Version control everything
+
+### 118. 117. Human-in-the-Loop Drift Evaluation
+- Why humans still matter
+  - Fast and scalable
+  - Context and judgement
+  - Compliance and ethics
+  - Not all drift requires action - humans provide the critical judgements
+- The role of human review
+  - Validates dift alerts before triggering costly retraining cycles
+  - Distinguish real drift from natual data variability
+  - Provides feedback loops for label updates
+  - Approve retraining cycles in regulated industries
+- Drift evaluation workflow
+  - Automated detection
+  - Flag for review
+  - Human analysis
+  - Decision
+- Tooling for human-in-the-loop
+  - Visualization dashboards
+  - Feedback UI
+  - Annotation tools
+  - Ticketing integration
+- Challenges in human-machine collaboration
+  - Alert fatigue
+  - Expertise gaps
+  - Finding balance
+  - Response time
+- Best practices
+  - Strategic automation: escalate only 20% of routine drift cases to human judgement
+  - Actionable dashboards
+  - Reviewer rotation
+  - Decision documentation
+
+### 119. 118. Mitigation Strategies – Retraining & Rebalancing
+- Why mitigation is needed
+  - Even the best models deteriorate over time
+  - Drift is inevitable in production
+  - Detection alone isn't enough. Must act
+  - Goal: restore accuracy, fairness, and reliability
+- Retraining basics
+  - Collect new data that reflects current reality
+  - Retrain model with updated distribution
+  - Choose your approach
+    - Full retraining
+    - Incremental retraining
+- When to retrain    
+  - Performance metrics drop below SLA
+  - Drift severity exceeds threshold
+  - Major external events: pandemic, market crash, or regulatory changes
+  - Periodic schedule: calendar based retraining as a preventive measure (daily, weekly, monthly)
+- Rebalancing data
+  - Oversampling
+  - Undersampling
+  - Synthetic data
+- Active learning loop: when data is sparse or expensive to label, active learning (human in the loop) provides a targeted approach
+  - Drift detection
+  - Human labeling
+  - Incremental retraining
+  - Add to training: incorporate newly labeled data into training pool
+- Trade-offs in mitigation strategies
+  - Frequent retraining: better accuracy, faster adaptation but higher compute costs, resource intensive
+  - Infrequent retraining: lower operation coss but risk drift build-up and performance degradation
+  - Rebalancing: quick fix for imbalance issues but may not address fundamental distribution shifts
+- Strategy selection must balance technical performance with business impact and budget
+- Best practices for mitigation
+  - Automate retraining triggers
+  - Maintain baseline models
+  - Monitor hoslistically
+  - Log everything
+
+### 120. 119. Lab – Build a Drift Detection Pipeline
+- Goal: Detect data & concept drift in a simulated AI system using EvidentlyAI, Kafka (or mock stream), and export drift metrics to Prometheus/Grafana for monitoring.
+```
+0) Prereqs
+
+    Python 3.9+
+
+    pip install pandas scikit-learn evidently kafka-python prometheus_client
+
+    Optional: Kafka cluster (local or Docker). If no Kafka → script falls back to mock batches.
+
+    Prometheus + Grafana from Lab 112 (for metrics visualization).
+
+1) Prepare Training (Reference) Data
+
+    python scripts/prepare_reference.py
+
+    Generates a reference dataset (synthetic classification data).
+
+    Saves data/reference.csv (baseline distribution).
+
+2) Simulate Streaming Data
+
+Two options:
+
+    With Kafka: produce drifting batches into topic inference-events.
+
+    Without Kafka: script generates random batches with drift patterns (e.g., shifting mean, new categories).
+
+    python scripts/stream_data.py
+
+3) Drift Detection with EvidentlyAI
+
+Run drift detection in a loop:
+
+    python scripts/drift_monitor.py
+
+    Consumes batches (Kafka or mock).
+
+    Compares against reference dataset.
+
+    Uses DataDriftPreset and PredictionDriftPreset.
+
+    Exposes Prometheus metrics at http://localhost:8005/metrics.
+
+4) Prometheus Integration
+
+Edit prometheus.yml to scrape drift metrics:
+
+    scrape_configs:
+      - job_name: "drift-monitor"
+        static_configs:
+          - targets: ["drift-monitor:8005"]
+
+Reload Prometheus → drift metrics now available.
+5) Grafana Dashboard
+
+Import grafana_dashboards/drift_dashboard.json.
+Panels include:
+
+    % Features Drifted
+
+    Drift detected per feature
+
+    Drift severity over time
+
+    Alerts on sustained drift
+
+6) Test the Pipeline
+
+    Start with stable stream → dashboard shows low/no drift.
+
+    Introduce synthetic drift (--drift-mode in stream_data.py) → Grafana shows feature drift rising.
+
+    Alerts fire if thresholds breached.
+
+7) Cleanup
+
+    docker stop kafka zookeeper   # if using Docker Kafka
+    pkill -f drift_monitor.py
+
+📂 Folder Structure
+
+    lab119_drift_pipeline/
+     ├── data/
+     │   └── reference.csv
+     ├── scripts/
+     │   ├── prepare_reference.py
+     │   ├── stream_data.py
+     │   └── drift_monitor.py
+     ├── grafana_dashboards/
+     │   └── drift_dashboard.json
+     ├── README.md
+
+✅ Next Steps
+
+    Extend with concept drift detection using ground-truth labels.
+
+    Connect retraining triggers → continuous training pipeline.
+
+    Integrate with Lab 118 strategies for automated retraining & rebalancing.
+```
+
+## Section 19: Week 18: AI Security & Compliance
 
 ### 121. 120. Security Risks in AI Infrastructure
-### 122. 121. Identity and Access Management (IAM)
-### 123. 122. Secrets Management for AI Systems
-### 124. 123. Data Encryption at Rest and In Transit
-### 125. 124. Model Theft and Adversarial Attacks
-### 126. 125. Compliance Standards (GDPR, HIPAA, SOC2)
-### 127. 126. Lab – Secure a Model Endpoint with Authentication
+- Why AI security is different
+  - Expanded attack surface: complex journey from data, features, models, inference, pipelines creates multiple vulnerable points
+  - Infrastructure complexity: GPU clusters and specialized runtimes
+  - Dual-nature threats: model can be both target and weapon (jailbreaks to bypass safety guardrails)
+- Threat landscape
+  - Data: theft, leakage, poisoning
+  - Model: theft, inversion, membership inference attacks
+  - Inference: prompt injection, adversarial inputs, Dos attacks
+  - Infra: supply-chain vulnerabilities, secret exposure
+- Data centric risks
+  - Training data poisoning
+  - Shadow datasets and PII Sprawl: untracked copies in S3/object storage lead to unmanaged sensitive data and potential regulatory violations
+  - Weak access controls
+  - Linkage attacks
+- Model centric risks
+  - Model extraction: response from API to create proprietary models, stealing intellectual property
+  - Model inversion: Recover sensitive training samples by exploiting the model's memory of training data
+  - Membership inference: detect user data in the training set, violating privacy expectations
+  - Watermakr/backdoor triggers: Hidden patterns embedded in weights can be activated by specific inputs to force malicious behaviors
+- Inference-time risks
+  - Prompt injection/jailbreaks: crafted inputs that bypass safety guardrails in LLMs, enabling policy violations or system manipulation
+  - Adversarial examples: subtly modified inputs that cause vision/speech models to make dangerous misclassifications
+  - Tool/plugin abuse: exploting connected tools to accss unauthorized resources or exfiltrate secrets
+  - DoS Attacks: Hot-path overload causing latency SLO breaches and service degradation
+- Pipeline and supply chain vulnerabilities
+  - Malicious model artifacts
+  - Dependency attacks
+  - Compromised training scripts
+  - SBOM (Software Bill of Materials) Gaps
+- Cloud & cluster risks
+  - IAM vulnerabilty
+  - Cloud metadata exposure: instance metadata theft
+  - Kubernetes weaknesses
+  - GPU security gaps
+- Multi-tenancy and data isolation
+  - Cross-tenant data access via shared feature stores/vector DBs exposing confidential information
+  - Inference servers hosting many models creating noisy neighbors that can leak information
+  - Inadequate namespace/RBAC controls allowing tenant boundary violations
+  - Missing per-tenant resource quotas enabling DoS against shared services
+  - Side-channel attacks against shared GPUs extracting model parameters
+- Governance and compliance gaps
+  - Missing audit trails
+  - No data lineage
+  - Key management issues
+  - Sovereignty violations
+- Indicators of compromise (IoCs)
+  - Unusual inputs: spikes in atypical prompts or token usage patterns indicating probing attacks
+  - Performance anomalies: unexpected latency/throughput changes on inference endpoints
+  - Container/model integrity: unrecognized container digests or model hashes suggesting tampering
+  - Access patterns: requests from unexpected principals/regions or outside normal hours
+- Mitigation playbook (preview)
+  - Data protection
+    - Encryption, DLP scanning data minimization strategies
+    - Cryptographically signed datasets with provenance
+    - Senstive data detection in pre-processing pipeline
+  - Model safeguards
+    - Watermarking models to detect theft and misuse
+    - Rate-limits on API usage to prevent extraction
+    - Differential privacy
+  - Inference protection
+    - Content filters detecting malicious inputs
+    - Input validation and sanitization frameworks
+    - Real-time threat scoring for unusual requests
+  - Infrastructure hardening
+    - IAM least-privilege, mTLS b/w services
+    - Signed container images with verified SBOMs
+    - WAF protection for model APIs and admin interfaces
+  - Operational excellence
+    - Comprehensive logging, alerting, incident runbooks
+    - Regular red-team exercises targeting AI components
+- Design pricinples
+  - Zero trust by default
+  - Secure-by-default
+  - Defense in depth
+  - Measure and test
 
-    3min
+### 122. 121. Identity and Access Management (IAM)
+- Why IAM matters
+  - Protects sensitive data
+  - Restricts model access
+  - Prevents resource misuse
+  - Ensures compliance
+- IAM core concepts
+  - Identity: users, service accounts, and roles
+  - Authentication: verifying identity through SSO, API keys, certificates, and tokens
+  - Authorization: enforcing what an authenticated identity can access or modify
+  - Principles of least privilege: granting only the minimum permissions necessary for the task
+- Cloud IAM examples
+  - AWS IAM
+  - GCP IAM
+  - Azure RBAC: role-based access control
+- Service accounts & workload identity
+  - Use service accounts
+  - Implement workload identity federation
+  - Automate credential rotation
+  - Never embed credentials
+- Secrets management integration
+  - IAM Authentication
+  - Secret store
+  - Protected assets
+- Monitoring & auditing IAM
+  - Access logging
+  - Anomaly detection
+  - Regular audits
+- IAM threat scenarios
+  - Accidental data exposure
+  - Privilege escalation
+  - Compromised service account
+  - Pipeline tampering
+- IAM Best practices
+  - Policy design
+    - Enforce least privilege + separation of duties
+    - Use groups and roles over individual permissions
+    - Break down monolithic policies into specific scopes
+    - Document policy decisions and exceptions
+  - Technical implementation
+    - Rotate & expire credentials automatically
+    - Use short-lived tokens instead of static keys
+    - Integrate IAM into CI/CD & IaC templates
+    - Conduct regular compliance reviews + audits
+
+### 123. 122. Secrets Management for AI Systems
+- AI stacks use many credentials across multiple systems
+  - Cloud API keys
+  - Database passwords and feature store tokens
+  - Model registry & vector DB authentication
+- Types of secrets in AI workflows
+  - Data access: S3/GCS/Blob storage credentials, SQL DB passwords, NoSQL connection strings, data warehouse access tokens
+  - Model access: Hugging face tokens, private model registry credentials, openAI API keys, vector embedding service authentication
+  - Pipeline: CI/CD tokens, container registry credentials
+  - Infrastructure: GPU cluster kubeconfigs, cloud IAM keys, provisioning credentials, monitoring system tokens
+- Common pitfalls
+  - Repository leaks: API keys and tokens committed to Github repo
+  - Static credentials
+  - Shared accounts
+  - Environment exposure
+- Secrets vaults and managers
+  - HashiCorp Vault
+  - AWS secrets manager
+  - GCP secret manager
+  - Azure Key Vault
+- Kubernetes Secrets
+  - Store small secretes as K8 Secrets objects
+  - Enable encryption at rest with KMS backing
+  - Implement strict RBAC policies for access
+- Secret rotations and expiry
+  - Automated rotation
+  - Short-lived tokens
+  - Dynamic secrets
+  - Immediate expiry
+- Integration with AI pipelines
+  - Orchestration integration
+  - Container security
+  - Model access
+  - Deployment security
+- Monitoring & auditing secrets
+  - Anomaly detection
+  - Leak detection
+  - Audit trails
+  - Policy enforcement
+- Best practices
+  - No hardcoding
+  - Centralize management
+  - Automate lifecycle
+  - Least privilege
+  - Team training
+
+### 124. 123. Data Encryption at Rest and In Transit
+- Why encryption matters
+  - Sensitive datasets
+  - Intellectual property
+  - Regulatory compliance: GDPR, HIPAA, SOC2
+- Encryption at Rest
+  - Disk-level
+    - LUKS (Linux)
+    - BitLocker (Windows)
+    - Cloud provider managed encryption
+  - Database level
+    - Transparent Data Encryption (TDE)
+    - Column-level encryption
+    - Native DB security features
+  - File/Object-level
+    - S3 server-side encryption
+    - GCS/Azure Blob encryption
+    - KMS-managed keys
+- Encryption in Transit
+  - TLS (HTTPS): secure all REST/gRPC endpoints with TLS 1.2+ and strong cipher suites for public-facing APIs
+  - Mutual TLS (mTLS): certificate-based mutual authentication b/w services in K8 clusters
+  - Secure Tunnels: VPN/IPsec/TLS tunnels
+- Key Management Systems (KMS)  
+  - Centralized encryption key lifecycle
+    - Creation
+    - Distrbituion
+    - Rotation
+    - Revocation
+  - Popular KMS solutions: AWS KMS, Google cloud KMS, Azure Key Vault, HashiCorp Vault
+  - Always implement least-privilege IAM polices for KMS access
+- Encryption in AI workflows
+  - 256-bit AES encryption
+  - TLS 1.3 
+  - 100% pipeline coverage  
+- End-to-end security architecture
+  - Disk encryption
+  - Monitoring
+  - Transport encryption
+  - Secrets & KMS
+- Common encryption pitfalls
+  - Insecuire transport
+  - Storage misconfigurations
+  - Weak cryptography
+  - Static keys  
+- Advanced encryption technologies
+  - Homomorphic encryption
+  - Secure enclaves
+  - Client-side encryption
+- Encryption best practices
+  - Encryption by default
+  - Managed KMS
+  - Strong authentication
+  - Continuous monitoring
+
+### 125. 124. Model Theft and Adversarial Attacks
+- Why this matters
+  - Intellectual property
+  - Security threats
+  - Business impact
+- Model theft (extraction attacks)
+  - Adversary queries repeatedly to rebuild a replica by analyzing inputs and outputs
+  - Common techniques
+    - Output mimicking (block-box extraction)
+    - API probing to map decision boundaries
+    - Gradient-based extraction on exposed model parameters
+- Model inversion attacks
+  -Infers training data samples from model outputs by exploiting model memory
+  - Higher risk areas:
+    - Models trained on personally identifiable information (PII)
+    - Medical records and patient data
+    - Financial and transaction information
+- Membership inference attacks
+  - Adversaries determine whether specific records were part of the model's training dataset
+  - Attack method: analyzes confidence scores and prediction patterns that reveal whether data was seen during training
+  - Exploits overfitting: 
+  - Regulatory implication: direct threat to privacy under GDPR, HIPAA, and other regulatory frameworks
+- Adversarial examples: specially crafted inputs with subtle perturbations that cause AI models to make incorrect predictions
+- Attack vector sin AI infrastructure
+  - Inference APIs
+  - Public datasets
+  - Unsecured model artifacts
+  - Third-Party Libraries
+- Mitigation strategies: model theft
+  - Rate limiting: query limits per user/IP
+  - Watermarking and fingerprinting
+  - Differential privacy
+  - Anomaly detection
+- Mitigation strategies: adversarial attacks
+  - Adversarial training
+  - Input validation
+  - Randomization
+  - Ensemble defenses: combine multiple models with different architectures to increase robustness through diversity
+- Monitoring & detection
+  - Proactive detection methods
+  - Query distribution analysis
+  - Boundary probing detection
+  - Confidence validation
+- Best practices
+  - Asset protection
+  - Access controls
+  - Defense in depth
+  - Security testing  
+
+### 126. 125. Compliance Standards (GDPR, HIPAA, SOC2)
+- Meeting regulatory and trust requirements
+- Why compliance matters
+  - Sensitive data protection
+  - Regulatory safeguards
+  - Risk mitigation
+  - Trust foundation
+- GDPR (General Data Protection Regulation)
+  - Core principles
+    - Lawfulness, fairness, transparency in data processing
+    - Data minimization and purpose limitations to restrict collection
+    - Rights of access, rectification, and erasure (right to be forgotten)
+  - AI specific implications
+    - Model explainability requirements
+    - Explicit consent for automated decision-making
+    - Algorithmic transparency obligations
+- GDPR in AI infrastructure
+  - End-to-end encryption
+  - Comprehensive audit trails
+  - Model explainability
+  - Data subject rights
+- HIPAA (Health Insurance Portability & Accountability Act)
+  - Covered entities
+    - Healthcare providers handling patient data
+    - Health plans and insurers
+    - Business associates processing PHI
+  - Key requirements
+    - Comprehensive safeguards
+    - De-identification standards
+    - Breach notification
+- HIPAA in AI infrastructure
+  - Encrypted PHI storage
+  - Least privilege access
+  - Vendor compliance
+  - Comprehensive auditing
+- SOC2 (Service Organization Control 2)
+  - Voluntary compliance framework
+  - Trust Service Principles (TSPs)
+    - Security
+    - Availability
+    - Processing Integrity
+    - Confidentiality
+    - Privacy
+- SOC2 in AI infrastructure
+  - Access governance
+  - Workload monitoring
+  - Resilience planning
+  - Enterprise readiness
+- Challenges in AI compliance
+  - Explainability Gap
+  - Data residency
+  - Unstructured content
+  - Evolving standards
+- Best practices across standards
+  - Universal encryption
+  - Comprehensive audit trails
+  - Rigorous access management
+  - Privacy by design
+  - Regular validation
+
+### 127. 126. Lab – Secure a Model Endpoint with Authentication
+- Goal: Take a plain FastAPI inference API and secure it with:
+  - JWT-based user authentication
+  - API Key auth (for service-to-service calls)
+  - Rate limiting
+  - Deployment to Kubernetes with TLS support
+```
+Step 0 — Prerequisites
+
+    Python 3.10+
+
+    (Optional) Kubernetes cluster with an Ingress controller (e.g., NGINX)
+
+    Docker if you want to containerize
+
+Step 1 — Create the FastAPI app
+
+app/main.py
+
+    from fastapi import FastAPI, Depends, HTTPException, status, Security
+    from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, APIKeyHeader
+    from pydantic import BaseModel
+    from jose import JWTError, jwt
+    from passlib.context import CryptContext
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    from fastapi.responses import JSONResponse
+    import time
+     
+    # FastAPI app + rate limiter
+    limiter = Limiter(key_func=get_remote_address)
+    app = FastAPI()
+    app.state.limiter = limiter
+     
+    @app.exception_handler(RateLimitExceeded)
+    def rate_limit_handler(request, exc):
+        return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
+     
+    # Demo secrets
+    SECRET_KEY = "change-me"
+    ALGORITHM = "HS256"
+    API_KEY = "super-secret"
+     
+    # Password hashing
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+     
+    # Demo users
+    fake_users = {
+        "alice": {"username": "alice", "hashed_pw": pwd_context.hash("alicepass")},
+        "admin": {"username": "admin", "hashed_pw": pwd_context.hash("adminpass")}
+    }
+     
+    oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+    api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+     
+    class Token(BaseModel):
+        access_token: str
+        token_type: str
+     
+    class Features(BaseModel):
+        features: list[float]
+     
+    def authenticate_user(username, password):
+        user = fake_users.get(username)
+        if not user or not pwd_context.verify(password, user["hashed_pw"]):
+            return None
+        return user
+     
+    def create_access_token(data: dict, expires_in: int = 3600):
+        payload = data.copy()
+        payload.update({"exp": time.time() + expires_in})
+        return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+     
+    async def get_current_user(token: str = Depends(oauth2_scheme)):
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            return payload.get("sub")
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Invalid token")
+     
+    async def get_api_key(api_key: str = Security(api_key_header)):
+        if api_key == API_KEY:
+            return api_key
+        raise HTTPException(status_code=403, detail="Invalid API key")
+     
+    # Routes
+    @app.post("/token", response_model=Token)
+    async def login(form: OAuth2PasswordRequestForm = Depends()):
+        user = authenticate_user(form.username, form.password)
+        if not user:
+            raise HTTPException(status_code=401, detail="Bad credentials")
+        token = create_access_token({"sub": form.username})
+        return {"access_token": token, "token_type": "bearer"}
+     
+    @app.get("/healthz")
+    def health():
+        return {"status": "ok"}
+     
+    @app.get("/readyz")
+    def ready():
+        return {"status": "ready"}
+     
+    @app.post("/predict")
+    @limiter.limit("30/minute")
+    async def predict(
+        data: Features,
+        user: str = Depends(get_current_user),
+        api_key: str = Depends(get_api_key)
+    ):
+        # Demo "model": sum of features
+        score = sum(data.features)
+        return {"prediction": "class_A" if score > 5 else "class_B"}
+
+Step 2 — Install dependencies
+
+    pip install fastapi uvicorn python-jose passlib[bcrypt] slowapi
+
+Step 3 — Run locally
+
+    export JWT_SECRET='change-me' API_KEY='super-secret'
+    uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+Test:
+
+    curl -s http://localhost:8000/healthz
+
+Step 4 — Get a JWT
+
+    curl -s -X POST http://localhost:8000/token \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "username=alice&password=alicepass"
+
+Step 5 — Call the protected endpoint
+
+Bearer token path
+
+    TOKEN="<paste JWT>"
+    curl -s -X POST http://localhost:8000/predict \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"features":[5.1,3.5,1.4,0.2]}'
+
+API key path
+
+    curl -s -X POST http://localhost:8000/predict \
+      -H "X-API-Key: super-secret" \
+      -H "Content-Type: application/json" \
+      -d '{"features":[6.0,2.2,4.0,1.0]}'
+
+Step 6 — Rate limiting
+
+    Global default: 60/minute
+
+    /predict endpoint: 30/minute
+
+Exceed → 429 Too Many Requests
+Step 7 — Containerize
+
+Dockerfile
+
+    FROM python:3.11-slim
+    WORKDIR /app
+    COPY app/ app/
+    RUN pip install fastapi uvicorn python-jose passlib[bcrypt] slowapi
+    CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+Build & run:
+
+    docker build -t secure-endpoint .
+    docker run -p 8000:8000 -e JWT_SECRET=change-me -e API_KEY=super-secret secure-endpoint
+
+Step 8 — Deploy to Kubernetes
+
+k8s/deployment.yaml
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: secure-ml
+      namespace: ai-sec
+    spec:
+      replicas: 1
+      selector:
+        matchLabels: { app: secure-ml }
+      template:
+        metadata:
+          labels: { app: secure-ml }
+        spec:
+          containers:
+          - name: api
+            image: YOUR_REGISTRY/secure-endpoint:latest
+            ports:
+            - containerPort: 8000
+            envFrom:
+            - secretRef:
+                name: jwt-secret
+            - secretRef:
+                name: api-key
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: secure-ml-svc
+      namespace: ai-sec
+    spec:
+      selector: { app: secure-ml }
+      ports:
+      - port: 80
+        targetPort: 8000
+
+Create namespace + secrets:
+
+    kubectl create namespace ai-sec
+    kubectl -n ai-sec create secret generic jwt-secret --from-literal=JWT_SECRET='change-me'
+    kubectl -n ai-sec create secret generic api-key --from-literal=API_KEY='super-secret'
+    kubectl -n ai-sec apply -f k8s/deployment.yaml
+
+(Optionally add an Ingress with TLS.)
+Step 9 — Hardening checklist
+
+    Use OIDC (Auth0, Cognito, Entra) instead of demo /token in production.
+
+    Enforce HTTPS at ingress (consider mTLS internally).
+
+    Store secrets in K8s Secrets or Vault, never in code.
+
+    Apply RBAC and namespace isolation.
+
+    Add DoS protection: WAF rules, tuned rate limits.
+
+    Log everything: request IDs, user IDs, model version → ship to SIEM.
+
+✅ End result: You have a model API protected with JWT, API keys, and rate limiting, containerized and deployable to Kubernetes.
+```
+
+## Section 20: Week 19: Reliability & High Availability
 
 ### 128. 127. Why AI Systems Fail in Production
 ### 129. 128. Fault Tolerance in AI Inference
