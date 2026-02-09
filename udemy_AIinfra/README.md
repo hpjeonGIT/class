@@ -7551,10 +7551,1460 @@ Step 9 — Hardening checklist
 ## Section 20: Week 19: Reliability & High Availability
 
 ### 128. 127. Why AI Systems Fail in Production
-### 129. 128. Fault Tolerance in AI Inference
-### 130. 129. Redundancy and Failover for AI APIs
-### 131. 130. Designing High-Availability AI Clusters
-### 132. 131. Auto-Healing Infrastructure with Kubernetes
-### 133. 132. Chaos Engineering for AI Systems
-### 134. 133. Lab – Build a HA AI Inference Cluster
+- Uncovering weak points in real-world ML deployments
+- The harsh reality
+  - Deployment gap
+  - Rapid degradation
+  - Complex failure modes
+  - Root cause
+- Data related failures
+  - Distribution drift
+  - Quality degradation
+  - Label errors
+  - Pipeline breakages
+- Model related failures
+  - Overfitting
+  - Bias amplification
+  - Inadequate retraining
+  - Model staleness: the world changes faster than model updates
+- Infrastructure failures
+  - Processing bottlenecks
+  - Container misconfigurations
+  - Latency issues
+  - Cost explosions
+- Monitoring & observability gaps
+  - Untracked metrics
+  - Absent alerting
+  - Traceability deficits
+  - Inadequate dashboards
+- Security & compliance risks
+  - Exposed endpoints
+  - Secret leakage
+  - Regulatory violations
+  - Adversarial attacks
+- Organizational failures
+  - Siloed teams
+  - Ownership gaps
+  - Missing playbooks
+  - Expectation management
+- Case studies: when AI systems fail
+  - Fraud detection: unexpected data drift
+  - Customer support chatbot: evolving slang and terminology
+  - Healthcare diagnostic tool: missing audit logs
+  - Recommendation engine: Unannounced upstream schema change caused production crash
 
+### 129. 128. Fault Tolerance in AI Inference
+- Designing systems that survive failures gracefully
+- Why fault tolerance matters
+  - Revenue impact
+  - User experience
+  - Safety risks
+- Sources of failure in AI inference systems
+  - HW failures
+  - Network issues
+  - Software bugs
+  - External dependencies
+- Core design principles for fault-tolerant AI
+  - Redundancy
+  - Graceful degradation
+  - Isolation
+  - Resilience testing
+- Load balancing & replication strategies
+  - Deploy multiple replicas of inference servers behind a load balander
+  - Implement auo-healing via K8, deployments with health probes
+  - Scale horizontally with HPA based on CPU, memory, or custom metrics
+  - For GPU intensive workloads, consider overprovisioning by 20-30% to handle unexpected traffic spikes and instance failures
+- Fallback models: the safety net
+  - Deploy shadow or lieghtweight models that can take over when primary models fail
+- Circuit breakers: preventing cascading failures
+  - Circuit breaker monitor failure rates and stop traffic to failing components
+  - Track error rates and latency for each inference endpoint
+  - When failures exceed threshold, "trip" the circuit
+  - Reject new requests to failing service for a recovery period
+- Retry & timeout strategies
+  - Implement retries with exponential backoff
+  - Set strict tiemouts
+  - Monitor retry patterns
+- Chaos engineering for AI systems
+  - Systematically inject failures to validate resilience mechanism
+  - Simulate HW failure
+  - Create network issues
+  - Induce resource constraints
+  - Test dependency failures
+- Best practices for fault-tolerant AI inference
+  - Design for failure
+  - Multi-region deployment
+  - Automate everything
+  - Regular testing
+  - Business-aligned SLAs
+
+### 130. 129. Redundancy and Failover for AI APIs
+- Why redundancy matters
+  - Customer experience and satisfaction
+  - Revenue and business operations
+  - Brand reputation and trust
+- Redundancy fundamentals
+  - Compute redundancy
+  - Network redundancy
+  - Storage redundancy
+- Failover mechanism
+  - Active-Active: all replicas simultaneously handle traffic with load balancing
+    - Maximum resource utilization
+    - Instant failover
+    - Higher oeprational complexity
+  - Active-Passive: Standby replicas activated when primary fails
+    - Cost-effective redundancy
+    - Slight longer recoverty time
+    - Simpler implementation
+  - Regional failover: traffic shifts to healthy region when primary region fails
+    - Protects against regional outages
+    - Requires multi-regional deployment
+  - DNS failover: health checks trigger DNS record updates to reroute traffice
+    - Slower but highly effective
+    - Works across cloud providers
+- Multi-zone/multi-region deployment
+  - Deploy inference servers across multiple zones and regions
+  - Store replicated models in regional caches to minimize latency
+  - Configure automated traffic routing b/w healthy instances
+  - Protect against natural disasters, power outages, ...
+- Load balances in failover architecture
+  - Container orchestration level
+  - Cloud load balancer level
+  - DNS routing level
+- Database & feature store redundancy
+  - Feature stores
+    - Read replicas for scaling feature retrieval
+    - Asynchronous replication for offline features
+    - Synchronous replication for critical online features
+  - Vector databases
+    - Multi-zone deployments of vector DBs 
+    - Sharded replicas for high-availability semantic search
+    - Consistent embedding indexing across regions
+  - Hot vs cold replicas: Hot replicas provide instant failover but at higher cost, while cold replicas offer more economical disaster recovery with longer recovery times
+- Testing failover scenarios
+  - Pod/node failure
+  - Zone outage
+  - Database failover
+- Best practices for AI API redundancy
+  - Implement robust health checks
+  - Automate all failover procedures
+  - Replicate models & features
+  - Run regular chaos drills  
+
+### 131. 130. Designing High-Availability AI Clusters
+- What is High Availability (HA)?
+  - Measured as nines of uptime
+    - 99.9%: 8.76 hours downtime/year
+      - Single-region, active-passive
+      - Multi-zone deployment
+      - Automated failover
+    - 99.99%: 52.6 min downtime/year
+      - Multi-region, active-active
+      - Global load balancing
+      - Real-time data replication
+    - 99.999%: 5.26min downtime/year
+      - Highly engineered redundancy
+      - Complete infrastructure duplication
+      - Instant failover mechanisms
+- HA in AI context
+  - Model accessibility
+  - Training resilience
+  - Inference stability    
+- Core design principles
+  - Redundancy
+  - Isolation
+  - Failover
+  - Resilience testing
+- Compute layer HA
+  - K8 foundations
+    - Deployments with replica sets (3+ minimum)
+    - Horizontal/vertical pod autoscalers
+    - Pod disruption budgets to maintain minimum availability
+    - Dedicated node pools for critical ML workloads
+  - Advanced configurations
+    - GPU scheduling with node affinity and tolerations
+    - Pod anti-affinity to spread across zones
+    - Readiness/liveness probes for auto-healing
+- Storage layer HA
+  - Persistent storage
+    - Replicated storage backends: Ceph, EBS, GCP PD
+    - Multi-attach volumes where supported
+    - Storage classes with appropriate redundancy
+  - ML data storage
+    - Data lakes and vector dB in multi-region mode
+    - Feature stores with hot replicas
+    - Distributed fiel systems (HDFS, GCS, S3)
+  - Recovery mechanisms
+    - Continuous snapshots and backups
+    - Point-in-time recovery options
+    - Cross-region replication for critical data
+  - Network layer HA
+    - Intelligent load balancing
+    - Resilient ingress
+    - Global routing
+    - Dedicated connectivity
+- HA for training
+  - Checkpoint management
+  - Elastic training frameworks
+  - Cost-effective resilience
+- HA for inference
+  - Multi-replica serving
+  - Safe deployment strategies: canary + blue/green rollouts
+  - Advanced resilience: latency based autoscaling, circuit breakers for dependent services
+- Observability in HA clusters
+  - Key metrics to monitor
+    - Uptime per service/endpoint
+    - Failover events and recovery time
+    - Latency spikes during degraded states
+    - Replica count mismatches or unhealthy nodes
+    - Resource utilization during failure scenarios
+  - Chaos engineering integration
+    - Regularly inject failures to validate your HA design
+      - Node terminations
+      - Network partitions
+      - Disk failures
+      - Resource exhaustion
+- Best practices
+  - Design for failure as default
+  - Distribute across failure domains
+  - Automate recovery processes
+  - Validate with real-world testing
+  - Right-size your HA investment
+
+### 132. 131. Auto-Healing Infrastructure with Kubernetes
+- With proper auto-healing implementation, your infrastructure can:
+  - Maintain higher uptime to meet strict SLAs
+  - Build resilience against pod and node crashes
+  - Recover faster with minimal human intervention
+- How K8 enables auto-healing 
+  - Controllers: reconcile desired state vs. actual state of the system
+  - Pod recovery
+  - Node replacement
+  * The combination of health probes and controllers creates a truly self-healing system
+- Pod-level healing
+  - RestartPolicy options
+    - Always
+    - OnFailure
+    - Never
+- Node level healing
+  - Node controller monitors node heartbeats to detect failures
+  - When a node goes down, K8:
+    - Marks the node a unhealthy
+    - Evicts pods from the failed node
+    - Reschedules workloads t healthy nodes
+  - Cloud provider integration
+    - AWS auto scaling groups
+    - GCP node auto-repair
+    - Azure VMSS auto-scaling
+- Probes for health checks
+  - Liveness probe: detects if a pod is stuck or unresponsive
+  - Readiness probe: determines if pod can receive traffic
+  - Startup probe: special check for slow-starting AI workloads
+- StatefulSets & Persistent Apps
+  - Identity Preservation
+  - Storage Persistence
+  - Ordered Operations
+- Chaos testing auto-healing
+  - Pod & node termination
+  - Resource contention
+  - Network partitions
+  * Popular tools: Chaos Mesh, LitmusChaos, Gremlin
+- Auto-healing in AI workloads
+  - Training: check points + job restart, failed nodes automatically replaced by cloud provider
+  - Feature stores: StatefulSets maintain data integrity during crashes. Failed tasks retried by workflow engines (Airflow, Kubeflow)
+  - Inference: Quick pod replacement ensures low API downtime, multiple relicas across zones for regional resilience
+- Best practices
+  - Define effective probes
+  - Conduct chaos testing
+  - Implement worload disribution
+  - Monitor healing events
+  - Enable cloud integration
+  - Use resource limits
+
+### 133. 132. Chaos Engineering for AI Systems
+- Why chaos engineering?
+  - AI infrastructures are complex and distributed, creating numerous potential failure points
+  - Inevitable failures
+  - Proactive confidence: simulate failures before they happen in production
+- Core principles of chaos engineering
+  - Define steady state
+    - Establish normal operational metrics such as inference latency, throughput, model accuracy/performance, resource utilization baselines
+  - Inject controlled failure
+  - Observe system response
+  - Improve and repeat
+- Chaos targets in AI systems
+  - Infrastructure
+  - Network
+  - Data pipeline
+  - Model serving
+- Tools for chaos engineering
+  - Chaos Mesh: pod/node failures, network chaos, IO chaos
+  - LitmusChaos: application-level faults, node-level faults
+  - Gremlin: fine-grained blast radius, advanced scheduling
+  - Istio/Envoy: HTTP error codes, request delays
+- Best practices
+  - Start small, scale gradually
+  - Automate your chaos
+  - Define clear abort conditions
+  - Measure MTTR (Mean Time To Recovery)
+- AI-specific challenges
+  - Beyond uptime metrics
+  - Silent drift dtection
+  - Complex blast radius
+  - Integrated observability
+
+### 134. 133. Lab – Build a HA AI Inference Cluster
+- Goal: Deploy a multi-replica, fault-tolerant inference service on Kubernetes with:
+  - Load-balancing
+  - Auto-healing pods
+  - Health probes
+  - Multi-zone deployment (optional)
+```
+Step 0 – Prereqs
+
+    Kubernetes cluster (≥ 2 nodes, ideally across zones)
+
+    kubectl and helm installed
+
+    Container image from Lab 126 (or any FastAPI/Triton inference app)
+
+Step 1 – Namespace
+
+    kubectl create namespace ai-ha
+
+Step 2 – Deployment (Multiple Replicas)
+
+    # k8s/deployment.yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ha-inference
+      namespace: ai-ha
+    spec:
+      replicas: 3                # ensure redundancy
+      selector:
+        matchLabels: { app: ha-inference }
+      template:
+        metadata:
+          labels: { app: ha-inference }
+        spec:
+          containers:
+          - name: model-api
+            image: YOUR_REGISTRY/secure-ml:latest   # replace with your image
+            ports:
+            - containerPort: 8000
+            readinessProbe:
+              httpGet: { path: /readyz, port: 8000 }
+              initialDelaySeconds: 5
+              periodSeconds: 5
+            livenessProbe:
+              httpGet: { path: /healthz, port: 8000 }
+              initialDelaySeconds: 15
+              periodSeconds: 10
+            resources:
+              requests: { cpu: "250m", memory: "512Mi" }
+              limits:   { cpu: "500m", memory: "1Gi" }
+
+Apply:
+
+    kubectl -n ai-ha apply -f k8s/deployment.yaml
+
+Step 3 – Service (Load Balancer)
+
+    # k8s/service.yaml
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: ha-inference-svc
+      namespace: ai-ha
+    spec:
+      selector: { app: ha-inference }
+      ports:
+      - name: http
+        port: 80
+        targetPort: 8000
+      type: LoadBalancer
+
+Apply:
+
+    kubectl -n ai-ha apply -f k8s/service.yaml
+
+Step 4 – Horizontal Pod Autoscaler (HPA)
+
+    kubectl -n ai-ha autoscale deployment ha-inference \
+      --cpu-percent=70 --min=3 --max=10
+
+    Ensures scaling under high load.
+
+    Keeps ≥3 pods always alive.
+
+Step 5 – Pod Disruption Budget (PDB)
+
+    # k8s/pdb.yaml
+    apiVersion: policy/v1
+    kind: PodDisruptionBudget
+    metadata:
+      name: ha-inference-pdb
+      namespace: ai-ha
+    spec:
+      minAvailable: 2
+      selector:
+        matchLabels:
+          app: ha-inference
+
+Apply:
+
+    kubectl -n ai-ha apply -f k8s/pdb.yaml
+
+This ensures at least 2 pods remain during maintenance or upgrades.
+Step 6 – Multi-Zone Scheduling (Optional)
+
+Add anti-affinity rules so pods spread across zones/nodes:
+
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                  - key: app
+                    operator: In
+                    values: [ "ha-inference" ]
+                topologyKey: "kubernetes.io/hostname"
+
+Step 7 – Chaos Test
+
+Kill one pod:
+
+    kubectl -n ai-ha delete pod <pod-name>
+    kubectl -n ai-ha get pods -w
+
+    Deployment immediately recreates pod.
+
+    Service routes only to healthy pods (readiness probe).
+
+Step 8 – Validation
+
+    Get service IP:
+
+    kubectl -n ai-ha get svc ha-inference-svc
+
+    Send multiple requests, watch load balance across pods:
+
+    while true; do \
+    curl -s http://<svc-ip>/healthz; \
+    sleep 1; \
+    done
+
+    Test HPA by running a load generator (e.g., hey or ab).
+
+Step 9 – Cleanup
+
+    kubectl delete namespace ai-ha
+
+📂 Folder Structure
+
+    lab133_ha_cluster/
+     ├── k8s/
+     │   ├── deployment.yaml
+     │   ├── service.yaml
+     │   └── pdb.yaml
+     └── README.md
+
+✅ With this lab, you now have a self-healing, load-balanced, auto-scaling inference cluster ready for production chaos.
+Learning
+```
+
+## Section 21: Week 20: Multi-Cloud AI Infrastructure
+
+### 136. 134. Why Enterprises Go Multi-Cloud
+- Why multiple clouds matter
+  - Diversified excellence
+  - Risk distribution
+  - Service optimization
+  - Global complicance
+- Business drivers for multi-cloud strategy
+  - Resilience and continuity
+  - Vendor leverage
+  - M & A reality  
+  - Regulatory compliance
+  - Proximity performance
+- Technical drivers: AI-specific considerations
+  - GPU Capacity and choice
+  - Specialized services
+  - Performance optimization
+  - Hybrid alignment
+- When multi-cloud is not worth it
+  - Limited operational maturity
+  - Deep PaaS integration
+  - Data gravity constraints
+  - Simplified compliance
+  * Cost/benefit analysis: multi-cloud only makes sense when benefits clearly outweight the combined additional complexity + cost
+- Data strategy: the hard part of multi-cloud
+  - Data gravity challenge
+  - Replication tradeoffs
+  - Open table formats
+  - Change data capture
+  - Egress optimization
+- Networking & identity: connecting your clouds
+  - Private connectivity
+  - Zero-trust security
+  - Unified authentication
+  - Intelligent DNS
+  - IP Management
+- Platform and orchestration across clouds  
+  - K8 as Portability layer
+  - GitOps for declarative management
+  - Multi-cloud control planes
+  - Service Mesh federation
+  - Artifact Mirroring
+- Observability & security: cross-cloud visibility
+  - Unified metrics
+  - Distributed tracing
+  - Security standardization
+- AI workload placement strategies
+  - Training workloads
+  - Inference services
+  - Feature store distribution
+  - Model registry strategy
+- Multi-cloud migration roadmap
+  - Standardize infrastructure
+  - Pilot program
+  - Shard services foundation
+  - Data migration
+  - Validation exercises
+- Pitfalls & anti-patterns to avoid
+  - Copy-paste architecture
+  - Ignoring economics
+  - Configuration drift
+  - Operational underinvestment
+
+### 137. 135. Kubernetes Federation Across Clouds
+- Why federation?
+  - Running K8 across multiple clouds
+  - Consistent Deployments
+  - Multi-region DR
+  - Global traffic routing
+- KubeFed (Kubernetes Federation)
+  - Cloud Native computing foundation project designed to coordinate management of multiple Kubernetes
+  - Resource synchronization
+  - Policy-driven placement
+  - Multi-cloud & hybrid support: Works across AWS, GCP, Azure
+- Key features
+  - Multi-cluster deployments
+  - Selective placement
+  - Failover & migration
+  - Global service discovery
+- Multi-cloud AI use case
+  - Training in Cloud A
+  - Shared ML resources
+  - Serving in Cloud B
+- Traffic management
+  - Federated services
+  - Multi-cloud DNS
+  - Geo-routing
+  - Automatic failover
+- Federation alternatives
+  - Google Anthos
+  - Azure Arc
+  - Rander/OpenShift
+  - Istio Federation
+- Challenges
+  - Operational Complexity
+  - Network latency
+  - Identity management
+  - Debugging complexity
+- Best practices
+  - Start small
+  - GitOps integration
+  - Selective Federation
+  - Cross-Cluster Observability
+  - Data locality
+  - Disaster Recoverty Testing
+
+### 138. 136. Data Replication Across Cloud Providers
+- Why replicate data?
+  - Disaster recovery
+  - Low-latency access
+  - Compliance
+  - Cross-cloud pipelines
+- Key challenges  
+  - Data gravity
+  - Latency & consistency
+  - Egress fees: cross-cloud data transfer costs 
+  - Schema drift: schema inconsistencies b/w cloud systems may corrupt data integrity
+  - Security
+- Replication models
+  - Synchronous replication
+    - Real time consistency b/w sources
+    - Transactions commit only after all replicas confirm
+    - Higher latency and operational costs
+    - Best for critical transaction data
+  - Asynchronous replication
+    - Eventual consistency model
+    - Primary system commits, secondaries update later
+    - Better performance and lower costs
+  - Hybrid replication
+    - Sync for metadata and critical configs
+    - Async for bulk data and large asset
+    - Balances performance and consistency
+    - Ideal for most ML production systems
+- Storage replication options
+  - Object storage: S3 <-> GCS <-> Azure Blob
+    - CloudSync, rconle, storage gateway  
+    - Native bucket replication
+    - CDN edge caching for static assets
+  - Databases
+    - Cloud spanner multi-region
+    - Aurora Global Database
+    - Cosmos DB multi-region write
+    - MongoDB Atlas multi-cloud clusters
+  - Data Lakes: portable open formats
+    - Apache Iceberg
+    - Delta Lake
+    - Apache Hudi
+    - Log-based incremental replication
+  - Streaming: real-time data movement
+    - Kakfa MirrorMaker2
+    - Pub/Sub <-> Kafka bridges
+    - Confluent Cloud multi-cloud
+- Feature store and vector DB replication: ML specific data systems
+  - Feature stores
+    - Feast, Tecton with multi-cloud storage backends
+    - Consistent feature values across clouds
+    - Offline/online store replication
+  - Vector databases
+    - Pinecone, Milvus, Weaviate with active-active replication
+    - Embedding consistency for distributed inference
+    - Read replicas for vector search
+- Network & security considerations
+  - Private interconnects: reduced latency and egress costs using AWS Direct Connect, Google Cloud Interconnect, Azure ExpressRoute
+  - Encryption requirements
+  - Monitoring and alerting
+- Trade-offs
+  - Performance vs cost
+  - Comliance vs agility
+  - Ops complexity
+- Best practices
+  - Use portable data formats
+  - Replicate critical subsets
+  - Monitor replication lag
+  - Align with AI workloads
+  - Test DR regularly
+
+### 139. 137. Cost Arbitrage in Multi-Cloud AI
+- What is cost arbitrage?
+  - Strategic multi-cloud: take advantage of pricing differences and specialized offerings
+  - Balance factors
+  - Critical for AI: valuable for GPU-intensive AI workloads
+- Why it matters for AI
+  - High-cost components
+  - Pricing variability
+    - Price changes by regions/vendors
+  - Discount opportunities: spot instances, preemptible VMs
+- Storage and network arbitrage
+  - Object storage: GCS offers better pricing for archival while S3 has better ecosystem tool integration
+  - Block storage: performance/price ratios vary by 15-25% across providers
+- Network costs: network egress is often the hidden cost driver
+- Multi-cloud arbitrage strategies
+  - Bursting
+  - Workload splitting
+  - Spot/preemptible VMs
+  - SaaS arbitrage
+- Tooling for arbitrage
+  - Infrastructure as code
+  - K8 Federation
+  - Cost monitoring
+  - Automated bidding
+- Risks & challenges
+  - Egress costs
+  - Operational complexity
+  - Migration overhead
+  - Monitoring discipline
+- Best practices
+  - Calculate total cost of ownership
+  - Automate placement decisions
+  - Develop egress-aware data strategy
+  - Leverage for vendor negotiations
+
+### 140. 138. Disaster Recovery Across Regions
+- Why DR matters for AI
+  - Business-critical applications
+  - Extended outage risk
+  - Multiple protection layers
+- Threats that trigger DR
+  - Cloud region outage
+  - Data corruption
+  - Infrastructur compromise
+  - Compliance issues
+- DR objectives: setting clear recovery targets
+  - RTO (Recovery Time Objective): How fast can your AI system recover after disaster?
+    - Financial fraud model: < 15min
+    - Recommendation engine: < 2 hours
+  - RPO (Recover Point Objective): How much data loss is acceptable during recovery?
+    - Financial fraud model: near zero
+    - Recommendation engine: 1-2 hours
+  * Validate your RPO/RTO objectives through scheduled replication tests and controlled failover exercises
+- DR architecture: finding your recovery balance
+  - Cold standby: cheapest option with manual spin-up of resources
+    - Minimal ongoing costs
+    - Longest recovery time
+    - Best for non-critical AI workloads
+  - Warm standby: Pre-provisioned but scaled-down resources
+    - Moderage ongoing costs
+    - Medium recovery time
+    - Balance of cost vs readiness
+  - Hot active-active: full replicas operating in multiple regions
+    - Highest ongoing costs
+    - Near-immediate recovery
+    - For mission-critical AI systems
+  - Hybrid: training on one region, inference replicated
+    - Optimized cost profile
+    - Prioritizes customer-facing components
+    - Balances performance and protection
+- Data replication fo rDR
+  - Object storage
+  - Databases
+  - Feature stores & vector DBs
+- Networking and routing: seamless traffic redirection
+  - Global DNS failover
+  - Anycast load balancing
+  - Network redundancy
+  - Certificate management
+- DR for AI pipelines:
+  - Training jobs
+  - Model registry
+  - Inference APIs
+  - Shadow deployments
+- Testing & chaos drills
+  - Regional outage simulation
+  - Failover validation
+  - Data integrity checks
+  - Team readiness
+- Compliance & governance considerations
+  - Data residency constraints
+  - Audit trail continuity
+  - Certification requirements
+  - Data protection
+- Best practices: building resilient AI infrastructure
+  - Define clear recovery objectives: RTP/RPO targets for each AI workload
+  - Automate failover processes
+  - Replicate the full ML stack
+  - Regular testing
+  - Cost vs risk balance
+
+### 141. 139. Hybrid On-Prem + Cloud AI Setups
+- Why hybrid AI?
+  - Data residency and compliance
+  - Latency senstive inference
+  - Cost control
+  - Burst workloads
+- Typical hybrid patterns
+  - Training on-perm, serving in cloud
+  - Inference on-prem/edge, retraining in cloud
+  - Cloud bursting
+  * Split by data sensitivity
+- On-prem components
+  - Compute infrastructure
+  - Storage
+  - Orchestration
+  - Security
+- Cloud components
+  - Elastic GPU training: AWS Sagemaker, Google Cloud Vertex AI, Azure Machine Learning
+  - Scalable model serving
+  - Global distribution
+  - Managed data services
+- Networking and connectivity
+  - Private interconnects to vendors
+  - VPN tunnels
+  - Service-to-Service Auth
+  - Unified Service Discovery
+- Data flow example
+  - Data collection: raw data stored on-prem for compliance requirements
+  - Feature engineering: features pushed to cloud feature store
+  - Model training: In cloud with elastic resources
+  - Deployment: On-prem for local inference
+- Hybrid AI challenges
+  - Data gravity
+  - Observability gaps
+  - Security inconsistency
+  - Performance impact
+  - Vendor lock-in risk
+- Tools & frameworks: enable seamless hybrid AI operations
+  - Kubeflow
+  - MLflow
+  - Service mesh
+  - Data fabrics
+  - Hybrid K8 Management
+- Best practices
+  - Data locality
+  - Consistent infrastructure
+  - Unified security
+  - End-to-end observability
+  - Resilience planning
+
+### 142. 140. Lab – Serve a Model Across AWS + GCP
+- Goal: Deploy the same AI inference service on AWS EKS and GCP GKE, fronted by a global DNS layer that routes requests to the nearest healthy endpoint.
+```
+Step 0 – Prereqs
+
+    AWS + GCP accounts with permissions for Kubernetes clusters.
+
+    kubectl, helm, eksctl, and gcloud CLI installed.
+
+    Docker image (e.g., from Lab 126’s FastAPI inference app).
+
+Step 1 – Build and Push Docker Image
+
+Build once, push to both registries:
+
+    # Build
+    docker build -t fastapi-inference:multi .
+     
+    # Tag & push to AWS ECR
+    aws ecr create-repository --repository-name fastapi-inference
+    AWS_URI=<account>.dkr.ecr.<region>.amazonaws.com/fastapi-inference:latest
+    docker tag fastapi-inference:multi $AWS_URI
+    docker push $AWS_URI
+     
+    # Tag & push to GCP Artifact Registry
+    gcloud artifacts repositories create inference --repository-format=docker --location=us-central1
+    GCP_URI=us-central1-docker.pkg.dev/<project-id>/inference/fastapi-inference:latest
+    docker tag fastapi-inference:multi $GCP_URI
+    docker push $GCP_URI
+
+Step 2 – Create Clusters
+
+AWS EKS
+
+    eksctl create cluster --name ai-eks --region us-east-1 --nodes 3
+
+GCP GKE
+
+    gcloud container clusters create ai-gke --region us-central1 --num-nodes 3
+
+Step 3 – Deploy App to Each Cluster
+
+Use the same Kubernetes manifests with different image URIs.
+
+deployment.yaml
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: inference-api
+    spec:
+      replicas: 3
+      selector:
+        matchLabels: { app: inference-api }
+      template:
+        metadata:
+          labels: { app: inference-api }
+        spec:
+          containers:
+          - name: api
+            image: <CLOUD_IMAGE_URI>   # AWS or GCP image URI
+            ports:
+            - containerPort: 8000
+            readinessProbe:
+              httpGet: { path: /readyz, port: 8000 }
+            livenessProbe:
+              httpGet: { path: /healthz, port: 8000 }
+
+service.yaml
+
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: inference-svc
+    spec:
+      type: LoadBalancer
+      selector: { app: inference-api }
+      ports:
+      - port: 80
+        targetPort: 8000
+
+Apply to each cluster:
+
+    kubectl apply -f deployment.yaml
+    kubectl apply -f service.yaml
+
+Step 4 – Get Load Balancer IPs
+
+AWS:
+
+    kubectl get svc inference-svc
+    # EXTERNAL-IP: a1b2c3.amazonaws.com
+
+GCP:
+
+    kubectl get svc inference-svc
+    # EXTERNAL-IP: 34.12.45.67
+
+Step 5 – Configure Global DNS
+
+Use AWS Route53 or Cloudflare to set a geo-aware DNS record:
+
+    inference.mycompany.com → routes to AWS LB in us-east-1 for U.S. users
+
+    → routes to GCP LB in us-central1 for others
+
+Example (Route53 latency-based policy):
+
+    Record 1: Name=inference.mycompany.com, Value=a1b2c3.amazonaws.com, Region=us-east-1
+
+    Record 2: Name=inference.mycompany.com, Value=34.12.45.67, Region=us-central1
+
+Step 6 – Test Multi-Cloud Inference
+
+    curl -s http://inference.mycompany.com/healthz
+    curl -s -X POST http://inference.mycompany.com/predict \
+      -H "Content-Type: application/json" \
+      -d '{"features":[5.1,3.5,1.4,0.2]}'
+
+Test from different regions (or VPNs) → traffic should hit the nearest cluster.
+Step 7 – Simulate Failover
+
+    Kill pods in AWS:
+
+    kubectl delete pods -n default -l app=inference-api
+
+    DNS automatically shifts to GCP endpoint.
+
+    Validate traffic continues to flow.
+
+Step 8 – Cleanup
+
+    eksctl delete cluster --name ai-eks
+    gcloud container clusters delete ai-gke --region us-central1
+
+✅ Learning Outcomes
+
+    Deploy an AI inference service on two cloud providers.
+
+    Configure multi-region/multi-cloud DNS failover.
+
+    Validate resilience & failover of HA inference APIs.
+```
+
+## Section 22: Week 21: Edge AI Infrastructure Basics
+
+### 143. 141. What Is Edge AI and Why It Matters
+- Edge AI defined
+  - Running ML on/near the data source
+  - Real world examples: cameras, robots, kiosks, vehicles, factory lines, retail stores, hospital room
+  - Key advantage: Low latency, high BW
+- Four drivers of Edge AI
+  - < 100 ms latency
+  - TB/day bandwidth
+  - GDPR(General Data Protection Regulation) privacy
+  - 99.9% resilience
+- Typical edge AI technology stack
+  - HW: Nvidia Jetson, ARM SoCs
+  - OS/runtime: Linux, JetPack, OpenVINO, CUDA
+  - Modelformat: ONNX, TensorRT engine, TFLite, core ML
+  - App & Management: gRPC/REST services, Local message bus, OTA updates
+- Use cases
+  - Vision
+  - Audio/NLP
+  - Industrial/IoT
+  - Mobility
+- Edge vs Cloud: complementary roles
+  - Edges: handles real-time inference, filtering, and pre-aggregation of data closer to the source
+  - Cloud: manages heavy training workloads, global coordination, model registry, and complex analytics
+  - Synchronization: Edge sends telemetry up; cloud sends optimized models and policies down
+- Navigating Edge Constraints
+  - Compute/memory/power limitations
+  - Intermittent connectivity
+  - Heterogeneous HW
+  - Physical security concerns
+- Model optimization toolkit
+  - Quantization
+  - Pruning & distillation
+  - Accelerator-aware compilers
+  - Efficient pipelines
+- Deploying and managing Edge AI at scale
+  - Packaging: containerize models and application code using Docker
+  - Orchestration: using lightweight K8 variants
+  - Updates
+  - Observability
+- Edge AI security essentials
+  - HW security
+  - Communication security
+  - Identity management
+  - Supply chain security
+- Cost & ROI considerations
+  - Cost reduction strategies
+  - HW efficiency
+  - Hybrid analytics: upload processed features and events rather than raw media
+  - Key metrics: Measure ROI through latency SLOs, accuracy, uptime and cost per inference
+
+### 144. 142. Use Cases: Retail, Healthcare, Smart Cities
+- Why industry-specific Edge AI?
+  - Unique drivers: specific requirements for latency, privacy, cost, and safety
+  - Local inference
+  - Shared benefits: real-time decision making, reduced cloud dependencies
+- Retail use cases
+  - Checkout-free stores
+  - Customer analytics
+  - Inventory management
+  - Personalization
+- Retail drivers: why Edge computing matters
+  - Latency
+  - Privacy
+  - Cost
+  - Customer experience
+- Healthcare use cases
+  - Bedside monitoring
+  - Medical imaging
+  - Smart devices
+  - Telemedicine
+- Healthcare drivers: where Edge AI becomes mission-critical
+  - Compliance
+  - Reliability
+  - Safety
+  - Integration
+- Smart cities use case
+  - Traffic management
+  - Public safety
+  - Smart lighting
+  - Environmental monitoring
+- Smart city drivers
+  - Thousands of interconnected endpoints, generating petabytes of data daily
+  - < 100 ms latency
+  - 90% bandwidth reduction
+  - 100% data sovereignty
+- Common challenges across sectors
+  - HW heteerogeneity
+  - Security & trust
+  - Model optimization
+  - Fleet management
+
+### 145. 143. Introduction to NVIDIA Jetson Devices
+- Nvidia Jetson
+  - ARM CPUs + CUDA-capable GPUs ona compact module
+  - For vision applications, robotics, and autonomous systems that require real-time AI processing at the edge
+- Why Jetson for Edge AI?
+  - GPU acceleration
+  - Compact and power-efficient
+  - Scalable family
+  - JetPack SDK
+- Jetson family overview
+  - Nano: entry-level platform
+  - TX2: mid-tier solution
+  - Xavier NX: professional edge deployments
+  - AGX Xavier: advanced autonomous capabilities
+  - Orin series: latest generation
+- Jetson SW ecosystem
+  - JetPack SDK
+  - DeepStream SDK
+  - TAO toolkit
+  - Isaac SDK
+- Edge AI use cases with Jetson
+  - Computer vision
+  - Robotics
+  - Healthcare
+  - Retail/smart cities
+- Why Jetson over alternatives
+  - GPU acceleration
+  - CUDA/TensorRT ecosystem
+  - Nvidia community and support
+  - Scalability
+- Deployment at scale
+  - HW integration
+  - Fleet management
+  - SW updates
+  - Security
+
+### 146. 144. Installing JetPack SDK on Jetson
+- JetPack SDK
+  - Ubuntu-based OS image
+  - CUDA, cuDNN, TensorRT
+  - DeepStream SDK
+  - Multimedia APIs and drivers
+- Why JetPack
+  - Optimized for Jetson HW
+  - Maximum GPU performance
+  - Simplified development
+  - Regular updates
+- Installation options
+  - Option 1: Nvidia SDK manager
+  - Option 2: Pre-flashed developer kits    
+- Installation steps
+    1. Prepare jetson device
+        - Nano, Xavier, Orin
+    2. Install nvidia sdk manager
+        - On your ubuntu host PC
+    3. Flash Jetson with JetPack
+        - Connect HW
+        - Recovery mode
+        - SDK manager setup
+        - Begin flashing
+    4. First boot setup
+    5. Verify JetPack Installation
+        - nvcc --version
+        - Check TensorRT runs at Python
+- Post-install extras
+  - AI frameworks
+  - Jetson.GPIO
+  - Performance tuning
+  - Jetson Zoo
+- Common issues & solutions
+  - Power problems: Use nvida-recommended power adapter
+  - Storage limitations: Use 32GB+ class 10 microSD or lager eMMC module
+  - SW compatibility: update SDK manager
+
+### 147. 145. Edge vs Cloud Tradeoffs for AI Deployment
+- Why right balance matters
+  - Latency
+  - Cost & scalability
+  - Privacy and compliance
+  - User experience
+- Edge AI advantages
+  - Ultra-low latency
+  - Offline operation
+  - Privacy by design
+  - Bandwidth savings
+- Edge AI limitations
+  - Resource constraints
+  - Deployment challenges
+  - Device heterogeneity
+  - Security vulnerabilities
+- Cloud AI advantages
+  - Elastic scalability
+  - Centralized model registry
+  - Fleet-wide management
+  - Advanced HW access
+- Cloud AI limitations
+  - Latency constraints
+  - Cost inefficiencies
+  - Privacy vulnerabilities
+  - Network dependencies
+- Hybrid approach: best of both worlds
+  - Edge capabilities
+    - Real-time inference with minimal latency
+    - Data filtering and pre-processing
+    - Privacy-preserving anonymization
+    - Continued operation during connectivity gaps
+  - Cloud capabilities
+    - Model training on aggregated datasets
+    - Centralized model registry and versioning
+    - Cross-device analytics and insights
+    - Orchestration and fleet management
+
+### 148. 146. ONNX Runtime for Edge Models
+- ONNX (Open Neural Network Exchange)
+  - Open standard 
+  - Framework support: Pytorch, TensorFlow, scikit-learn, and Hugging-Face
+  - Interoperability
+- ONNX runtime overview
+  - x86, ARM, GPUs, NPUs, Jetson boards, mobile and embeded devices
+  - HW acceleration (CUDA, TensorRT, DirectML)
+  - Quantization for efficiency
+  - Cross-language APIs: Python, C++, Java, C#
+- Why ONNX for Edge AI?
+  - Portability
+  - Performance
+  - Flexibility
+  - Compatibility: integrates with TensorRT, OpenVINO, Core ML and other edge platforms
+- Edge HW acceleration
+  - Nvidia Jetson: TensorRT 
+  - Intel CPU/VPU: OpenVINO execution provider
+  - iOS devices: CoreML execution provider
+  - Android devices: NNAPI execution provider
+- ONNX optimizations
+  - Quantization
+  - Graph optimization
+  - Execution providers
+- For python, pip install onnx onnxruntime
+
+### 149. 147. Lab – Deploy YOLOv5 on Jetson Nano
+- Goal: Run a real-time object detection model (YOLOv5) on a Jetson Nano, optimized with TensorRT for edge performance.
+Step 0 – Prerequisites
+  - Jetson Nano Developer Kit (4GB preferred)
+  - JetPack SDK installed (Day 144)
+  - 16–32 GB microSD card or eMMC
+  - USB webcam or CSI camera (Raspberry Pi Camera v2)
+  - Internet connectivity
+```
+Step 1 – Environment Setup
+
+    Update system:
+
+    sudo apt update && sudo apt upgrade -y
+
+    Create a Python environment (recommended):
+
+    python3 -m venv yolov5-env
+    source yolov5-env/bin/activate
+
+    Install dependencies:
+
+    sudo apt install -y python3-pip git
+    pip install --upgrade pip setuptools wheel
+    pip install numpy torch torchvision matplotlib onnx onnxruntime
+
+Step 2 – Clone YOLOv5 Repository
+
+    git clone https://github.com/ultralytics/yolov5.git
+    cd yolov5
+    pip install -r requirements.txt
+
+Step 3 – Test Inference (CPU/GPU PyTorch)
+
+Run a quick detection test:
+
+    python detect.py --source 0 --weights yolov5s.pt --conf 0.4
+
+    --source 0 = webcam
+
+    --weights yolov5s.pt = small YOLOv5 model (fastest)
+
+✅ You should see bounding boxes on live video.
+Step 4 – Export to ONNX
+
+Convert YOLOv5 PyTorch model → ONNX format:
+
+    python export.py --weights yolov5s.pt --include onnx
+
+Output: yolov5s.onnx
+Step 5 – Optimize with TensorRT
+
+Use NVIDIA TensorRT for faster inference on Jetson GPU:
+
+    python export.py --weights yolov5s.pt --include engine
+
+    Creates a .engine file (TensorRT optimized)
+
+Step 6 – Run Inference with TensorRT
+
+    python detect.py --source 0 --weights yolov5s.engine --conf 0.4
+
+    Expect 2–4× speedup vs PyTorch on Jetson Nano.
+
+Step 7 – Measure Performance
+
+Benchmark inference speed:
+
+    python detect.py --source data/images --weights yolov5s.engine --conf 0.4 --save-txt
+
+    Compare FPS with PyTorch vs TensorRT
+
+    Typical: ~5 FPS (PyTorch) → ~15 FPS (TensorRT optimized)
+
+Step 8 – Optional: Deploy as API
+
+    Install FastAPI:
+
+    pip install fastapi uvicorn
+
+    Wrap YOLOv5 inference in an API:
+
+    from fastapi import FastAPI, UploadFile
+    import torch
+     
+    app = FastAPI()
+    model = torch.hub.load('ultralytics/yolov5', 'custom', path='yolov5s.engine')
+     
+    @app.post("/predict")
+    async def predict(file: UploadFile):
+        img = await file.read()
+        results = model(img)
+        return results.pandas().xyxy[0].to_dict(orient="records")
+
+    Run API:
+
+    uvicorn app:app --host 0.0.0.0 --port 8000
+
+Step 9 – Cleanup
+
+    Deactivate environment:
+
+    deactivate
+
+    Free GPU memory by stopping scripts: Ctrl+C
+
+✅ Learning Outcomes
+
+    Setup Jetson Nano with YOLOv5 for object detection
+
+    Convert models to ONNX & TensorRT for optimized edge inference
+
+    Measure performance gains
+
+    (Optional) Serve detections via a lightweight FastAPI endpoint
+```
+
+## Section 23: Week 22: Optimizing AI for Edge Devices
+
+### 150. 148. Quantization for Edge Efficiency
+### 151. 149. Pruning and Model Compression Basics
+### 152. 150. TensorRT for Edge Inference
+### 153. 151. Running Vision Models on Raspberry Pi
+### 154. 152. TinyML and Microcontrollers for AI
+### 155. 153. Benchmarking Models on Edge Hardware
+### 156. 154. Lab – Optimize a Model with TensorRT
+
+##
+
+### 157. 155. Why Mobile AI Is Booming
+### 158. 156. Core ML for iOS – Basics
+### 159. 157. TensorFlow Lite for Android – Basics
+### 160. 158. Deploying On-Device NLP Models
+### 161. 159. Power Management in Mobile AI
+### 162. 160. Privacy Considerations for On-Device AI
+### 163. 161. Lab – Build a Mobile AI App with TFLite
+1min
+
+### 164. 162. Introduction to ETL and ELT Pipelines
+### 165. 163. Apache Airflow for AI Workflows
+### 166. 164. Streaming Data with Apache Kafka
+### 167. 165. Feature Stores for ML (Feast, Tecton)
+### 168. 166. Real-Time Data Preprocessing at Scale
+### 169. 167. Data Quality Monitoring for AI Systems
+### 170. 168. Lab – Build a Streaming Pipeline with Kafka
+4min
+
+### 171. 169. Infrastructure Challenges of Large Language Models
+### 172. 170. Memory and Storage Needs of LLMs
+### 173. 171. Vector Databases – FAISS, Pinecone, Weaviate
+### 174. 172. RAG (Retrieval-Augmented Generation) Pipelines
+### 175. 173. Caching Strategies for LLMs
+### 176. 174. Serving LLMs in Production
+### 177. 175. Lab – Deploy a Simple RAG Pipeline
+2min
+
+### 178. 176. DeepSpeed and ZeRO Optimization for LLMs
+### 179. 177. Megatron-LM for Large Model Training
+### 180. 178. Flash Attention and Memory Optimizations
+### 181. 179. Multi-Node Distributed Training for LLMs
+### 182. 180. Fine-Tuning vs Parameter-Efficient Tuning
+### 183. 181. Cost Challenges of Generative AI Training
+### 184. 182. Lab – Fine-Tune a Small LLM with PEFT
+1min
+
+### 185. 183. Image and Video Data Challenges in AI Infra
+### 186. 184. Training Pipelines for CV Models
+### 187. 185. EfficientNet and Model Scaling Tradeoffs
+### 188. 186. Serving Real-Time Video Inference
+### 189. 187. DeepStream SDK for Video Analytics
+### 190. 188. Edge-to-Cloud Video Processing
+### 191. 189. Lab – Deploy Real-Time Object Detection
+2min
+
+### 192. 190. NLP Workloads: Tokenization, Embeddings, Transformers
+### 193. 191. Training Large Transformer Models
+### 194. 192. Infrastructure for BERT and GPT
+### 195. 193. Efficient Serving of Embedding Models
+### 196. 194. Latency Reduction in NLP Inference
+### 197. 195. Deploying Multilingual Models at Scale
+### 198. 196. Lab – Deploy a BERT Model with FastAPI
+2min
+
+### 199. 197. What Is Multimodal AI?
+### 200. 198. Handling Text + Image Pipelines
+### 201. 199. Training and Serving CLIP Models
+### 202. 200. Infrastructure for Speech + Text Models
+### 203. 201. Deploying Video + Text Search Systems
+### 204. 202. Challenges of Multimodal Model Serving
+### 205. 203. Lab – Deploy CLIP for Image Search
+2min
+
+### 206. 204. Basics of Reinforcement Learning Workloads
+### 207. 205. Simulation Environments for RL (Gym, Isaac)
+### 208. 206. Distributed RL Training Infrastructures
+### 209. 207. Real-Time Serving of RL Agents
+### 210. 208. Scaling RL for Robotics
+### 211. 209. Infrastructure for Online Learning Agents
+### 212. 210. Lab – Train RL Agent with Ray RLlib
+1min
+
+### 213. 211. What Is Large-Scale Training?
+### 214. 212. Data Parallelism vs Model Parallelism Revisited
+### 215. 213. Pipeline Parallelism in Transformers
+### 216. 214. Distributed Optimizers and Gradient Sync
+### 217. 215. Infrastructure Bottlenecks in Training LLMs
+### 218. 216. Fault Tolerance in Multi-Node Training
+### 219. 217. Lab – Train Transformer Across Multiple Nodes
+2min
+
+### 220. 218. DeepSpeed ZeRO-2/3 Optimizations
+### 221. 219. Fully Sharded Data Parallel (FSDP)
+### 222. 220. Flash Attention in Large Models
+### 223. 221. Checkpointing Strategies for Multi-Node Systems
+### 224. 222. Elastic Training with Kubernetes
+### 225. 223. Scaling Beyond 1,000 GPUs
+### 226. 224. Lab – Train with DeepSpeed ZeRO-3
+1min
+
+### 227. 225. What Is Enterprise MLOps?
+### 228. 226. Introduction to Kubeflow
+### 229. 227. Introduction to MLflow at Scale
+### 230. 228. SageMaker Pipelines – Basics
+### 231. 229. GCP Vertex AI Pipelines
+### 232. 230. Azure ML Pipelines
+### 233. 231. Lab – Build a Pipeline in Kubeflow
+2min
+
+### 234. 232. Model Registry in Enterprise MLOps
+### 235. 233. Continuous Training (CT) Pipelines
+### 236. 234. Automating Drift Retraining with Kubeflow
+### 237. 235. Feature Store Integration in Pipelines
+### 238. 236. Governance in Enterprise MLOps
+### 239. 237. Audit Trails and Compliance Logging
+### 240. 238. Lab – Automate Drift Retraining with Kubeflow
+2min
+
+### 241. 239. What Is Model Optimization for Infra Efficiency?
+### 242. 240. Quantization Basics
+### 243. 241. Pruning Basics
+### 244. 242. Distillation Basics
+### 245. 243. Structured vs Unstructured Sparsity
+### 246. 244. Benchmarking Optimized Models
+### 247. 245. Lab – Quantize a Vision Model
+2min
+
+### 248. 246. Mixed Precision Training with AMP
+### 249. 247. Quantization-Aware Training (QAT)
+### 250. 248. Advanced Distillation Techniques
+### 251. 249. Sparse Training and Hardware Impacts
+### 252. 250. Compiler Optimizations (XLA, TorchDynamo)
+### 253. 251. Infra Tradeoffs: Accuracy vs Efficiency
+### 254. 252. Lab – Train with Mixed Precision
+2min
+
+### 255. 253. What Is Federated Learning?
+### 256. 254. Privacy-Preserving AI at Scale
+### 257. 255. Federated Learning with TensorFlow Federated
+### 258. 256. Secure Aggregation Protocols
+### 259. 257. Federated Data Challenges
+### 260. 258. Edge Deployment of Federated Models
+### 261. 259. Lab – Train a Federated Model with TFF
+2min
+
+### 262. 260. Why Privacy Matters in AI Infra
+### 263. 261. Homomorphic Encryption Basics
+### 264. 262. Differential Privacy for AI Models
+### 265. 263. Secure Multi-Party Computation (MPC)
+### 266. 264. Tradeoffs in Privacy-Preserving AI
+### 267. 265. Industry Applications of Privacy-Preserving AI
+### 268. 266. Lab – Apply Differential Privacy in Training
+2min
+
+### 269. 267. Attacks on AI Infrastructure
+### 270. 268. Model Poisoning Attacks
+### 271. 269. Data Poisoning Attacks
+### 272. 270. Membership Inference Attacks
+### 273. 271. Adversarial Examples in Deployment
+### 274. 272. Mitigation Strategies for Infra Security
+### 275. 273. Lab – Defend Against Adversarial Attacks
+2min
+
+### 276. 274. What Is Multi-Tenancy?
+### 277. 275. Resource Sharing Across Teams
+### 278. 276. Cost Allocation for Multi-Tenant Infra
+### 279. 277. Role-Based Access Control (RBAC)
+### 280. 278. Isolation Strategies in AI Systems
+### 281. 279. Monitoring Multi-Tenant Environments
+### 282. 280. Lab – Configure Multi-Tenant Cluster
+2min
+~
