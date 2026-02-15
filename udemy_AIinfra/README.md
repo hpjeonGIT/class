@@ -6993,7 +6993,7 @@ Panels include:
   - Infra: supply-chain vulnerabilities, secret exposure
 - Data centric risks
   - Training data poisoning
-  - Shadow datasets and PII Sprawl: untracked copies in S3/object storage lead to unmanaged sensitive data and potential regulatory violations
+  - Shadow datasets and PII (Personally Identifiable Information) Sprawl: untracked copies in S3/object storage lead to unmanaged sensitive data and potential regulatory violations
   - Weak access controls
   - Linkage attacks
 - Model centric risks
@@ -8837,86 +8837,4013 @@ Step 9 – Cleanup
 ## Section 23: Week 22: Optimizing AI for Edge Devices
 
 ### 150. 148. Quantization for Edge Efficiency
-### 151. 149. Pruning and Model Compression Basics
-### 152. 150. TensorRT for Edge Inference
-### 153. 151. Running Vision Models on Raspberry Pi
-### 154. 152. TinyML and Microcontrollers for AI
-### 155. 153. Benchmarking Models on Edge Hardware
-### 156. 154. Lab – Optimize a Model with TensorRT
+- Models developed in datacenter environment might be too large for Edge device
+- Why quantization
+  - Latency: INT8 operations is much faster ahn FP32 on many edge processors
+  - Memory: weights and activations shrink dramatically from FP32->INT8 (4x)
+  - Power: fewer bits == less energy consumed per operation
+  - Deployability: fit models on microcontroller and SoC memory budgets
+- Key quantization concepts
+  - Bit-width reduction: FP32-> FP16/BF16 -> INT8/INT4
+  - Quantization parameters: maps real values to integers using scal and zero-point
+  - Granularity choices: per-tensor vs per-channel quantization
+- Quantization approaches
+  - PTQ (Post-Training Quantization)
+    - No retraining
+    - Requires calibration data
+    - Best for well-behaved networks
+  - QAT (Quantization-Aware Training)
+    - Simulates quantization effects during training
+    - Higher accuracy but more engineering effort and training
+- HW landscape for quantized models
+  - ARM CPUs (NEON)
+  - NPUs/Edge TPUs
+  - Nvidia Jetson
+  - Apple/Android: CoreML/NNAPI backends prefer low-precision
+- PTQ quick start (PyTorch -> ONNX runtime)
+```py
+# Collect a small calibration set (10031000 samples)
+calib = [prepare_input(x) for x in calib_loader]
+# Export to ONNX
+torch.onnx.export(model, dummy, "model_fp32.onnx", opset_version=17)
+# ONNX Runtime static PTQ (simplified sketch)
+from onnxruntime.quantization import quantize_static, CalibrationDataReader, QuantType
+class MyCalib(CalibrationDataReader):
+    def get_next(self):
+        # yield dicts: {input_name: np_array}
+        for x in calib:
+            yield { "input": x }
+quantize_static(
+    "model_fp32.onnx",
+    "model_int8.onnx",
+    MyCalib(),
+    weight_type=QuantType.QInt8,
+    optimize_model=True)
+```
+- QAT quick start (PyTorch)
+```py
+import torch, torch.ao.quantization as tq
+model.train()
+model.fuse_model() # if supported (Conv+BN+ReLU)
+qconfig = tq.get_default_qat_qconfig("fbgemm")
+model.qconfig = qconfig
+tq.prepare_qat(model, inplace=True)
+for step, (x, y) in enumerate(train_loader):
+    loss = train_step(model, x, y) # standard training
+    if step % 1000 == 0:
+        validate(model)
+model.eval()
+tq.convert(model, inplace=True) # produces INT8 modules
+```
+- TensorRT INT8 (Jetson)
+  - Export ONNX -> build INT8 engine
+  - Sensitive layers can remain FP16
+  - Expect 1.5-3x speedups vs FP16 on supported operations
+  - Monitor accuracy drop; adjust per-channel and calibration strategy as needed
+- Accuracy guardrails
+  - Representative calibration
+  - Per-channel quantization
+  - Skip sensitive operations
+  - Special transformer techniques
+- Validation checklist
+  - Accuracy metrics: top-1/F1/WE delta vs FP32
+  - Performance metrics: p50/p95 latency, throughput
+  - Resource usage
+  - Production testing: A/B test in production & automated rollback
+- Common pitfalls & fixes
+  - Big accuracy drop: use QAT instead of PTQ
+  - Edge device OOM: quantize activations too, reduce batch size, use INT8 IO types
+  - Layer mismatch after export: align ONNX opset versions & fusion patterns, update runtime libraries
+  - Jittery latency: pin CPU threads, use static input shapes, implement proper warmup
 
-##
+### 151. 149. Pruning and Model Compression Basics
+- Why compression?
+  - Compression reduces
+    - Model size
+    - Compute cost
+    - Power consumption
+  - Goal: faster, leaner models without major accuracy loss
+- What is pruning?
+  - Removing unnecessary weights, neurons or filters
+  - Based on
+    - Magnitude: drop small weights near zero
+    - Structured: drop entire channels/layers
+    - Unstructured: random connections removed
+  - Recovery: pruned models retrain -> recover performance
+- Types of prunning
+  - Unstructured: fine-grained (individual weights)
+  - Structured: remove neurons, filters, heads, layers
+  - Dynamic: drop comkputations on the fly; context-dependent calculations
+- Pruning workflow
+  - Train baseline model
+  - Apply pruning
+  - Fine-tune retrain
+  - Export compressed model
+  - Deploy with sparsity-aware runtime
+- Ex: unstructured pruning (PyTorch)
+```py
+import torch
+import torch.nn.utils.prune as prune
+# Load pre-trained model
+model = torch.hub.load('pytorch/vision','resnet18',pretrained=True)
+# Prune 30% of connections in first conv layer
+prune.l1_unstructured(model.conv1,name="weight",amount=0.3)
+# Fine-tune model on training data after pruning
+```
+- Ex: structured pruning (Filters)
+```py
+# Remove entire filters from Conv2d layer
+prune.ln_structured(
+  model.layer1[0].conv1,
+  name="weight",
+  amount=0.2, # Remove 20% of filters
+  n=2, # L2 norm
+  dim=0 # Filter dimension
+)
+```
+- Compression beyond pruning
+  - Quantization: reduce precision(FP32-INT8)
+  - Knowledge distillation: train small student model from large teacher model by mimicking output distribution rather than hard labels
+  - Weight sharing: Reuse weights through Huffman coding or clustering similar parameters
+  - Low-rank factorization: approximate weight matrices as products of smaller matrices to reduce parameter count and computation
+- HW acceleration of sparse models
+  - HW support challenges
+    - GPUs/CPUs often ignore random sparsity -> no speedup
+    - Memory access patterns matter more than FLOP count
+    - Structured pruning with HW -> actual latency reduction
+  - Acceleration libraries
+    - Nvidia TensorRT
+    - cuSparse
+    - ONNX Runtime
+    - TensorFlow lite
+    - ARM Compute library
+- **Sparsity-aware hardware (HW)** in AI refers to specialized computing architectures (like AI accelerators, GPUs, or TPUs and Spiking Neural Networks (SNNs)) designed to detect and skip computations involving zero-valued weights or activations    
+- Trade-offs
+  - Accuracy vs compression: aggressive pruning == higher accuracy loss
+  - Implementation complexity: sparse models harder to optimize without runtime support
+  - Structure vs flexibility: structured pruning = real speedups but less flexible
+- Real world examples
+  - YOLOv5: 40% pruned model runs 2x faster with only 2.5% mAP drop on Jetson Nano
+  - Transformer: heads/layers pruned by 30% fits in 2GB RAM on-device NLP
+  - ResNet Vision: filter pruning + quantization -> 4x smaller with < 1% accuracy drop
+- Best practices
+  - Start conservative
+  - Always fine-tune
+  - Combine methods: pruning + quantization
+  - Favor structure
+  - Measure what matters: latency, not parameter count
+
+### 152. 150. TensorRT for Edge Inference
+- TensorRT
+  - Nvidia's inference optimizer & runtime that converts trained models into optimized execution engines for deployment on edge devices
+  - Supported Targets
+    - Jetson family
+    - Nvidia GPUs
+    - Data center AI accelerators
+  - Framework support: PyTorch, TensorFlow, ONNX
+- Why TensorRT for Edge AI?
+  - Reduced latency
+  - Smaller memory footprin
+  - Increased throughput
+  - Extended battery life
+- Optimization techniques in TensorRT
+  - Layer fusion
+  - Precision calibration: FP32 -> FP16 -> INT8
+  - Kernel auto-tuning
+  - Dynamic memory allocation
+- TensorRT workflow overview
+  - Train model
+  - Export to ONNX
+  - Build TensorRT engine
+  - Run inference
+  - Benchmark & validate
+- INT8 quantizawtion may result in 1-2% accuracy loss compared to FP32
+- Use cases at the edge
+  - Computer vision
+  - Robotics
+  - Healthcare
+  - Retail/smart cities
+- TensorRT best practices
+  - Representative calibration data
+  - Profile before production
+  - Maintain multiple engines: keep both FP16 and INT8 engines for fallback
+  - Scale with K8 + Triton: for multi-device deployments
+  - Validate accuracy vs speed
+
+### 153. 151. Running Vision Models on Raspberry Pi
+- Why Rasberry Pi for AI?
+  - Low-cost, accessible: $35-75
+  - Ideal for prototyping & education
+  - Camera interface built-in
+  - Broad community support
+- HW requirements
+  - Rasberry Pi 4: 4/8GB RAM, ARM Cortex-A72 CPU
+  - MicroSD card: > 32GB, class 10
+  - Camera: Pi Camera module v2 (8MP) or USB webcam
+  - Optional: Coral TPU (USB accelerator for 10-50x faster inference)
+- SW stack
+  - OS: Rasberry Pi OS (64bit recommended), Ubuntu 20.04 LTS
+  - Frameworks: TensorFlow Lite, PyTorch Lite, OpenCV
+  - Optimization: ONNX runtime ARM builds, Coral Edge TPU runtime, ARM NEON acceleration
+  - Languages: Python3, C++, shell script
+- Ex: TensorFlow Lite   
+```py
+import tflite_runtime.interpreter as tflite
+import numpy as np
+interpreter = tflite.Interpreter(
+  model_path="mobilenet.tflite")
+interpreter.allocate_tensors()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+img = np.random.rand(1,224,224,3).astype(np.float32)
+interpreter.set_tensor(input_details[0]['index'], img)
+interpreter.invoke()
+output = interpreter.get_tensor(
+output_details[0]['index'])
+```
+- ONNX runtime on Rasberry Pi
+  - Benefits
+    - Run models from any framework
+    - ARM-optimized builds for improved performance
+    - Memory-efficient inference on Pi's limited RAM
+    - Supports popular vision models (ResNet, MobileNet)
+- Acceleration with Coral EdgeTPU
+  - 10-50x speed up with USB accelerator
+- Challenges
+  - Limited resources
+  - Thermal constraints
+  - Power limitations
+  - Processing bottlenecks
+- Best practices
+  - Use lightweight architectures
+  - Apply quantization
+  - Optimize IO pipeline
+  - Consider HW accelerations
+
+### 154. 152. TinyML and Microcontrollers for AI
+- AI on devices with KB memory
+- Sensors, wearables, IoT
+- Tasks: keyword spotting, anomaly detection, gesture recognition
+- Why TinyML
+  - Ultra-low power
+  - Privacy-first
+  - Real-time inference
+  - Massive scale
+- HW examples
+  - Arduino Nano 33 BLE Sense
+  - STM32 MCUs
+  - ESP32
+  - Edge TPU/NPU
+- TinyML SW stack
+  - TensorFlow Lite for microcontrollers
+  - Edge Impulse
+  - CMSIS-NN
+  - ONNX Runtime Mobile
+- Ex: keyword spotting
+  - Collect audio samples
+  - Train CNN on spectograms
+  - Convert to TFLM model
+  - Deploy on Arduino
+  - Test device response
+- Ex: anomaly detection in IoT
+  - Vibration sensor
+  - MCU runs autoencoder model locally
+  - Algorithm learns "normal" operation patterns
+  - Alerts sent only when anomalies detected
+- Model optimizatino techniques
+  - Quantization
+  - Pruning & distillation
+  - Feature engineering
+  - Micro-architectures
+- TinyML challenges
+  - Memory constraints: 32-512KB RAM
+  - Power management
+  - Bare metal programming: no OS
+  - Limited debugging
+- Best practices
+  - Design for extreme constraints
+  - Use specialized tools
+  - Benchmark on real HW
+  - Optimize power consumption
+  - Focus on specific tasks
+
+### 155. 153. Benchmarking Models on Edge Hardware
+- Why benchmark?
+  - Resource constraints
+  - Performance variability
+  - Deployment confidence
+- Key metrics to measure
+  - Performance: latency (p50/p95), throughput (inferences/sec, FPS for vision)
+  - Quality: accuracy (top-1/F1/precision-recall), memory footprint (RAM usage, model size)
+  - Efficiency: Power draw (Watt consumption, battery drain)
+- Benchmarking workflow
+  - Select candidate models
+  - Convert to edge-optimized format
+  - Deploy to target HW
+  - Run standardized benchmark dataset
+  - Collect comprehensive metrics
+  - Compare against baseline
+- Tools & frameworks
+  - TensorFlow Lite
+  - ONNX runtime
+  - MLPerf Tiny/Inference
+  - PyTorch Mobile
+  - Custom profiling: time.perf_counter, torch.cuda.synchronize()  
+- Ex: TFLite benchmark on Rasberry Pi
+```bash
+./benchmark_model \
+--graph=mobilenet_v2.tflite \
+--input_layer="input" \
+--input_layer_shape="1,224,224,3" \
+--num_threads=4
+```
+  - Output metrics:
+    - Inference latency (ms)
+    - Memory usage (MB)
+    - CPU utilization (%)
+    - Initialization time
+    - Per-layer performance breakdowns
+- Edge device categories
+  - Microncontrollers: tinyML, MicroNets, ProxylessNAS
+  - Rasberyy Pi-class: MobileNetV2, EfficientDetLite
+  - Jetson/Edge GPUs: YOLOv5, ResNet18, DistilBERT
+- Power & Thermal Testing
+  - Measurement tools
+    - USB inline power meters
+    - Jetson tegrastats utility
+    - Thermal imaging cameras
+    - System power monitoring APIs
+  - Key metrics
+    - Watts under various workloads
+    - Thermal throttling thresholds
+    - Accuracy-per-Watt efficiency
+    - Battery life estimation
+- Best practices
+  - Use real HW
+  - Representative datasets
+  - Measure complete latency
+  - Batch size variations
+  - Automate testing
+  
+### 156. 154. Lab – Optimize a Model with TensorRT
+- Goal: Take a pretrained vision model (ResNet18) → convert it to TensorRT engines (FP16 & INT8) → benchmark performance improvements on Jetson / NVIDIA GPU.
+```
+Step 0 – Prerequisites
+
+    NVIDIA Jetson (Nano/Xavier/Orin) or any NVIDIA GPU system with CUDA + TensorRT installed.
+
+    torch, onnx, onnxruntime, torchvision.
+
+    TensorRT CLI tool trtexec (bundled with TensorRT).
+
+Step 1 – Export PyTorch Model to ONNX
+
+    import torch
+    import torchvision.models as models
+     
+    # Load pretrained ResNet18
+    model = models.resnet18(pretrained=True).eval()
+     
+    dummy = torch.randn(1, 3, 224, 224)
+    torch.onnx.export(model, dummy, "resnet18.onnx",
+                      input_names=["input"],
+                      output_names=["output"],
+                      opset_version=17)
+    print("ONNX model saved: resnet18.onnx")
+
+✅ Output: resnet18.onnx
+Step 2 – Baseline ONNX Runtime Inference
+
+    import onnxruntime as ort
+    import numpy as np, time
+     
+    session = ort.InferenceSession("resnet18.onnx")
+    input_name = session.get_inputs()[0].name
+     
+    x = np.random.rand(1, 3, 224, 224).astype(np.float32)
+     
+    start = time.time()
+    out = session.run(None, {input_name: x})
+    print("Latency (ms):", (time.time()-start)*1000)
+
+✅ Record baseline latency (~50–100ms on Jetson Nano, lower on Xavier/desktop GPU).
+Step 3 – Build TensorRT FP16 Engine
+
+    trtexec --onnx=resnet18.onnx \
+            --saveEngine=resnet18_fp16.engine \
+            --fp16
+
+    --fp16 enables half-precision ops.
+
+    Produces resnet18_fp16.engine.
+
+Step 4 – Run FP16 Engine
+
+    trtexec --loadEngine=resnet18_fp16.engine --shapes=input:1x3x224x224
+
+✅ Compare average latency vs ONNX Runtime FP32.
+Expect ~2–3× speedup.
+Step 5 – INT8 Quantization (Calibration)
+
+    Prepare small calibration dataset (50–100 sample images).
+
+    Build INT8 engine with calibration:
+
+    trtexec --onnx=resnet18.onnx \
+            --saveEngine=resnet18_int8.engine \
+            --int8 \
+            --calib=calib.cache
+
+    Calibration ensures accuracy retention in INT8 mode.
+
+Step 6 – Run INT8 Engine
+
+    trtexec --loadEngine=resnet18_int8.engine --shapes=input:1x3x224x224
+
+✅ Expect ~3–5× speedup vs FP32, with slight accuracy drop (<1–2%).
+Step 7 – Compare Results
+
+Mode Latency (ms) Speedup Accuracy Δ FP32 ~50 ms 1.0× baseline FP16 ~20 ms 2.5× ~0% drop INT8 ~12 ms 4× <2% drop
+Step 8 – Integrate into Python (Torch-TensorRT)
+
+    import torch_tensorrt
+     
+    trt_model = torch_tensorrt.compile(
+        model,
+        inputs=[torch_tensorrt.Input((1,3,224,224))],
+        enabled_precisions={torch.float16}  # or int8
+    )
+    torch.jit.save(trt_model, "resnet18_trt.ts")
+
+✅ Easier integration into PyTorch workflows.
+Step 9 – Cleanup
+
+    rm resnet18.onnx resnet18_fp16.engine resnet18_int8.engine
+
+📂 Folder Structure
+
+    lab154_tensorrt_opt/
+     ├── export_resnet18.py
+     ├── benchmark_onnx.py
+     ├── README.md
+     └── (generated) resnet18.onnx / .engine files
+
+✅ Learning Outcomes
+
+    Export model → ONNX → TensorRT engine.
+
+    Optimize inference with FP16 & INT8.
+
+    Benchmark latency and accuracy trade-offs.
+
+    Deploy optimized models for real-time edge inference.
+```
+
+## Section 24: Week 23: Mobile AI Infrastructure
 
 ### 157. 155. Why Mobile AI Is Booming
+- AI landscape is evolving from cloud-only to hybrid + on-device inference models
+- Core drivers of mobile AI adoption
+  - Latency: sub-100ms response
+  - Privacy
+  - Cost efficiency
+  - Reliability
+  - Personalization
+- HW tailwinds
+  - NPUs/neural engines
+  - Efficient GPU/DSP pipelines via metal/vulkan APIs
+  - Mixed precision support (FP16/INT8)
+- SW ecosystem
+  - Apple Core ML
+  - TensorFlow Lite
+  - Android NNAPI
+  - ONNX Runtime Mobile
+- Business impact
+  - Improved metrics
+  - Cost reduction
+  - Compliance: data residency and user consent requirements
+  - Competitive Edge  
+- Constraints & trade-offs
+  - Memory & compute
+  - Thermals & battery
+  - Model lifecycle
+  - HW fragmentation
+- Making models mobile-ready
+  - Quantization
+  - Pruning & distillation
+  - Operator coverage
+  - Streaming & chunking
+  - On-device caching: store tokens/embeddings for faster inferences
+- Architectures that work well on mobile
+  - Vision
+  - Speech
+  - NLP
+  - LLMs
+- Hybrid AI patterns
+  - On-device first
+  - Progressive enhancement
+  - Privacy gates
+- Success checklist for mobile AI
+  - Define clear SLAs
+  - Ensure framework compatibility
+  - Optimize aggressively
+  - Test across device matrix
+  - Implement telemetry: collect performance parameters
+
 ### 158. 156. Core ML for iOS – Basics
+- Apple's framework for on-device ML
+- Core ML
+  - Native ML framework for Apple's entire ecosystem
+  - Comprehensive support for vision, NLP, sound analysis, recommendation systems, and tabular ML
+  - Performance optimized for Apple Neural Engine (ANE), GPU, and CPU
+  - Models deployed as `.mlmodel` files
+- Why Core ML?
+  - Performance
+  - Privacy
+  - Battery efficiency
+  - Ecosystem integration: Vision, CreateML, ARKit, and Siri
+- Core ML workflow
+  - Train model: PyTorch, TensorFlow, or Scikit-learn
+  - Convert model: .mlmodel format using coremltools or ONNX conversion pipeline
+  - Integrate
+  - Implement API
+  - Run inference
+- Ex: Converting PyTorch model
+```py
+import torch
+import torchvision.models as models
+import coremltools as ct
+# Load pretrained model
+model = models.mobilenet_v2(pretrained=True).eval()
+# Dummy input
+example = torch.rand(1, 3, 224, 224)
+# Convert to Core ML
+traced = torch.jit.trace(model, example)
+mlmodel = ct.convert(
+  traced,
+  inputs=[ct.ImageType(name="input",
+  shape=example.shape)]
+)
+mlmodel.save("MobileNet.mlmodel")
+```
+- Core ML model types
+  - Image models
+  - Text models
+  - Audio models
+  - Tabular models: recommendation engines, regression models, and decision trees for structured data
+- Deployment benefits
+  - Offline-ready operation
+  - Support for over-the-air model updates
+  - Seamless ecosystem integration with apple framework
+- Limitations and challenges
+  - Model size constraints; keep models under 100MB for App store distribution
+  - Operator support gaps: not all PyTorch/TF operations are compatible in CoreML
+  - Optimization requirements: quantization (INT8) and pruning for acceptable performance
+  - Debugging complexity
+
 ### 159. 157. TensorFlow Lite for Android – Basics
+- TensorFlow Lite
+  - Mobile & embedded ML framework
+  - HW optimized: tuned for ARM CPUs, GPUs, NPUs, and DSPs
+  - On-device processing: runs offline, private, and fast on android devices
+- Why TFLite for android?
+  - Performance
+  - Battery life
+  - Device compatibility
+  - Developer integration
+- TFLite development workflow
+  - Train/export model
+  - Convert to TFLite
+  - Add to android project
+  - Implement interpreter API
+  - Optimize with delegates
+- Converting a model to TFLite
+```py
+import tensorflow as tf
+# Load model (Keras example)
+model = tf.keras.applications.MobileNetV2( weights="imagenet")
+# Convert to TFLite
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT] # optional quantization
+tflite_model = converter.convert()
+# Save file
+open("mobilenet_v2.tflite", "wb").write(tflite_model)
+```
+- Key conversion options  
+  - Quantization (INT8, FP16)
+  - Pruning for size reduction
+  - Op compatibility selection
+  - Input/output shape specification
+- Accelerators (Delegates)
+  - NNAPI delegate
+  - GPU delegate
+  - Hexagon DSP delegate
+  - Edge TPU delegate: optimized for Google Coral and other custom HW
+- Common challenges
+  - Model size constraints: App store/play store limits (~100MB)
+  - Operator compatibility
+  - Device fragmentation
+  - Performance tradeoffs
+
 ### 160. 158. Deploying On-Device NLP Models
+- Why on-device NLP?
+  - Privacy
+  - Latency
+  - Cost
+  - Personalization
+  - Reliability
+- Typical on-device NLP tasks
+  - Text classification: spam detection, sentiment analysis
+  - Sequence labeling
+  - Generation: auto-complete, predictive text input, suggested replies
+  - Speech-to-text/translation
+  - Conversational AI
+- Model architectures that work
+  - Compressed transformers
+    - DistillBERT
+    - TinyBERT
+    - MobileBERT
+  - Parameter sharing
+    - ALBERT
+  - Lightweight models
+    - FastText
+    - Bag-of-Embeddings
+  - Ultra-low-resource
+    - RNN-Lite/GRU variants: for MCUs
+- Workflow overview
+  - Train/fine-tune
+  - Optimize
+  - Export
+  - Integrate
+  - Run inference
+- Ex: converting DistilBERT -> TFLite  
+```py
+from transformers import TFDistilBertForSequenceClassification
+import tensorflow as tf
+# Load model
+model = TFDistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased")
+# Convert to TFLite
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT] # quantization
+tflite_model = converter.convert()
+open("distilbert.tflite", "wb").write(tflite_model)
+```
+  - Key points
+    - Default quantization
+    - Size reduction: 240MB -> 60MB
+    - Direct Keras model conversion
+- Performance optimizations
+  - Quantization
+  - Pruning
+  - Operator fusion
+  - Distillation    
+- Best practices
+  - Start with mobile-optimized models
+  - Apply QAT
+  - Test across device tiers
+  - Build hybrid pipelines
+
 ### 161. 159. Power Management in Mobile AI
+- Why power matters in mobile AI
+  - User retentioanl challenge
+  - Computational intensity
+  - Thermal constraints
+- Sources of power drain
+  - Compute operations
+  - Sensor usage
+  - Inefficient code
+- HW efficiency levers
+  - NPUs deliver up to 100x enery efficiency vs CPU for AI workloads
+  - GPU delegates for parallel operations can achieve 4-8x better energy efficiency than CPU
+  - DSPs enable 20x more efficient audio/sensor inference
+- SW optimization techniques
+  - Model optimization
+    - Quantization
+    - Pruning/distillation
+  - Runtime optimization
+    - Batching & caching
+    - Lazy loading
+- Duty cycling for sensors
+  - Motion triggers
+  - Keyword spotting
+  - Preprocessing offload
+  - Camera activation
+- Developer tools for power profiling
+  - Anroid tools
+    - Android studio profiler
+    - Battery historian
+    - ADB shell dumpsys batterystats
+  - iOS tools
+    - Xcode instruments: Energy Log
+    - Energy Gauge
+    - MetricKit
+  - Embedded Tools
+    - Jetson tegrastats
+    - External power monitors
+- Real-world best practices
+  - Use smaller models
+  - Quantize aggressively
+  - Profile per-feature
+  - User controls: implement low-power mode toggle in app settings
+  - A/B testing
+  - Thermal testing
+
 ### 162. 160. Privacy Considerations for On-Device AI
+- Why privacy matters
+  - Sensitive data
+  - Trust & adoption
+  - Regulatory landscape: GDPR, CCPA, and HIPAA
+  - Data minimization
+- Privacy advantages of on-device AI
+  - Local inference
+  - Reduced attack surface
+  - Offline-first operation
+  - Private personalization
+- Core privacy risks
+  - Model leakage
+  - Side-channel leaks
+  - Unintended storage
+  - Over-collection
+- Privacy-by-design principles
+  - Data minimization
+  - On-device preprocessing
+  - Transparency
+  - User control
+  - Secure defaults
+- Techniques for enhanced privacy
+  - Layer: federated learning - train across devices without sharing raw data
+  - Outer: secuire enclaves and storage - HW isolation and encrypted model files
+  - Core: differential privacy - adds noise to data to protect individuals
+- Regulatory considerations
+  - GDPR(EU)  
+    - Right to explanation of algorithmic decisions
+    - Explicit consent for data procesing
+    - Right to erasure
+  - CCPA (California)
+    - Opt-out of data sales/sharing
+    - Transparent disclosure of data usage
+    - Access to collected personal information
+  - HIPAA (US Healthcare)
+    - Strict protocols for health data handling
+    - Breach notification requirements
+    - Limited disclosure permissions
+- Ex: on-device NLP 
+  - Keyboard AI for text prediction: a privacy-sensitive application of on-device AI
+    - Local processing: no raw text transmission
+    - Federatd updates: only anonymized gradients are shared to improve the central model, not user text
+    - Differential privacy: statistical noise masks individual patterns while preserving group insights
+  - Face unlock on smartphones
+    - Secure storage
+    - Local-only processing
+    - Continuous improvement
+- Developer best practices
+  - Encryption
+  - Minimal logging
+  - Process isolation
+  - Clear consent
+  - Regular audits
+- Common pitfalls 
+  - Unncessary cloud reliance
+  - Excessive data retention
+  - Third-Party exposure
+  - Inference opacity
+
 ### 163. 161. Lab – Build a Mobile AI App with TFLite
-1min
+- Goal: Create a simple Android app that uses TensorFlow Lite to run an image classification model (MobileNet) fully on-device.
+```
+Step 0 – Prerequisites
+
+    Android Studio installed (latest version).
+
+    Android device or emulator (with camera access).
+
+    mobilenet_v2.tflite model (from Day 157 export).
+
+    Basic knowledge of Android app structure.
+
+Step 1 – Create Android Studio Project
+
+    Open Android Studio → New Project → “Empty Activity”.
+
+    Set package name: com.example.tfliteclassifier.
+
+    Language: Kotlin.
+
+    Minimum SDK: API 23+.
+
+Step 2 – Add TensorFlow Lite Dependencies
+
+In app/build.gradle:
+
+    dependencies {
+        implementation 'org.tensorflow:tensorflow-lite:2.12.0'
+        implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
+        implementation 'org.tensorflow:tensorflow-lite-gpu:2.12.0'
+    }
+
+Sync project.
+Step 3 – Add Model to Project
+
+    Place mobilenet_v2.tflite in:
+
+        app/src/main/assets/
+
+    Also add labels.txt with ImageNet class labels.
+
+Step 4 – Load TFLite Model in Kotlin
+
+Classifier.kt:
+
+    import org.tensorflow.lite.Interpreter
+    import android.content.res.AssetFileDescriptor
+    import java.nio.MappedByteBuffer
+    import java.nio.channels.FileChannel
+     
+    class Classifier(private val assetManager: android.content.res.AssetManager) {
+        private var interpreter: Interpreter
+     
+        init {
+            interpreter = Interpreter(loadModel("mobilenet_v2.tflite"))
+        }
+     
+        private fun loadModel(model: String): MappedByteBuffer {
+            val fileDescriptor: AssetFileDescriptor = assetManager.openFd(model)
+            val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
+            val channel = inputStream.channel
+            val startOffset = fileDescriptor.startOffset
+            val declaredLength = fileDescriptor.declaredLength
+            return channel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+        }
+     
+        fun runInference(input: Array<Array<Array<FloatArray>>>): FloatArray {
+            val output = Array(1) { FloatArray(1001) }
+            interpreter.run(input, output)
+            return output[0]
+        }
+    }
+
+Step 5 – Connect Camera Input
+
+    Use Android CameraX API to capture frames.
+
+    Preprocess image → resize to 224×224, float32 normalized [0,1].
+
+    Pass tensor into Classifier.runInference().
+
+Step 6 – Display Prediction
+
+In MainActivity.kt:
+
+    val probs = classifier.runInference(preprocessedImage)
+    val topIdx = probs.indices.maxByOrNull { probs[it] } ?: -1
+    val label = labels[topIdx]
+    textView.text = "Prediction: $label"
+
+Step 7 – Run on Device
+
+    Build & install app.
+
+    Point camera at objects.
+
+    App shows real-time classification results.
+
+Step 8 – Optimize (Optional)
+
+    Enable GPU delegate:
+
+    val options = Interpreter.Options().addDelegate(GpuDelegate())
+    val interpreter = Interpreter(model, options)
+
+    Expect 2–3× faster inference vs CPU.
+
+✅ Learning Outcomes
+
+    Integrated TensorFlow Lite into an Android app.
+
+    Performed real-time image classification locally.
+
+    Explored GPU acceleration for faster results.
+
+    Learned how to package AI models for mobile deployment.
+```
+
+## Section 25: Week 24: Data Pipelines for AI at Scale
 
 ### 164. 162. Introduction to ETL and ELT Pipelines
+- Building scalable data workflows for AI infrastructure
+- Why data pipelines matter
+  - Foundation for AI
+  - Automation
+  - Scalability
+- ETL
+  - Extract: pull data from multiple sources
+  - Transform: clean, normalize, and structure the data
+  - Load: store processed data in target system
+- ELT
+  - Extract
+  - Load: store raw data in a data lake or warehouse
+  - Transform: leverage in-warehouse comkpute for prcessing after loading, transform data on-demand for specific use cases
+- ETL vs ELT
+  - ETL approach
+    - Process data before loading
+    - Optimized for smaller datasets
+    - Well-suited for legacy, on-premises systems
+  - ELT approach
+    - Process dat after loading
+    - Designed for large, raw datasets
+    - Ideal for modern cloud and AI workflows
+- AI use cases of pipelines
+  - Data preprocessing
+  - Real-time analytics
+  - Feature engineering
+  - Knowledge bases
+- Common tools in ETL/ELT
+  - ETL tools
+    - Talend
+    - Informatica PowerCenter
+    - Apache NiFi
+    - MS SSIS
+  - ELT Tools
+    - dbt (data build tool)
+    - Snowflake
+    - Google BigQuery
+    - Databricks
+  - Orchestration
+    - Apache Airflow
+    - Prefect
+    - Dagster
+    - Luigi
+  - Streaming
+    - Apache Kafka
+    - Apache Flink
+    - Apache Spark Streaming
+    - AWS Kinesis
+- Best practices
+  - Error handling
+  - Data quality
+  - Modularity
+  - Alignment
+
 ### 165. 163. Apache Airflow for AI Workflows
+- Why workflow orchestration matters
+  - Manual process break down
+  - Dependency management fails
+  - Reliability suffers
+- Apache Airflow
+  - Authors, schedules, and monitors workflows as code
+  - Directed Acyclic Graphs (DAGs) to define workflow relationships, dependencies, and execution order
+  - Configuration as Python code
+  - Built-in scheduler for both time and event-based triggers
+  - Rich monitoring and visualization UI
+- Key features of Airflow
+  - Advanced scheduling
+  - Robust error handling
+  - Rich ecosystem: BigQuery, Snowflake, Databricks, K8, ...
+  - Flexible scaling
+- AI/ML use cases
+  - Data pipeline orchestration
+  - Training pipeline automation
+  - LLM & RAG workflows
+- Airflow architecture components
+  - Webserver UI
+  - Metadata database
+  - Scheduler
+  - Executors
+  - Workers
+- Best practices for ML workflows
+  - Build Idempotent Tasks
+  - Version control everything
+  - Implement comprehensive monitoring
+  - Use dynamic DAGs
+
 ### 166. 164. Streaming Data with Apache Kafka
+- How to build responsive AI systems
+- Why streaming data matters
+  - Real-time requirements
+  - Instantaneous decisions
+  - Continuous learning
+  - Essential for IoT monitoring, fraud detection, and recommendation engines
+- Apache Kafka
+  - Distributed streaming platform
+  - Publish-subscribe: enables applications to publish and subscribe to streams of records
+  - Durable storage
+  - Real-time processing: immediate response
+  - Horizontal scalability
+- Kafka core concepts
+  - Producer: applicatino that sends data to Kafka topics
+  - Topic: named feed or category where records are published
+  - Consumer: application that reads and processes data from topics
+  - Broker: individual Kafka server instance storing data
+  - Cluster: group of brokers  
+- AI/ML use cases
+  - Feature engineering: extract, transform and deliver real-time features for training and inference, enabling models to response to changing conditions
+  - Knowledge streaming: feed fresh information to large language models to prevent staleness and hallucination in responses
+- Integrations with AI infrastructure
+  - Kafka + Spark/Flink: distributed processing frameworks that consume Kafka streams for complex transformation and analytics
+  - Kakfa +  Airflow: orchestrate complex data workflows triggered by streaming events for ETL and model training
+  - Kafka + Feast: real-time feature store that standardizes features for training and serving with low latency
+  - Kafka + TF Serving: stream real-time data directly to model endpoints for continuous inference
+- Best practices for Kafka in AI systems
+  - Strategic partitioning
+  - Fault tolerance
+  - Performance monitoring
+  - Security implementation
+
 ### 167. 165. Feature Stores for ML (Feast, Tecton)
+- Why feature stores matter
+  - Feature duplication
+  - Training-serving skew
+  - Slow iteration cycles
+- What is a feature store?
+  - Centralized repository
+  - Offline/online bridge
+  - Covernance & metadata
+- Feast: open source feature management
+  - Python SDK and CLI for simple developer workflows
+  - Offline stores: BigQuery, Redshift, Snowflake, File
+  - Online stores: Redis, DynamoDB, Datastore
+  - Streaming: Kafka, Kinesis integration
+  - Ideal for research teams, startups, and organization with strong engineering capabilities
+- Tecton: enterprise-grade feature platform
+  - Managed infrastucture: production-ready, fully maanged feature platform with SLAs and expert support
+  - Enterprise integration: Spark, Snowflake, Databricks, and AWS/Azure/GCP
+  - Governance & compliance: RBAC, audit logs, approval workflows
+  - Performance at scale: optimized for high-throughput, low-latency
+- Feature store best practices
+  - Standardize feature definitions
+  - Version and track lineage
+  - Monitor quality and freshness
+  - Implement access controls
+
 ### 168. 166. Real-Time Data Preprocessing at Scale
+- Why real-time preprocessing?
+  - Fresh
+  - Clean
+  - Formatted
+  - Actionable
+- Critical use cases
+  - Fraud dtection
+  - IoT sensor processing
+  - Real-time recommendations
+  - Autonomous systems
+- Core preprocessing tasks
+  - Cleaning: handle missing, duplicate, or corrupted data points in the stream
+  - Transformation: convert data into ML-ready formats such as feature scaling/normalization, one-hot encoding, dimensionality reduction
+  - Aggregation: rolling statistics over time windows, tumbling windows for batch processing
+  - Enrichment: join stream data with external sources - reference data lookups, feature store integration, cross-stream correlations
+- Tools & Frameworks
+  - Apache Kafka + Kafka Streams: event sourcing, log aggregation
+  - Apache Flink: complex event processing, time-series analysis
+  - Spark Structured Streaming: ML feature engineering at scale
+- AI/ML use cases
+  - Robotics & reinforcement learning
+  - Recommendation engines
+  - Anomaly detection
+  - Conversational AI
+- Scaling strategies
+  - Windowing techniques: implement appropriate time-based aggregations to manage computational load
+  - Parallelization: scale horizontally
+  - Optimization techniques: reduce resource utilization while maintaining throughput
+- Best practices
+  - Continuous data quality validation
+  - Lightweight processing design
+  - Schema evolution planning
+  - Comprehensive monitoring
+
 ### 169. 167. Data Quality Monitoring for AI Systems
+- Why data quality matters
+  - Garbage in/garbage out
+- Dimensions of data quality
+  - Completeness
+  - Accuracy
+  - Consistency
+  - Timeliness: fresh enough?
+  - Validity
+- Tools for monitoring
+  - EvidentlyAI
+  - Great Expectations
+  - WhyLabs
+  - Monte Carlo & Soda
+- AI/ML use cases
+  - Feature validation
+  - Schema monitoring
+  - Fairness checks
+  - Anomaly detection
+- Scaling strategies
+  - Automate validation
+  - Visual monitoring
+  - Set Thresholds
+  - CI/CD integration
+- Best practices
+  - Treat data as first-class infrastructure
+  - Monitor both training & inference data
+  - Version datasets & track schema changes
+  - Collaborate with domain experts  
+
 ### 170. 168. Lab – Build a Streaming Pipeline with Kafka
-4min
+- Learning goals
+  -  Stand up a single-broker Kafka on your laptop with a visual UI
+  - Publish synthetic transactions in real time
+  - Build a stream processor that validates, aggregates, and emits features
+  - Observe and troubleshoot with a UI + logs
+  -  (Optional) Add a dead-letter queue and basic data quality checks
+```
+0) Prereqs (install once)
+
+    Docker Desktop (running)
+
+    Python 3.9+ (python --version)
+
+    Terminal + code editor
+
+1) Project scaffold
+
+    mkdir kafka-streaming-lab && cd kafka-streaming-lab
+    mkdir app
+
+Repo layout
+
+    kafka-streaming-lab/
+      docker-compose.yml
+      app/
+        requirements.txt
+        producer.py
+        processor.py
+        consumer.py
+
+2) Docker Compose (Kafka + Kafka UI)
+
+Create docker-compose.yml:
+
+    version: "3.8"
+    services:
+      kafka:
+        image: bitnami/kafka:3.7
+        container_name: kafka
+        ports:
+          - "9092:9092"    # external for host apps
+          - "29092:29092"  # internal for containers
+        environment:
+          - KAFKA_ENABLE_KRAFT=yes
+          - KAFKA_CFG_NODE_ID=1
+          - KAFKA_CFG_PROCESS_ROLES=broker,controller
+          - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+          - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+          - KAFKA_CFG_LISTENERS=INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+          - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+          - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+          - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+        volumes:
+          - kafka_data:/bitnami/kafka
+     
+      kafka-ui:
+        image: provectuslabs/kafka-ui:latest
+        container_name: kafka-ui
+        ports:
+          - "8080:8080"
+        environment:
+          - KAFKA_CLUSTERS_0_NAME=local
+          - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+        depends_on:
+          - kafka
+     
+    volumes:
+      kafka_data:
+
+Up the stack
+
+    docker compose up -d
+
+    UI: http://localhost:8080 (you’ll see cluster “local”)
+
+3) Python deps
+
+Create app/requirements.txt:
+
+    kafka-python==2.0.2
+    faker==25.9.2
+    pydantic==2.8.2
+    python-dateutil==2.9.0.post0
+
+Install:
+
+    cd app
+    python -m venv .venv
+    source .venv/bin/activate # Windows: .venv\Scripts\activate
+    pip install -r requirements.txt
+
+4) Create topics (optional—auto-create is on)
+
+You can let Kafka auto-create, or do it explicitly:
+
+Via UI → Topics → “Create”:
+
+    transactions (partitions: 3)
+
+    features (partitions: 3)
+
+    dlq-transactions (optional, partitions: 1)
+
+5) Producer – real-time synthetic events
+
+Create app/producer.py:
+
+    import json, os, random, time
+    from datetime import datetime, timezone
+    from faker import Faker
+    from kafka import KafkaProducer
+     
+    BOOTSTRAP = os.getenv("BOOTSTRAP", "localhost:9092")
+    TOPIC = os.getenv("TOPIC", "transactions")
+    EPS = float(os.getenv("EVENTS_PER_SECOND", "5"))
+     
+    fake = Faker()
+    producer = KafkaProducer(
+        bootstrap_servers=BOOTSTRAP,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        key_serializer=lambda k: str(k).encode("utf-8") if k is not None else None,
+        linger_ms=10
+    )
+     
+    EVENT_TYPES = ["view", "add_to_cart", "purchase"]
+    DEVICES = ["web", "ios", "android"]
+    COUNTRIES = ["US", "IN", "BR", "DE", "GB", "CA"]
+     
+    def make_event():
+        user_id = random.randint(1, 500)
+        etype = random.choices(EVENT_TYPES, weights=[0.7, 0.2, 0.1])[0]
+        amount = round(random.uniform(5, 200), 2) if etype == "purchase" else 0.0
+        return {
+            "event_time": datetime.now(timezone.utc).isoformat(),
+            "user_id": user_id,
+            "event_type": etype,
+            "amount": amount,
+            "device": random.choice(DEVICES),
+            "country": random.choice(COUNTRIES)
+        }, user_id
+     
+    def main():
+        print(f"Producing to {TOPIC} @ {EPS} eps")
+        interval = 1.0 / EPS
+        while True:
+            payload, key = make_event()
+            producer.send(TOPIC, key=key, value=payload)
+            time.sleep(interval)
+     
+    if __name__ == "__main__":
+        main()
+
+Run:
+
+    python producer.py
+
+Tip: Watch messages in Kafka UI → Topics → transactions → Messages.
+6) Stream processor – validate → aggregate → emit features
+
+Create app/processor.py:
+
+    import json, os, time
+    from collections import defaultdict
+    from datetime import datetime, timezone
+    from dateutil import parser as dtparser
+    from pydantic import BaseModel, Field, ValidationError
+    from kafka import KafkaConsumer, KafkaProducer
+     
+    BOOTSTRAP = os.getenv("BOOTSTRAP", "localhost:9092")
+    SRC_TOPIC = os.getenv("SRC_TOPIC", "transactions")
+    SINK_TOPIC = os.getenv("SINK_TOPIC", "features")
+    DLQ_TOPIC = os.getenv("DLQ_TOPIC", "dlq-transactions")  # optional
+    WINDOW_SEC = int(os.getenv("WINDOW_SEC", "60"))
+     
+    class Txn(BaseModel):
+        event_time: str
+        user_id: int = Field(ge=1)
+        event_type: str
+        amount: float
+        device: str
+        country: str
+     
+    def epoch_minute(ts_iso: str) -> int:
+        ts = dtparser.isoparse(ts_iso)
+        return int(ts.timestamp() // WINDOW_SEC) * WINDOW_SEC
+     
+    consumer = KafkaConsumer(
+        SRC_TOPIC,
+        bootstrap_servers=BOOTSTRAP,
+        group_id="processor-1",
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+        key_deserializer=lambda k: int(k.decode("utf-8")) if k else None,
+        auto_offset_reset="earliest",
+        enable_auto_commit=False,
+        max_poll_records=200
+    )
+     
+    producer = KafkaProducer(
+        bootstrap_servers=BOOTSTRAP,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+     
+    # state: (user_id, window_start) -> counters
+    state = defaultdict(lambda: {"event_count":0, "purchase_count":0, "revenue":0.0})
+     
+    last_flush = time.time()
+     
+    def flush_ready(now_epoch: int):
+        """Flush windows that ended before current window."""
+        to_delete = []
+        for (user_id, win_start), agg in state.items():
+            if win_start + WINDOW_SEC <= now_epoch - 1:
+                out = {
+                    "user_id": user_id,
+                    "window_start": win_start,
+                    "window_end": win_start + WINDOW_SEC,
+                    "event_count": agg["event_count"],
+                    "purchase_count": agg["purchase_count"],
+                    "revenue": round(agg["revenue"], 2),
+                    "emitted_at": datetime.now(timezone.utc).isoformat()
+                }
+                producer.send(SINK_TOPIC, value=out)
+                to_delete.append((user_id, win_start))
+        for k in to_delete:
+            del state[k]
+     
+    try:
+        while True:
+            records = consumer.poll(timeout_ms=1000)
+            if not records: 
+                flush_ready(int(time.time()))
+                continue
+     
+            for tp, msgs in records.items():
+                for msg in msgs:
+                    try:
+                        txn = Txn(**msg.value)
+                        win = epoch_minute(txn.event_time)
+                        key = (txn.user_id, win)
+                        st = state[key]
+                        st["event_count"] += 1
+                        if txn.event_type == "purchase":
+                            st["purchase_count"] += 1
+                            st["revenue"] += float(txn.amount)
+                    except ValidationError as e:
+                        # optional DLQ
+                        producer.send(DLQ_TOPIC, value={
+                            "error": "validation_error",
+                            "reason": e.errors(),
+                            "payload": msg.value
+                        })
+     
+            consumer.commit()
+            now = time.time()
+            if now - last_flush > 5:  # flush every ~5s
+                flush_ready(int(now))
+                last_flush = now
+     
+    except KeyboardInterrupt:
+        flush_ready(int(time.time()))
+        consumer.commit()
+
+Run:
+
+    python processor.py
+
+7) Feature consumer – view results (and/or write CSV)
+
+Create app/consumer.py:
+
+    import csv, os, json
+    from kafka import KafkaConsumer
+     
+    BOOTSTRAP = os.getenv("BOOTSTRAP", "localhost:9092")
+    TOPIC = os.getenv("TOPIC", "features")
+    WRITE_CSV = os.getenv("WRITE_CSV", "false").lower() == "true"
+     
+    consumer = KafkaConsumer(
+        TOPIC,
+        bootstrap_servers=BOOTSTRAP,
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+        auto_offset_reset="earliest",
+        group_id="features-reader"
+    )
+     
+    if WRITE_CSV:
+        f = open("features.csv", "w", newline="")
+        writer = None
+     
+    print("Consuming features...")
+    for msg in consumer:
+        rec = msg.value
+        print(rec)
+        if WRITE_CSV:
+            if writer is None:
+                writer = csv.DictWriter(f, fieldnames=rec.keys())
+                writer.writeheader()
+            writer.writerow(rec)
+
+Run (choose one):
+
+    python consumer.py
+    # or write to CSV as a sink
+    WRITE_CSV=true python consumer.py
+
+Watch Kafka UI → topics → features → Messages for aggregated outputs.
+8) Sanity checks
+
+    Throughput: In UI, check consumer groups → processor-1 lag ~ 0
+
+    Windows roll: You should see features where window_start increments every minute per user
+
+    DLQ (if enabled): Force a bad event by editing producer.py to sometimes emit negative amount. Confirm records land in dlq-transactions.
+
+9) Experiments (short, impactful)
+
+    Scale partitions: In UI, increase transactions partitions, run a 2nd processor (GROUP_ID=processor-1 keeps both in same group → load-share).
+
+    Backpressure: Bump rate EVENTS_PER_SECOND=50 for the producer; watch consumer lag.
+
+    Latency: Shrink WINDOW_SEC=30 and flush interval to emit faster windows.
+
+    Schema evolution: Add a new field (e.g., marketing_channel) and keep processor tolerant (ignore unknown keys).
+
+    Fault injection: Kill processor.py and restart—confirm it resumes from last committed offsets.
+
+10) Cleanup
+
+    # stop Python processes
+    # then
+    docker compose down -v
+    deactivate  # exit venv
+
+What you should see (expected)
+
+    transactions: frequent JSON events (views, add_to_cart, purchase)
+
+    features: minute-bucketed aggregates per user:
+
+        {
+          "user_id": 123,
+          "window_start": 1724782380,
+          "window_end": 1724782440,
+          "event_count": 9,
+          "purchase_count": 2,
+          "revenue": 153.17,
+          "emitted_at": "2025-08-27T01:23:45.678901+00:00"
+        }
+
+Stretch goals (pick any)
+
+    Replace Python aggregation with Spark Structured Streaming or Flink
+
+    Add a Postgres container + write features to SQL (via your consumer)
+
+    Containerize producer, processor, consumer with Dockerfiles
+
+    Add Prometheus + Grafana and export simple metrics (messages/sec, lag)
+
+    Replace in-memory windows with Redis or RocksDB for durability
+```
+
+## Section 26: Week 25: Generative AI Infrastructure - Foundations 
 
 ### 171. 169. Infrastructure Challenges of Large Language Models
+- From experiment to planet-scale production
+- Why LLM infrastructure is hard
+  - Massive model scale: billions-trillions of parameters
+  - Data pipeline complexity: terabytes-petabytes datasets
+  - Extended training windows
+  - Conflicting inference demands
+- Compute & parallelism constraints
+  - GPU scarcity issues
+  - Parallelism trade-offs
+  - Interconnect bottlenecks
+  - Distributed recovery
+- Networking & IO bottlenecks
+  - Critical network constraints
+    - All-reduce operations for gradient synchronization saturate network links
+    - Uneven sharding or heterogeneous nodes create performance stragglers
+    - Vector databases experience hot-spotting during high-volume RAG operations
+  - Mitigation strategies
+    - Locality-aware data placements to minimize cross-rack traffic
+    - Intelligent prefetching based on access patterns
+    - Hierarchical synchronization to reduce global communication
+- Cost & energy management
+  - Cost optimization strategies
+    - Spot/preemptible instances with checkpoint recovery
+    - Mixed precision training (FP16/BF16) and inference (INT8/INT4)
+    - Kernel fusions and operator optimization for throughput gains
+    - Attention mechanisms sparsity to reduce computation
+  - Sustainability considerations
+    - Power consumption monitoring and capping
+    - Cooling efficiency optimization
+    - HW utilization targets to justify environmental impact
+    - Carbon-aware scheduling for training workloads
+- Reliability & observability gaps
+  - Training reliability
+  - Drift detection
+  - End-to-end tracing
+  - Safety monitoring
+- Data, privacy & governance
+  - Data quality at scale
+  - Privacy workflows
+  - Compliance & lineage
+  - Safety evaluation
+- Serving at scale
+  - Performance balancing
+  - Multi-tenant operations
+  - Caching architecture
+  - Deployment control
+- Best-in-class LLM infrastructure
+  - Unified platform
+  - Composable optimization
+  - Robust CI/CD pipeline
+  - Cost-aware experimentation
+
 ### 172. 170. Memory and Storage Needs of LLMs
+- Why memory & storage are critical
+  - Billions-trillions of parameters
+  - Training stores parameters + optimizer states + activations simultaneously
+  - Inference requires fast weight loading and context caching
+  - Checkpoint storage costs grow exponentially
+- Memory demands in training
+  - Parameter storage: 1 billion parameters consume 4GB in FP32, optimizer (Adam) adds 4x overhead (~16GB)
+  - Activation memory: forward pass activations often exceed parameter size during backpropagation. Gradient checkpoint trades compute for memory by recomputing activations
+  - Precision tradeoffs: mixed precision traininig (FP16/BF16) cuts memory footprint ~50%
+  - Overall, model weights ~25%, optimizer states ~35%, activations ~40% of memory
+- Storage demands in training
+  - Dataset storage: Petabyte-scale datasets
+  - Checkpoint volume: 1-10TB per training run
+  - Tiered architecture: NVMEe for hot data + object store for checkpoints + cold storage for archives
+- Inference time memory needs
+  - Weight loading
+  - KV-Cache Growth: In transformers, Key-Value Cache for attention grows linearly with sequence length
+  - Optimization techniques: batch inference amortizes memory usage
+- Storage for model lifecycle
+  - Training
+  - Fine-tuning
+  - Archiving
+  - Deployment
+- Optimization strategies
+  - Distributed training optimizations
+    - Parameter sharding: distributes model across GPUs
+    - Activation offloading: moves tensors to CPU/NVMe when not needed
+    - Gradient accumulation: reduces optimizer state memory pressure
+  - Storage optimizations  
+    - Compression & deduplication
+    - Differential checkpoints: store only parameter changes
+    - Checkpoint pruning: removes intermediate saves systematically
+
 ### 173. 171. Vector Databases – FAISS, Pinecone, Weaviate
+- Why vector databases?
+  - Semantic search
+  - Vector operations: high dimensional numeric vectors
+  - Similarity metrics
+- Key features of vector databases
+  - ANN indexing: Approximate Nearest Neighbor algorithms make billion scale vector search practical
+  - Massive scale: Billions of embeddings while maintaining sub-second query response times
+  - Metadata filtering: combine vector similarity with traditional filters (date ranges, categories, keywords)
+  - Framework integration: Langchain, Llamaindex, and other LLM framekwork
+- FAISS
+  - Facebook AI Similarity Search
+  - Optimized for both CPU & GPU vector operations
+  - Supports multiple index types
+  - Excellent for research and prototyping
+  - May not scale well
+- Pinecone
+  - Fully managed cloud service
+  - Enterprise-grade features
+  - Advanced search capabilities
+- Weaviate 
+  - Built-in ML modules
+  - GraphQL + REST API
+  - Hybrid deployment options: self-hosted or Weaviate cloud service for managed infrastructure
+- AI/ML use cases
+  - RAG chatbots: retrieve relevant documents
+  - Multimodal search: CLIP embeddings enable searching images with text queries or finding similar images
+  - Recommendation systems
+  - Anomaly detection: embedding sequences in time series and finding outliers
+- Best practices
+  - Choose the right index
+    - Flat index: 100% accuracy, slower searches
+    - HNSW: high accuracy, fast, memory-intensive
+    - IVF: scalable, moderate accuracy, best for huge datasets
+  - Version your embeddings
+  - Monitor quality metrics
+  - Keep vectors normalized
+
 ### 174. 172. RAG (Retrieval-Augmented Generation) Pipelines
+- Why RAG?
+  - Limited context
+  - Knowledge cutoff
+  - Fresh information: RAG injects fresh, domain-specific info when needed
+  - Reduced hallucinations
+- Core RAG workflow
+  - User query: convert user's query into an embedding vector representation
+  - Vector DB search: find semantically relevant document
+  - Context assembly: select and organize top-k results to fit within context window
+  - LLM Generation
+- Key components
+  - Embedding model: OpenAI, BERT, CLIP
+  - Vector database: FAISS, Pinecone, Weaviate
+  - Retriever
+  - LLM
+- AI/ML use cases
+  - Enterprise knowledge assistants
+  - Proprietary document chatbots
+  - Scientific research assistants
+  - Multimodal RAG: combinations of text, images, audio, and other data types
+- Infrastructure challenges
+  - Scale
+  - Relevance
+  - Latency
+  - Freshness
+- Best practices
+  - Chunking strategy: meaningful chunks of 500-1000 tokens
+  - Hybrid retrieval: combine semantic (embedding-based) and keyword (BM25) search for better coverage
+  - Metrics monitoring; track relevance scores, recall rates, and hallucination frequencies
+  - Performance optimization: Cache frequent queries/results
+
 ### 175. 173. Caching Strategies for LLMs
+- Why caching matters
+  - LLM inference is expensive and slow
+  - Caching provides:
+    - Eliminating redundant compute operations
+    - Improving latency and throughput
+    - Reducing operational costs by 30-70% in high-volume applications
+- Types of caching strategies for LLMs
+  - Prompt/response cache: stores complete query/answer pairs for exact matching
+  - Embedding cache: reuses vector representations for repeated documents/queries
+  - KV-Cache: preserves attention key-value states b/w inference steps
+  - Retrieval cache: stores RAG search results for frequent queries
+- Prompt/response caching
+  - For frequently repeated queries
+  - Hash the entire query +  model parameters as cache key
+  - Store full model responses as cache values
+  - Implement fuzzy matching for near-duplicate detection
+  - Set appropriate TTL based on content freshness needs
+  - Ex: customer support bots handling FAQs
+- KV-cache in transformers
+  - Technical benefits
+    - Reduces inference complexity from N^2 to N
+    - Cuts per-token generation time by 30-50%
+    - Essential for long-context inference (8k+ tokens)
+    - Enables real-time chat applications at scale
+  - Implementation challenges
+    - Memory footprint grows linearly with context length
+    - Requires GPU memory management strategy
+    - Must balance b/w sequence batching and cache size
+    - Pruning techniques needed for ultra-long contexts
+- Infrastructure considerations
+  - Cache store options
+    - Reids
+    - Memcached
+    - In-GPU memory
+    - Hybrid approaches: tiered caching
+  - Eviction policies
+    - LRU: Removes least recently used entries
+    - LFU: prioritizes frequently accessed items
+    - TTL-based: expires entries after set druation
+    - Size-based: caps memory usage with watermarks
+  - Consistency management
+    - Model versioning in cache keys
+    - Flush strategy on model updates
+    - Canary deployments with cache warning
+    - Monitoring for stale response detection
+- AI/ML use cases
+  - Customer service chatbots
+  - Search & RAG applications
+  - Multi-turn dialogue systems
+  - Content moderation  
+- Best practices
+  - Implementation guidelines
+    - Cache selectively
+    - Monitor hit/miss ratios
+    - Implement cache warming
+    - Version cache keys
+  - Optimization strategies
+    - Semantic deduplication
+    - Adaptive TTL
+    - Partial result caching
+    - Probabilistic caching
+
 ### 176. 174. Serving LLMs in Production
+- Why serving is challenging
+  - Size constraints
+  - Performance demands
+  - Traffic unpredicatability
+  - Resource efficiency: multi-tenant, cost-aware infrastructure
+- Core serving architecture
+  - Frontend API
+  - Inference Engine
+  - Caching layer
+  - Orchestration
+  - Observability
+- Model deployment options
+  - Single-node serving: simple deployment, limited scale
+    - FastAPI
+    - Limited by a single GPU memory
+    - Suitable for smaller models
+  - Distributed serving: shareded models across GPUs/nodes
+    - Tensor parallelism across multiple GPUs
+    - Supports larger models (70B+)
+    - Higher operational complexity
+  - Serverless APIs: on-demand, cost-efficient, higher latency
+    - Pay-per-token pricing model
+    - Cold start penalties
+    - No infrastructure management
+- Performance optimization
+  - KV-Cache reuse
+  - Request batching
+  - Quantization & pruning
+  - Memory pinning
+- Observability & monitoring
+  - Performance metrics: p50, p95, p99, throughput, error rates
+  - Resource utilization
+  - Distributed tracing
+  - Proactive alerting
+- Security & governance
+  - API protection
+  - Data security
+  - Compliance
+  - Access control
+
 ### 177. 175. Lab – Deploy a Simple RAG Pipeline
-2min
+- Learning Goals
+  - Build a retrieval-augmented generation pipeline end-to-end
+  - Index documents as embeddings with FAISS
+  - Retrieve relevant chunks at query time
+  - Pass them into an LLM via API
+  - Serve the pipeline through FastAPI for real-time usage
+```
+0) Prerequisites
+
+    Python 3.9+
+
+    An LLM API key (OpenAI, Anthropic, etc.)
+
+    Install dependencies:
+
+    mkdir rag-lab && cd rag-lab
+    python -m venv .venv
+    source .venv/bin/activate   # Windows: .venv\Scripts\activate
+    pip install faiss-cpu openai fastapi uvicorn tiktoken pydantic
+
+1) Prepare Sample Documents
+
+Create docs/ folder and add a few .txt files. Example:
+
+    ai_infra.txt
+
+    etl_vs_elt.txt
+
+    kafka_streaming.txt
+
+Each file should have ~3–5 paragraphs.
+2) Create Embedding + Indexing Script
+
+File: build_index.py
+
+    import os, faiss, pickle, glob
+    from openai import OpenAI
+    import tiktoken
+     
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    EMBED_MODEL = "text-embedding-3-small"
+     
+    def embed(texts):
+        res = client.embeddings.create(model=EMBED_MODEL, input=texts)
+        return [d.embedding for d in res.data]
+     
+    def chunk_text(text, size=500, overlap=50):
+        enc = tiktoken.get_encoding("cl100k_base")
+        tokens = enc.encode(text)
+        chunks = []
+        for i in range(0, len(tokens), size - overlap):
+            sub = enc.decode(tokens[i:i+size])
+            chunks.append(sub)
+        return chunks
+     
+    docs, metadatas = [], []
+    for file in glob.glob("docs/*.txt"):
+        with open(file) as f:
+            text = f.read()
+        chunks = chunk_text(text)
+        docs.extend(chunks)
+        metadatas.extend([{"source": file}] * len(chunks))
+     
+    embeds = embed(docs)
+     
+    dim = len(embeds[0])
+    index = faiss.IndexFlatL2(dim)
+    index.add(np.array(embeds).astype("float32"))
+     
+    with open("faiss_index.pkl", "wb") as f:
+        pickle.dump((index, docs, metadatas), f)
+    print("Index built with", len(docs), "chunks")
+
+Run:
+
+    python build_index.py
+
+3) Create RAG Query Function
+
+File: rag.py
+
+    import os, pickle, faiss, numpy as np
+    from openai import OpenAI
+     
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    EMBED_MODEL = "text-embedding-3-small"
+    LLM_MODEL = "gpt-4o-mini"  # adjust if needed
+     
+    with open("faiss_index.pkl", "rb") as f:
+        index, docs, metadatas = pickle.load(f)
+     
+    def embed(query):
+        res = client.embeddings.create(model=EMBED_MODEL, input=[query])
+        return np.array(res.data[0].embedding).astype("float32").reshape(1, -1)
+     
+    def retrieve(query, k=3):
+        qvec = embed(query)
+        D, I = index.search(qvec, k)
+        results = [docs[i] for i in I[0]]
+        return results
+     
+    def rag_answer(query):
+        contexts = retrieve(query, k=3)
+        prompt = f"Answer based on context:\n{contexts}\n\nQuestion: {query}\nAnswer:"
+        res = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return res.choices[0].message.content
+
+Test in REPL:
+
+    from rag import rag_answer
+    print(rag_answer("What’s the difference between ETL and ELT?"))
+
+4) Deploy with FastAPI
+
+File: server.py
+
+    from fastapi import FastAPI
+    from pydantic import BaseModel
+    from rag import rag_answer
+     
+    app = FastAPI()
+     
+    class Query(BaseModel):
+        question: str
+     
+    @app.post("/ask")
+    def ask(q: Query):
+        answer = rag_answer(q.question)
+        return {"question": q.question, "answer": answer}
+
+Run server:
+
+    uvicorn server:app --reload --port 8000
+
+5) Test the API
+
+    curl -X POST http://127.0.0.1:8000/ask \
+         -H "Content-Type: application/json" \
+         -d '{"question":"Explain Kafka streaming for AI systems"}'
+
+Response:
+
+    {
+      "question": "Explain Kafka streaming for AI systems",
+      "answer": "Kafka enables real-time data ingestion..."
+    }
+
+6) Observability + Improvements
+
+    Log queries & cache responses in SQLite/Redis
+
+    Add a /health endpoint for monitoring
+
+    Add a prompt/response cache to cut cost
+
+    Deploy on cloud (Render, AWS ECS, GCP Cloud Run)
+
+7) Stretch Goals
+
+    Replace FAISS with Pinecone or Weaviate
+
+    Add hybrid retrieval (keyword + vector search)
+
+    Add auth (API keys) for multi-tenant serving
+
+    Containerize with Dockerfile → deploy in Kubernetes
+
+✅ Outcome: You now have a working RAG API serving answers from your own documents using embeddings + vector DB + LLM.
+```
+
+## Section 27: Week 26: Generative AI Infrastructure - Advanced
 
 ### 178. 176. DeepSpeed and ZeRO Optimization for LLMs
+- Train bigger models faster & cheaper
+- Why DeepSpeed?
+  - Memory constraints
+  - Communication bottlenecks
+  - Storage explosion
+- ZeRO: core idea
+  - Zero Redundancy Optimizer
+  - Instead of data parallelism, partitions:
+    - Optimizer states
+    - Gradients
+    - Parameters
+- ZeRO stages:
+  - Stage 0: Baseline DDP - standard distributed data parallel with no sharding. Full model replica on each GPU
+  - Stage 1: shared optimizer states - distributes Adam optimizer states across GPUs, saving ~4x memory for these tensors
+  - Stage 2: Shard gradients - additionally partitions gradients, eliminating their redundancy during backpropagation
+  - Stage 3: Shard parameters - full sharding. Distributes model parameters across GPUs, enabling training of massive models
+- Offloading variants
+  - ZeRO-offload
+    - Moves optimizer states and gradients to CPU RAM
+    - Reduces GPU memory pressure
+    - PCIe transfer overhead
+  - ZeRO-Infinity
+    - Offloads model parameters and activations to CPU/NVMe
+    - Virtually unlimited model size
+    - Higher latency trade-off
+- Performance techniques
+  - Communication overlap
+  - Kernel fusion
+  - Gradient accumulation
+  - Activation checkpointing
+- DeepSpeed vs FSDP
+  - DeepSpeed ZeRO-3
+    - Mature offloading capabilities to CPU/NVMe
+    - Advanced memory compression techniques
+    - Flexible training schedulers and optimizers
+    - Microsoft-supported, dedicated project
+    - Custom communicatino backend
+  - PyTorch FSDP
+    - Native PyTorch API
+    - Stornger ecosystem compatibility
+    - Similar setup within PyTorch workflows
+    - PyTorch's native communication
+- Practical tuning tips
+  - Progressive implementation
+  - Measure Key Metrics
+  - Tune communication parameters
+  - Optimize offloading
+- Failure modes & debugging
+  - OOM erros despite ZeRO
+    - Reduce micro-batch size
+    - Increase ZeRO stage (1 -> 2 -> 3)
+    - Enable offloading or activation checkpointing
+    - Check memory leaks in custom code
+  - Slow CPU/NVMe offloading
+    - Verify PCIe bandwidth and utilization
+    - Check disk IO performance and queue depth
+    - Enable pinned memory for CPU transfers
+    - Increase compute/communication overlap
+  - Communication issues
+    - Chjeck NCCL debug logs
+    - Verify infiniband configuration
+    - Monitor network bandwidth utilization
+    - Test with smaller bucket sizes
+  - Training instability
+    - Review loss scaling approach
+    - Try BF16 instead of FP16 if available
+    - Check for NaN/Inf values in gradients
+    - Implement gradient clipping
+- When to use what
+  - < 10B parameters
+    - ZeRO-2/3 + BF16
+    - Minimal offloading
+    - Focus on throughput optimization
+  - > 20B parameters
+    - ZeRO-3 with aggressive offloading
+    - Consider NVMe extension
+    - Balance throughput vs capacity trade-offs
+  - Long context models
+    - Aggressive activation checkpointing
+    - Implement KV-cache optimization techniques
+    - Selective attention patterns
+  - Multi-tenant clusters
+    - Prioritize elasticity and job recovery
+    - Optimize communication overlap
+    - Implement checkpoint/resume strategies
+  
 ### 179. 177. Megatron-LM for Large Model Training
+- Why Megatron-LM?
+  - Standard DDP + ZeRO can't scale alone for truly enormous models
+  - Megatron-LM pioneered tensor + pipeline parallelism for extreme scale
+- Core parallelism approaches
+  - Data parallelism
+  - Tensor parallelism: split individual weight matrics across GPUs
+  - Pipeline parallelism: split model layers sequentially across different devices or nodes
+- Tensor parallelism
+  - Split large matrix multiplications across multiple GPUs
+  - Requires high-speed interconnect
+- Pipeline parallelism
+  - Divide layers
+  - Micro batching: schedule small batches to keep all GPUs busy
+  - Bubble overhead: manage idle stages at pipeline start/end
+- 3D parallelism in Megatron-LM
+  - Maximum scale: DP + TP + PP for training models with 100B-1T parameters
+  - Topology aware
+  - Industry proven: GPT-3, MT-NLG, BLOOM
+- Key features of Megatron-LM
+  - Optimized CUDA kernels
+  - Fused operations
+  - Activation checkpointing
+  - DeepSpeed integration: works with ZeRO optimizer and CPU/NVMe offloading
+- Infrastructure requirements
+  - HW
+    - Multinode GPU clusters with infiniband
+    - High GPU memory capacity
+    - Fast storage for massive checkpoints
+  - SW stack
+    - Mixed precision (FP16/BF16)
+    - NCCL 
+    - CUDA 11.0+ with cuDNN
+  - Orchestration
+    - Slurm for HPC environment
+    - K8 for cloud deployment
+    - Ray for flexible research workflows
+- Practical challenges
+  - Communication bottleneck
+  - Debugging complexity
+  - Pipeline efficiency
+  - Parameter tuning
+- Best practices
+  - Match parallelism to HW
+  - Balance pipeline stages
+  - Optimize memory usage
+  - Focus on right metrics
+
 ### 180. 178. Flash Attention and Memory Optimizations
+- Why optimize attention?
+  - Standard attention mechanisms face significant scaling challenges
+  - N^2 compute + memory complexity
+  - Long sequences create a quadratic explosion in resource requirements
+  - Attention activations dominate GPU memory usage during training
+- Flash attention
+  - Optimized CUDA kernel (kernel fusion)
+  - Fused operations: avoids large attention matrices by combining operations
+  - Chunk-based computation: smaller memory blocks (tiling)
+    - 
+  - Mathematically exact
+- Benefits of Flash Attention
+  - 2-4x speed up
+  - 50-70% memory reduction
+  - 8k-32k token context
+  - Available in:
+    - PyTorch core
+    - Hugging Face Transformers
+    - Nvidia Megatron-LM
+    - Google JAX/Flax
+    - Meta's Fairseq
+- Memory optimization techniques
+  - Activation checkpointing
+  - Gradient accumulation
+  - Mixed precision
+  - Parameter sharding
+- Inference time optimizations
+  - KV-cache
+  - Quantization
+  - Paged attention (vLLM)  
+  - GPU memory pinning
+- Real world impact
+  - Advanced model training
+  - Responsive chatbots
+  - Smaller infrastructure
+  - Cost reduction
+- Best practices
+  - Enable Flash Attention by default
+  - Layer optimizations
+  - Profile before scaling
+  - Monitor throughput: focus on tokens/sec, not FLOPS, as memory bandwidth often limits performance
+
 ### 181. 179. Multi-Node Distributed Training for LLMs
+- Why multi-node trainig?
+  - Training requires hundreds to thousands of GPUs 
+- Core parallelism dimensions
+  - Data parallelism
+  - Model parallelism: tensor/pipeline parallelism
+  - 3D parallelism + Hybrid: DP+TP+PP and ZeRO/FSDP
+- Communication backbone
+  - NCCL
+  - HW interconnects
+  - Hierarchical communication
+  - Fault tolerance
+- Orchestration and scheduling
+  - HPC environment: Slurm
+  - Cloud deployment: K8 + Ray, dynamic cluster management
+- Challenges in multi-node training
+  - Stragglers: slow nodes bottleneck synchronous training
+  - Network bottlenecks
+  - Storage demands
+  - Debugging complexity
+- Optimization strategies
+  - Computation optimization
+    - Mixed precision
+    - Gradient compression using quantization and sparsification
+  - Communication optimization
+    - Overlap gradient communication with backward pass computation
+    - Map pipeline parallelism to physical network topology
+    - Dynamic GPU allocation for elasticity during training
+- Real world examples
+  - GPT-3: 175B parameters on 1,024 V100 GPUs
+  - BLOOM: 176B parameters on 384 A100 GPUs
+- Best practices
+  - Performance metrics
+  - Scaling strategy
+  - Monitoring & debugging
+  - Automation
+
 ### 182. 180. Fine-Tuning vs Parameter-Efficient Tuning
+- Why tuning matters
+  - General-purpose foundation
+  - Domains sepcialization
+  - Resource constraints
+- Full fine-tuning
+  - Update all parameters
+  - Advantages
+    - Maximum flexibility
+    - Highest potential accuracy/performance
+    - Full control over model behavior  
+  - Limitations
+    - Requires enormous compute resource
+    - High storage costs
+    - Needs substantial training data
+    - Deployment challenges for multiple versions
+- Parameter-EFficient Tuning (PEFT)
+  - Selective updates: only tune a small subset of paramters (0.1-3%)
+  - Lightweight deltas: stores small weight changes on top of frozen base model
+  - Multi-task efficiency
+  - Key PEFT methods
+    - LoRA: injects trainable low-rank matrices into attention layers
+    - Adapters: adds small bottleneck layers b/w transformer blocks
+    - Prefix/Prompt tuning: learns continuous prompt embeddings that are prepended to inputs
+    - P-tuning & BitFit: tunes only bias terms in mokdel weights
+- PEFT advantages
+  - 10-100x cheaper training costs
+  - 10-1000x smaller storage
+  - Faster training cycles
+  - Simpler deployment
+- Use cases
+  - Domain adaptation
+  - On-device personalization
+  - Multilingual fine-tuning
+  - Rapid prototyping
+- Best practices  
+  - Start with PEFT
+  - Track trade-offs
+  - Hybrid approaches: combine PEFT with quantization for edge deployment
+
 ### 183. 181. Cost Challenges of Generative AI Training
+- Balancing scale, performance, and economics
+- Why costs explode
+  - Scale issues: billions-trillions of parameters
+  - HW demands: thousands of GPUs
+  - Hidden expenses: storage + bandwidth, energy & cooling
+- Key cost drivers
+  - Compute: GPU/TPU
+  - Data: collecting, cleaning, and storing petabyte 
+  - Networking: high-bandwidth interconnects
+  - Storage
+  - Energy: power + cooling
+- Hidden & indirect costs
+  - Experimentation overhead: failed runs, hyperparameter tuning, instabilities, bugs
+  - Idle capacity
+  - Engineering time
+  - Cloud egress fees  
+- Optimization levers
+  - Mixed precision (FP16/BF16)
+  - ZeRO/FSDP sharding
+  - Flash attention & fused kernels
+  - Gradient accumulation & scheduling
+- Cost-aware strategies
+  - Spot/preemptible GPU usage
+  - Elastic training
+  - Checkpoint optimization
+  - Model distillation
+- Business trade-offs
+  - Size vs efficiency
+  - Build vs adapt
+  - ROI calculation
+  - Total cost of ownership
+
 ### 184. 182. Lab – Fine-Tune a Small LLM with PEFT
-1min
+- Learning Goals
+  - Understand parameter-efficient fine-tuning (PEFT)
+  - Apply LoRA adapters to a small LLM
+  - Train on a sample dataset with minimal compute
+  - Evaluate and generate text from the fine-tuned model
+```
+0) Prerequisites
+
+    Python 3.9+
+
+    GPU recommended (Colab, Kaggle, or local CUDA)
+
+    Install dependencies:
+
+    mkdir peft-lab && cd peft-lab
+    python -m venv .venv
+    source .venv/bin/activate   # Windows: .venv\Scripts\activate
+    pip install torch transformers datasets peft accelerate bitsandbytes
+
+1) Load a Base Model
+
+We’ll use DistilGPT-2 (tiny, fast to train).
+
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+     
+    MODEL_NAME = "distilgpt2"
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+
+2) Load a Toy Dataset
+
+We’ll use a subset of the SST2 (sentiment) dataset for demonstration.
+
+    from datasets import load_dataset
+     
+    dataset = load_dataset("sst2")
+    train_texts = [f"Review: {x['sentence']} Sentiment: {x['label']}" for x in dataset['train'][:2000]]
+
+Tokenize:
+
+    def tokenize(batch):
+        return tokenizer(batch["text"], padding="max_length", truncation=True, max_length=64)
+     
+    dataset = dataset["train"].select(range(2000)).map(lambda x: {"text": f"Review: {x['sentence']} Sentiment: {x['label']}"})
+    tokenized = dataset.map(lambda x: tokenizer(x["text"], truncation=True, padding="max_length", max_length=64), batched=True)
+    tokenized.set_format(type="torch", columns=["input_ids", "attention_mask"])
+
+3) Apply LoRA with PEFT
+
+    from peft import LoraConfig, get_peft_model, TaskType
+     
+    lora_config = LoraConfig(
+        task_type=TaskType.CAUSAL_LM, 
+        r=8,               # rank
+        lora_alpha=16,     # scaling
+        lora_dropout=0.1
+    )
+     
+    model = get_peft_model(model, lora_config)
+    model.print_trainable_parameters()
+
+👉 Only a few million params will be trainable.
+4) Training Setup
+
+    from transformers import Trainer, TrainingArguments
+     
+    training_args = TrainingArguments(
+        output_dir="outputs",
+        per_device_train_batch_size=8,
+        num_train_epochs=2,
+        logging_steps=10,
+        save_strategy="epoch",
+        evaluation_strategy="no",
+        learning_rate=2e-4,
+        fp16=True
+    )
+     
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized,
+        tokenizer=tokenizer
+    )
+
+5) Train the Model
+
+    trainer.train()
+
+Watch logs → you should see loss decreasing. Training should finish in minutes on GPU.
+6) Generate with the Fine-Tuned Model
+
+    prompt = "Review: The movie was exciting and"
+    inputs = tokenizer(prompt, return_tensors="pt")
+    outputs = model.generate(**inputs, max_length=50)
+    print(tokenizer.decode(outputs[0], skip_special_tokens=True))
+
+You should see the model generate text with sentiment-flavored completions.
+7) Save & Reload Adapters
+
+    model.save_pretrained("lora-finetuned")
+    tokenizer.save_pretrained("lora-finetuned")
+
+Reload with:
+
+    from peft import PeftModel
+    base_model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+    lora_model = PeftModel.from_pretrained(base_model, "lora-finetuned")
+
+8) Stretch Goals
+
+    Try different datasets (e.g., IMDB reviews, dialogue data)
+
+    Swap to a larger model (e.g., gpt2, facebook/opt-1.3b)
+
+    Experiment with other PEFT methods (prefix tuning, adapters)
+
+    Deploy with FastAPI (like in Lab 175 RAG)
+
+✅ Outcome: You fine-tuned a small GPT model with LoRA adapters → faster, cheaper, and lightweight vs full fine-tuning.
+```
+
+## Section 28: Week 27: Infrastructure for Computer Vision at Scale
 
 ### 185. 183. Image and Video Data Challenges in AI Infra
+- Why vision data is hard
+  - Scale issues: massive volumes from frame/sec $\times$ devices
+  - Format complexity
+  - Label challenges
+  - Edge constraints: strict latency + bandwidth limitations b/w edge and cloud
+- Data ingestion and stroage architecture
+  - High-throughput ingest
+  - Tiered storage
+  - Metadata indexing: chunk and index by time, camera ID, and scene for efficient retrieval
+  - Granula access
+- Compression, codecs, and formats
+  - Critical trade-offs
+    - Bitrate vs visual quality vs CPU/GPU decode cost
+    - Higher compression == more compute
+    - 10x storage difference b/w raw and compressed
+  - HW acceleration
+    - Leverage NVDEC(Nvidia) and VAAPI (Intel) for decode
+    - Dedicated decode engines free compute resource
+    - 4-10x performance gain vs SW decode
+  - Format standardization
+    - H.264/H.265/AV1 when available
+    - Store codec metadata for optimized processing
+    - Track keyframe indices for random access
+- Labeling & curation challenges
+  - Active learning loops: prioritize uncertain/hard samples for human reviews
+  - Bootstrapped labeling: Use weak/auto labels initially with human-in-the-loop QA to scale annotation effect
+  - De-duplication
+  - Bias mitigation
+- Feature & dataset management
+  - Version control
+  - Augmentation tracking
+  - Embedding precomputation
+  - Compliance metadata
+- Training Pipeline Bottlenecks
+  - IO optimization
+  - Dataloader engineering: async dataloader with prefetching; cache preprocessed shards
+  - Precision & accumulation: mixed precision training
+  - Distributed strategies
+- Serving & latency constraints
+  - Real-time processing: end-to-end latency under 100ms
+  - Batching strategies: Maximize throughput
+  - Tracking optimization
+  - Edge processing
+- Edge-to-cloud architectures
+  - Edge processing
+    - Capture raw video streams
+    - Lightweight filtering
+    - GEnerate event triggers for relevant content
+    - Buffer important segments locally
+  - Transport layer
+    - Use message buses (Kafka/MQTT) for event transport
+    - Implement reliable delivery with at-least-once semantics
+      - Data durabilty over uniqueness
+    - Synchronize clocks via PTP/NTP for multicamera analytics
+  - Cloud processing
+    - Run computationally intensive models
+    - Perform multi-camera correlation and analysis
+    - Manage long-term storage and archiving
+    - Enable historical analysis and model training
+- Security and compliance
+  - Data protection: TLS for streams, KMS for storage encryption
+  - Privacy preservation: on-device blurring, consent tracking
+  - Access controls: role-based access, tamper-proof logs
+  - Regional compliance: GDPR, CCPA
+
 ### 186. 184. Training Pipelines for CV Models
+- Why pipelines matter
+  - Repeatable automated flows
+  - End-do-end management: preprocessing, augmentation, training, and comprehensive logging
+  - Production scalability
+- Data preparation stage
+  - Ingest: from cloud, edge, or archives
+  - Normalize: resize, color space, channels
+  - Validate: missing/corrupted files
+  - Privacy: Face/plate blurring when needed
+- Augmentation & enrichment
+  - Geometric transforms: flip, rotate, crop, scale
+  - Photometric transforms: brightness, constrast, saturation
+  - Noise & degradation: noise, blur, cutout
+  - Policy-driven approaches
+- Feature & label management
+  - Consistency is critical
+    - Maintain uniform class labels across dataset versions
+    - Track dataset splits with metadata
+    - Document annotation
+  - Optimization opportunities
+    - Precompute embeddings for similarity checks
+    - Imlpement feature stores for embedding reuse
+    - Cache processed data to improve training startup time
+- Model training stage
+  - Transfer learning: pretrained CNNs/Vision transformers
+  - Optimization: mixed precision
+  - Distribution: GPUs with DDP/FSDP for larger models
+  - Logging: MLflow, W&B, or ClearML
+- Validation & monitoring
+  - Performance metrics: accuracy, precision, recall, mAP
+  - Data drfit detection: monitor for new classes
+  - Failure analysis
+  - Alert systems
+- Automation tools
+  - Kubeflow pipelines: containerized ML workflows
+  - Airflow/Prefect: scheduling and dependency management for preprocessing + training
+  - MLflow: experiment tracking, artifact storage, and model registry
+  - Weight & Biases
+- Best practices
+  - Version everything
+  - Measure what matters
+  - Optimize for deployment conditions, not just training accuracy
+
 ### 187. 185. EfficientNet and Model Scaling Tradeoffs
+- Fundamental tension in CV
+  - Bigger models: higher accuracy but significantly slower inference and more computational demands
+  - Smaller models: faster processing but risk underfitting on complex visual recognition tasks
+- EfficientNet's compound scaling appraoch
+  - Depth: more layers to capture complex features
+  - Width: more channels
+  - Resolution
+- The EfficientNet Family
+  - B0 (baseline): compact model (5.3M params)
+  - B1-B3 (Mid-range)
+  - B4-b7 (Large): high capacity model (66M params)
+- Scaling trade-offs in practice
+  - B0 to B3 may increase inference time by 2-5x
+  - B0 -> B7 may consume 10-15x more GPU RAM
+  - B5 -> B7 yields 2% accuracy gain while 4x more parameters
+  - B0 -> B7 may consume 8x more energy
+- Deployment scenarios
+  - Edge devices: EfficientNet-Lite, MobileNet, and int8-quantized models
+  - Real-time video analytics: B0-B2 (15-30fps)
+  - Cloud inference: B3-B5
+  - Research applications: B6-B7
+- Beyond EfficientNet: emerging scaling paradigms
+  - Vision transformers
+  - Neural Architecture Search
+  - Mixture of Experts (MoE)  
+  - ConvNeXt/RegNet
+- Implementation best practices
+  - Establish a baseline
+  - Profile key metrics
+  - Apply optimizations
+  - Match model to workload
+
 ### 188. 186. Serving Real-Time Video Inference
+- From camera streams to AI predictions in milliseconds
+- Why real-time matters
+  - Stream density: 30-60 fps
+  - Latency budget: ultra-low latency response of less than 100ms per frame
+- Core pipeline for video inference
+  - Capture
+  - Decode
+  - Preprocess
+  - Inference
+  - Postprocess
+- Performance challenges
+  - GPU saturation
+  - Bandwidth constraints
+  - Multi-camera synchronization
+  - Accuracy/speed tradeoffs
+- Infrastructure optimizations
+  - Frame batching
+  - Pipeline parallelism
+  - Inference optimization
+  - Edge preprocessing  
+- Scaling architectures
+  - Deployment models
+    - Single GPU edge
+    - Multi-stream servers
+    - Hybrid edge-cloud
+  - Use message brokers (Kafka, MQTT) for reliable and scalable distribution
+- Monitoring & reliability
+  - Performance metrics: FPS, latency
+  - Health monitoring
+  - Resiliency features
+- Use cases
+  - Smart cities
+  - Retail analytics
+  - Industrial safety
+  - Sports analytics
+  
 ### 189. 187. DeepStream SDK for Video Analytics
+- DeepStream
+  - Nvidia's SDK for video understanding applications at scale
+  - Real-time multi-stream
+  - Cross-platform
+  - GStreamer-based
+- DeepStream pipeline solution workflow
+  - Decode
+  - Preprocess
+  - Inference
+  - Postprocess
+  - Output
+- Core components
+  - nvinfer: supports TensorRT and ONNX models
+  - nvtracker: implements SORT and DeepSORT algorithms
+  - nvvideoconvert: formation conversion
+  - message broker: publishes metadata to Kafka, MQTT, and REST endpoints
+- Deployment scenarios
+  - Jetson Edge: self-contained AI at factories, retail stores, and hospitals
+  - Multi-stream server: hundreds of cameras in smart city deployments
+  - Cloud-hosted analytics
+  - Hybrid edge-cloud: edge inference + analytics at cloud
+- Integration ecosystem
+  - Model serving: Triton inference server
+  - Event streaming: Kafka, RabbitMq, and MQTT
+  - Data storage: Store metadata in RDBMS
+  - Monitoring: Grafana + Prometheus integration
+- Best practices
+  - Profile pipeline performance
+  - Optimize models with TensorRT
+  - Balance GPU workloads
+  - Implement batching strategies
+
 ### 190. 188. Edge-to-Cloud Video Processing
+- Why Edge-to-Cloud?
+  - Video streams generate massive data volumes
+  - Sending all raw frames to cloud is expensive and slow
+  - Edge processing cuts latency & saves bandwidth
+- Edge processing capabilities
+  - Real-time inference
+  - Pre-filtering
+  - On-device caching
+  - Privacy filters
+- Cloud processing capabilities
+  - Heavy compute processing
+  - Cross-camera correlation
+  - Long-term storage and replay
+  - System integration
+- Data flow architecture
+  - Capture
+  - Preprocess + infer
+  - Transport: Kafka, MQTT, REST
+  - Cloud  
+- Performance challenges
+  - Bandwidth bottlenecks
+  - Synchronization issues
+  - Edge model accuracy
+  - Cloud costs
+- Optimization strategies
+  - Intelligent compression
+  - Event-driven transmission: send only anomalies/events, not continuous streams
+  - Model cascading
+  - Distribution optimization: use CDN & regional cloud zones
+- Use cases
+  - Smart factories
+  - Retail analytics
+  - Transportation: traffic signal control
+  - Security
+- Best practices
+  - Event-driven architecture
+    - Threshold-based triggers
+    - Metadata-first approach
+  - Edge privacy protection
+  - Performance monitoring
+  - Hybrid deployement: autoscaling in cloud
+
 ### 191. 189. Lab – Deploy Real-Time Object Detection
-2min
+- Learning Goals
+  - Run a pretrained object detection model (YOLOv8)
+  - Perform inference on live video or webcam stream
+  - Deploy a FastAPI inference server for real-time detection
+  - Visualize detections with bounding boxes
+```
+0) Prerequisites
+
+    Python 3.9+
+
+    GPU recommended (CUDA device or Colab)
+
+    Install dependencies:
+
+    mkdir object-detection-lab && cd object-detection-lab
+    python -m venv .venv
+    source .venv/bin/activate   # Windows: .venv\Scripts\activate
+    pip install ultralytics fastapi uvicorn opencv-python-headless python-multipart
+
+1) Run YOLOv8 Locally (Quick Test)
+
+    from ultralytics import YOLO
+     
+    # Load pretrained COCO model
+    model = YOLO("yolov8n.pt")  # n = nano, fast & lightweight
+     
+    # Run inference on an image
+    results = model.predict("https://ultralytics.com/images/bus.jpg", show=True)
+     
+    for r in results:
+        print(r.boxes.xyxy)  # print bounding boxes
+
+✅ You should see a bus, people, and objects detected.
+2) Real-Time Webcam Detection
+
+File: webcam.py
+
+    import cv2
+    from ultralytics import YOLO
+     
+    model = YOLO("yolov8n.pt")
+    cap = cv2.VideoCapture(0)  # 0 = default webcam
+     
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        results = model(frame)
+        annotated = results[0].plot()
+        cv2.imshow("YOLOv8 Real-Time", annotated)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+     
+    cap.release()
+    cv2.destroyAllWindows()
+
+Run:
+
+    python webcam.py
+
+Press q to quit.
+3) Deploy FastAPI Inference Server
+
+File: server.py
+
+    from fastapi import FastAPI, UploadFile, File
+    from ultralytics import YOLO
+    import cv2
+    import numpy as np
+     
+    app = FastAPI()
+    model = YOLO("yolov8n.pt")
+     
+    @app.post("/detect/")
+    async def detect(file: UploadFile = File(...)):
+        contents = await file.read()
+        nparr = np.frombuffer(contents, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        results = model(img)
+        detections = []
+        for r in results:
+            for box in r.boxes:
+                detections.append({
+                    "class": model.names[int(box.cls)],
+                    "confidence": float(box.conf),
+                    "bbox": box.xyxy[0].tolist()
+                })
+        return {"detections": detections}
+
+Run server:
+
+    uvicorn server:app --reload --port 8000
+
+4) Test API with curl
+
+    curl -X POST "http://127.0.0.1:8000/detect/" \
+      -F "file=@bus.jpg"
+
+Output (sample):
+
+    {
+      "detections": [
+        {"class": "bus", "confidence": 0.89, "bbox": [34, 56, 280, 190]},
+        {"class": "person", "confidence": 0.77, "bbox": [310, 80, 400, 250]}
+      ]
+    }
+
+5) Optional – Streamlit UI for Easy Testing
+
+    pip install streamlit
+
+File: app.py
+
+    import streamlit as st
+    from ultralytics import YOLO
+    import cv2, numpy as np
+     
+    model = YOLO("yolov8n.pt")
+    st.title("Real-Time Object Detection")
+     
+    uploaded = st.file_uploader("Upload an image", type=["jpg","png","jpeg"])
+    if uploaded:
+        file_bytes = np.asarray(bytearray(uploaded.read()), dtype=np.uint8)
+        img = cv2.imdecode(file_bytes, 1)
+        results = model(img)
+        st.image(results[0].plot(), channels="BGR")
+
+Run:
+
+    streamlit run app.py
+
+6) Stretch Goals
+
+    Switch to YOLOv8m or YOLOv8l for higher accuracy
+
+    Connect FastAPI with Kafka/MQTT for edge → cloud video streams
+
+    Deploy with Triton Inference Server for GPU optimization
+
+    Quantize with INT8 to run on Jetson/edge devices
+
+✅ Outcome: You deployed a real-time object detection pipeline, accessible via webcam, API, or web UI.
+```
+
+## Section 29: Week 28: Infrastructure for NLP at Scale
 
 ### 192. 190. NLP Workloads: Tokenization, Embeddings, Transformers
+- Challenges to NLP process:
+  - Unicode variations and normalization challenges
+  - Inconsistent casing and formatting
+  - Special content like emojis and code blocks
+  - Throughput bottlenecks at tokenizationand batching stages
+- Tokenization basics
+  - Whitepsace/word tokenization
+  - Subword tokenization
+  - Out-of-Vocabulary handling
+- Practical tokenization tips
+  - Preprocessing
+  - Performance optimization
+  - Sequence management
+  - Versioning
+- Embeddings 101
+  - What are embeddings?
+    - Dense vector representations of text that capture semantic meaning
+    - Fixed dimension floating point vectors (128-1536)
+    - Measure similarity via cosine/dot product/L2
+    - Enable semantic matching beyond keyword search
+  - Use cases
+    - RAG
+    - Sematic search
+    - Clustering & deduplication
+    - Recommendation
+- Building embedding pipelines
+  - Optimize throughput
+  - Store & index: FAISS, Pinecone, Weaviate, store metadata alongside vectors for filtering
+  - Balance tradeoffs    
+- Transformers at a glance
+  - Encoder-only (BERT)
+    - Bidirectional context
+    - Classification and encoding
+    - Ex: sentiment, NER, embedding
+  - Decoder-only (GPT)
+    - Unidirectional (left-to-right)
+    - Text generation
+    - Ex: completion, chat, QA
+  - Encoder-decoer (T5)
+    - Full sequence transformation
+    - Sequence-to-sequence tasks
+    - Ex: translation, summarization
+- The attention mechanism
+  - Learning contextual relationship b/w words
+  - Capturing long-range dependencies in text
+  - Parallel processing of sequence elements
+  - Self-attention: N^2 complexity with sequence length
+- Throughput & latency levers
+  - Sequence length
+  - Optimization techniques: Flash attention, mixed precision
+  - Efficent batching: dynamic batching +  KV-cache
+  - Quantization: INT8/INT4 for edge deployment
+- Quality and evaluation
+  - Classification metrics
+    - Accuracy, precision, recall
+    - F1 score
+    - ROC-AUC
+    - Confusion matrix
+  - Generation metrics
+    - BLEU, ROUGE (n-gram overlap)
+    - METEOR (synonym matching)
+    - BERTScore (semantic similarity)
+    - Perplexity (prediction confidence)
+  - Retrieval metrics
+    - Recall@k (found relevant items)
+    - Mean Reciprocal Rank (MRR)
+    - Normalized Discounted Cumulative Gain (nDCG)
+    - Latency-at-percentile (p95,p99)
+  - Human evaluation
+    - Factual accuracy and hallucination detection
+    - Safety and bias assessment
+    - Writing style and tone appropriateness
+    - Overall usefulness for intended application
+- Best practices
+  - Version management
+  - Monitoring
+  - Guardrails: profanity filters and PII detection
+
 ### 193. 191. Training Large Transformer Models
+- Why transformers dominate
+  - Long-range dependencies
+  - Strong generalization
+  - Cross-domain adaptability
+- Training challenges
+  - Model size: billions of params exceed a single GPU memory
+  - Compute requirements
+  - Data scale: petabyte scale datasets
+  - Training duration
+- Core training techniques
+  - Data parallelism
+  - Model/tensor parallelism
+  - Pipeline parallelism
+  - 3D parallelism: DP+TP+PP (MegaTron-LM, DeepSpeed, Alpa)
+- Memory optimization
+  - Mixed precision
+  - Gradient checkpointing
+  - ZeRO/FSDP
+  - CPU/NVMe offloading
+- Efficiency boosters
+  - Flash attention
+  - Fused operations
+  - Gradient accumulation
+  - Elastic scaling
+- Data pipeline requirements
+  - High-performance tokenization
+  - Streaming architecture
+  - Data quality processing
+  - Batch construction
+- Checkpointing & fault tolerance
+  - Comprehensive state saving
+  - Sharded checkpoint IO
+  - Asynchronous operations
+  - Validation and redundancy
+- Evaluation during training
+  - Perplexity tracking
+  - Benchmark evaluation
+  - Scaling law analysis
+- Infrastructure needs
+  - HW requirements
+    - Multi GPU servers
+    - 200-400 Gbps infiniband/RoCE
+    - High-bandwidth NVMe storage
+    - Specialized cooling systems
+  - Orchestration & monitoring
+    - Job scheduler
+    - Distributed training framework
+    - Real-time metrics: tokens/sec, GPU utilization, memory usage
+    - Cost tracking: $/epoch
+- Best practices
+  - Start small, scale gradually
+  - Comprehensive logging
+  - Automated recovery
+  - Realistic resource planning
+
 ### 194. 192. Infrastructure for BERT and GPT
+- BERT: pioneered bidirectional pretraining
+- GPT: popularized autoregressive generation for text completion
+- BERT infrastructure needs
+  - Encoder-only training
+  - Data scale
+  - Downstream tasks
+  - Serving requirements: need fast embedding serving, latency sensitive, not compute intensive
+- GPT infrastructure needs
+  - Decoder-only architecture
+  - Memory challenges: long-sequence training introduces N^2 memory costs
+  - Inference optimization: 
+  - Application focus
+  - Cache-heavy infrastructure is required
+- Training pipelines
+  - Distributed parallelism
+  - Precision optimization
+  - Memory management
+  - Observabilty
+- Data engineering for transformers
+  - Tokenization
+  - Data cleaning
+  - Versioning
+  - IO optimization
+- Serving BERT models
+  - BERT models typically power latency-sensitive embedding generatin for search, recommendation, and classification systems
+  - Optimization techniques
+    - Deploy via ONNX or TensorRT for 3-5x speedup
+    - INT8 quantization for 2-4x throughput improvement
+    - Batch queries intelligently for higher GPU utilization
+  - Deployement architecture
+    - Scale with k8 + HPA based on GPU utilization
+    - Implement embedding cache for frequent queries
+    - Monitor latency p50/p95/p99 as critical SLIs
+- Serving GPT models
+  - GPT inference requires low-latency for interactive chat
+  - KV-cache management
+  - Request optimization
+  - Deployment options
+  - Continuous batching
+- Best practices
+  - BERT optimization: apply distillation + quantization to reduce size by 75% + while maintaining 95%+ of accuracy
+  - GPT optimization: implement PEFT (LoRA, P-Tuning) for 99% parameter reduction during fine-tuning
+  - Production monitoring: monitor embedding drift and generation quality with automated evaluation pipelines
+
 ### 195. 193. Efficient Serving of Embedding Models
+- Embeddings are the foundation of modern AI
+  - RAG, semantic search, and recommendation systems
+  - FAce demanding workloads with high QPS + low-latency requirements
+  - Balance from throughput, latency and memory usage
+- Core challenges in embedding serving
+  - High dimensionality: thousands of dimensions create significant memory pressure and computational demands
+  - Tokenization overhead: expensive tokenizations cause a CPU bottleneck at scale
+  - Latency constraints
+  - Multi-tenant complexity
+- Infrastructure patterns for embedding services
+  - Deployment architecture
+    - Expose as microservice APIs via FastAPI, gRPC, or Triton inference server
+  - Performance optimization
+    - Leverage async IO patterns
+    - Configure intelligent load-balancing across multiple GPU pods
+- Technical optimizations for embedding efficiency
+  - Quantization
+  - Strategic caching
+  - HW selection: smaller models on CPU
+  - Pre-computation
+- Critical metrics to track
+  - Performance: p50/p95/p99 latency, tokens/sec, embeddings/sec, GPU utilization
+  - Quality: embedding drift metrics, semantic shift detection, retraining triggers
+  - Efficiency: request deduplication rates, cache hit/miss ratios, cost per embedding
+- Integrating with vector databases
+  - Full pipeline: Embed -> index -> retrieve -> rerank
+  - FAISS
+    - Excellent for in-moemroy workloads
+    - Supports CPU/GPU acceleration
+    - Requires custom scaling solutions
+  - Pinecone
+    - Simplified operations
+    - Auto-scaling capabilities
+    - Higher operational costs
+  - Weaviate  
+    - Rich filering capabilities
+    - GraphQL-based API
+- Production use cases
+  - Information retrieval
+    - RAG pipelines
+    - Semantic search
+  - Matching & analysis
+    - Real-time recommendations
+    - Anomaly detection
+- Engineering best practices
+  - Performance benchmarking
+  - Vector normalization
+  - Versioning strategy
+  - Index selection
+
 ### 196. 194. Latency Reduction in NLP Inference
+- Why latency matters
+  - User experience: each 100ms delay reduces engagement by 8%
+  - Cost efficiency
+  - System reliability
+- Key sources of latency
+  - Tokenization
+  - Model loading
+  - Attention comlexity: N^2 for long sequences
+  - Infrastructure overhead
+- Model level optimizations
+  - Quantization
+  - Pruning
+  - Distillation
+  - Optimized runtimes: TensorRT, ONNX runtimes, vLLM
+- Runtime optimizations
+  - KV-cache reuse
+  - Flash attention
+  - Batching & micro-batching
+  - Memory management
+- Infrastructure optimizations
+  - Deployment options
+    - Triton & Ray Serve
+    - Autoscaling
+- Monitoring latency
+  - Track percentiles
+  - Decompose metrics
+  - End-to-end tracing
+  - SLOs & Alerts
+- Use cases
+  - Chatbots 
+  - Search & RAG
+  - Streaming Apps
+  - Edge applications
+- Best practices
+  - Profile the full pipeline
+  - Implement strategic caching
+  - Test under peak load
+  - Balance trade-offs: latency vs accuracy vs cost
+
 ### 197. 195. Deploying Multilingual Models at Scale
+- Core challenges
+  - Vocabulary size
+  - Inference latency
+  - Quality variance: 15-30% performance gaps b/w high-resource (english, chinese) and low-resource language(Nepali)
+  - Fairness & bias
+- Infrastructure demands
+  - Larger embedding tables -> 2.5x memory footprint 
+  - Smart batching across mixed-language queries to maximize GPU utilization
+  - Cache common embeddings/prompts for frequent languages to reduce redundant compuation
+  - Ex: A production multilingual BERT service typically requires 3-4x HW resources of its monolingual counterpart
+- Training & fine-tuning strategies
+  - Foundation pretraining: start with large, diverse multilingual corpora (CommonCrawl, Wikipedia in 100+ languages)
+  - Efficient adaptation: PEFT enables language-specific tuning while sharing base parameters
+  - Data-centric approach
+- Serving optimizations
+  - Infrastucture solutions
+    - Deploy via Triton, vLLM, Ray Serve for scalable, distributed inference
+    - Region-based autoscaling -> reduce latency for global users
+  - Model optimizations
+    - Quantization
+    - Hybrid inference: fallback to smaller models for rare languages
+- Monitoring & evaluation
+  - Performance metrics
+  - Quality assessment
+  - User feedback
+- Use cases
+  - Multilingual chatbots & copilots
+  - Cross-lingual semantic search & RAG
+  - Translation services
+  - Global content moderation
+- Best practices
+  - Unified architecture
+  - Geographic distribution
+  - Continuous evaluation
+  - Consistent preprocessing
+
+
 ### 198. 196. Lab – Deploy a BERT Model with FastAPI
-2min
+- Learning Goals
+  - Load a pretrained BERT model for text classification
+  - Expose it as a FastAPI endpoint
+  - Send queries and receive predictions in JSON format
+  - Understand how to containerize/deploy in production
+```
+0) Prerequisites
+
+    Python 3.9+
+
+    Install dependencies:
+
+    mkdir bert-fastapi-lab && cd bert-fastapi-lab
+    python -m venv .venv
+    source .venv/bin/activate   # Windows: .venv\Scripts\activate
+    pip install torch transformers fastapi uvicorn
+
+1) Load Pretrained BERT Model
+
+We’ll use distilbert-base-uncased-finetuned-sst-2-english for sentiment classification.
+
+File: model.py
+
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    import torch
+     
+    MODEL_NAME = "distilbert-base-uncased-finetuned-sst-2-english"
+     
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+     
+    labels = ["negative", "positive"]
+     
+    def predict(text: str):
+        inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+        with torch.no_grad():
+            outputs = model(**inputs)
+            probs = torch.nn.functional.softmax(outputs.logits, dim=-1)[0]
+        return {labels[i]: float(probs[i]) for i in range(len(labels))}
+
+2) Build FastAPI App
+
+File: server.py
+
+    from fastapi import FastAPI
+    from pydantic import BaseModel
+    from model import predict
+     
+    app = FastAPI()
+     
+    class Query(BaseModel):
+        text: str
+     
+    @app.post("/classify/")
+    def classify(query: Query):
+        result = predict(query.text)
+        return {"input": query.text, "prediction": result}
+
+3) Run the API Server
+
+    uvicorn server:app --reload --port 8000
+
+    API runs at: http://127.0.0.1:8000
+
+    Docs at: http://127.0.0.1:8000/docs (auto-generated Swagger UI)
+
+4) Test the Endpoint
+
+Using curl:
+
+    curl -X POST "http://127.0.0.1:8000/classify/" \
+      -H "Content-Type: application/json" \
+      -d '{"text": "I really enjoyed this movie"}'
+
+Sample output:
+
+    {
+      "input": "I really enjoyed this movie",
+      "prediction": {
+        "negative": 0.02,
+        "positive": 0.98
+      }
+    }
+
+5) Optional – Add Batch Inference
+
+Modify predict() in model.py to accept a list of texts:
+
+    def predict_batch(texts):
+        inputs = tokenizer(texts, return_tensors="pt", truncation=True, padding=True)
+        with torch.no_grad():
+            outputs = model(**inputs)
+            probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
+        return [{labels[i]: float(p[i]) for i in range(len(labels))} for p in probs]
+
+Add a /batch endpoint in server.py.
+6) Optional – Dockerize for Deployment
+
+Dockerfile
+
+    FROM python:3.10-slim
+    WORKDIR /app
+    COPY . .
+    RUN pip install --no-cache-dir torch transformers fastapi uvicorn
+    CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+
+Build & run:
+
+    docker build -t bert-fastapi .
+    docker run -p 8000:8000 bert-fastapi
+
+7) Stretch Goals
+
+    Add a /health endpoint for monitoring
+
+    Connect with Prometheus/Grafana for latency metrics
+
+    Deploy on Kubernetes/Ray Serve for scaling
+
+    Extend to multilingual models (e.g., bert-base-multilingual-cased)
+
+✅ Outcome: You deployed a BERT text classification API using FastAPI, with options for scaling, monitoring, and containerization.
+```
+
+## Section 30: Week 29: Infrastructure for Multimodal AI
 
 ### 199. 197. What Is Multimodal AI?
+- Multimodal
+  - Beyond text: real world signas in diverse formats
+  - Complementary fusion
+  - Richer experiences
+  - Enhanced RAG: text + image + audio + video
+- Core concept of multimodal AI
+  - Modality: distinct data types including text, image, audio, video, tabular data, and sensor readings
+  - Encoders: BERT for text, ResNet for images, etc
+  - Fusion: methods to combine embeddings across modalities: early (raw inputs), late (decisions), or cross-attention (transformers)
+  - Alignment: creating a shared semantic space where different modalities can understand and relate to each other
+- Model archetypes
+  - Dual-encoder
+  - Encoder-decoder
+  - Unified transformers
+  - Tool-use models  
+- Typical multimodal pipelines
+  - Perception: ASR for audio, OCR for image/documents, object/scene detectors for video frames
+  - Embedding: create dense vector representations for each modality chunk, frame, or segment
+  - Fusion/retrieval: cross-modal search or attention-based fusion of relevant information
+  - Generation/decision: produce outputs of captions, answers, search results, recommendations
+- Key infrastructure challenges
+  - Scale
+  - Synchronization: aligning audio, video, and text timestamps for coherent understanding
+  - Latency
+  - Quality control
+- Common use cases
+  - Search
+  - Assistants
+  - Commerce
+  - Operations
+- Best practices for implementation
+  - Preprocessing: normalize and timestamp all inputs. preserve provenance metadata for traceability and debugging
+  - Specialized processing: Use purpose-built encoders (ASR/OCR/ViT) for initial perception before fusion
+  - Optimization: cache embeddings to avoid redundant computation; chunk long videos into shots/scenes
+  - Responsible AI: implement guardrails for sensitive media including PII detection, face/license plate blurring, and audio consent management
+
 ### 200. 198. Handling Text + Image Pipelines
+- Why text + image together?
+  - Many tasks involve joint reasoning: captions, VQA, search
+  - Images provide context, text adds semantics
+  - Combining improves accuracy, robustness, and user experience
+- Core pipeline stages
+  - Ingest: collect text+images from database, APIs, user uploads
+  - Preprocess: normalize text, resize/augment images, handle multiple languages
+  - Encode: modality specific models (BERT, ViT, CLIP)
+  - Fuse: combine embeddings into shared representation space
+  - Serve: deliver results (retrieval, generation, classification)
+- Fusion strategies
+  - Early fusion: combine raw features before encoding
+  - Late fusion: indepenent encoders -> combine embeddings
+  - Cross-attention: transformer layers align modalities
+- Infrastructure requirements
+  - GPU acceleration
+  - Vector database
+  - Intelligent batching
+  - Streaming pipelines
+- Use cases
+  - Visual search
+  - Image captioning
+  - Visual question answering
+  - E-commerce
+- Challenges
+  - Data alignment
+  - Bias & fairness
+  - Latency
+  - Scale
+- Best practices
+  - Standardize pipelines
+  - Leverage pretrained models
+  - Monitor relevance
+  - Implement caching
+
 ### 201. 199. Training and Serving CLIP Models
+- Bridging text and images with join embeddings
+- CLIP
+  - Developed by OpenAI to create a unified understanding b/w text and images
+  - Web-scale training: trained on millions of image-caption pairs
+  - Joint Embedding space: maps both text and images into the same high-dimensional vector space
+  - Zero-shot capabilities: can classify images into arbitrary categories
+- How CLIP works
+  - CLIP uses dual encoder architecture to map text and images into a shared embedding space
+    - Text Encoder: Transformer maps text tokens into a fixed-dimensional embedding vector
+    - Image Encoder: Vision transformer (ViT) or ResNet processes image patches, creating a comparable embedding vector
+  - During training, CLIP maximizes similartiy b/w matched image-text pairs while minimizing similarity b/w unmatched pairs using **contrastive loss**
+- Training CLIP at scale
+  - Data requirements
+    - Millions to billions of diverse image-caption pairs
+    - Extensive data cleaning: deduplication, NSFW filtering, caption normalization
+    - Balanced domain coverage to prevent performance skew
+  - Training infrastructure
+    - Distributed training across GPU clusters
+    - Mixed precision
+    - 3D parallelism
+    - Checkpointing for fault tolerance
+  - Steps
+    - Data processing: ETL pipelines for image-text pairs
+    - Distributed training: scale across hundreds of GPUs
+    - Evaluation: Zero-shot benchmarking
+- Serving CLIP models
+  - Offline processing: precompute and store embeddings for your entire corpus in a vector database
+  - Query-time processing: encode the query (text or image), perform approximate nearest neighbor search, return top-k results
+- Infrastructure optimizations
+  - Request batching
+  - Model quantization
+  - Embedding caching
+  - Deployment frameworks
+- CLIP use cases
+  - Semantic search
+  - Intelligent captioning
+  - Content moderation
+  - Multimodal RAG
+- Challenges in CLIP deployment
+  - Data biases
+  - Infrastructure scaling
+  - Domain adaptation
+  - Workload management
+- Best practices
+  - Model fine-turning
+  - Retrieval strategies
+  - Embedding management
+  - Quality monitoring
+
 ### 202. 200. Infrastructure for Speech + Text Models
+- Connect spoken language with NLP pipelines
+- Why speech + text integration matters
+  - Natural interface: speech is 3x faster than typing
+  - Accessibility: enables hands-free operation
+  - Multimodal AI: foundation for next-gen assistants
+- Modern AI must handle both ASR (speech -> text) and TTS (text -> speech) for complete communication loops
+- Core pipeline components
+  - Audio capture
+  - Preprocessing
+  - ASR models: acoustic signals to text
+  - NLP processing
+  - TTS models: natural speech responses using neural vocoders (voice encoders)
+- Infrastructure demands
+  - Low-latency requirements
+  - Streaming capabilities
+  - Codec support: PCM, MP3, Opus, ...
+  - GPU acceleration
+- Serving speech pipelines
+  - Streaming APIs: WebSocket and gRPC interfaces
+  - Micro-batching: Group audio frames for optimal GPU
+  - Containerization: Deploy ASR + NLP + TTS as a separate service
+  - Response caching: store frequent TTS outputs
+- Latency optimization techniques
+  - Edge-cloud hybrid architecture
+  - Model quantization
+  - Model distillation
+  - Parallel TTS processing
+- Monitoring and reliability
+  - Word Error Rate (WER)  
+  - End-to-end latency
+  - Throughput
+  - Audio drift
+- Real-world use cases
+  - Voice assistants: Alexa, Siri, ...
+  - Call analytics
+  - Meeting intelligence
+  - Accessibility
+- Engineering best practices
+  - Audio preprocessing standardization
+  - Microservice architecture
+  - Regional model deployment
+  - Demographic evaluation
+
 ### 203. 201. Deploying Video + Text Search Systems
+- Bridging natural language queries with visual content
+- Why video+text search?
+  - Rich but complex modality
+  - Natural Language Interface
+  - Cross-domain applications
+  - Technical requirements: multimodal embeddings +  scalable infrastructure
+- Core pipeline architecture
+  - Ingest video
+  - Preprocess
+  - Embedding: CLIP for visual frames, BERT/LLM for text transcripts
+  - Indexing: vector DB for efficient multimodal storage and retrieval
+  - Query
+- Infrastructure demands
+  - Storage: petabyte-scale video storage
+  - Compute
+  - Indexing: FAISS/Pinecone/Weaviate for efficient vector similarity search
+  - Serving: FastAPI/gRPC endpoints with robust caching layers
+- Optimizations for scale & performance
+  - Precompute embeddings
+  - Hierarchical indexing
+  - Vector compression
+  - Result caching
+- Real world use cases
+  - Media
+  - Security
+  - Education
+- Monitoring & evaluation  
+  - Critical metrics
+    - Recall@k: percentage of relevant results returned
+    - Query latency: end-to-end response time
+    - System throughput
+    - User engagement
+  - Cross-modal evaluation: separate benchmark across text-only, video-only, and cross-modal queries
+- Best practices
+  - Dual representation
+  - Hybrid retrieval
+  - Intelligent partitioning
+  - Continuous improvement
+
 ### 204. 202. Challenges of Multimodal Model Serving
+- Why multimodal serving is hard
+  - Processing of different input formats simultaneously
+  - Handling varied workloads from lightweight text to heavyweight video
+  - Strict latency expectations for interactive pipelines
+- Input complexity
+  - Text: tokenization pipelines, embedding generation, and vocabulary management
+  - Images: resizing, augmentation, CNN/ViT encoding
+  - Audio: spectogram generation, ASR preprocessing, and feature extraction
+  - Video: frame extraction, temporal alignment, and motion analysis
+- Model fusion challenges
+  - Dual-encoder models (like CLIP) process modalities separately then combine
+  - Cross-attention fusion allows modalities to influence each other's processing
+  - Both requires significant memory and compute demands
+  - System designer must balance throughput with accuracy requirements
+- Infrastructure constraints
+  - Specialized GPUs
+  - Decoding bottlenecks
+  - Batching complexity
+- Latency & throughput issues
+  - Text: ms latency, p95/p99 met
+  - Image: 10-100 ms, some p99 spike
+  - Audio: 0.1-1 sec, p95 sometimes exceeded
+  - Video/fusion: seconds, p95/p99 often exceeded 
+- Scaling & deployment challenges
+  - Memory constraints
+  - Orchestration complexity
+  - Varied autoscaling needs
+  - Microservice architecture
+- Monitoring & observability
+  - Metrics
+    - Speech: WER
+    - Text: BLEU, perplexity
+    - Images: Recall@k, precision
+  - Additional monitoring
+    - Drift across varied inputs (audio noise, image lighting)
+    - End-to-end tracing for multi-hop, cross-modal queries
+    - Unifying quality metrics
+- Security and governance
+  - Privacy concerns
+  - Compliance requirements
+  - Audit challenges
+- Best practices
+  - Modular architecture
+  - Strategic caching
+  - Model optimization
+  - Regional deployment  
+
 ### 205. 203. Lab – Deploy CLIP for Image Search
-2min
+- Learning Goals
+  - Encode images & text into a shared embedding space
+  - Store image embeddings in FAISS (vector database)
+  - Query with natural language to retrieve similar images
+  - Deploy as a FastAPI microservice
+```
+0) Prerequisites
+
+    Python 3.9+
+
+    Install dependencies:
+
+    mkdir clip-search-lab && cd clip-search-lab
+    python -m venv .venv
+    source .venv/bin/activate   # Windows: .venv\Scripts\activate
+    pip install torch torchvision faiss-cpu fastapi uvicorn pillow transformers
+
+1) Load CLIP Model
+
+File: clip_model.py
+
+    import torch
+    from PIL import Image
+    from transformers import CLIPProcessor, CLIPModel
+     
+    MODEL_NAME = "openai/clip-vit-base-patch32"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+     
+    model = CLIPModel.from_pretrained(MODEL_NAME).to(device)
+    processor = CLIPProcessor.from_pretrained(MODEL_NAME)
+     
+    def embed_image(image_path: str):
+        img = Image.open(image_path).convert("RGB")
+        inputs = processor(images=img, return_tensors="pt").to(device)
+        with torch.no_grad():
+            emb = model.get_image_features(**inputs)
+        return emb.cpu().numpy()
+     
+    def embed_text(query: str):
+        inputs = processor(text=[query], return_tensors="pt", padding=True).to(device)
+        with torch.no_grad():
+            emb = model.get_text_features(**inputs)
+        return emb.cpu().numpy()
+
+2) Build Image Index with FAISS
+
+File: build_index.py
+
+    import os, faiss, pickle
+    from clip_model import embed_image
+     
+    image_folder = "images"   # put your sample JPG/PNG images here
+    image_paths = [os.path.join(image_folder, f) for f in os.listdir(image_folder)]
+     
+    embs, metadata = [], []
+    for path in image_paths:
+        embs.append(embed_image(path))
+        metadata.append(path)
+     
+    import numpy as np
+    embs = np.vstack(embs).astype("float32")
+     
+    index = faiss.IndexFlatL2(embs.shape[1])
+    index.add(embs)
+     
+    with open("clip_index.pkl", "wb") as f:
+        pickle.dump((index, metadata), f)
+     
+    print(f"Indexed {len(metadata)} images.")
+
+Run:
+
+    python build_index.py
+
+3) Create Search Function
+
+File: search.py
+
+    import faiss, pickle, numpy as np
+    from clip_model import embed_text
+     
+    with open("clip_index.pkl", "rb") as f:
+        index, metadata = pickle.load(f)
+     
+    def search_images(query: str, k=3):
+        qvec = embed_text(query).astype("float32")
+        D, I = index.search(qvec, k)
+        results = [metadata[i] for i in I[0]]
+        return results
+
+Test in REPL:
+
+    from search import search_images
+    print(search_images("a dog playing in the park"))
+
+4) Deploy FastAPI Service
+
+File: server.py
+
+    from fastapi import FastAPI
+    from pydantic import BaseModel
+    from search import search_images
+     
+    app = FastAPI()
+     
+    class Query(BaseModel):
+        text: str
+     
+    @app.post("/search/")
+    def search(query: Query):
+        results = search_images(query.text, k=5)
+        return {"query": query.text, "results": results}
+
+Run:
+
+    uvicorn server:app --reload --port 8000
+
+5) Test API
+
+    curl -X POST "http://127.0.0.1:8000/search/" \
+      -H "Content-Type: application/json" \
+      -d '{"text": "a man riding a bicycle"}'
+
+Sample response:
+
+    {
+      "query": "a man riding a bicycle",
+      "results": ["images/bike1.jpg", "images/bike2.jpg", "images/bike3.jpg"]
+    }
+
+6) Stretch Goals
+
+    Add an image upload endpoint to dynamically insert new images
+
+    Store embeddings in Weaviate or Pinecone for scale-out search
+
+    Build a Streamlit UI to visualize retrieved images
+
+    Quantize CLIP model for faster inference on CPU/edge
+
+✅ Outcome: You built and deployed a CLIP-powered image search API, capable of finding images based on natural language queries.
+```
+
+## Section 31: Week 30: Infrastructure for Reinforcement Learning
 
 ### 206. 204. Basics of Reinforcement Learning Workloads
+- What makes RL different?
+  - Data generation: data is generated, not given through agent environment interaction loop
+  - Shifting distribution
+  - Reward-based learning: no explicit labels
+  - Infrastructure demands: fast simulations, scalable rollout systems
+- Core RL loop
+  - Observe state
+  - Choose action
+  - Policy update
+  - Environment response
+- Common algorithms
+  - Policy gradient/PPO
+    - On-policy approach with clipping for stability
+    - Best for general problems requiring stable convergence
+  - Actor-critic/A2C/A3C
+    - Combines parallel actors with a value baseline
+    - Best for distributed training across many CPUs
+  - DQN/Rainbow
+    - Value based approach for discrete action spaces
+    - Best for environments with clear state representations and limited action choices
+  - SAC/TD3
+    - Off-policy algorithms for continuous control
+    - Best for robotics and physical control tasks requiring precise movements
+- RL workload components
+  - Environment & rollout
+    - Environment: Gym/Isaac/Unity simulators
+    - Rollout workers: Generate trajectories from agent-environment interaction
+  - Learning & evaluation
+    - Replay buffer/batcher: store experiences for off-policy or on-policy learning
+    - Learner: GPU-accelerated neural network training
+    - Evaluator: periodic checks of policy performance
+- Throughput & scaling
+  - Horizontal scaling
+  - Actor-learner separation
+  - Asynchronous queueing
+  - Vectorized environments
+- IO & serialization
+  - Challenges
+    - Trajectories are small but numerous _> high messaging overhead
+    - Image observation can create bandwidth bottlenecks
+    - Environment-agent communication can become a throughput limiter
+  - Solutions
+    - Optimize IPC (Inter-process communication)
+    - Compress observations
+    - Shared memory: zero-copy transfers where available
+    - Version everything
+- Training stability
+  - Normalization and clipping
+  - Curriculum learning
+  - Target networks
+  - Early stopping
+  * RL is notoriously unstable !!!
+- Infra & tooling
+  - Training frameworks
+    - Ray RLlib
+    - CleanRL
+  - Experiment tracking
+    - weight & biases
+    - MLflow
+  - Infrastructure
+    - Docker container
+    - K8/slurm
+- Serving RL policies
+  - Model export: TorchScript, ONNX, or TensorRT
+  - Real-time control
+  - Safety measures
+  - Monitoring & updates
+
 ### 207. 205. Simulation Environments for RL (Gym, Isaac)
+- A sandbox for RL prior to running robots
+- Why simulation matter
+  - Safety and exploration
+  - Cost & efficiency
+  - Control & repeatability
+- OpenAI Gym: the classic choice
+  - Lightweight python interface designed for RL research
+  - Standardized API: reset(), step(action)
+  - Diverse environment collection from simple CartPole to complex MuJoCo
+  - Perfect for algorithm prototyping and benchmarking
+- Gym's ecosystem advantages
+  - Rapid iteration
+  - Rich extensions
+  - Flexibility
+- Nvidia Isaac Gym: GPU-accelerated physics
+  - Scale revolution
+  - CUDA-powered physics: built on PhysX
+  - Robotics focus
+- Isaac Gym's technical edge
+  - End-to-end GPU acceleration
+  - Domain randomization
+  - Comprehensive physics
+- Alternative simulation environments
+  - Unity ML-agents
+  - DeepMind lab/Habitat
+  - CARLA
+  - Gazebo/MuJoCo
+- Infrastructure considerations
+  - Compute architecture: CPU heavy simulations (OpenAI Gym) or GPU-parallel environment (Isaac Gym)
+  - IO communication
+  - Reproducibility
+  - Deployment
+- Scaling your simulations with vectorization strategies
+  - Run multiple environment copies per process to amortize overhead
+  - Distribute rollout workers across compute nodes using Ray RLlib or MPI
+  - Implement asynchronous stepping to prevent slow environments from creating bottlenecks
+- Best practices for RL simulation
+  - Start simple, then scale
+  - Measure performance
+  - Ensure robustness
+  - Maintain reproducibility
+
 ### 208. 206. Distributed RL Training Infrastructures
+- Why distributed RL?
+  - Sample hungry
+  - Speed limitations
+  - Scale benefits
+- Core distributed architectures
+  - Synchronous
+    - A2C, IMPALA-style architectures
+    - Uses barriers for policy/value updates
+    - More stable learning, higher sample efficiency
+    - Limited by slowest actor (straggler problem)
+  - Asynchronous  
+    - A3C, Ape-X approaches
+    - Actors push trajectories independently
+    - No waiting for stragglers
+    - Can introduce policy staleness
+- Key components
+  - Actors: generate trajectories through environment rollouts. Run on CPU, often parallelized across many machines
+  - Learners: update policy/value networks on GPU. Process batches of experience to improve agent performance
+  - Buffer/queue
+  - Parameter server: synchronizes policy weights back to actors
+- Frameworks & tooling
+  - Ray RLlib
+  - IMPALA/SEED RL
+  - Ape-X/Reverb
+  - CleanRL + MPI
+- Scaling challenges
+  - Network bottlenecks
+  - Straggler problem
+  - Memory pressure
+  - Fault tolerance
+- Optimization strategies
+  - Vectorized environments
+  - Prioritized experience replay
+  - Asynchronous updates
+  - Gradient compression
+- Infrastructure requirements
+  - CPUs
+  - GPUs
+  - Networking
+  - Orchestration
+- Best practices
+  - Start small, then scale
+  - Use elastic training
+  - Frequent checkpointing
+  - Separate logging
+
 ### 209. 207. Real-Time Serving of RL Agents
+- From training pipelines to low-latency action loops
+- Why real-time serving matters
+  - Speed requirements: agents must act in milliseconds
+  - Consequences: latency spikes lead to unsafe actions or missed opportunities
+  - Infrastructure need: serving systems must ensure deterministic, low-latency inference
+- Latency challenges
+  - Computational constraints
+  - Data-intensive preprocessing
+  - Network bottlenecks
+  - Jitter
+- Optimization techniques
+  - Model optimizations
+    - Quantization
+    - ONNX/TensorRT export
+  - Deployment optimizations
+    - Batch observations when safe
+    - Use GPU pinning or dedicated edge accelerators
+- Infrastructure patterns
+  - On-device inference
+    - Lowest latency (<5ms)
+    - Ideal for critical control loops
+  - Edge servers
+    - Near real-time (5-20ms)
+    - Good balance of power and latency
+  - Cloud serving
+    - Higher latency (20-100ms)
+    - Best for non-critical tasks
+- Monitoring and safety
+  - Critical metrics
+    - Performance metrics: inference latency, action frequency, real-time reward proxies
+    - Safety indicators: Action saturation detection, environment drift, OOD observation detection
+- Use cases
+  - Robotics
+  - Finance: algorithmic trading
+  - Gaming/simulation
+  - Industrial ops
+- Best practices
+  - Co-locate agents with environment
+  - Profile end-to-end latency
+  - Implement fallback policies
+  - Log continuously for retraining
+  
 ### 210. 208. Scaling RL for Robotics
+- Why robotics needs scale
+  - Complex state-action spaces
+  - Unavoidable noisein sensors and actuation
+  - Physical constraints that must be respected
+- The simulation-to-real gap
+  - Simulation ben
+    - Fast iteration
+    - Parallel environment
+    - Perfect state information
+  - The gap
+    - Dynamic simplification
+    - Contact physics inaccuracies
+    - Sensor noise models
+  - Real world complexity
+    - Unpredictable friction
+    - Material properties
+    - Environmental variability
+- Bridging the gap: domain randomization
+- Scalable training pipelines
+  - Massively parallel simulation
+    - Isaac Gym: Parallel environments over GPU
+    - Brax: JAX-accelerated physics
+    - MuJoCo: CPU-based, but highly optimized
+  - Distributed architecture
+    - Actor-critic separation across compute nodes
+    - Asynchronous policy updates
+    - Curriculum learning adapts task difficulty
+- HW infrastructure
+  - Computation
+    - GPU
+    - TPU pods
+    - High-memory instances for replay
+  - Simulation
+    - GPU-accelerated physics
+    - Isaac Gym
+    - Multi-GPU rendering
+  - Edge deployment
+    - Nviida Jetson AGX Orin
+    - Edge TPU
+  - Infrastructure    
+    - Infiniband/RoCE for inter-node communication
+    - Specialized job schedulers
+    - Checkpoint management
+- Policy optimization techniques
+  - Algorithm selection: SAC, TD3, PPO, IMPALA
+- Deployment challenges
+  - Real-time constraints: inference times under 1-10ms
+  - Safety guarantees
+  - Fault recovery
+  - Generalization
+- Serving in robotics
+  - Model optimization pipeline
+    - Training model
+    - Optimization
+    - Deployment
+  - Runtime safety systems
+    - Multi-tiered control
+    - Confidence-based switching b/w controllers
+    - Continuous monitoring for policy drift
+- Example applications
+  - Quadruped locomotion
+  - Industrial manipulation
+  - Aerial navigation: agile drone
+  - Autonomous vehicles
+- Best practices
+  - Development workflow
+    - Simulation development
+    - Domain randomization
+    - Controlled testing
+    - Limited field trials
+    - Continuous monitoring
+  - Technical recommendations
+    - Log everything
+    - Implement asymmetric actor-critic for privileged information in simulations
+    - use both conservative and exploratory policy variants
+    - Design for policy distillation to keep deployment models lightweight
+
 ### 211. 209. Infrastructure for Online Learning Agents
+- What is online learning?
+  - Continuous updates: agents update models at new data arrival
+  - Evolving environment
+  - Dual optimization
+- Key characteristics of online learning systems
+  - Streaming data ingestion
+  - Incremental model updates
+  - Dynamic exploration-exploitation
+  - Catastrophic forgetting mitigation
+- Core infrastructure components
+  - Data stream layer: Kafka, Pulsar, MQTT
+  - Experience replay buffer
+  - Online learner
+  - Serving engine
+  - Monitoring & drift detection  
+- Training strategies for online learning
+  - Mini-batch updates
+  - Adaptive optimizers
+  - Hybrid training approaches
+  - Parameter-efficient techniques
+- Infrastructure challenges
+  - Latency constraints
+  - Horizontal scalability
+  - Model stability
+  - Resource isolation
+- Optimization approaches
+  - Asynchronous updates
+  - Gradient optimization
+  - Resource management
+- Monitoring & safety systems
+  - Oneline metrics dashboard
+  - Concept drift detection
+  - Safety mechanism
+    - Shadow deployment of updated policies
+    - Automatic rollback
+    - Bounded exploration
+- Realworld use cases
+  - Financial trading
+  - Intelligent transportation
+  - Personalization systems
+  - Adaptive robotics
+- Best practices for production deployment
+  - Hybrid training pipeline
+  - Safety infrastructure
+  - Robust memory management
+  - DevOps Integration
+
 ### 212. 210. Lab – Train RL Agent with Ray RLlib
-1min
+- Learning Goals
+  - Install and configure Ray + RLlib
+  - Train an RL agent on a standard Gym environment
+  - Monitor training metrics and visualize results
+  - Save and reload trained policies for inference
+```
+0) Prerequisites
+
+    Python 3.9+
+
+    Install dependencies:
+
+    mkdir rllib-lab && cd rllib-lab
+    python -m venv .venv
+    source .venv/bin/activate   # Windows: .venv\Scripts\activate
+    pip install "ray[rllib]" gymnasium[classic_control] matplotlib
+
+1) Quick Test: Hello RLlib
+
+File: train_cartpole.py
+
+    import ray
+    from ray.rllib.algorithms.ppo import PPOConfig
+     
+    # Start Ray
+    ray.init(ignore_reinit_error=True)
+     
+    # Configure PPO for CartPole
+    config = (
+        PPOConfig()
+        .environment("CartPole-v1")
+        .rollouts(num_rollout_workers=1)
+        .training(train_batch_size=4000)
+        .framework("torch")
+    )
+     
+    # Build Trainer
+    algo = config.build()
+     
+    # Train for N iterations
+    for i in range(5):
+        result = algo.train()
+        print(f"Iter: {i}, reward_mean: {result['episode_reward_mean']:.2f}")
+
+Run:
+
+    python train_cartpole.py
+
+You should see the reward_mean increase as the agent learns.
+2) Save & Load Policy
+
+Extend train_cartpole.py:
+
+    # Save checkpoint
+    checkpoint = algo.save()
+    print("Checkpoint saved at:", checkpoint)
+     
+    # Load checkpoint later
+    algo.restore(checkpoint)
+
+3) Run Inference with Trained Policy
+
+File: inference.py
+
+    import gymnasium as gym
+    import ray
+    from ray.rllib.algorithms.ppo import PPOConfig
+     
+    # Init Ray & load trained policy
+    ray.init()
+    config = PPOConfig().environment("CartPole-v1").framework("torch")
+    algo = config.build()
+    algo.restore("last_checkpoint_path")   # replace with actual checkpoint path
+     
+    env = gym.make("CartPole-v1", render_mode="human")
+    obs, _ = env.reset()
+     
+    done = False
+    while not done:
+        action = algo.compute_single_action(obs)
+        obs, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
+     
+    env.close()
+
+Run:
+
+    python inference.py
+
+You’ll see the trained agent balancing the CartPole. 🎉
+4) Visualize Training Rewards
+
+    import matplotlib.pyplot as plt
+     
+    rewards = []
+    for i in range(20):
+        result = algo.train()
+        rewards.append(result["episode_reward_mean"])
+     
+    plt.plot(rewards)
+    plt.xlabel("Iteration")
+    plt.ylabel("Mean Episode Reward")
+    plt.title("PPO Training on CartPole")
+    plt.show()
+
+5) Stretch Goals
+
+    Swap environment to MountainCar-v0 or LunarLander-v2
+
+    Try a different algorithm: DQN instead of PPO
+
+    Run distributed training with multiple rollout workers:
+
+        .rollouts(num_rollout_workers=4)
+
+    Deploy trained policy as a FastAPI service for online inference
+
+✅ Outcome: You trained and served an RL agent with Ray RLlib, monitored rewards, and deployed a checkpoint for inference.
+```
+
+## Section 32: Week 31: Large-scale Training - Basics
 
 ### 213. 211. What Is Large-Scale Training?
 ### 214. 212. Data Parallelism vs Model Parallelism Revisited
@@ -9007,4 +12934,3 @@ Step 9 – Cleanup
 ### 281. 279. Monitoring Multi-Tenant Environments
 ### 282. 280. Lab – Configure Multi-Tenant Cluster
 2min
-~
