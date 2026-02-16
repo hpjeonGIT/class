@@ -12846,49 +12846,2235 @@ You’ll see the trained agent balancing the CartPole. 🎉
 ## Section 32: Week 31: Large-scale Training - Basics
 
 ### 213. 211. What Is Large-Scale Training?
+- Why go large?
+  - Model performance
+  - Pattern recognition: long-range patterns & rare phenomena
+  - Time efficiency: more scaling reduce wall time of training
+  - Frontier capabilities
+- Defining "Large Scale"
+  - Model scale
+  - Data scale
+  - Compute scale
+  - Operational scale
+- Core ingredients
+  - Parallelism
+  - Memory optimization
+  - High-speed IO
+  - Fault tolerance
+- Parallelism at a glance
+  - Data parallel
+  - Tensor parallel
+  - Pipeline parallel
+  - 3D parallelism: DP + TP + PP
+- Systems bottleneck
+  - Memory wall
+  - Network bottleneck
+  - Storage constraints
+  - Scheduling challenges: stragglers, preemptions
+- Efficiency levers
+  - Precision & kernels: Mixed precision and kernel fusion
+  - Parameter sharding: ZeRO/FSDP
+  - Attention and memory: flash attention
+  - Communication overlap
+- Data pipeline requirements
+  - Fast tokenizatoin and shuffling: parallel preprocessing
+  - Streaming data access: sharded data format
+  - Quality filtering: deduplication & quality metrics
+  - Determinism
+- Reliability & observability
+  - Resilient checkpointing
+  - Performance metrics
+  - Distributed tracing
+  - Automation
+- What "good" looks like
+  - Reproducibility: end-to-end CI/CD pipelines
+  - Operational playbooks
+  - Clear SLOs
+  - Research-infra loop
+
 ### 214. 212. Data Parallelism vs Model Parallelism Revisited
+- Your choice of parallelism strategy impacts throughput, memory utilization, and training costs
+- Data parallelism
+  - The simplest and most widely adopted approach
+  - Replicate the entire model across multiple GPUs
+  - PyTorch DDP, Horovod, DeepSpeed ZeRO-1
+- Model Parallelism
+  - Core concept: split model parameters across GPUs
+  - Tensor parallelism
+  - Pipeline parallelism
+- Hybrid approaches: 3D parallelism
+  - Data parallelism
+  - Tensor parallelism
+  - Pipeline parallelism
+- Performance & efficiency tradeoffs
+  - Data parallelism: 95% but drops if global batch size is too small or communication ovheread dominates
+  - Pipeline parallelism: 75% but decreases with pipepline bubbles
+  - Tensor parallelism: 85% but reduces with increased communication
+- Best practices
+  - Start simple with pure DP for models under 10B parameters
+  - Introduce ZeRO/FSDP optimizations when memory becomes a constraint
+  - Add TP and PP for models > 20B params
+  - For 100B+ models, full 3D parallelism with topology mapping
+
 ### 215. 213. Pipeline Parallelism in Transformers
+- Splitting layers across GPUs for efficient training
+- Why PP?
+  - Memory limitations
+  - DP drawbacks: DP creates redundant parameters on each GPU, limiting max model size
+  - Layer-based division
+  - Massive scale
+- Core idea: divide and pipeline
+  - Layer distribution
+  - Stage processing
+  - Micro-batch execution
+  - Pipeline efficiency: accept the trade-off of "bubble" periods at start and end of pipeline where some GPUs are idle
+- Ex: 4-stage pipeline
+  - GPU 0: input layers - embedding layer and early encoding layers
+  - GPU 1: Middle layers
+  - GPU 2: Middle layers
+  - GPU 3: Output layers: last encoder layers and output head
+- Micro-batching & scheduling
+  - Key concepts
+    - Split global batch (e.g., 1024) into smaller micro-batches (8 batches of 128)
+    - Stagger micro-batch execution across pipeline stages
+    - Allows multiple micro-batches to be processed simultaneously
+    - Reduces "bubble"
+  - Scheduling strategies
+    - GPipe (Fill-Drain): complete all forwards, then all backwards. Simple but less efficient
+    - 1F1B schedule: alternate 1 forward, 1 backward. Better GPU utilization
+- Infrastructure requirements
+  - Fast interconnect
+  - Balanced stages
+  - SW frameworks: DeepSpeed and Megatron-LM
+  - 3D parallelism
+- Benefits of PP
+  - Memory scaling
+  - Architecture flexibility
+  - Massive model training
+- Challenges
+  - Load balancing
+  - Pipeline bubbles -> micro-batching
+  - Debugging complexity
+  - Checkpoint management
+- Advanced optimizations
+  - Activation checkpointing
+  - Communication overlap
+  - Optimized scheduling
+  - Hybrid techniques: combine ZeRO/FSDP
+- Best practices
+  - Profile & balance
+    - Measure per-layer FLOPs and memory usage
+  - Batch size optimization
+    - Larger micro-batches increase efficiency but require more memory
+  - Start simple then scale
+  - Performance monitoring
+    - Track tokens/sec/GPU as primary efficiency metric
+
 ### 216. 214. Distributed Optimizers and Gradient Sync
+- Why distributed optimizers
+  - Shard states across GPUs/nodes
+  - Gradient synchronization ensures consistent model updates across all workers
+  * 175B params could require 2-4TB memory for optimizer states
+- Gradient synchronization basics
+  - Data parallelism
+  - Gradient computation
+  - All-reduce
+  - Consistent updates
+- Communication patterns
+  - Ring all-reduce
+  - Tree all-reduce
+  - Hierarchical reduce
+- Optimizer state explosion
+  - Adam memory foot print: requires 3x parameters in memory
+    - Parameters
+    - Gradients
+    - First momentum
+    - Second moment (variance)
+  - For 100B parameter model:
+    - Parameters: 200GB (FP16)
+    - Adam states: ~600GB
+    - Activations: 100GB+
+    - Total: ~900GB+
+- Distributed optimizer approaches
+  - ZeRO (DeepSpeed)    
+    - ZeRO-1: optimizer states
+    - ZeRO-2: + gradients
+    - ZeRO-3: + parameters
+  - FSDP (PyTorch)
+  - Hybrid offload
+    - CPU/NVMe offloading
+- Overlpa compute and communication
+  - Backward pass
+  - Immediate reduction
+  - Continue backprop
+- Fault tolerance
+  - Challenges
+    - Node/GPU failures
+    - Optimizer sharding increases vulnerability
+    - Silent corruption
+  - Solutions
+    - Elastic training (TorchElastic, DeepSpeed)
+    - Frequent checkpointing
+    - Gradient/parameter validation with statistical checks
+    - Reactive replication of critical state components
+- Best practices
+  - Start simple, scale as needed
+  - Benchmark your specific HW
+  - Maximize overlap
+  - Monitor and profile
+
 ### 217. 215. Infrastructure Bottlenecks in Training LLMs
+- Why bottlenecks matter
+  - Wasted GPU resources, inflated operational costs, and failed training runs
+- Memory bottleneck
+  - Parameter storage overflow
+  - Activation growth problem: N^2 for long text
+  - Memory-compute tradeoffs
+  - Offloading penalties
+- Compute bottlenecks
+  - Inefficient kernel implementations
+  - Small batch size under-utilizes GPUs
+  - Pipeline bubbles
+- Data bottleneck
+  - Tokenization bottleneck
+  - IO starvation
+  - Network variability
+  - Preprocessing overhead
+- Communication bottleneck
+  - Gradient synchronization quickly saturates network interconnects
+  - Straggler nodes
+- Storage bottleneck
+  - Checkpoint
+  - Cloud transfer time
+  - File shards
+  * Robust metadata management becomes critical
+- Orchestration bottleneck
+  - Resource allocation challenges
+    - Availabilty of many GPUs
+    - Preemptions can kill long-running jobs
+  - Mitigation approaches
+    - Gang scheduling (all-or-nothing)
+    - Elastic training capabilities
+- Cost bottlenecks
+  - Direct cost impacts
+    - GPU idle time becomes financial waste
+    - Spot/elastic infrastructure requires robust recovery
+  - Indirect cost factors
+    - Energy and cooling overheads
+    - Budget overruns occur without continuous efficiency monitoring
+- Monitoring & mitigation
+  - Throughput tracking: tokens/sec/GPU
+  - Communication overlap
+  - IO performance
+- Best practices
+  - Integrated parallelism strategy
+  - Computational efficiency
+  - Data pipeline optimization
+  - Reliability engineering
+
 ### 218. 216. Fault Tolerance in Multi-Node Training
+- Why fault tolerance matters
+  - Single node/GPU failure can halt entire train run
+  - Cloud preemptions, HW errors, and network faults are inevitable
+  - Goal: resume seamlessly without losing progress
+- Common failure scenarios
+  - GPU/node crash
+  - Network disruption
+  - Job preemption
+  - Storage errors
+- Fault tolerance mechanisms
+  - Checkpointing
+  - Elastric training
+  - Replication: duplicate critical states, master + backup redundancy
+  - Job orchestration
+- Checkpointing strategies
+  - Sharded checkpoints
+  - Differential checkpoints: save only changed weights to minimize storage and transfer time
+  - Async checkpoints
+- Elastic training approaches
+  - TorchElastic
+  - DeepSpeed ZeRO
+  - Ray
+  - K8
+- Communication fault tolerance
+  - Watchdog timers
+  - Timeout + retry logic
+  - Hierarchical communication
+- Storage & IO reliability
+  - Redundant storage
+  - Checkpoint validation
+  - Multiple generations: multiple checkpoints
+  - Bandwidth scheduling: coordinate checkpoint timing to avoid network contention periods
+- Monitoring & alerts
+  - Critical metrics
+    - GPU health
+    - P95/99 checkpoint latency
+    - Stalled training steps or synchronization operations
+    - Network bandwidth and saturation during all-reduce
+  - Implementation
+    - Prometheus + Grafana
+    - Alert rules for recovery automation
+    - Incident history to identify recurring issues
+- Best practices
+  - Checkpoint frequency
+  - Always shard
+  - Validate recovery
+  - Automate restarts
+
 ### 219. 217. Lab – Train Transformer Across Multiple Nodes
-2min
+- Learning Goals
+  - Understand multi-node distributed training with PyTorch DDP
+  - Launch training jobs with torchrun across nodes
+  - Train a BERT model on a classification task (IMDB sentiment)
+  - Save, resume, and evaluate the distributed model
+```
+0) Prerequisites
+
+    Two or more GPU nodes (bare metal or cloud VMs)
+
+    PyTorch 2.x with NCCL backend
+
+    Shared filesystem or checkpoint sync directory
+
+    Install packages:
+
+    pip install torch torchvision torchaudio transformers datasets
+
+1) Networking Setup
+
+On each node, set environment variables:
+
+    export MASTER_ADDR="node0_ip"   # IP of rank 0 node
+    export MASTER_PORT=29500        # any free port
+    export WORLD_SIZE=2             # number of nodes
+    export NODE_RANK=0              # 0 for master, 1 for worker, etc.
+
+2) Training Script (DDP)
+
+File: train_ddp.py
+
+    import os
+    import torch
+    import torch.distributed as dist
+    from torch.nn.parallel import DistributedDataParallel as DDP
+    from torch.utils.data import DataLoader, DistributedSampler
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    from datasets import load_dataset
+     
+    def setup():
+        dist.init_process_group("nccl")
+     
+    def cleanup():
+        dist.destroy_process_group()
+     
+    def main():
+        setup()
+        rank = dist.get_rank()
+        device = torch.device(f"cuda:{rank % torch.cuda.device_count()}")
+     
+        # Load dataset & tokenizer
+        dataset = load_dataset("imdb")
+        tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+     
+        def tokenize(batch):
+            return tokenizer(batch["text"], padding="max_length", truncation=True, max_length=128)
+     
+        tokenized = dataset["train"].map(tokenize, batched=True)
+        tokenized.set_format("torch", columns=["input_ids", "attention_mask", "label"])
+     
+        sampler = DistributedSampler(tokenized)
+        dataloader = DataLoader(tokenized, batch_size=8, sampler=sampler)
+     
+        # Model
+        model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2)
+        model.to(device)
+        model = DDP(model, device_ids=[device])
+     
+        optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
+        loss_fn = torch.nn.CrossEntropyLoss()
+     
+        # Training loop
+        for epoch in range(2):
+            sampler.set_epoch(epoch)
+            for batch in dataloader:
+                inputs, attn, labels = batch["input_ids"].to(device), batch["attention_mask"].to(device), batch["label"].to(device)
+                outputs = model(inputs, attention_mask=attn)
+                loss = loss_fn(outputs.logits, labels)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+            if rank == 0:
+                print(f"Epoch {epoch} done.")
+     
+        if rank == 0:
+            torch.save(model.module.state_dict(), "bert_ddp.pt")
+     
+        cleanup()
+     
+    if __name__ == "__main__":
+        main()
+
+3) Launch Multi-Node Training
+
+On each node, run:
+
+    torchrun --nnodes=$WORLD_SIZE \
+             --nproc_per_node=4 \   # GPUs per node
+             --node_rank=$NODE_RANK \
+             --master_addr=$MASTER_ADDR \
+             --master_port=$MASTER_PORT \
+             train_ddp.py
+
+4) Validate Model Checkpoint
+
+On master node:
+
+    import torch
+    from transformers import AutoModelForSequenceClassification
+     
+    model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2)
+    model.load_state_dict(torch.load("bert_ddp.pt"))
+    model.eval()
+    print("Loaded checkpoint successfully!")
+
+5) Stretch Goals
+
+    Run on more than 2 nodes with InfiniBand interconnect
+
+    Switch optimizer → AdamW + ZeRO/FSDP for memory scaling
+
+    Replace IMDB with WikiText or C4 for larger runs
+
+    Deploy with Slurm or Kubernetes + TorchElastic for elastic training
+
+✅ Outcome: You trained a Transformer with multi-node DDP, learned about setup, distributed data loading, and checkpoint handling.
+```
+
+## Section 33: Week 32: Large-Scale Training - Advanced
 
 ### 220. 218. DeepSpeed ZeRO-2/3 Optimizations
+- Why ZeRO
+  - Billion+ parameters
+  - ZeRO shards states across data-parallel workers
+  - Fit larger models, larger batches, lower training cost
+- ZeRO stages
+  - Stage 1: Shard optimizer states only
+  - Stage 2: Shard optimizer states + gradients
+  - Stage 3: Shard optimizer states +  gradients + parameters
+- What ZeRO-2 adds
+  - Gradient partitioning & reduce-scatter
+  - Bucketing + overlapped communication
+  - Typical gains: 2-3x larger batch size
+- What ZeRO-3 adds    
+  - Just-in-time gathering of parameters per layer during forward/backward
+  - True memory scaling
+  - Enables > 20B parameter models
+- Offloading options
+  - ZeRO-offload: move optimizer states and gradients to CPU memory
+  - ZeRO-infinity: offload to CPU/NVMe
+- Performance levers
+  - Communication overlap
+  - Mixed precision
+  - Gradient accumulation
+  - Activation checkpointing
+- Practical tuning flow
+  - Staged approach: 1->2->3
+  - Batch size tuning: dial micro-batch up to near OOM
+  - Communication optimization
+  - Consider offloading to CPU/NVMe
+- Monitoring & debugging
+  - Key metrics to watch
+    - Tokens/sec/GPU
+    - GPU memory utilization
+    - NCCL wait time
+  - Common issues & fixes
+    - If JIT-gathers stall -> reduce param persistence threshold, prefetch earlier
+    - If CPU offload slow -> check memory pinning, NUMA configuration, PCIe generation, disk IOPS
+    - Divergence in training -> Test loss scaling, disable suspect kernel fusions
+- When to choose what
+  - < 10B params: ZeRO-2
+  - 10-40B params: ZeRO-3 w/ bf16 + checkpointing
+  - 40B+ or limited GPUs: ZeRO-3 + Offload/infinity
+
+
 ### 221. 219. Fully Sharded Data Parallel (FSDP)
+- FSDP:
+  - Bringing ZeRO-style memory sharding natively into PyTorch
+  - Intelligently sharding parameters, gradients, and optimizer states
+  - Enabling training of 100B+ parameter models on modest HW
+- Core concept: memory sharding
+  - Distributed storage
+  - Just-in_time assembly
+  - Efficient gradient flow
+  - Near-linear scaling
+- Key features
+  - Full-state sharding
+  - PyTorch integration
+  - Precision options: FP16/BF16
+  - Memory extensions: CPU/NVMe offload
+- FSDP vs ZeRO: comparison
+  - Core similarities
+    - Both shard model staes across multiple GPUs
+  - Key differences
+    - ZeRO (DeepSpeed): external framework, more mature offload features
+    - FSDP: Native PyTorch implementation, simpler integration
+- Ex:
+```py
+import torch
+from torch.distributed.fsdp import (FullyShardedDataParallel as FSDP )
+model = MyTransformer()
+sharded_model = FSDP(model) # wrap layers or full model
+loss_fn = torch.nn.CrossEntropyLoss()
+# Train as usual
+for inputs, targets in dataloader:
+outputs = sharded_model(inputs)
+loss = loss_fn(outputs, targets)
+loss.backward()
+optimizer.step()
+```    
+  - Launch command: torchrun --nproc_per_node=8 train.py
+- Memory optimizations
+  - Activation checkpointing
+  - Mixed precision
+  - CPU offload
+  - Auto-Wrap policies
+- Performance considerations
+  - When to use FSDP
+    - Best for large transformer-style models (10B+ params)
+    - When memory is the primary constraint
+    - Multi-node training setups
+    - When you need to increase batch size
+  - Tuning for performance
+    - Adjust communication bucket size
+    - Overlap communication with computation
+    - Benchmark tokens/sec/GPU before/after enabling
+- Fault tolerance
+  - Shareded checkpoints
+  - Elastic training
+  - Recovery testing
+- Best practices
+  - Strategic wrapping
+  - BF16 precision
+  - Gradient accumulation
+  - Thorough benchmarking
+
 ### 222. 220. Flash Attention in Large Models
+- Memory-efficient transformers at scale
+- Why attention is bottleneck
+  - Standard attention requires N^2 memory and compute
+  - GPUs spend more time on memory reads/writes
+  - Severely limits sequence length & batch size in LLMs
+- What is Flash Attention?
+  - Optimized CUDA kernel
+  - Tile-based processing
+  - Memory efficient
+  - Linear scaling
+- How it works
+  - Tile-based softmax: eliminates need to store full nxn attention matrix by computing in manageable blocks
+  - Fused operations: combines matmul + scaling + softmax + dropout into a single efficient kernel
+  - IO-aware design: minimizes GPU DRAM access
+- Benefits of Flash Attention
+  - 3x faster training and inference
+  - 10x memory reduction
+   - Larger batch size
+   - Drop-in replacement: compatible with most existing transformer frameworks
+- Integration in frameworks
+  - PyTorch >= 2.0
+  - Hugging Face Transformers
+  - Distributed training: Megatron-LM, DeepSpeed
+  - Other frameworks: xFormers, Triton
+- Practical example (PyTorch 2.x)
+```py
+import torch
+from torch.nn.functional import scaled_dot_product_attention
+# Create query, key, value tensors
+q, k, v = [torch.rand(8, 16, 128, 64,device="cuda") for _ in range(3)]
+# Use Flash Attention automatically
+out = scaled_dot_product_attention(
+  q, k, v,
+  is_causal=True
+)
+print(out.shape) # (batch, heads, seq_len, dim)
+```
+- Performance considerations
+  - Sequence length impact
+  - Batch/sequence tradeoffs
+  - HW dependencies: new GPUs only
+- Limitations
+  - Compatiblity issues
+  - SW requirements
+  - Custom mask limitations
+  - Algorithmic limitation: still quadratic scaling
+- Best practices
+  - Default to Flash Attention
+  - Combine optimization techniques
+  - Profile your workload
+  - Maintina fallback options
+
 ### 223. 221. Checkpointing Strategies for Multi-Node Systems
+- Why checkpointing matters
+  - Node crashes
+  - Network stalls
+  - Preemptions
+  - HW failures
+  - Without proper checkpointing, we need to restart from scratch
+- What to save
+  - Model parameters
+  - Optimizer states
+  - Gradients
+  - RNG (Random Number Generator) states
+  - Training Metadata
+- Full vs sharded checkpoints
+  - Full checkpoint
+    - One giant file containing all model state
+    - Single point of failure
+    - Creates IO bottleneck at scale
+  - Sharded checkpoint
+    - Each GPU/node saves its portion of the model
+    - Faster parallel saves and smaller per file size
+    - Standard in distributed training frameworks
+    - Enables faster save/load operations
+    - Reduces memory spikes during checkpoint ops
+- Types of checkpoints
+  - Traditional (sync)
+  - Asynchronoous
+  - Incremental
+- Storage infrastructure
+  - Distributed file systems
+    - Lustre, GPFS, BeeGFS
+    - High-throughput paralle access
+    - Optimized for HPC workloads
+  - Cloud object storage
+    - S3, GCS, Azure Blob
+    - Infinite scale, high durability
+    - Multi-region
+- Frequency trade-offs
+  - Too frequent: IO bottleneck, storage cost, resource contention
+  - Too infrequent: high compute cost after failure, extended recovery time, risk of missing data
+  - Balanced approach
+    - Rule of thumb: every 30-60min for long-running jobs
+    - Use lightweight evaluation checkpoints more frequently + full saves less often
+    - Adjust frequency based on failure rates in your environment
+- Fault tolerance enhancements
+  - Checkpoint retention
+  - Integrity verification
+  - Automated recovery
+  - Orchestration integration
+- Best practices
+  - Use sharded, async checkpointing
+  - Implement redundant storage
+  - Automate checkpoint-restore workflows
+  - Validate before production
+
 ### 224. 222. Elastic Training with Kubernetes
+- Why elastic training?
+  - Node failures and preemptions
+  - Static training limitations
+  - Dynamic resource utilization
+- Core idea: dynamic world size
+  - Dynamic topology
+  - Automatic state redistribution
+  - Continuous learning
+- Kubernetes as orchestrator
+  - Manage GPU workloads across heterogeneous clusters
+  - Restarts failed pods automatically
+  - Handles service discovery
+  - Provides native scaling
+  - Integrates with cloud provider
+  - Manages storage for checkpoints and model artifacts
+- Elastic training frameworks
+  - TorchElastic
+  - DeepSpeed ZeRO-Elastic
+  - Ray Train
+- Workflow example: TorchElastic on K8
+  - Define ElasticJob CRD
+  - Auto-registraion
+  - Dynamic worker pool
+  - Seamless recovery
+- Benefits of elastic training
+  - Fault tolerance
+  - Cost efficiency
+  - Opportunistic scaling
+  - Resource utilization
+- Challenges and mitigations
+  - Checkpoint frequency tradeoffs
+  - Synchronization overhead
+  - Straggler nodes
+  - Complex debugging
+- Monitoring and observability
+  - Key metrics to track
+    - Performance: tokens/sec/GPU, training loss convergence vs baseline static jobs, checkpoint save/load latency
+    - Infrastructure: worker join/leave frequency and distribution, rendezvous coordination time, node failure patterns by instance type
+    - Resource utilization: GPU memroy usage under different world sizes, network bandwidth during gradient synchronization, storage IO patterns during checkpoints
+- Best practices for production
+  - Infrastructure configuration
+    - Stgore check points on durabe shared storages (S3/GCS with local NVMe cache)
+    - Deploy redundant rendezvous servers with leader election
+    - Use node anti-affinity to spread workers across failure domains
+    - Set appropriate pod disruption budgets to prevent mass evictions
+    - Implement graceful terminatino handlers for clean checkpointing
+  - Training configuration
+    - Combine with ZeRO-3/FSDP for optimial memory efficiency
+    - Start with min_size=max_size for testing, then gradually increase elasticity
+
 ### 225. 223. Scaling Beyond 1,000 GPUs
+- Exascale AI training
+- Why 1000+ GPUs?
+  - LLMs with trillions of params
+  - Trillions of tokens
+  - Convergence needs exascale compute budgets
+- System bottlenekc at scale
+  - Networking
+  - Stragglers
+  - Checkpointing
+  - Orchestration
+- Parallelism requirements
+  - 3D parallelism of DP + TP + PP
+  - Advanced techniques:
+    - FSDP/ZeRO-3
+    - Mixture of experts
+    - Load balancing
+- Network challenges
+  - All-reduce latency grows with node count
+  - Multi-hop rack architectures lead to congestion & stalls
+  - Hierarchical collectives necessary
+  * HW requirements: infiniband HDR/NDR or Ethernet RoCEv2
+- Efficiency tricks
+  - Maximizing GPU utilization
+    - Overlap comm + compute
+    - Gradient compression
+  - Memory optimization
+    - Activation checkpointing
+    - Monitor tokens/sec/GPU
+- Cost & sustainability
+  - Economic impact: 1000 A100 GPUs = ~$40k/day
+  - Environmental footprint
+  - ROI considerations
+- Best practices
+  - Benchmark scaling efficiency before full runs
+  - Partition jobs into logical domains
+  - Implement sharded checkpoints
+  - Design infrastructure holistically
+
 ### 226. 224. Lab – Train with DeepSpeed ZeRO-3
-1min
+- Learning Goals
+  - Configure DeepSpeed ZeRO-3 for sharded training
+  - Train a Hugging Face Transformer model at scale
+  - Monitor GPU memory savings and throughput improvements
+  - Save and reload ZeRO-3 checkpoints
+```
+0) Prerequisites
+
+    Multi-GPU system or cluster (NCCL backend)
+
+    Install dependencies:
+
+    pip install torch transformers datasets deepspeed
+
+Verify DeepSpeed install:
+
+    deepspeed --version
+
+1) Prepare Dataset & Model
+
+We’ll use BERT fine-tuned on IMDb sentiment classification.
+
+File: train_ds_zero3.py
+
+    import torch
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+    from datasets import load_dataset
+     
+    # Load dataset
+    dataset = load_dataset("imdb")
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+     
+    def tokenize(batch):
+        return tokenizer(batch["text"], truncation=True, padding="max_length", max_length=128)
+     
+    dataset = dataset.map(tokenize, batched=True)
+    dataset.set_format("torch", columns=["input_ids", "attention_mask", "label"])
+     
+    # Model
+    model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2)
+     
+    # Training args with DeepSpeed ZeRO-3 config
+    training_args = TrainingArguments(
+        output_dir="./outputs",
+        per_device_train_batch_size=4,
+        evaluation_strategy="steps",
+        num_train_epochs=1,
+        save_steps=500,
+        logging_steps=50,
+        report_to="none",
+        deepspeed="ds_config_zero3.json",  # Link to config file
+    )
+
+2) DeepSpeed ZeRO-3 Config
+
+File: ds_config_zero3.json
+
+    {
+      "train_batch_size": 32,
+      "train_micro_batch_size_per_gpu": 4,
+      "gradient_accumulation_steps": 2,
+      "zero_optimization": {
+        "stage": 3,
+        "overlap_comm": true,
+        "contiguous_gradients": true,
+        "reduce_bucket_size": 5e8,
+        "stage3_prefetch_bucket_size": 5e8,
+        "stage3_param_persistence_threshold": 1e5,
+        "offload_optimizer": {
+          "device": "cpu",
+          "pin_memory": true
+        }
+      },
+      "bf16": { "enabled": true },
+      "gradient_clipping": 1.0,
+      "steps_per_print": 100,
+      "wall_clock_breakdown": false
+    }
+
+3) Integrate with Trainer
+
+Extend train_ds_zero3.py:
+
+    from transformers import Trainer
+     
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset["train"].shuffle().select(range(5000)),  # subset for speed
+        eval_dataset=dataset["test"].select(range(1000)),
+    )
+     
+    trainer.train()
+
+4) Run Training with DeepSpeed
+
+Launch training across 2 GPUs:
+
+    deepspeed --num_gpus=2 train_ds_zero3.py
+
+Expected:
+
+    Lower GPU memory per device vs vanilla DDP
+
+    Checkpoints saved in sharded format under ./outputs
+
+5) Reload Checkpoint
+
+    from transformers import AutoModelForSequenceClassification
+     
+    model = AutoModelForSequenceClassification.from_pretrained("./outputs/checkpoint-500")
+    print("Checkpoint reloaded successfully!")
+
+6) Monitor GPU Memory Savings
+
+Run with nvidia-smi or DeepSpeed logs:
+
+    Memory per GPU should drop significantly compared to non-ZeRO runs
+
+    Larger batch sizes possible without OOM
+
+7) Stretch Goals
+
+    Try larger model (e.g., roberta-large, gpt2-xl)
+
+    Scale to multiple nodes with SLURM or Kubernetes
+
+    Enable ZeRO-Infinity to offload params/activations to NVMe
+
+    Profile tokens/sec and compare vs standard DDP
+
+✅ Outcome: You trained a Transformer with DeepSpeed ZeRO-3, saw memory savings, and learned how to scale beyond single-GPU limits.
+```
+
+## Section 34: Week 33: Enterprise MLOps - Foundations
 
 ### 227. 225. What Is Enterprise MLOps?
+- Why enterprise MLOps matters
+  - Reliable services
+  - Faster delivery
+  - Aligned lifecycles
+  - Enterprise controls
+- Core pillars of enterprise MLOps
+  - Platform
+  - Pipeline
+  - Operations
+  - Governance
+- Enterprise MLOps reference architecture
+  - Data layer
+  - ML layer
+  - Serving layer
+  - Observability
+  - Security
+- ML lifecycle stages
+  - Problem & data discovery
+  - Feature engineering
+  - Training & tracking
+  - Validation & approval
+  - Deployment
+  - Monitoring & feedback
+- Key platform capabilities
+  - Reproduciable environments
+  - Standardized pipelines
+  - Model registry + promotion
+  - Secrets & access control
+- Data & feature management
+  - FEature store benefits
+    - Consistency
+    - Reuse
+    - Data contracts
+    - Quality checks
+    - Lineage tracking
+    - Point-in-time correctness
+- Deployment patterns
+  - Batch scoring
+    - Scheduled ETL/ELT jobs
+    - High througuput
+    - Minutes-to-hours latency
+    - Efficient for large volumes
+  - Streaming
+    - Kafka, Flink-based pipelines
+    - Near-real-time processing
+    - Seconds-to-minutes latency
+    - Event-driven architecture
+  - Online serving
+    - FastAPI/Triton microservices
+    - Autoscaling capabilities
+    - Milliseconds-to-seconds latency
+    - Safe rollout patterns
+- Observability & SLOs
+  - Model health
+  - System health
+  - Data health
+  - Business KPIs
+- Governance & risk management
+  - Policy enforcement
+    - Policy-as-code: policies are enforced automatically within CI/CD pipelines
+    - Audit trails
+    - PII handling
+    - Safety evaluations
+- Organization & process
+  - Roles & responsibilities
+  - ML-specific CI/CD
+  - Templates & playbooks
+  - FinOps practices: cost management
+
 ### 228. 226. Introduction to Kubeflow
+- Why Kubeflow?
+  - Scalable orchestration
+  - K8 foundation
+  - Unified platform
+- Core goals of Kubeflow
+  - Portability
+  - Scalability
+  - Reproducibility
+  - Integration
+- Key components
+  - Kubeflow pipelines (KFP): workflow automation & experiment tracking
+  - KServing: model deployment with intelligent autoscaling
+  - Katib: hyperparameter tuning at scale
+  - Notebooks
+  - Training operators: PyTorchJob, TFJob, MPIJob
+- Kubeflow pipelines (KFP)
+  - DAG-based pipeline structure from data ingestion to deployment
+  - Comprehensive artifact tracking and metadata lineage
+  - Easy parameterization for rapid experimentation
+- Training on Kubeflow
+  - PyTorchJob
+  - TFJob
+  - MPIJob
+- Model serving with KServe
+  - Mircoservice-based architecture
+    - Deploy models as scalable AIP endpoitns on K8
+    - Support for both REST and gRPC inference protocols
+    - Knative integration for intelligent autoscaling
+    - Multi-framework serving for TorchScript, Tensorflow, ONNX, and Triton
+- Hyperparameter tuning with Katib
+  - Define Experiment
+  - Run distributed trials
+  - Track & select best
+  - Automate retraining
+- Security and multi-tenancy
+  - Namespace isolation
+  - Role-based access control
+  - Identity integration
+  - Shared infrastructure
+- Kubeflow in action
+  - Data preparation
+  - Model training
+  - Tracking
+  - Deployment
+  - Monitoring
+- Best practices
+  - Use KFP for reproducibility
+  - Persistent storage strategy
+  - Efficient inference with KServe
+  - Automate with Katib
+
 ### 229. 227. Introduction to MLflow at Scale
+- Why MLflow?
+  - Track experiments
+  - Compare results
+  - Reproduce runs
+  - Provides a standardized framework for tracking, packaging, and deploying models
+- Core components of MLflow
+  - Tracking
+  - Projects
+  - Models
+  - Registry
+- MLflow tracking
+  - Hyperparameters
+  - Metrics
+  - Artifacts
+  * Tracking server backed by local SQLite or RDBMs
+- MLflow projects
+  - Define environment and entry points in an MLproject file
+  - Support for Conda, docker, or system environments
+  - Run with consistent dependencies across dev, staging, and production
+  - Chain projects together into multi-step workflows
+- Model registry
+  - Development
+  - Staging
+  - Production
+  - Archived
+- Scaling MLflow
+  - Infrastructure scaling
+    - K8 deployments for high availability
+    - Databricks-managed MLflow for zero maintenance
+  - Process scaling
+    - Integrate with CI/CD pipelines
+    - Auto-scaling inference endpoints
+    - Multi-tenant steups for large organizations
+- Observability at scale
+  - Experiment tracking
+  - Model monitoring
+  - System monitoring
+- Security & governance
+  - Access control
+  - Audit trail
+  - Enterprise integration
+  - Compliance
+- Best practices
+  - For data scientists
+    - Always log code version + dataversion
+    - Create standard parameter set for baseline
+    - Document experiments with tags and notes
+    - Track data lineage alongside models
+  - For ML engineers
+    - Standardize pipelines with MLflow projects
+    - Automate promotion to production via CI/CD
+    - Scale tracking infrastructure with managed database and object storage
+    - Implement model approval workflows
+
 ### 230. 228. SageMaker Pipelines – Basics
+- AWS native MLOps orchestration
+- Core capabilities
+  - Define ML-workflows as pipelines
+  - Built-in step types
+  - Track lineage
+  - Automate promotions
+- Pipeline workflow example
+  - Data preprocessing
+  - Feature engineering
+  - Model training
+  - Evaluation
+  - Conditional step
+  - Register/deploy
+- How it works
+  - Define: Python SDK
+  - Store: artifacts stored in S3
+  - Execute
+  - Monitor: SageMaker Studio UI
+- Monitoring and observability
+  - Comprehensive visibility
+    - CloudWatch logs
+    - Track accuracy, loss, and custom metrics
+    - Complete lineage view: datasets -> model -> endpoint
+- Common use cases
+  - Automating batch retraining
+  - Standardizing ML workflows
+  - Model approved workflows
+  - Enterprise MLOps
+- Best practices
+  - Configuration & flexibility
+    - Use PipelineParameters for runtime flexibility
+    - Store all datasets on S3 with versioning
+  - Governance & cost control  
+    - Integrate with SageMaker Model Registry for governance
+    - Tag resources for cost tracking & auditing
+    - Implement appropriate instance auto-scaling policies
+
 ### 231. 229. GCP Vertex AI Pipelines
+- Why Vertex AI pipelines
+  - Fully managed Kubeflow pipelines
+  - Seamlessly integrated with BigQuery, GCS, AutoML, and GCP infrastructure
+- Core capabilities
+  - Pipeline definiion: define ML workflow as DAGs
+  - Orchestration
+  - Metadata Storage
+  - Serverless infrastructure
+- Pipeline workflow example
+  - Data ingestion
+  - Processing
+  - Training
+  - Evaluation
+  - Conditional
+  - Registry
+- How it works
+  - Define in Python
+  - Compile in YAML
+  - Vertex AI orchestration
+  - Monitor via UI
+- Key benefits
+  - Serverless
+  - Scalable
+  - Integrated
+  - Governed
+- Observability and monitoring
+  - Vertex ML metadata
+  - Evaluation metrics
+  - Cloud monitoring integration
+  - Alerting system
+- Common use cases
+  - Automated retraining
+  - Hybrid model approach
+  - Explainable auditable ML
+  - Research to production
+- Best practices  
+  - Parameterize everything
+  - Version control data
+  - Log everything
+  - Approval workflows
+
 ### 232. 230. Azure ML Pipelines
+- Why Azure ML pipelines?
+  - Multi-step, repetitive workflows
+  - Reproducibilty + Enterprise scalability
+  - End-to-end automation
+- Core capabilities
+  - Multi-step workflow definition
+  - Parameterized components
+  - Complete lineage tracking
+  - Azure-managed compute
+- Typical ML workflow
+  - Data preparation
+  - Feature engineering
+  - Model training
+  - Evaluation
+  - Registration
+  - Deployment
+- Pipeline architecture
+  - Azure ML studio
+  - Python SDK
+  - Reusable components
+- Enterprise benefits
+  - Enterprise security & integration
+  - Infinite scalability
+  - Governance & compliance
+  - Framework flexibility
+- Monitoring & observability
+  - Azure monitor + App insights
+  - Dataset drift detection
+  - Endpoint health monitoring
+  - Cost & resource management
+- Common use cases
+  - Automated batch retraining
+  - Regulated industry MLOps
+  - Hybrid ML solutions
+  - Edge ML deployment
+- MLOps best practices  
+  - Modularize with Reusable Components
+  - Implement Data Lake Storage Strategy
+  - Secure secrets with Key Vault
+  - Automate with CI/CD integration
+  
 ### 233. 231. Lab – Build a Pipeline in Kubeflow
-2min
+- Learning Goals
+  - Define a pipeline in Kubeflow Pipelines (KFP)
+  - Build reusable pipeline components (preprocess, train, evaluate)
+  - Compile and run the pipeline in the Kubeflow UI
+  - Track artifacts, metrics, and pipeline lineage
+```
+0) Prerequisites
+
+    A running Kubeflow Pipelines deployment (on GCP, AWS, Azure, or on-prem)
+
+    Install SDK locally:
+
+    pip install kfp
+
+    Optional: Access to Jupyter Notebook / Kubeflow Notebooks
+
+1) Create Pipeline Components
+Preprocessing Component – preprocess.py
+
+    def preprocess_op():
+        import pandas as pd
+        from sklearn.model_selection import train_test_split
+        
+        df = pd.read_csv("/mnt/data/iris.csv")
+        train, test = train_test_split(df, test_size=0.2, random_state=42)
+        train.to_csv("/mnt/data/train.csv", index=False)
+        test.to_csv("/mnt/data/test.csv", index=False)
+
+Training Component – train.py
+
+    def train_op():
+        import pandas as pd
+        from sklearn.linear_model import LogisticRegression
+        import joblib
+     
+        train = pd.read_csv("/mnt/data/train.csv")
+        X, y = train.drop("species", axis=1), train["species"]
+     
+        model = LogisticRegression(max_iter=200)
+        model.fit(X, y)
+        joblib.dump(model, "/mnt/data/model.pkl")
+
+Evaluation Component – evaluate.py
+
+    def evaluate_op():
+        import pandas as pd
+        import joblib
+        from sklearn.metrics import accuracy_score
+     
+        test = pd.read_csv("/mnt/data/test.csv")
+        X, y = test.drop("species", axis=1), test["species"]
+     
+        model = joblib.load("/mnt/data/model.pkl")
+        preds = model.predict(X)
+     
+        acc = accuracy_score(y, preds)
+        print(f"Model accuracy: {acc}")
+
+2) Define Pipeline with KFP SDK
+
+File: iris_pipeline.py
+
+    import kfp
+    from kfp import dsl
+    from kfp.dsl import pipeline
+     
+    @pipeline(name="iris-classifier-pipeline", description="Simple Iris ML pipeline")
+    def iris_pipeline():
+        preprocess = dsl.ContainerOp(
+            name="Preprocess Data",
+            image="python:3.9",
+            command=["python", "preprocess.py"]
+        )
+        train = dsl.ContainerOp(
+            name="Train Model",
+            image="python:3.9",
+            command=["python", "train.py"]
+        ).after(preprocess)
+        evaluate = dsl.ContainerOp(
+            name="Evaluate Model",
+            image="python:3.9",
+            command=["python", "evaluate.py"]
+        ).after(train)
+
+3) Compile the Pipeline
+
+    python -m kfp.compiler.cli compile \
+        --py iris_pipeline.py \
+        --output iris_pipeline.yaml
+
+This generates a YAML file to upload to Kubeflow.
+4) Upload & Run Pipeline
+
+    Go to Kubeflow Pipelines UI → Upload pipeline (iris_pipeline.yaml)
+
+    Create a new Run with default parameters
+
+    Observe DAG execution: preprocess → train → evaluate
+
+5) Track Artifacts & Metrics
+
+    Preprocess step → outputs train/test datasets
+
+    Train step → model artifact (model.pkl)
+
+    Evaluate step → logs accuracy to Kubeflow UI
+
+    Explore lineage in Pipeline Dashboard
+
+6) Stretch Goals
+
+    Add hyperparameter tuning step with Katib
+
+    Store model in MinIO/S3 and register with MLflow/KServe
+
+    Add conditional step: deploy only if accuracy > threshold
+
+    Convert components into reusable YAML ops for team reuse
+
+✅ Outcome: You built and executed a Kubeflow pipeline with preprocessing, training, and evaluation stages, and tracked results through the KFP UI.
+```
+
+## Section 35: Week 34: Enterprise MLOps - Advanced
 
 ### 234. 232. Model Registry in Enterprise MLOps
+- Why a model registry?
+  - Central repository
+  - Reproducibility
+  - Standardized promotion
+  - Governance support
+- Core concepts
+  - Registred model
+  - Version
+  - Stage: staging, production, or archived
+  - Metadata  
+- What a good registry stores
+  - Artifacts
+    - Model files
+    - Inference code
+    - Containerized dependencies
+  - Metrics
+    - Offline evaluation scores
+    - Fairness/robustness measures
+    - Calibration statistics
+  - Lineage
+    - Dataset versions
+    - Feature views
+    - Code commit references
+    - Pipeline run identifiers
+  - Constraints
+    - Schema definitions
+    - Input/output specifications
+    - Pydantic/OpenAPI contracts
+  - Risk/safety
+    - Bias test results
+    - PII handling documentation
+    - Red-team evaluation notes
+- Popular imlementations
+  - MLflow Model Registry
+  - SageMaker Model Registry
+  - Vertex AI Model Registry
+  - Azure ML Registry
+  - Databricks Unit Catalog
+- Promotion workflow
+  - Train/log
+  - Register
+  - Gate Checks
+  - Approval
+  - Promote
+  - Deploy
+- Policy-as-code (Gates)
+  - Automated guardrails ensure only quality models reach production environments
+  - Performance thresholds: minimum AUC/F1 score
+  - Data freshness: enforces training data recency <= N days old
+  - Drift detection: verifies feature schema & data drift bounds
+  - Security compliance: security scan (licenses, CVEs) on artifacts/containers
+- CI/CD integration
+  - Train job
+  - CI pipeline: executes gates including unit-tests, data validation, evaluation metrics, and security scans
+  - CD pipeline: on approval, transitions model stage and triggers deployment automation
+  - Canary deployment: routes 5-10% traffic to new version; auto-rollback on p95/p99 latency or KPI regressions
+- Observability & feedback
+  - Serving telemetry
+  - Live metrics
+  - Shadow testing
+  - Feedback loop
+- Governance & compliance
+  - RBAC (Role-Based Access Control)
+  - Audit trail
+  - Retention policies
+  - Version freeze
+- Multi-env & multi-cloud
+  - Environment strategy: choose b/w separate registries per environment or single global registry with logical partitions
+  - Cross-region replication
+  - Portability
+  - Deployment mapping
+- Common pitfalls
+  - File storage mindset
+  - Schema negligence
+  - Rollback blindness
+  - Orphaned versions
+- What Good looks like
+  - Registry-driven endpoints
+  - Gated promotion
+  - Complete lineage
+  - Safety mechanisms
+
 ### 235. 233. Continuous Training (CT) Pipelines
+- Why continuous training?
+  - Data & environment shifts
+  - Static model degradation
+  - Automation need
+- What is Continuous Training?
+  - Monitor data & performance
+  - Trigger retraining
+  - Validate new model
+  - Deploy if gates pass
+- CT pipeline architecture
+  - Data ingestion & monitoring
+  - Trigger conditions
+  - Retraining job
+  - Evaluation & comparison
+  - Registry update & promotion
+  - Deployment & testing
+- Triggering retraining
+  - Time-based triggers
+  - Volume-based triggers
+  - Event-based triggers
+  - Manual triggers
+- Tech stack examples
+  - Kubeflow + Katib
+  - MLflow + Airflow
+  - SageMaker Pipelines
+  - Vertex AI Pipelines
+- Validation & gates
+  - Performance comparison
+  - Fairness evaluation
+  - Operational assessment
+  - Progressive deployment
+- Monitoring & feedback loop
+  - Input drift monitoring
+  - Output drift monitoring
+  - Feedback integration
+  - Business KPI tracking
+- Continuous training transforms ML from a project-based activity into a sustainable oeprational capability
+- Challenge & risks
+  - Retraining frequency balance
+  - Infrastructure complexity
+  - Validation failures
+  - Automation vs oversight
+- Best practices for continuous training
+  - Use policy-as-code: implement retraining triggers and validation gates as versioned code in your CI/CD system
+  - Dataset reproducibility
+  - Always compare to Prod
+  - Human oversight integration
+
 ### 236. 234. Automating Drift Retraining with Kubeflow
+- Why automate retraining?
+  - Model degradation by data drift and concept dript
+  - Manual approach is slow
+  - Kubeflow enables event-driven retraining pipelines
+- Understanding different type of drift
+  - Data drift
+  - Concept drift
+  - Label drift
+- Kubeflow building blocks for automated retraining
+  - Kubeflow pipelines
+  - Katib
+  - KServe
+  - ML metadata (MLMD)
+- Drift detection integratoin architecture
+  - Monitoring component
+  - Drift detector
+  - Trigger step
+  - Update registry
+- Example pipeline flow
+  - Ingest & monitoir data
+  - Detect drift
+  - Retrain model
+  - Evaluate vs current prod
+  - Conditional promotion: promote if accuracy improves and drift is adequately addressed
+  - Deploy with KServe
+- Benefits of Kubeflow for drift retraining
+  - Automation
+  - Scalability
+  - Reproducibility
+  - Flexibility   
+- Challenges and pitfalls to avoid
+  - False positives: unnecessary retrains triggered by noisy data
+  - Pipeline performance: slow retraining cycles
+  - Trigger reliability
+  - Governance gaps
+- Best practices for drift-based retraining
+  - Set clear thresholds
+  - Always compare against prod
+  - Use shadow deployments
+  - Automate rollbacks  
+
 ### 237. 235. Feature Store Integration in Pipelines
+- Why a feature store?
+  - Providing consistent features
+  - Without proper management:
+    - Skew, leakage, errors
+    - Duplicate work
+    - No governance or versioning creates risk
+  - Core capabilities of feature stores
+    - Centralized repository
+    - Offline store: optimized batch storage
+    - Online store: Low-latency database for real-time serving (10ms response time)
+    - Metadata registry
+- Integration with ML pipelines
+  - Data preparation step
+  - Training step
+  - Validation step
+  - Deployment step
+- Workflow example: customer transaction features
+  - Ingest data
+  - Compute aggregates
+  - Register feature
+  - Train model
+- Popular feature store solutions
+  - Feast (opensource)
+  - SageMaker Feature Store
+  - Tecton
+  - Vertex AI Feature Store
+  - Databricks Feature Store
+  - Hopsworks
+- Benefits of feature store integration
+  - Eliminates train-serve skew
+  - Feature reusability
+  - Accelerated iteration
+  - Governance
+- Implementation challenges
+  - Offline/online synchronization
+  - Storage cost
+  - Serving latency
+  - Schema management
+- Best practices for feature store integration
+  - Register features with rich metadata
+  - Version features explicitly
+  - Validate schema before pipeline execution
+  - Cache frequently used features
+
 ### 238. 236. Governance in Enterprise MLOps
+- Why governance matters
+  - Trust: stakeholders must trust that AI systems operate as intended and produce fair, accurate results
+  - Accountability: clear ownership of decisions and outcomes throughput the ML lifecycle
+  - Reliability
+- Core governance dimensions
+  - Lineage: comprehensive tracking of datasets, features, models, and code versions through their entire lifecycle
+  - Approval workflows
+  - Access control
+  - Compliance
+- Model lifecycle governance
+  - Registration
+  - Evaluation
+  - Approval
+  - Promotion
+  - Monitoring
+- Data governance in ML
+  - Catalogs & lineage
+  - Data contracts and validation
+  - Sensitive data management
+  - Data lifecycle controls
+- Risk & bias management
+  - Fairness across subgroups: gender identities, geographic regions, age demographics, ...
+  - Model robustness
+  - Ethical reviews
+  - Audit registry
+- Tools & platforms
+  - Lineage & metadata
+    - ML Metadata (MLMD)
+    - Datahub
+    - Amundsen
+    - OpenLineage
+  - Model registries
+    - MLflow
+    - SageMaker/Vertex AI/Azure ML Registry
+  - Policy-as-code
+    - Open Policy Agent (OPA)
+    - AWS Control Tower
+    - HashiCorp Sentinel
+  - Monitoring
+    - Prometheus & Grafana
+    - EvidentlyAI
+    - WhyLabs
+- Approval & audit trails
+  - Every stage transition must be logged with immutable timestamps and user attribution
+  - Evaluation reports and reviewer sign-offs must be permanently attached to model versions
+  - Records must be tamper-proof and readily available for auditors and regulators
+  - System must enable clear explainability of who approved what and why
+- Security & access control
+  - RBAC & IAM
+  - Secrets management
+  - Encryption
+  - Change detection
+- Governance challenges
+  - Overhead vs agility
+  - Multi-cloud complexity
+  - Standardization gaps
+  - Balancing responsibility
+- Governance best practices
+  - Policy-as-code integratoin
+  - Automate compliance
+  - Templates & playbooks
+  - Guardrails vs guidelines
+
 ### 239. 237. Audit Trails and Compliance Logging
+- Why audit trails matter
+  - Regulatory compliance
+  - Stakeholder transparency
+  - Trust foundation
+  * Critical for regulated industries: financial services, healthcare, security & defense, government agencies
+- What to capture in audit logs
+  - Model lineage
+  - Experiment metadata
+  - Registry events
+  - Deployment actions
+  - Operational events
+- Compliance requirements
+  - GDPR/CCPA: data acess tracking, retention policies, support for right to be forgotten requests
+  - HIPAA: comprehensive audit logs documenting all access to protected health information
+  - SOX/FINRA: full transparency in financial prediction systems and decision processes
+  - EU AI Act: extensive documentation of high-risk AI usage, including validation methodologies
+- Audit loggin across the ML pipeline
+  - Data ingestion: record dataset IDs, schema version, data hashes, source systems, access permissions
+  - Feature engineering: store transformations, feature owners, feature store versions, validation criteria
+  - Training: log hyperparameters, random seeds, compute environment, container images, libraries
+  - Validation: log ibas assessments, drift detection, robustness tests, fairness metrics, approvers
+  - Deployment: log approvers, rollout strategy, canary deployments, fallback mechanisms
+  - Monitoring: log performance incidents, rollback decisions, retraining triggers, concept drift alerts
+- Tooling and platforms
+  - ML Specific tools
+    - ML Metadata (MLMD)
+    - MLflow
+    - Kubeflow Pipelines
+  - Enterprise infrastructure
+    - Cloud audit systems
+    - Compliance logging
+    - Custom solutions
+- Example log entry
+  - Precise timestamp
+  - User identity
+  - Specific action
+  - Full object identification
+  - State transition
+  - Cross-references
+  - Human-readable notes
+- Observability + compliance
+  - Monitoring integration
+  - Alert Mechanisms
+  - Correlation capabilities
+  - Regulatory storage
+- Challenges in ML audit logging
+  - Performance overhead
+  - Log immediately
+  - Multi-cloud complexity
+  - Privacy considerations
+- Best practices
+  - Standardize log schema
+  - Immutable storage
+  - Automate collection
+  - Test audit readiness
+
 ### 240. 238. Lab – Automate Drift Retraining with Kubeflow
-2min
+- Learning Goals
+  - Detect data drift in production pipelines
+  - Automate retraining & evaluation with Kubeflow
+  - Implement conditional deployment if retrained model passes gates
+  - Track artifacts and lineage with Kubeflow Pipelines
+```
+0) Prerequisites
+
+    Running Kubeflow Pipelines (KFP) instance
+
+    Access to storage (MinIO/S3/GCS) for datasets & models
+
+    Install Python SDK:
+
+    pip install kfp evidently scikit-learn pandas joblib
+
+1) Create Drift Detection Component
+
+File: drift_detector.py
+
+    import pandas as pd
+    from evidently.report import Report
+    from evidently.metric_preset import DataDriftPreset
+     
+    def detect_drift(ref_data_path="/mnt/data/ref.csv", new_data_path="/mnt/data/new.csv", threshold=0.1):
+        ref = pd.read_csv(ref_data_path)
+        new = pd.read_csv(new_data_path)
+     
+        report = Report(metrics=[DataDriftPreset()])
+        report.run(reference_data=ref, current_data=new)
+        drift_share = report.as_dict()["metrics"][0]["result"]["drift_share"]
+     
+        print(f"Drift detected: {drift_share:.2f}")
+        if drift_share > threshold:
+            exit(0)  # trigger downstream retraining
+        else:
+            exit(1)  # stop retraining
+
+2) Training Component
+
+File: train.py
+
+    import pandas as pd
+    from sklearn.linear_model import LogisticRegression
+    import joblib
+     
+    def train_model(train_path="/mnt/data/train.csv", model_out="/mnt/data/model.pkl"):
+        df = pd.read_csv(train_path)
+        X, y = df.drop("label", axis=1), df["label"]
+     
+        model = LogisticRegression(max_iter=200)
+        model.fit(X, y)
+        joblib.dump(model, model_out)
+
+3) Evaluation Component
+
+File: evaluate.py
+
+    import pandas as pd
+    import joblib
+    from sklearn.metrics import accuracy_score
+     
+    def evaluate(model_path="/mnt/data/model.pkl", test_path="/mnt/data/test.csv", threshold=0.85):
+        model = joblib.load(model_path)
+        test = pd.read_csv(test_path)
+        X, y = test.drop("label", axis=1), test["label"]
+     
+        preds = model.predict(X)
+        acc = accuracy_score(y, preds)
+        print(f"Model accuracy: {acc:.3f}")
+        if acc >= threshold:
+            exit(0)  # pass promotion gate
+        else:
+            exit(1)  # fail
+
+4) Define Kubeflow Pipeline
+
+File: drift_retrain_pipeline.py
+
+    import kfp
+    from kfp import dsl
+     
+    @dsl.pipeline(name="drift-retrain-pipeline", description="Automated drift retraining pipeline")
+    def pipeline(threshold: float = 0.1, acc_threshold: float = 0.85):
+     
+        detect = dsl.ContainerOp(
+            name="Detect Drift",
+            image="python:3.9",
+            command=["python", "drift_detector.py"],
+            arguments=["--threshold", str(threshold)]
+        )
+     
+        train = dsl.ContainerOp(
+            name="Train Model",
+            image="python:3.9",
+            command=["python", "train.py"]
+        ).after(detect)
+     
+        evaluate = dsl.ContainerOp(
+            name="Evaluate Model",
+            image="python:3.9",
+            command=["python", "evaluate.py", "--threshold", str(acc_threshold)]
+        ).after(train)
+     
+        # Conditional deployment
+        with dsl.Condition(evaluate.output == "0"):
+            deploy = dsl.ContainerOp(
+                name="Deploy Model",
+                image="myregistry/deploy:latest",
+                command=["sh", "-c"],
+                arguments=["echo Deploying model..."]
+            )
+
+5) Compile & Upload Pipeline
+
+    python -m kfp.compiler.cli compile \
+        --py drift_retrain_pipeline.py \
+        --output drift_retrain_pipeline.yaml
+
+Upload drift_retrain_pipeline.yaml to Kubeflow Pipelines UI.
+6) Run Pipeline
+
+    Set threshold=0.1 for drift sensitivity
+
+    If drift > 10%, retrain is triggered
+
+    If new accuracy ≥ 0.85, pipeline promotes the model to deployment
+
+7) Stretch Goals
+
+    Replace dummy deploy step with KServe model deployment
+
+    Store drift reports in MinIO/S3 as artifacts
+
+    Add Katib HPO step for retraining optimization
+
+    Trigger pipeline automatically from Kafka/BigQuery events
+
+✅ Outcome: You built an automated Kubeflow pipeline that detects drift, retrains models, evaluates performance, and conditionally deploys only if gates are passed.
+```
+
+## Section 36: Week 35: Optimization Techniques - Foundations
 
 ### 241. 239. What Is Model Optimization for Infra Efficiency?
+- Faster, cheaper, greener ML at scale
+- Why optimize?
+  - Production constraints
+  - Resource constrained environment
+  - Infrastructure economics
+- Optimization toolkit
+  - Quantization
+  - Pruning
+  - Knowledge distillation
+  - Sparsity
+  - Compilation: graph level fusion & kernel selection
+  - Caching: KV-cache, embedding/prompt caches for LLM
+- Where it pays off
+  - Inference services
+  - Real-time applications
+  - Batch scoring
+  - Edge/IoT deployment
+- Core trade-offs
+  - Accuracy vs latency/size
+  - Portability vs HW gains
+  - Online quality vs offline metrics
+  - Development speed vs toolchain complexity
+- Workflow: optimize then serve
+  - Baseline
+  - Select methods
+  - Calibrate & fine-tune
+  - Validate
+  - A/B deploy
+  - Monitor
+- HW & runtime levers
+  - Precision engineering
+    - Mixed precision
+    - INT8/INT4 on CPUs/NPUs/Edge
+  - Compiler optimization
+  - Execution strategy
+    - Micro-batching
+    - Concurrency controls and pinning models to memory
+- Data & architecture levers
+  - Input optimization: shorter sequence lengths/reduced image resolutions. Token pruning
+  - Parameter efficiency
+  - Efficient model design
+  - Conditional computation
+- Measuring **Efficiency**
+  - Performance metrics
+    - Latency: p50/p95/p99 response times
+    - Throughput: requests/sec, tokens/sec
+  - Resource metrics
+    - Memory: peak GB, model sizes (MB)
+    - Energy: Joules per inference
+  - Business metrics
+    - Cost: $ per 1K inferences
+    - Quality: task metrics + human eval
+- Governance & safety Considerations
+  - Post-optimization validatino
+  - Contract testing
+  - Artifact management
+  - Deployment safety
+- Common pitfalls
+  - Quantization without calibration
+  - Ineffective pruning strategies
+  - Incomplete profilng
+  - Focusing on ly on average case: ignoring tail latencies and multi-tenant inference can cause SLA violations
+- Best practices
+  - Layered approach
+  - HW-aware sparsity
+  - Quality recovery
+  - Realistic testing
+
 ### 242. 240. Quantization Basics
+- Smaller, faster, cheaper models with lower precision
+- Quantization
+  - FP32 -> INT8 or FP16
+  - Represents values using fewer bits
+  - Dramatically reduces model footprint
+  - Critical for resource-constrained environment
+- Why quantize?
+  - Inference efficiency
+  - Edge deployment
+  - Cost savings
+  - Energy efficiency
+- Types of quantization
+  - Post-training quantization (PTQ)
+    - No retraining required
+    - Quick toi implement, moderate accuracy loss
+  - Quantization-aware training (QAT)
+    - Fine-tune with quantization in the loop
+    - Higher engineering cost, better results
+  - Dynamic vs static quantization
+    - Dynamic: weights quantized offline, activations at runtime
+    - Static: both weights and activations quantized with calibration dataset
+- Precision levels
+  - FP32 & FP16/BF16: well supported on modern GPUs
+  - INT8 & beyond: 4x smaller than FP32
+    - INT4/INT2: extreme compression
+- Benefits of quantization
+  - FP32 -> INT8 conversion reduces model size by 75%
+  - For inference workloads, 3x thorughput gain
+  - For matrix operations, 70% memory bandwidth reduction
+- Limitations of quantization
+  - Accuracy impact: some models experience signficant degradation
+    - NLP models with complex patterns
+    - Recommendation systems with long-tail distributions
+    - Small models with limited redundancy
+  - HW compatibility: not all HW supports accelerated quantized operations
+  - Engineering complexity  
+    - Calibration data collection and management
+    - QAT requires retraining infrastructure
+    - Model validation across precision levels
+- Where quantization shines
+  - LLM inference
+  - Edge deployment
+  - Cost-efficient batch processing
+- Best practices
+  - Start simple
+  - HW specific optimization
+  - Hybrid approaches
+    - Keep senstive layers in higher precision
+    - Combine with knowledge distillation  
+
 ### 243. 241. Pruning Basics
+- What is pruning
+  - Removes unnecessary weights or neurons from a neural network
+- Why prune?
+  - Eliminate redundancy
+  - Faster inference
+  - Enable edge deployment
+- Types of pruning
+  - Unstructured pruning
+  - Structured pruning
+  - Global vs local
+  - Dynamic pruning
+- Unstructured pruning
+  - Selectively zeroes out individual weights in the model, targetting those with the smallest magnitude
+  - Can achieve very high compression ratios
+  - Preserves model architecture
+  - Minimal accuracy impact
+  - Requires specialized sparse matrix operations for actual speedup
+- Structured pruning
+  - Removes entire filters, channels, or attention heads
+  - HW efficiency
+  - Deployment-friendly: easily integrates with ONNX or TensorRT
+    - May impact accuracy significantly
+- Ex: PyTorch unstructured pruning
+```py  
+import torch
+import torch.nn.utils.prune as prune
+# Create a simple linear layer
+model = torch.nn.Linear(128, 64)
+# Prune 30% of weights with lowest L1 norm
+prune.l1_unstructured(model, name="weight", amount=0.3)
+# Inspect the pruning mask (1 = kept, 0 = pruned)
+print(model.weight_mask) # binary mask of pruned weights
+# Make pruning permanent (optional)
+prune.remove(model, 'weight')  
+```
+- Workflow for pruning
+  - Train baseline model
+  - Apply pruning strategy
+  - Fine-tune the model
+  - Export for deployment
+  - Benchmark Performance
+- Benefits of pruning
+  - Dramatic size reduction
+  - Faster inference
+  - Energy efficiency
+  - Complementary technique
+- Limitations and challenges
+  - Accuracy degradation
+  - HW compatibility
+  - Increased training complexity
+  - Challenging trade-offs
+- Best practices for effective pruning
+  - Start conservative
+  - Prioritize structure
+  - Fine-tune strategically
+  - Measure what matters
+
 ### 244. 242. Distillation Basics
+- Knowledge distillation
+  - Transferring knowledge from a large teacher model to a smaller student model
+  - The student learns not just hard labels but also soft predictions (logits/probabilities) from the teacher
+  - Create a smaller, faster, cheaper model that maintains near-teacher accuracy
+- Why distill?
+  - Edge & mobile deployment
+  - Cost efficiency
+  - Performance preservation: distilled models are compact but accurate
+  - Democratizing aI
+- Core concepts
+  - Teacher model: pre-trained, large, highly accurate model
+  - Soft targets
+  - Student model: smaller, lightweight architecture
+  - Distillation loss
+- Types of distillation
+  - Logit distillation: most common. Student learns to mimic teacher's softmax outputs
+  - Feature distillation: aligns intermediate representations b/w teacher and student models
+  - Self-distillation: model iteratively teaches improved versions of itself
+  - Attention distillation: student learns to reproduce attention maps 
+- Distillation loss function: $L = (1-\alpha) \cdot C E (y_{true}, y_{student}) + \alpha \cdot T^2 \cdot K L(p_{teacher}(T),|,p_{student}(T))$
+- Ex: Hugging Face DistilBERT
+```py
+from transformers import DistilBertForSequenceClassification
+# Pretrained DistilBERT already distilled from BERT
+student = DistilBertForSequenceClassification.from_pretrained(
+"distilbert-base-uncased"
+)
+student.train() # fine-tune on your dataset
+```
+  - DistilBERT has 40% fewer parameters while retaining 97% of BERT's performance
+- Limitations
+  - Performance gap
+  - Training overhead
+  - Hyperparameer sensitivity
+  - Bias inheritance
+- Real-world examples
+  - DistilBERT
+  - TinyBERT & MobileBERT
+  - LLM distillation
+- Best practices
+  - Teacher selection
+  - Temperature tuning
+  - Task-specific data
+  - Complementary techniques: combine with quantization/pruning
+
 ### 245. 243. Structured vs Unstructured Sparsity
+- What is sparsity?
+  - There are many weights are:
+    - Redundant or near-zero in value
+    - Contributing minimally to overall performance
+    - Consuming memory and compute resources
+  - Sparsity introduces zeros into those weights or activations to create leaner models
+- Unstructured sparsity
+  - Individual weight removal: prunes weights below a certain threshold regardless of position. Creates an arbitrary pattern of zeros throughout weight tensors
+  - High compression potential: 80-90% sparsity
+  - HW limitations: irregular patterns are difficult for HW to exploit
+- Structured sparsity
+  - Removes entire structural components
+    - Complete filters in CNNs
+    - Attention heads in Transformers
+    - Neurons or input/output channels
+- Visual comparison
+  - Unstructured
+    - Scattered zeros
+    - Irregular pattern
+    - Preserves important connections
+  - Structured
+    - Enire rows/columns removed
+    - Regular, predictable pattern
+    - HW can optimize computations
+- Benefits of unstructured sparsity
+  - Minimal accuracy loss
+  - Extreme compression
+    - Reduces the size but may not help speed
+  - Implementation ease
+  - Storage efficiency
+- Benefits of structured sparsity
+  - HW acceleration
+  - Framework compatibility
+  - Edge performance
+- Ex: PyTorch unstructured pruning
+```py
+import torch.nn.utils.prune as prune
+# Remove 50% of smallest weights by L1 norm
+prune.l1_unstructured(
+  model.fc,
+  name="weight",
+  amount=0.5
+)
+```
+- Ex: PyTorch structured pruning
+```py
+import torch.nn.utils.prune as prune
+# Remove 30% of rows (filters) with smallest L2 norm
+prune.ln_structured(
+  model.conv1,
+  name="weight",
+  amount=0.3,
+  n=2,
+  dim=0
+)
+```
+- Real-world applications
+  - Unstructured
+    - Compress LLMs for reduced checkpoint size and memory footprint
+  - Structured
+    - Accelerate CNN inference for mobile vision and Transformer layers
+- Challenges and limitations
+  - Unstructured challenges
+    - Sparse kernel support remains limited in HW
+    - Specialized libraries required
+    - Compression benefits don't always translate to speed
+    - Format conversion overhead can negate savings
+  - Structured challenges
+    - Higher risk of accuracy degradation
+    - May remove important features or capabilities
+    - Requires careful selection of pruning criteria
+    - Often needs more extensive retraining
+- Best practices
+  - Start with the goal
+    - Size reduction: use unstructured sparsity
+    - Inference speedup: use structured sparsity
+    - Both: layerwise hybrid approaches
+  - Combine techniques
+    - Sparsity + quantization
+    - Sparsity + knowledge distillation
+    - Sparsity + efficient architectures
+  - Rigorous testing
+
 ### 246. 244. Benchmarking Optimized Models
+- Why benchmark?
+  - Prove performance gains
+  - Validate quality
+  - Deployment confidence
+- Key metrics to measure
+  - Latency
+  - Throughput
+  - Memory footprint
+  - Energy efficiency
+  - Task quality
+- Benchmarking workflow
+  - Define baseline
+  - Apply optimization
+  - Measure infrastructure metrics
+  - Measure task metrics
+  - Compare & decide
+- Tools for benchmarking
+  - Runtime performance
+    - ONNX runtime
+    - TensorRT
+    - TVM
+    - OpenVINO
+  - Standardized benchmarks
+    - TorchBench
+    - MLPerf
+  - Custom testing
+    - Python timeit
+    - Apache benchmark (ab)
+    - Locust for load testing
+  - LLM optimization
+    - DeepSpeed
+    - FSDP
+    - Hugging Face Optimum
+- Tail latency matters
+  - Don't just measure average (p50) performance. Tail latencies at p95 and p99 can significantly impact user experience
+- Best practices
+  - Automate
+  - Multiple workloads
+  - Holistic measurement
+  - A/B testing
+
 ### 247. 245. Lab – Quantize a Vision Model
-2min
+- Learning Goals
+  - Understand post-training quantization (PTQ) in PyTorch
+  - Apply INT8 quantization to a ResNet model
+  - Compare inference latency and accuracy vs FP32 baseline
+  - Export quantized model for deployment
+```
+0) Prerequisites
+
+    Python 3.9+, PyTorch ≥ 1.13
+
+    Install dependencies:
+
+    pip install torch torchvision timm
+
+    GPU optional (quantization also runs on CPU)
+
+1) Load Pretrained Vision Model
+
+    import torch
+    import torchvision.models as models
+    import torchvision.transforms as T
+    from PIL import Image
+     
+    # Load ResNet-18 pretrained on ImageNet
+    model_fp32 = models.resnet18(pretrained=True)
+    model_fp32.eval()
+
+2) Prepare Input Transform & Sample Image
+
+    transform = T.Compose([
+        T.Resize(256),
+        T.CenterCrop(224),
+        T.ToTensor(),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+     
+    img = Image.open("sample.jpg")
+    x = transform(img).unsqueeze(0)  # batch size = 1
+
+3) Run Baseline FP32 Inference
+
+    import time
+     
+    with torch.no_grad():
+        start = time.time()
+        for _ in range(100):
+            _ = model_fp32(x)
+        end = time.time()
+     
+    print("FP32 Avg Latency (ms):", (end - start) / 100 * 1000)
+
+4) Apply Dynamic Quantization (INT8)
+
+    import torch.quantization
+     
+    # Quantize Linear layers to INT8
+    model_int8 = torch.quantization.quantize_dynamic(
+        model_fp32, {torch.nn.Linear}, dtype=torch.qint8
+    )
+    model_int8.eval()
+     
+    with torch.no_grad():
+        start = time.time()
+        for _ in range(100):
+            _ = model_int8(x)
+        end = time.time()
+     
+    print("INT8 Avg Latency (ms):", (end - start) / 100 * 1000)
+
+5) Compare Model Sizes
+
+    import os
+     
+    torch.save(model_fp32.state_dict(), "resnet_fp32.pth")
+    torch.save(model_int8.state_dict(), "resnet_int8.pth")
+     
+    print("FP32 Size (MB):", os.path.getsize("resnet_fp32.pth") / 1e6)
+    print("INT8 Size (MB):", os.path.getsize("resnet_int8.pth") / 1e6)
+
+6) Validate Accuracy (Optional – on Dataset)
+
+    from torchvision.datasets import CIFAR10
+    from torch.utils.data import DataLoader
+     
+    test_data = CIFAR10(root="./data", train=False, transform=transform, download=True)
+    test_loader = DataLoader(test_data, batch_size=32)
+     
+    def evaluate(model):
+        correct, total = 0, 0
+        with torch.no_grad():
+            for images, labels in test_loader:
+                outputs = model(images)
+                preds = outputs.argmax(1)
+                correct += (preds == labels).sum().item()
+                total += labels.size(0)
+        return correct / total
+     
+    acc_fp32 = evaluate(model_fp32)
+    acc_int8 = evaluate(model_int8)
+     
+    print("FP32 Accuracy:", acc_fp32)
+    print("INT8 Accuracy:", acc_int8)
+
+7) Export Quantized Model for Deployment
+
+    dummy_input = torch.randn(1, 3, 224, 224)
+    torch.onnx.export(model_int8, dummy_input, "resnet18_int8.onnx", opset_version=13)
+    print("Quantized model exported to ONNX")
+
+8) Stretch Goals
+
+    Try static quantization with calibration dataset
+
+    Use QAT (Quantization-Aware Training) for better accuracy retention
+
+    Benchmark on GPU vs CPU for throughput differences
+
+    Deploy ONNX model with ONNX Runtime / TensorRT
+
+✅ Outcome: You quantized a pretrained ResNet-18 model, measured latency and size improvements, and validated accuracy. The INT8 model runs faster and smaller, making it ready for efficient deployment.
+```
+
+## Section 37: Week 36: Optimization Techniques - Advanced
 
 ### 248. 246. Mixed Precision Training with AMP
 ### 249. 247. Quantization-Aware Training (QAT)
@@ -12897,7 +15083,8 @@ You’ll see the trained agent balancing the CartPole. 🎉
 ### 252. 250. Compiler Optimizations (XLA, TorchDynamo)
 ### 253. 251. Infra Tradeoffs: Accuracy vs Efficiency
 ### 254. 252. Lab – Train with Mixed Precision
-2min
+
+##
 
 ### 255. 253. What Is Federated Learning?
 ### 256. 254. Privacy-Preserving AI at Scale
