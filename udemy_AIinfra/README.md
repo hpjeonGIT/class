@@ -11380,8 +11380,7 @@ Reload with:
 - Cloud processing capabilities
   - Heavy compute processing
   - Cross-camera correlation
-  - Long-term storage and replay
-  - System integration
+  - Long-term storage and re###   - System integration
 - Data flow architecture
   - Capture
   - Preprocess + infer
@@ -12539,8 +12538,7 @@ Sample response:
   - Fault tolerance
 - Optimization strategies
   - Vectorized environments
-  - Prioritized experience replay
-  - Asynchronous updates
+  - Prioritized experience re###   - Asynchronous updates
   - Gradient compression
 - Infrastructure requirements
   - CPUs
@@ -12628,8 +12626,7 @@ Sample response:
   - Computation
     - GPU
     - TPU pods
-    - High-memory instances for replay
-  - Simulation
+    - High-memory instances for re###   - Simulation
     - GPU-accelerated physics
     - Isaac Gym
     - Multi-GPU rendering
@@ -15077,47 +15074,681 @@ prune.ln_structured(
 ## Section 37: Week 36: Optimization Techniques - Advanced
 
 ### 248. 246. Mixed Precision Training with AMP
+- Mixed precision
+  - Modern GPU are optimized for FP16 operations
+- Key benefits
+  - 3x faster training
+  - 50% memory savings
+  - 95% HW utilization
+  - 100% accuracy retention
+- Automatic Mixed Precision (AMP)
+  - PyTorch AMP and TensorFlow AMP
+  - Auotmatically casts operations to FP16 or FP32 where available
+  - Keeps numerically sensitive operations (like softmax) in FP32
+- Ex: PyTorch AMP
+  - autocast(): automatically chooses b/w FP16 and FP32 for each operation based on safety and performance
+  - GradScaler(): prevents numerical underflow in gradients by applying and adjusting scaling factors
+```py
+scaler = torch.cuda.amp.GradScaler()
+for data, target in dataloader:
+  optimizer.zero_grad()
+  with torch.cuda.amp.autocast():
+    output = model(data)
+    loss = criterion(output, target)
+  scaler.scale(loss).backward()
+  scaler.step(optimizer)
+  scaler.update()
+```  
+- Ex: Tensorflow AMP
+```py
+policy = tf.keras.mixed_precision.Policy('mixed_float16')
+tf.keras.mixed_precision.set_global_policy(policy)
+model = tf.keras.Sequential([...])
+model.compile(optimizer='adam', loss='categorical_crossentropy')
+model.fit(train_ds, epochs=5)
+```
+- Loss scaling
+  - Problem: FP16 has limited precision range, risking gradient underflow during backpropagation
+  - Solution: Multiply loss by a large scaling factor (128 or 256) before backprop
+  - Unscaling: divide gradients by the same factor before optimizer update
+  - Scaling: Gradients become larger, preventing them from becoming too small for FP16
+- Tradeoffs & considerations
+  - HW requirements
+  - Debugging challenges
+  - Operation support
+  - Validation step
+- Real world use cases
+  - Computer vision: 3x speedup on ResNet-50 on ImageNet
+  - NLP models: GP and BERT
+  - Recommendation systems: enables larger batch sizes
+
 ### 249. 247. Quantization-Aware Training (QAT)
+- Why quantization?
+  - FP32 consumes large memory/high computation and produces deployment challenges
+- Quantization: weights and activations in INT8 dramatically reduces resource requirements
+- Post-Training Quantization (PTQ)
+  - Convert FPe2 -> INT8 after training
+  - Fast implementation process
+  - Minimal engineering effort
+  - May result in signficant accuracy drops
+  - No model adaptation to quantization noise
+- Quantization-Aware Training (QAT)
+  - Train model with quantization simulation
+  - Learns to adapt during training process
+  - Maintains higher accuracy than PTQ
+  - Recovers from quantization-induced errors
+  - Results in deployment-ready models
+- How QAT works
+  - Training phase
+    - Master weights in FP32
+    - Insert fake quantization operations
+    - Simulate rounding effects to INT8
+    - Forward pass: quantize -> compute -> dequantize
+    - Backward pass: learn to compensate for quantization noise
+  - Inference phase
+    - Deploy actual INT8 quantized model
+    - Remove training-only operations
+    - Use HW-optimzed INT8 operations
+    - Dramatically reduced memory footprint
+    - Significantly faster computation
+- Benefits of QAT
+  - 4x memory reduction
+  - 3x inference speedup
+  - ~0% accuracy drop
+  - 10x energy efficiency
+- Ex: TensorFlow QAT
+  - `quantize_model()` wraps layers with fake quantization operations  
+```py
+import tensorflow_model_optimization as tfmot
+# Create quantization-aware model
+qat_model = tfmot.quantization.keras.quantize_model(model)
+# Compile and train as usual
+qat_model.compile(optimizer='adam',loss='categorical_crossentropy')
+qat_model.fit(train_data, train_labels, epochs=5)
+# The resulting model can be converted to TFLite
+converter = tf.lite.TFLiteConverter.from_keras_model(qat_model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+quantized_tflite_model = converter.convert()
+```
+- Ex: PyTorch QAT
+  - `qconfig` defines quantization parameters
+  - `prepare_qat()` inserts fake quantization operations
+```py
+import torch.quantization as tq
+# Create model and set quantization config
+model_fp32 = Net()
+model_fp32.qconfig = tq.get_default_qat_qconfig('fbgemm')
+# Prepare model for QAT
+model_prepared = tq.prepare_qat(model_fp32)
+# Train with QAT
+train(model_prepared, data_loader)
+# Convert to deployable quantized model
+model_int8 = tq.convert(model_prepared)
+# Save the quantized model
+torch.jit.save(torch.jit.script(model_int8), "quantized_model.pt")
+```
+- Accuracy vs efficiency tradeoff
+  - Model architecture: larger models like BERT/ResNet typically see better benefits from QAT
+  - Task complexity: simpler tasks may be satisfied with PTQ
+  - Precision requirements: critical applicatoins may need higher precision
+- HW impact
+  - CPUs
+    - Intel AVX512 VNNI instructions
+    - ARM NEON SIMD optimizations
+    - 2-4x throughput improvement with INT8
+  - Mobile/Edge
+    - Qualcomm Hexagon DSP
+    - Apple Neural Engine
+    - MediaTek APU
+    - Optimized for INT8 operations
+  - TPUs
+    - Native INT8 matrix multplication
+    - Massive throughput improvement
+    - Google Edge TPUs require quantization
+  - GPUs
+    - TensorRT INT8 optimizations
+    - Smaller gains than other HW
+    - Still excel at FP16/FP32 operations
+- Industry applications
+  - Mobile applications
+    - On-device speech recognition
+    - Offline language translation
+  - IoT devices
+    - Anomaly detection in sensors
+    - Predictive maintenance
+  - Autonomous systems
+    - Real time object detection
+    - Autonomous navigation
+    - Gesture recognition
+  - Cloud deployment
+    - Reduced inference costs
+    - Lower power consumption
+    - Scaled deployment savings
+- Limitations of QAT
+  - Training complexity
+  - Increased training time
+  - Limited operation support
+
 ### 250. 248. Advanced Distillation Techniques
+- Why knoledge distillation matters
+  - Create a compact model
+- Core idea: The teacher-student paradigm
+  - Teacher mode: pretrained large model with high accuracy but resource-intensive
+  - Student model: compact model trained to mimic the teacher's behavior
+  - Soft targets: use probability distributions instead of only hard labels
+  - Dark knowledge: student learns relative class probabilities and relationships b/w classes
+- Types of knolwedge distillation
+  - Response-based: student mimics teacher's output probability distributions (soft labels)
+  - Feature-based: student learns to mimic intermediate representations from teacher's hidden layers
+  - Relation-based: student mimics relationships and structural dependencies among teacher's activations
+- Advanced distillation methods
+  - Data-free distillations: use synthetic data when original training data is unavailable due to privacy or IP concerns
+  - Cross-layer distillations: transfer hidden features from one layer to multiple student layers, not just layer-to-layer
+  - Self-distilaation: model distills knowledge into tis own smaller layers, creating a more efficient version of itself
+  - Ensemble distillation: combines knowledge from multiple teacher models into a single unified student model
+- Response-based distillation example (PyTorch)
+  - Uses soft targets (teacher logits with temperature) and hard labels
+  - Higher temperature revelas more dark knowledge about class relationships
+```py
+# PyTorch implementation
+def distillation_loss(student_logits,
+                      teacher_logits,
+                      labels,
+                      temp=2.0,
+                      alpha=0.5):
+# Soft targets with temperature
+soft_targets = F.softmax(teacher_logits / temp, dim=1)
+# KL divergence loss
+soft_loss = F.kl_div(F.log_softmax(student_logits / temp, dim=1),soft_targets,reduction='batchmean') * (temp * temp)
+# Hard label loss
+hard_loss = F.cross_entropy(student_logits, labels)
+# Combined loss
+return alpha * soft_loss + (1 - alpha) * hard_loss
+```
+- Feature-based distillation
+  - Teacher's hidden layers: rich internal representations capture complex patterns
+  - Feature alignment: loss functions match intermediate feature maps
+  - Student's hidden layers: learns meaningful representations despite smaller capacity
+  - Particularly effective in CNN and Transformers
+- Relation-based distillation
+  - Capures pairwise relations or structural dependencies b/w feature maps
+  - Teacher transmits knowledge of feature geometry and relationships
+  - Methods include:
+    - Attention transfer
+    - Correlation congruence
+    - Graph-based knowledge distillation
+- Self-distillation 
+  - Same architecture: teacher and student share the same architecture
+  - Deep to shallow: knowledge flows from deeper layers to shallower layers within the network
+  - Enhanced generalization: boosts generalization ability and reduces overfitting on training data
+  - Born-again networks: sequential self-distillation where each generation teaches the next
+- Data-free distillation
+  - The challenge
+    - Privacy regulations
+    - Intellectual property concerns
+    - Storage constraints
+    - Proprietary datasets
+  - Solution
+    - Generate synthetic data: using GANs, random noise, or model inversion technqiues
+    - Teacher predictions: get teacher model outputs on synthetic data
+    - Student training: train student to match teacher on synthetic examples
+- Ensemble distillation
+  - Multpile specialized teachers
+    - Different architectures
+    - Different training data
+    - Different initialization
+  - Knowledge integration
+    - Averaging predictions
+    - Weighted ensembling
+    - Multi-teacher distillation
+  - Unified student
+    - Enhanced robustness
+    - Better generalization
+    - Reduced variance
+- Real-world applications
+  - Mobile AI: BERT -> TinyBERT
+  - Autonomous vehicles
+  - Healthcare
+  - Cloud inference
+- Tradeoff & considerations
+  - Critical hyperparameters
+    - Temperature (T): controls softness of probability distribution
+    - Alpha: Balances soft and hard loss components
+    - Layer mappings: which teacher layers connect to wtih student layers
+    - Loss weights: relative importance of different distillation objectives
+  * Distilled models rarely achieve identical accuracy to their teachers - expect a slight performance drop in exchange for efficiency gains
+- Industry case studies
+  - TinyBERT/DistilBERT: 40-60% smaller BERT with 95% of original performance
+  - ResNet compression via FitNets: 73% parameter reduction with less than 1% accuracy drop
+  - Data-free distillation in federated learning: critical for finance and healthcare applications
+  - Google YouTube Recommendation models
+
 ### 251. 249. Sparse Training and Hardware Impacts
+- Why sparsity matters
+  - Resource efficiency: Reduce FLOPs, memory usage, latency, and energy consumption
+  - Model scaling: Fit larger models on existing HW infrastructure
+  - Deployment flexibility: enable edge inference capabilities and operational cost savings
+- Taxonomy of sparsity
+  - Unstructured
+    - Arbitrary zero placement (fine-grained)
+    - Highest theoretical compression
+    - Limited HW support
+  - Structured
+    - Entire channels/filters/blocks removed
+    - Clean mapping to HW
+    - Higher accuracy impact
+  - N:M (semi-structured)
+    - Out of every M values, keep N non-zeros
+    - 2:4 sparsity for NVIDIA GPUs
+    - Balance of accuracy and acceleration
+  - Architectural
+    - Mixture-of-Experts (MoE)
+    - Token-level routing/activation
+    - Scalable to massive models
+- Training vs Inference sparsity
+  - Training sparsity approaches  
+    - Dynamic sparse training (DST): evolving masks during training
+    - RigL: Rigged lottery tickets with gradient-based regrowth
+    - Movement pruning: Gradient-based decisions for NLP tasks
+  - Post-training approaches
+    - Magnitude/gradient pruning: remove least important weights
+    - Critical step: fine-tuning to recover accuracy
+- Unstructured pruning (magnitude-based)
+  - Remove weights with smallest absolute values (|w|)
+  - Advantages
+    - High theoretical compression ratios
+    - Often retains accuracy at 90-95% sparsity
+    - Minimal algorithmic complexity
+  - Limitations
+    - Speed benefits limited without specialized kernels
+    - Irregular memory access patterns
+    - Overhead of sparse index storage
+- Structured pruning
+  - Remove entire structural units (channels, filters, blocks)
+  - Dense kernel compatibility
+  - Predictable performance
+  - Accuracy trade-offs
+- N:M semi-structured sparsity (e.g., 2:4)
+  - In each group of M weights, keep exactly N non-zeros (commonly 2:4)
+  - Directly supported by Nvidia Ampere/Hopper tensor cores
+  -  Excellent balance b/w accuracy retention and speed
+  - 50% theoretical compute reduction with minimal accuracy impact
+  - Supported by cuSPARSELt and TensorRT libraries
+- Dynamic Sparse Trainig (DST)
+  - Start Sparse
+  - Evolve topology
+  - Optimize parameters
+  - Converge
+  * Popular methods include RigL (gradient-based regrowth), SET (random exploration), and movement pruning for NLP tasks
+- Lottery Ticket Hypothesis (LTH)
+  - Train the network
+  - Prune less important weights
+  - Rewind weights to early state
+  - Retrain the sparse subnetwork
+- Distillation + sparsity: powerful combination
+  - Pruning inevitably causes some accuracy drop. Knowledge distillation offers a powerful technique to recover the lost performance
+  - Train a dense teacher model to peak accuracy
+  - Apply pruning to create a sparse student model
+  - Train student to match teacher's soft predictions
+  - Benefit from teacher's knowledge without its size
+- Low-Rank Adaptation (LoRA) + Sparsity
+  - Backbone pruning reduces base model size
+  - LoRA enables efficient rask-specific adaptation
+  - Ideal for multi-task deployment scenarios
+- Activation sparsity & gating mechanisms
+  - ReLU & activation functions: ReLU and similar functions naturally create activation zeros. HW can exploit this if properly designed
+  - Top-k sparsification: only keep k highest activation values. Controls sparsity level explicitly
+  - Mixture-of-Experts (MoE): route tokens to a subset of available experts. Each token activates only 1-2 experts out of many
+- Storage formats & kernel optimization
+  - CSR/CSC/COO: compressed sparse row/column/coordinate. Efficeint for highly sparse unstructure matrices
+  - Block-sparse: Zero out entire blocks of the matrix
+  - Custom formats: vendor-specific formats for specific HW
+- HW sparsity
+  - Nvidia (A100/H100): 2:4 sparsity visa cuSPARSELt & TensorRT
+  - CPUs (AVX512/VNNI): structured sparsity + block-sparse win. INT8 quantization compounds benefits
+  - TPUs: Prefer structured patterns via XLA. N:M sparsity support in newer versions
+  - Mobile NPUs: block/structured sparsity + INT8
+- When do zeros equal speed?
+  - Compiler & kernel support
+  - Sparsity threshold
+  - Structured patterns
+- PyTorch: Quick unstructure pruning
+```py
+import torch
+import torch.nn.utils.prune as prune
+import torch.nn.functional as F
+class Net(torch.nn.Module):
+...
+model = Net()
+# L1 unstructured weight pruning on Conv2d
+prune.l1_unstructured(
+                      model.conv1,
+                      name='weight',
+                      amount=0.5
+)
+# Permanently remove mask/reparam
+prune.remove(model.conv1, 'weight')
+# Fine-tune after pruning
+for x,y in loader:
+  loss = F.cross_entropy(model(x), y)
+  loss.backward()
+  optimizer.step()
+  optimizer.zero_grad()
+```  
+- PyTorch: structured channel pruning
+```py
+prune.ln_structured(
+model.conv2,
+name='weight',
+amount=0.3,
+n=2,
+dim=0
+)
+# Remove reparametrization
+prune.remove(model.conv2, 'weight')
+```
+- TensorFlow/Keras: Pruning Aware Training
+```py
+import tensorflow_model_optimization as tfmot
+import numpy as np
+prune_low_magnitude = \
+  tfmot.sparsity.keras.prune_low_magnitude
+end_step = np.ceil(
+  len(train_ds) * epochs
+).astype(np.int32)
+pruning_params = {
+  'pruning_schedule':
+  tfmot.sparsity.keras.PolynomialDecay(
+  0.0, 0.8, 0, end_step
+  )
+}
+model = prune_low_magnitude(base_model, **pruning_params)
+  model.compile(
+  optimizer='adam',
+  loss='categorical_crossentropy'
+)
+model.fit(
+  train_ds,
+  callbacks=[
+  tfmot.sparsity.keras.UpdatePruningStep()
+  ]
+)
+```
+- N:M (2:4) Sparsity: practical implementation path
+  - Pattern-aware training
+  - Export with Metadata
+  - Optimized engine build
+  - Validation & profiling
+- Pruning scheduling & recipes
+  - One-shot pruning: Prune to target sparsity in a single step, then fine-tune
+    - Pro: fast, simple
+    - Cons: higher accuracy loss
+  - Iterative pruning: gradually prune in small increments (5-10%), fine-tune after each step
+    - Pro: better accuracy preservation
+    - Cons: more time-consuming, complex training loop
+  - Pruning strategies
+    - Global vs layerwise
+      - Start with global magnitude pruning
+      - Identify and protect sensitive layers
+      - Apply layerwise targets based on sensitivity
+    - Sensitivity analysis
+      - Prune each layer independently to measure impact
+      - Create sparsity budget based on findings
+      - Allocate higher sparsity to robust layers
+- Metrics & evaluation framework
+  - Accuracy metrics: Top-1/Top-5, F1/precision/recall, ECE, Task-specific
+  - Performance metrics: latency, throughput, power, cost-efficiency
+  - Resource metrics: memory footprint, storage size, FLOPS, Effective sparsity
+
 ### 252. 250. Compiler Optimizations (XLA, TorchDynamo)
+- Compilers in AI infrastructure
+  - XLA: pwoers TensorFlow & JAX optimization
+  - TorchDynamo: handles PyTorch graph capture
+  - TVM: portable deep learning compiler stack
+  - ONNX runtime: enables model portability + optimizations
+- Key compiler techniques
+  - Operation fusion
+  - Kernel specialization
+  - Graph lowering
+  - Scheduling
+- XLA overview: Accelerated linear algebra
+  - Fuses operations(e.g., matmul + activation) to reduce memory access
+  - Maximizes device utilization across CPU/GPU/TPU
+  - Provides cross-platform compatibility
+  - Eliminates redundant computations
+- TensorFlow with XLA
+```py
+@tf.function(jit_compile=True)
+def train_step(x, y):
+  with tf.GradientTape() as tape:
+    pred = model(x, training=True)
+    loss = loss_fn(y, pred)
+  grads = tape.gradient(loss, model.trainable_variables)
+  optimizer.apply_gradients(zip(grads, model.trainable_variables))
+```
+- JAX & XLA
+```py
+import jax
+import jax.numpy as jnp
+@jax.jit
+def f(x):
+  return jnp.exp(x) / jnp.sum(jnp.exp(x))
+# XLA compilation happens automatically
+result = f(jnp.array([1.0, 2.0, 3.0]))
+```
+- TorchDynamo overview
+  - Python-level JIT compiler designed for PyTorch
+  - Converts Python bytecode into FX graph representations
+  - Preserves PyTorch's dynamic behavior
+  - Integrates with TorchInductor for kernel generation
+  - Enables advanced optimizations such as graph-level optimizations, operator fusion, efficient scheduling, HW-specific code generation
+- TorchDynamo example
+```py
+import torch
+def train_loop(model, data):
+  for x, y in data:
+    loss = model(x).sum()
+    loss.backward()
+  # Only one line change to enable  compilation
+  opt_model = torch.compile(model)
+  train_loop(opt_model, dataloader)
+```
+- TorchInductor & Codegen
+  - Backend compiler
+  - Tunable backends
+- TVM: Apache's Deep Learning Compiler
+  - Auto-tuning
+  - Broad support: CPU, GPU, FPGA, and custom accelerators
+  - End-to-end
+  - Framework-agnostic: works with TensorFlow, PyTorch, ONNX
+  - Popular for: edge deployment optimization, research into novel HW backends, custom accelerator integration
+- Limitations and challenges
+  - Compilation overhead
+  - Dynamic models
+  - Debugging complexity
+  - Fallback mechanisms: not all operations are optimized
+
 ### 253. 251. Infra Tradeoffs: Accuracy vs Efficiency
+- Why tradeoffs matter
+  - Compute is finite
+  - Deployment needs differ
+  - Optimizations deliver speed/memory gains but may reduce accuracy
+- Accuracy first (research mindset)
+  - Benchmark-driven
+  - Model architecture: larger models, dense precision formats
+  - Cost implications: high computes
+- Efficiency first (industry mindset)
+  - Latency & throughput
+  - Infrastructure cost
+  - Business KPIs
+- Typical tradeoff dimensions
+  - Precision: FP32 -> FP16 -> INT8
+  - Model size: full -> distilled -> pruned
+  - Batch size
+  - Serving infrastructure
+- Accuracy vs latency curve
+  - Finding the sweet spot
+    - Initial optimizations yield minimal accuracy loss
+    - Beyond a threshold, accuracy drops steeply
+    - The optimal point exists on the **Pareto frontier**
+    - Best configurations balance cost vs benefit
+- Case study: Quantization (INT8)
+  - Accuracy impact by task
+    - NLP tasks
+      - PTQ: 2-3 BLEU point loss
+      - QAT: reduces the gap significantly
+    - Computer vsion
+      - Less than 1% top-1 accuracy drop with proper QAT
+- Case study: Distillatin
+   - DistilBERT vs BERT
+    - 60% smaller model size
+    - 2x faster inference speed
+    - Maintains 97% of BERT's accuracy
+  - Real world applications
+    - Mobile NLP applications with limited resources
+    - High-throughput API services
+- Best practices
+  - Comprehensive benchmarking
+  - Define acceptable loss early
+  - Progressive optimization
+  - Target HW profiling
+- Framework for decisions
+  - Define KPI thresholds
+  - Explore Pareto-Optimal configurations
+  - Align with business priorties
+  - Document tradeoff decisions
+
 ### 254. 252. Lab – Train with Mixed Precision
+- Lab Objective
+  - Understand mixed precision training with FP16 + FP32.
+  - Use Automatic Mixed Precision (AMP) in PyTorch & TensorFlow.
+  - Compare speed, memory usage, and accuracy vs FP32 baseline.
+```
+Step 1: Environment Setup
 
-##
+    Make sure you have a GPU that supports Tensor Cores (Volta, Turing, Ampere, Hopper).
 
-### 255. 253. What Is Federated Learning?
-### 256. 254. Privacy-Preserving AI at Scale
-### 257. 255. Federated Learning with TensorFlow Federated
-### 258. 256. Secure Aggregation Protocols
-### 259. 257. Federated Data Challenges
-### 260. 258. Edge Deployment of Federated Models
-### 261. 259. Lab – Train a Federated Model with TFF
-2min
+    Install dependencies:
 
-### 262. 260. Why Privacy Matters in AI Infra
-### 263. 261. Homomorphic Encryption Basics
-### 264. 262. Differential Privacy for AI Models
-### 265. 263. Secure Multi-Party Computation (MPC)
-### 266. 264. Tradeoffs in Privacy-Preserving AI
-### 267. 265. Industry Applications of Privacy-Preserving AI
-### 268. 266. Lab – Apply Differential Privacy in Training
-2min
+    # PyTorch
+    pip install torch torchvision
+     
+    # TensorFlow
+    pip install tensorflow
 
-### 269. 267. Attacks on AI Infrastructure
-### 270. 268. Model Poisoning Attacks
-### 271. 269. Data Poisoning Attacks
-### 272. 270. Membership Inference Attacks
-### 273. 271. Adversarial Examples in Deployment
-### 274. 272. Mitigation Strategies for Infra Security
-### 275. 273. Lab – Defend Against Adversarial Attacks
-2min
+    Verify GPU availability:
 
-### 276. 274. What Is Multi-Tenancy?
-### 277. 275. Resource Sharing Across Teams
-### 278. 276. Cost Allocation for Multi-Tenant Infra
-### 279. 277. Role-Based Access Control (RBAC)
-### 280. 278. Isolation Strategies in AI Systems
-### 281. 279. Monitoring Multi-Tenant Environments
-### 282. 280. Lab – Configure Multi-Tenant Cluster
-2min
+    import torch
+    print(torch.cuda.get_device_name(0))
+     
+    import tensorflow as tf
+    print(tf.config.list_physical_devices('GPU'))
+
+✅ Expected: You should see your GPU model listed (e.g., NVIDIA A100).
+Step 2: Baseline FP32 Training
+
+We’ll start with FP32 (default) training to establish baseline.
+
+PyTorch (ResNet18, CIFAR-10):
+
+    import torch, torchvision
+    import torch.nn as nn, torch.optim as optim
+    from torchvision import datasets, transforms
+     
+    # Data
+    transform = transforms.Compose([transforms.ToTensor()])
+    trainset = datasets.CIFAR10('./data', train=True, download=True, transform=transform)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True)
+     
+    # Model
+    model = torchvision.models.resnet18().cuda()
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+     
+    # Train loop (FP32 baseline)
+    for epoch in range(1):
+        for x, y in trainloader:
+            x, y = x.cuda(), y.cuda()
+            optimizer.zero_grad()
+            output = model(x)
+            loss = criterion(output, y)
+            loss.backward()
+            optimizer.step()
+
+⏱ Track time per epoch and GPU memory usage (e.g., via nvidia-smi).
+Step 3: Enable PyTorch AMP
+
+    scaler = torch.cuda.amp.GradScaler()
+     
+    for epoch in range(1):
+        for x, y in trainloader:
+            x, y = x.cuda(), y.cuda()
+            optimizer.zero_grad()
+            # Autocast context
+            with torch.cuda.amp.autocast():
+                output = model(x)
+                loss = criterion(output, y)
+            # Scaled backprop
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+✅ Expected:
+
+    Training speed increases (check epoch time).
+
+    GPU memory usage drops (allows bigger batch sizes).
+
+    Accuracy ≈ same as FP32.
+
+Step 4: TensorFlow AMP
+
+    import tensorflow as tf
+    from tensorflow.keras import layers, models
+     
+    # Enable mixed precision globally
+    policy = tf.keras.mixed_precision.Policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy(policy)
+     
+    # Model
+    model = models.Sequential([
+        layers.Flatten(input_shape=(28,28)),
+        layers.Dense(128, activation='relu'),
+        layers.Dense(10)
+    ])
+     
+    model.compile(optimizer='adam',
+                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                  metrics=['accuracy'])
+     
+    # Train
+    (x_train, y_train), _ = tf.keras.datasets.mnist.load_data()
+    model.fit(x_train, y_train, epochs=3, batch_size=512)
+
+✅ Expected: Faster training than FP32 baseline, same accuracy.
+Step 5: Compare Results
+
+Record results for baseline FP32 vs AMP:
+
+Metric FP32 AMP (Mixed Precision) Training Speed (s/epoch) ~baseline ~1.5–2.5× faster GPU Memory (MB) ~baseline ~30–50% lower Accuracy (%) ~baseline ≈ same
+Step 6: Experiment (Optional)
+
+    Try larger batch sizes with AMP (should now fit in GPU memory).
+
+    Try different models (ResNet, Transformer).
+
+    Introduce loss scaling manually to see impact of underflow.
+
+Step 7: Wrap-Up
+
+    Mixed Precision = FP16 math + FP32 stability.
+
+    AMP automates casting & loss scaling.
+
+    Real gains: speed ↑, memory ↓, accuracy ≈ same.
+
+    Industry standard for training large AI models.
+
+✅ End of Lab — You’ve trained models with mixed precision in PyTorch & TensorFlow, observed improvements, and compared against FP32.
+```
+## Continued in README_2.md
