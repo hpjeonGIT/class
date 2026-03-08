@@ -9857,29 +9857,1602 @@ You now have a working, observable, autoscaling prototype of your Capstone servi
 ## Section 51: Week 50: Capstone - Implementation Phase II
 
 ### 346. 344. Scaling Training Across Multi-GPU Nodes
+- Why multi-GPU training?
+  - Single GPU limitations: memory constraints, extended training periods (weeks) with large datasets
+  - Significant higher throughput
+  - Ability to train massive models (LLMs, ViTs)
+  - Optimal HW resource utilization
+- Strategies for scaling
+  - Data parallelism: PyTorch DDP, Horovod
+  - Model parallelism: Megatron-LM, DeepSpeed
+  - Pipeline parallelism: model divided into sequential stages across GPUs
+- Hybrid approaches
+  - Tensor parallelism
+  - Zero Redundancy Optimizer (ZeRO)
+  - Fully sharded Data Parallel (FSDP)
+- Communication backbones
+  - NCCL
+  - High-speed interconnects: Infiniband, NVLink, NVSwitch
+  - Ethernet: limited bandwidth
+- PyTorch DDP (MultiGPU single node)
+```py
+import torch
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+dist.init_process_group("nccl")
+model = MyModel().to(local_rank)
+model = DDP(model, device_ids=[local_rank])
+```
+  - Launch command: `torchrun --nproc_per_node=4 train.py`
+- PyTorch DDP (Multi-nodes)
+```py
+torchrun --nnodes=2 --nproc_per_node=4 \
+  --rdzv_id=123 --rdzv_backend=c10d \
+  --rdzv_endpoint=host0:29400 train.py
+```
+- Horovod example
+```py
+import horovod.torch as hvd
+hvd.init()
+torch.cuda.set_device(hvd.local_rank())
+optimizer = hvd.DistributedOptimizer(
+              optimizer,
+              named_parameters=model.named_parameters()
+)
+```
+- DeepSpeed ZeRO
+  - Stage 1: shards optimizer states across GPUs. ~4x memory reduction
+  - Stage 2: Shards gradients + optimizer states. ~8x memory reduction
+  - Stage 3: Shards model parameters + gradients + optimizer states. Enables training models with trillions of parameters
+- PyTorch FSDP
+  - Combines parameter sharding with data parallelism
+  - Dynamically materializes parameters for forward/backward passes
+  - Native PyTorch API with minimal code changes
+  - Supports mixed precision
+- Checkpointing & fault tolerance
+  - Distributed checkpointing
+  - Checkpointing frequency
+  - Resumption requirements
+- K8 + Multi-GPU jobs: using Kubeflow training operators (PyTorchJob, TFJob CRDs)
+```yaml
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: train-mgpu
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      template:
+        spec:
+          containers:
+          - image: my/train:1.0
+            resources:
+              limits:
+                nvidia.com/gpu: 1
+    Worker:
+      replicas: 3
+      template:
+        spec:
+          containers:
+          - image: my/train:1.0
+            resources:
+              limits:
+                nvidia.com/gpu: 1
+```
+- Monitoring training efficiency
+  - Key metrics to track: GPU utilization, network bandwidth, step time variance
+  - Monitoring tools: Nvidia DCGM, Prometheus, Grafana, WandB/MLflow
+- Cost optimization strategies
+  - Spot/preemptible instances save 60-80%
+  - Requires frequent checkpointing (every 15-30min)
+  - Optimize batch size to maximize throughput
+  - Use mixed precision (FP16/BF16) to reduce memory and increase speed
+- ROI considerations
+  - Time-to-result (business opportunity cost)
+  - Infrastructure cost (direct expense)
+  - Engineer productivity (development cycles)
+  - Final model quality (convergence issues)
+- Key lessons for Multi-GPU training
+  - Choose the right parallelism strategy
+  - Optimize communication infrastructure
+  - Leverage advanced frameworks
+  - Plan for resilience and cost
+
 ### 347. 345. Implementing Drift Detection Pipeline
+- Why drift detection matters
+  - Silent accuracy decacy
+  - Regulatory risk
+  - Cost waste
+  - Safer operations
+- Taxonomy & signals
+  - Numerical: mean/variance shifts
+  - Categorical: proportion changes across categories, sudden spikes in rare categories
+  - Embeddings: centroid/covariance shift, cosine distance, Earth Mover's Distance (EMD)
+  - LLMs: prompt mix shift, retrieval hit-rate drift in RAG, toxicity/safety drift
+- Core metrics by data type
+  - Numerical features: Kolmogorov-Smirnov test, PSI, MMD, Jensen-Shannon/Kullback-Leiber divergence
+  - Embeddings: cosine distance of centroids, FID-style stats, EMD
+  - Categorical features: Chi-squared test, PSI
+  - LLM-specific: Output length distribution, Refusal rate changes, Safety policy trigger rate, RAG retrieval hit-rate
+- Windows & baselines
+  - Reference window: gold standard baseline from last stable 30-90 days of production data
+  - Comparison window: latest N hours/days of incoming data to check against reference
+  - Advanced windows: sliding + seasonal windows accounting for weekday patterns and seasonal trends
+- Pipeline architecture 
+  - Collect
+  - Compute
+  - Store
+  - Alert
+  - Act: retraining triggers, canary/shadow deployments, rollbacks
+- Batch drift (daily) with Airflow
+```py
+@dag(schedule="@daily", catchup=False, tags=["drift"])
+def drift_daily():
+    ref = load_reference("s3://bucket/gold/2024-06/*")
+    cur = load_current("s3://bucket/gold/{{ ds }}/*")
+    report = compute_evidently_report(ref, cur)
+    store_report(report, path=f"s3://bucket/reports/{{ ds }}/drift.html")
+    metrics = extract_alert_metrics(report) # per-feature PSI/KS etc.
+    push_to_prometheus(metrics) # pushgateway
+    gate = evaluate_thresholds(metrics, policy="strict")
+    maybe_page(gate)
+    maybe_open_retrain_pr(gate)
+drift_daily()
+```
+- Batch code snippet (Evidently)
+```py
+import pandas as pd
+from evidently.report import Report
+from evidently.metric_preset import DataDriftPreset
+# Load parquet/csv snapshots
+ref = pd.read_parquet("ref.parquet")
+cur = pd.read_parquet("cur.parquet")
+# Create report with drift metrics
+report = Report(metrics=[DataDriftPreset()])
+report.run(reference_data=ref, current_data=cur)
+report.save_html("drift_report.html")
+# Extract metrics for alerting
+summary = report.as_dict()
+fmetrics = {
+    m["column_name"]: m["metrics"].get("psi") or
+    m["metrics"].get("p_value")
+    for m in summary["metrics"][0]["result"]["drift_by_columns"]
+}
+```
+- Streaming Drift (Minutes) with Kafka + River
+```py
+from river.drift import ADWIN
+adwins = {
+  "ctr_30d": ADWIN(delta=1e-3),
+  "views_7d": ADWIN(delta=1e-3)
+}
+def on_event(x): # x is a dict of feature values
+    alerts = []
+    for f, v in x.items():
+        if f in adwins:
+            before = adwins[f].change_detected
+            adwins[f].update(float(v))
+            if adwins[f].change_detected and not before:
+                alerts.append(f)
+    if alerts:
+        publish("drift-alerts", {"features": alerts, "ts": now()})
+```
+- Feature store integration
+  - Inference logging
+  - Contract enforcement
+  - Reference snapshots
+  - Privacy-safe auditing
+- Thresholds & alerting strategy
+  - Starting point
+    - Statistical tests (p<0.01)
+    - Then calibrate to business impact
+    - Track false positive/negative rates
+  - Advanced controls
+    - Hysteresis: require sustained drift
+    - Cool-downs: prevent alert storms
+    - Segment-specific thresholds
+  - Two-Tier Alert system
+    - Page (P1): High PSI/KS across top features + KPI dip
+    - Ticket (P2): Single feature mild drift for 24h
+- Actions: from Alert -> Mitigation
+  - Auto-retrain
+  - Traffic shift
+  - Feature Hotfix
+  - Rollback
+- CI/CD guardrails for drift
+  - Shadow deployment
+  - Drift analysis
+  - Canary evaluation
+  - Promotion decision
+- LLM/RAG-specific drift
+  - Prompt mix drift: domain/user segments shift
+  - Retrieval drift: track when retrieval performance degrades or document relevance changes
+  - Output drift: monitor when generated text characteristics shift unexpectedly
+  - Embedding drift: track semantic space movement in embeddings over time
+- Dashboards you need
+  - Drift overview
+  - Feature detail
+  - LLM Quality
+  - Action log
+- Governance, privacy, compliance
+  - PII protection
+  - Access controls
+  - Audit trail
+  - Retention plicy
+- Cost & Performance tips
+  - Strategic sampling
+  - Computation tiering
+  - Smart caching
+  - Focused alerting
+- Implementation checklist
+  - Define windows
+  - Select metrics
+  - Build pipelines
+  - Configure alerts
+  - Automate actions
+  - Create visibility
+
 ### 348. 346. Securing Model Endpoints with IAM
+- Threats to model endpoints
+  - Key theft
+  - Abuse vectors
+  - Tenant breakout
+  - Model extraction
+  - Configuration errors
+- IAM fundamentals
+  - Authentication (AuthN): API keys and secrets, OpenID connect, Mutual TLS
+  - Accountability: immutable audit logs, distributed trace IDs, nonrepudation through signing
+  - Authorization (AuthZ): RBAC, ABAC, policy enforcment points
+  - Least priviege + JIT: minimal permissions necessary, JIT credential issuance, time-bound access windows
+- Recommended control layers
+  - Edge: WAF, rate limits, bot detection, DDoS protection
+  - API: OAuth2/OIDC, JWT validation, scoped API keys, mTLS
+  - Service mesh: mTLS, SPIFFE identities, policy enforcement
+  - Network: private endpoints, VPC peering, egress control
+  - Data: KMS/HSM keys, row/column-level access controls
+  - Audit: immutable logs, anomaly detection, alert pipelines
+- Identity patterns for model APIs
+  - User-to-API: OAuth2/OIDC flows producing short-lived JWT access tokens
+  - Service-to-Service: mTLS + workload identity using SPIFFE/SPIRE
+  - Machine-to-Cloud: OIDC federation mapped to cloud IAM roles
+  - Break-Glass: Time-bound, heavily audited emergency tokens
+- OAuth2/OIDC (Public clients)
+  - Key components
+    - Authoriztion code with PKCE
+    - JWT contents: sub, aud, exp, scope, tenant_id
+    - Rotate signing keys (JWKS): clock skew <= 2-5min
+  - JWT verification
+```py
+from jose import jwt
+claims = jwt.decode(token, jwks,
+audience="inference-api",
+options={"verify_aud":True})
+assert "model:infer" in claims.get("scope","").split()
+```
+- mTLS + SPIFFE
+  - Issue SPIFFE IDs
+  - Service mesh handles cert rotation & TLS
+  - AuthZ via mesh polices: allow only specific SPIFFE IDs
+- API Gateway Hardening
+  - JWT validation
+  - Rate limiting & quotas
+  - WAF protection
+  - Payload protection
+- Cloud IAM quick patterns
+  - AWS: SigV4, IAM roles, STS, API Gatewya = Lambda authorizers
+  - GCP: Service accounts, IAM Conditions, IAP, Workload identity
+  - Azure: Managed Identities, AAD App Roles, APIM policies
+- K8 RBAC & namespacing
+  - Separate namespaces per team/tenant
+  - Quotas & LimitRanges to prevent noisy-neighbor attacks
+  - RBAC priciples: no cluster-admin; scope to namespace
+- Network security & private access
+  - Private endpoitns: eliminate public IPs unless required
+  - Ingress allowlists; NetworkPolicies to limit east-west traffic
+  - Egress control: only allow S3/Blob/FeatureStore endpoints
+  - TLS everywhere with modern cipher suites only
+- Authorization models
+  - RABC (Role-Based)
+    - Roles map to resource/actions
+  - ABAC (Attribute-Based)
+    - Policies based on attributes (tenants, region, risk score)
+- Multi-tenant Isolation & Quotas
+  - Tenant boundaries
+  - Usage controls
+  - Cost attribution
+  - Model separation
+- Model-aware controls
+  - Input protection: safe prompts, content filters, input validation 
+  - Output & usage controls: request budget, output filtering, watermarking/provenance, cost monitoring and anomaly detection
+- Audit, forensics &  nonrepudiation
+  - Comprehensive logging
+  - Immutable storage
+  - Distributed tracing
+  - Anomaly detection
+- Security delivery & supply chain
+  - Sign images/manifests
+  - Admission control to deny unsigned image
+  - Regular base image scanning and patching
+- Red team & validation
+  - Token tests
+  - Network tests
+  - Data exfiltration
+  - API fuzzing
+- Financial controls  
+  - Per-key daily caps & spike arrest thresholds
+  - Dynamic pricing tiers mapped to rate limits + model choices
+  - Budget alerts and automatic cutoffs
+- Abuse detection
+  - Detect grey noise: high QPS, low utility -> throttle/ban
+  - ML-based anomaly detection for usage patterns
+  - Shadow billing dashboard for tenants to monitor their own usage
+  - Graudated response: warn -> throttle -> suspend
+- Quick start checklist
+  - Edge security: private endpoints + WAF + rate limiting
+  - Identity: OAuth2/OIDC for users, mTLS for services
+  - Authorization: JWT scopes; model:infer, model:admin
+  - K8: RBAC + NetworkPolicies per namespace
+  - Secrets: external Secrets + KMS
+  - Observability: Audit logs + trace IDs + anomaly alerts
+  - Deployment: canary policy rollout; signed images only
+- Example "Golden" Request Flow
+  - Client (OIDC): User authenticates and receives JWT
+  - API Gateway: JWT verify, rate limit, WAF protection
+  - Istio mTLS: SPIFFE identity verification between services
+  - Inference Pod: RBAC-limited ServiceAccount
+  - Feature Store: IAM-scoped access to data
+  - KMS Decrypt: Envelope encryption of sensitive data
+  - Logs/Traces: Immutable audit records
+  - FinOps Tags: Usage tracking and billing attribution
+
 ### 349. 347. Cost Monitoring and Optimization Setup
+- Four cost dimensions in AI infrastructure
+  - Compute
+  - Storage
+  - Networking
+  - Ops/Overhead: monitoring, CI/CD pipeline, model retraining, and idle resources
+- FinOps principles for AI infrastructure
+  - Visibility
+  - Accountability
+  - Optimization
+  - Forecasting
+- Tagging & attribution
+  - Resourc tagging strategy: tag every resource consistently such as team, env, id
+  - Dashboard integration: use consistent labels to power FinOps dashboards and reports
+  - Multi-tenant attribution: enable detailed cost-per-team and cost-per-feature reporting
+- Monitoring compute spend
+  - $/training run
+  - $/inference (per 1k requests)
+  - GPU utilization %
+  - Clound native billing tools
+- Monitoring storage costs
+  - Track usage patterns
+  - Key storage metrics: TB stored per dataset/model, lifecycle tier transitions, $/TB-month trend line
+  - Alert configuration
+- Networking cost controls
+  - GB transferred per service/region
+  - CDN cache hit/miss ratio
+  - Cross-region data movement
+- Essential dashboards to build
+  - Compute dashboard: GPU hours consumed, $/1k inference requests, resource idle percentage
+  - Storage dashboard: TB trend over time, Hot vs cold storage ratio, 30-day forecast
+  - Network dashboard: GB transfer per API, Egress cost by destination, transfer optimization opportunities
+  - Totla spend dashboard: costs by project/team, drilldowns: service->namespace->pod, budget vs actual tracking
+- Setting up alerts & budgets
+  - Critical alert: > 80% budget consumed
+  - Warning ticket: cost spikes >20% above daily baseline
+  - Automated controls
+    - Auto-shutdown for idle clusters
+    - Quotas to limit maximum GPU nodes per team
+    - Approval workflows for high-cost resources
+- Optimization strategies: compute
+  - Spot/preemptible GPUs
+  - Mixed precision training
+  - Model compression
+  - Inference optimization
+- Storage optimization
+  - Compress and partition data (Parquet + ZSTD)
+  - Archive old checkpoints, logs, and raw data
+  - Implement object lifecycle rules for automatic tiering
+- Network optimization
+  - Cache inference responses where appropriate
+  - Utilize CDNs for frequently accessed outputs
+  - Batch API requests to reduce overhead
+- Key lessons for AI infrastructure cost control
+  - Comprehensive cost view
+  - Visibility first
+  - Maximum impact optimizations
+  - Implement guardrails
+
 ### 350. 348. Configuring High Availability Clusters
+- Real-time critical services
+  - Fraud detection
+  - Healthcare diagnostics
+  - Self-driving vehicle operations
+  - HA matters
+- High availability principles
+  - Redundancy
+  - Failover
+  - Isolation
+  - Self-healing
+- HA layers in AI infrastructure
+  - Compute
+  - Storage
+  - Networking
+  - Control plane
+  - Application
+- K8 HA setup
+  - Control plane redundancy: 3-5 control plane nodes distributed across availability zones
+  - Worker node distribution
+    - At least 2 availabilty zones
+- Pod resilience strategies
+  - ReplicaSets/Deployments
+  - PodAntiAffinity
+  - PodDisruptingBudgets
+  - Readiness/Liveness probes
+- Storage HA Strategies
+  - Cloud-native storage
+  - K8 volumes
+  - Database clustering
+- Networking HA
+  - Load balancing: layer 4/7 load balancers
+  - Global routing: DNS failover, ingress controllers
+- Multi-Zone
+  - Within single region, low latency
+  - Protects against rack/zone failures
+  - Lower cost, simpler implementation
+  - Vulnerable to region-wide outages
+- Multi-region
+  - True disaster recovery (DR) capability
+  - Active-Active (traffic split) or Active-Passive (warm standby)
+  - Defined by RTO (Recoverty time) & RPO (data loss tolerance)
+  - Higher cost, data synchronization challenges
+- HA for GPU clusters
+  - Distribute GPU node pools across AZs to avoid zone-based outages
+  - Implement job checkpointing (DDP/FSDP/DeepSpeed) to resume after node failures
+  - Use elastic training frameworks
+  - For inference, deploy multiple GPU pods with autoscaling rather than relying on single large GPUs
+- Monitoring HA Health
+  - Hearbeat monitoring: endpoint response, SSL certificate expiration, DNS resolution
+  - Error budget tracking: response time percentiles, request success rate percentages, remaining error budget visualization
+  - Alert configuration: pod restart events exceeding thresholds, node NotReady conditions, load balander health check failures, resource utilization approaching limits
+  - HA dashboards: overall uptime percentage, failover event history and duration, recovery time metrics, regional health comparison
+- Cost trade-offs for HA
+  - Multi-region storage replciation can double storage costs
+  - Idle standby clusters represent wasted resources
+  - Control plane redundancy increases management overhead
+  - Increased complexity requires more specialized skills
+- HA architecture = redundancy + failover across all infrastructure layers
+
 ### 351. 349. Stress Testing the AI System
+- Test objectives
+  - Latency SLOs
+  - Throughput
+  - Stability
+  - Cost efficiency
+  - Degradation behavior
+- Test types you'll run
+  - Baseline: single user->establish golden numbers
+  - Load: step/ramp to target QPS
+  - Stress: Push beyond capacity -> find the knee
+  - Spike: instant jump to Nx traffic
+  - Soak: hous/days -> detect leask & performance drift
+  - Chaos: fault injection; node/pod/network/database failures
+- Plan before you blast
+  - Workload model
+  - Test data
+  - Environment configuration
+  - Pass/fail gates
+- Toolbelt (API & Infra)
+  - Load testing: k6, hey, vegeta, wrk
+  - Scenarios/State: Locust
+  - Chaos engineering: Chaos Mesh, Litmus, PowerfulSeal
+  - GPU metrics: DCGM, tritonserver perf_analyzer
+  - Tracing: OpenTelemetry + Jaeger
+  - Dashboards: Grafana/Prometheus, Kubecost
+- k6 Quickstart (HTTP API)
+```js
+// script.js
+import http from 'k6/http';
+import { sleep, check } from 'k6';
+export let options = {
+  stages: [
+    { duration: '2m', target: 200 }, // ramp
+    { duration: '5m', target: 200 }, // hold
+    { duration: '1m', target: 0 } // cool
+  ],
+  thresholds: {
+    http_req_failed: ['rate<0.001'],
+    http_req_duration: ['p(95)<300', 'p(99)<600']
+  }
+};
+export default function () {
+  const res = http.post(
+    `${__ENV.BASE_URL}/predict`,
+    JSON.stringify({text: 'hello world'}),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+  check(res, { 'status 200': r => r.status === 200 });
+  sleep(0.1);
+}
+```
+- Locust (User flows & state)
+```py
+from locust import HttpUser, task, between
+class User(HttpUser):
+wait_time = between(0.1, 0.5)
+@task
+def predict(self):
+  self.client.post(
+    "/predict",
+    json={"text":"lorem ipsum"}
+  )
+```
+  - Run webUI: `locust -H http://nlp.local`
+- GPU & model throughput (Triton)
+  - Command: `perf_analyzer -m my_model -u triton.default.svc.cluster.local:8001 -b 32 -p 1000 --input-data zero`
+- K8 readiness for tests
+  - Right-size replicas & set HPA targets
+  - Enable PodAntiAffinity and PDB
+  - Add resource limits
+  - Ensure metrics & tracing are on
+- What to watch during tests
+  - API: p50/p95/p99 latency, error rate, timeouts, success rate by endpoint
+  - Infrastructure: CPU/GPU utilization, mem/power
+  - Pipeline: Kafka log, Airflow DAG latency, Database connection pools
+  - Cache: hit ratio, Embedding/RAG lookups, CDN performance
+  - Costs: $/1k requests, idle GPU percentage, resource utilization efficiency
+- Find the Knee (Capacity)
+  - Inrease RPS stepwise and plot p95 latency vs RPS to find your system's true capacity
+  - The "knee" marks your system's practical capacity limit - where performance degrades rapidaly under additional load
+- Common bottlenecks & fixes
+  - High p95, low GPU util: IO bound. Batch requests, pin threads, increase batch sizes
+  - High 5xx rate: Memory/OOM. Reduce batch siz, quantize model, add replicas
+  - Slow first-token (LLM): initialization. Warmup, KV-cache, faster tokenizer, pin CPU frequency
+  - Feature store latency: data access. Cache hot keys, move online store near pods
+  - Ingress limits: Connection handling. Raise worker concurrency, tune keep-alive settings
+- Data scenarios matter
+  - Cache-warm vs cache-cold runs
+  - Payload size distributions
+  - Class skew for classifiers
+  - RAG recency
+- Soak testing (stability)
+  - Duration: 3-34 hours
+  - Track: memory growth over time, file handles & connections, goroutine/threads count, GPU temperatures
+  - Alert on: latency drift, periodic error spikes, slow resource leaks, queue growth
+- Pass/fail gates
+  - Latency: p95 <300ms at 200rps for 10min
+  - Error rate: < 0.1% sustained
+  - Cost: cost delta < +10% vs last release
+  - Stability: no OOM/CrashLoop events: GPU util> 40% average
+  - Resilience: chaos: maintain p95 <+25% during 30% pod kill
+- Reporting template (Copy/Paste)
+  - Environment
+  - Workload
+  - Results: baseline, load, stress, spike, soak (tables)
+  - Findings: bottlenecks with evidence
+  - Actions: tuning items, owner, ETA
+  - Decision: Go/No-Go with risks
+- Safety & ethics
+  - Get approvals
+  - Tag traffic
+  - Respect PII
+
 ### 352. 350. Lab – Deliver Scalable Infra Deployment
-2min
+- Objective: Deploy a multi-replica, GPU-enabled AI inference service
+  - Configure autoscaling + HA + IAM security
+  - Add cost monitoring + drift detection hooks
+  - Validate with stress tests & failover drills
+```
+✅ Deliverable: a scalable prototype serving real predictions under load, with monitoring dashboards and security guardrails.
+Step 1 — Prep Your Cluster
+
+    Use a managed K8s cluster (EKS/GKE/AKS) with GPU nodes, or local kind/minikube (no GPU).
+
+    Install required add-ons:
+
+        NVIDIA device plugin (for GPU scheduling)
+
+        Prometheus + Grafana (monitoring)
+
+        Ingress Controller (NGINX/Istio)
+
+        Kubecost (optional: cost tracking)
+
+Verify cluster:
+
+    kubectl get nodes -o wide
+    kubectl describe node <gpu-node> | grep -i nvidia
+
+Step 2 — Containerize & Push Model
+
+    Export model → TorchScript/ONNX/TensorRT (your choice).
+
+    Write inference server (FastAPI, Triton, or TorchServe).
+
+    Build + push container:
+
+    docker build -t ghcr.io/<org>/capstone-infer:v1 .
+    docker push ghcr.io/<org>/capstone-infer:v1
+
+Step 3 — Deploy with HA & Autoscaling
+
+deployment.yaml
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: capstone-infer, labels: {app: infer}}
+    spec:
+      replicas: 3
+      selector: {matchLabels: {app: infer}}
+      template:
+        metadata: {labels: {app: infer}}
+        spec:
+          containers:
+          - name: infer
+            image: ghcr.io/<org>/capstone-infer:v1
+            ports: [{containerPort: 8080}]
+            resources:
+              requests: {cpu: "500m", memory: "1Gi", nvidia.com/gpu: 1}
+              limits:   {cpu: "2", memory: "4Gi", nvidia.com/gpu: 1}
+            readinessProbe: {httpGet: {path: /healthz, port: 8080}}
+            livenessProbe: {httpGet: {path: /healthz, port: 8080}}
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector: {matchLabels: {app: infer}}
+                topologyKey: "kubernetes.io/hostname"
+
+hpa.yaml
+
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata: {name: capstone-infer-hpa}
+    spec:
+      scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: capstone-infer}
+      minReplicas: 3
+      maxReplicas: 20
+      metrics:
+      - type: Resource
+        resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}
+
+Apply:
+
+    kubectl apply -f deployment.yaml -f hpa.yaml
+
+Step 4 — Secure with IAM & RBAC
+
+    Ingress secured with OAuth2 proxy or API Gateway (JWT validation).
+
+    K8s RBAC: restrict namespace access.
+
+    Secrets: mounted from KMS/Vault using External Secrets.
+
+Example: restrict service account with least privilege:
+
+    kind: Role
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata: {name: infer-role, namespace: ml}
+    rules:
+    - apiGroups: [""] resources: ["pods"] verbs: ["get","list"]
+    ---
+    kind: RoleBinding
+    metadata: {name: infer-rb, namespace: ml}
+    subjects: [{kind: ServiceAccount, name: infer-sa}]
+    roleRef: {kind: Role, name: infer-role, apiGroup: rbac.authorization.k8s.io}
+
+Step 5 — Monitoring & Cost Dashboards
+
+    Use Prometheus to scrape API & GPU metrics.
+
+    Add Grafana dashboards for:
+
+        p95 latency
+
+        GPU utilization %
+
+        Cost per 1k requests (Kubecost metric)
+
+    Add Alertmanager:
+
+        Page if p95 > 500ms for 10m
+
+        Ticket if drift PSI > 0.25 for 1h
+
+Step 6 — Drift Detection Hook
+
+    Nightly Airflow job with Evidently AI:
+
+    report = Report(metrics=[DataDriftPreset()])
+    report.run(reference_data=ref, current_data=cur)
+    report.save_html("drift_report.html")
+
+    Export drift scores → Prometheus Pushgateway.
+
+    Grafana panel: top 5 drifting features.
+
+Step 7 — Stress Test Deployment
+
+    Run k6 load test:
+
+    BASE_URL=http://capstone.local k6 run script.js
+
+    Check scaling via HPA:
+
+    kubectl get hpa capstone-infer-hpa -w
+
+    Monitor latency vs QPS in Grafana.
+
+    Inject chaos (Chaos Mesh):
+
+    kind: PodChaos
+    spec:
+      action: pod-kill
+      mode: fixed-percent
+      value: "50"
+
+Verify service stays alive.
+Step 8 — Acceptance Criteria
+
+✅ /predict returns valid outputs at ≥200 QPS with p95 < 300ms
+✅ Autoscaler adds pods under load, scales down when idle
+✅ Survives node/pod kills (HA verified)
+✅ Drift pipeline produces nightly report
+✅ Grafana dashboards show cost, latency, GPU util
+✅ IAM prevents unauthorized API access
+✅ Wrap-Up
+
+In this lab, you:
+
+    Delivered a scalable, secure, observable AI service
+
+    Validated HA, autoscaling, and cost guardrails
+
+    Built the foundation for your Capstone production infra
+```
+
+## Section 52: Week 51: Capstone - Finalization
 
 ### 353. 351. Conducting End-to-End Testing
+- What E2E testing covers
+  - Pipelines: ingestion->validation->feature store->training->registry
+  - Non-functionals: latency, availability, cost, security, compliance
+  - Serving: gateway/mesh->inference->feature lookups->storage
+  - Runbooks: alerts, rollback, retrain triggers
+- AI testing pyramid
+  - Experiments: Canary, A/B, Shadow traffic
+  - System/E2E: realistic data + real infra + success metrics
+  - Integration: model + feature store, model+tokenizer, API+auth
+  - Unit: functions, preprocessors, prompt templates
+- E2E success criteria
+  - Performance
+  - Functional
+  - Cost
+  - Compliance
+  - Recovery: rollback/retrain
+- Environment strategy
+  - Prod-like staging
+  - Ephemeral test namespaces
+  - Deterministic seeds
+  - Isolated test accounts
+- Golden test data & seeds
+  - For reproducible, deterministic testing of AI systems:
+    - Build golden dataset with common & edge cases
+    - Pin dataset with DVC/LakeFS
+    - Control randomness with seeds in all frameworks
+    - Store expected outputs
+- Data pipeline E2E testing
+  - Ingest
+  - Validate
+  - Compute
+  - Materialize: feature store
+  - Key assertions
+    - Schema validatino    
+    - Value ranges & distributions
+    - Missingness patterns
+    - Join keys integrity
+    - Data freshness
+    - Offline vs online feature parity
+- Training & registry E2E testing
+  - Kick off training job
+  - Validate metrics
+  - Promote to STAGING
+  - Verify metadata
+- Contract & schema testing
+  - Validate API against OpenAPI specification
+  - Reject malformed payloads with clear error messages
+  - Ensure backward-compatibility for clients
+  - Test deprecation paths
+  - Use property-based fuzzing to test:
+    - Field length limits
+    - Unicode handling
+    - Oversized payloads
+- Negative & Edge Case Testing
+  - Input variations: empty inputs, massive payloads, rare category values, out-of-distribution data
+  - System conditions: request timeouts, dependency failures, slow feature store, network partitions
+  - Auth scenarios: rate-limit exceeded, expired tokens, missing scopes, incorrect permissions
+- Performance & soak testing
+  - Use k6/Locust scripts that mirror production traffic mix
+  - Track multiple dimensions concurrently: p95/p99 latency percentiles, error rates, cost per 1k requests, GPU utilization and memory patterns
+  - Run 2-4 hours soak tests to detect: memory leaks, file handle exhaustion, GPU temperature
+- Shadow testing
+  - Duplicate requests: copy production traffic to new model
+  - Zero User impact: responses discarded, only metrics collected
+  - Statistical analyis: requires significant improvement or tie + cheaper
+- Security & IAM E2E testing
+  - AuthZ matrix
+  - mTLS Validation
+  - Secret management
+  - Audit trail: log who did what
+- Critical compliance checks
+  - PII handling
+  - Encryption
+  - Data residency
+  - Audit logs
+  - Safety filters
+- Observability under test
+  - Health probes
+  - Alert verification
+  - Dashboard validation
+- Reproducibility & rollback testing
+  - Training reproducibility
+  - Rollback drill
+  - Recovery metrics
+- E2E automation in CI/CD
+  - Spin up ephemeral namespace for each PR
+  - Deploy complete system to isolated environment
+  - RUn comprehensive E2E test suite
+  - Collect all test artifacts and metrics
+- E2E test reporting template
+  - Environment: cluster/node types, model version, data hash
+  - Functional tests: pass/fail matrix (happy/edge/negative cases)
+  - SLO metrics: p50/p95/p99 latency, error%, cost/1k vs targets
+  - Security & compliance: IAM matrix results, audit log verification
+  - Issues & owners: root cause +  fix plan + assigned owner
+  - Final decision: Go/No-Go (with canary deployment plan)
+- Common E2E pitfalls & fixes
+  - Flaky tests: adjust timeouts, seed randomness, warm caches
+  - Feature store drift: implement feature store parity checks
+  - Green tests, Red SLOs: include load testing in E2E, not just functional checks
+  - Audit failures: add compliance assertions in pipeline
+
 ### 354. 352. Adding Redundancy and Failover Mechanisms
+- Downtime leads to lost revenue, SLA penalties, erosion of customer trust
+- Types of redundancy
+  - Horizontal: multiple replicas allowing for load distribution and failover capability
+  - Vertical: over-provisioning capacity per node
+  - Geographic: deploying across multiple availability zones and regions
+  - Storage: replicating datasets and model checkpoints across multiple storage systems and locations
+  - Networking: implementing multiple load balancer endpoints and DNS failover mechanisms
+- Redundancy at each layer
+  - Compute: multi-node, multi-AZ GPU pools
+  - Data: Object storage replication
+  - Network: load balancer
+  - Control plane
+  - Applicatoin: replicated pods with PodDisruptionBudget (PDB) and canary deployment options
+- Failover mechanisms
+  - Active-Active: all replicas simultaneously serve traffic, distributed by load balancers
+  - Active-Passive: Standby infrastructure activated only during failover events
+  - DNS Failover: Switch traffic b/w regions via Route53/Cloud DNS
+  - Cluster Failover: promote standby cluster to primary when outage is detected
+  - Database Failover: Automatic leader election or promotion of read-replicas during primary failure
+- K8 HA patterns
+  - Replicas >=3 for critical services
+- Load balancing
+  - L4/L7 load balancers
+  - Health checks 
+  - Global anycast IPs
+- DNS failover
+  - Health checks
+  - Ex: AWS Route53 + CloudFront redirect traffic to healthy region
+  - TTL settings control propagaion speed during failover
+- Storage redundancy
+  - Cross-region replication
+  - Multi-region databases
+  - Backup strategy
+- Failover for model serving
+  - Canary & Blue/Green deployments: enable instant rollback capabilities when new models fail
+  - Shadow mode: run standby model version that receive traffic but don't return responses
+  - Service mesh: use Istio/Linkerd for fine-grained traffic control
+- Testing failover (drills)
+   - Chaos engineering approach
+    - Deliberately kill pods/nodes using Chaos Mesh or Kube-monkey
+    - Block network traffic to a region for 15min
+    - Simulate GPU failures or performance degradation
+   - Verification checklist
+    - Load balancers correctly reroute traffic to healthy endpoints
+    - Client applications retry successfully with minimal errors
+    - Monitoring dashboards clearly show the failover event
+    - Recovery happens within SLA time constraints
+- Cost vs reliability trade-off
+  - Multi-zone: +15-20% cost. Recommended minimum for all production AI systems
+  - Multi-region active-active: +50-100% cost. Ideal for mission-critical AI applications requiring 99.99%+ uptime
+  - Active-passive: balance point b/w cost and reliability
+
 ### 355. 353. Polishing Monitoring and Alerting Dashboards
+- Simple, business-aligned KPIs -> polished dashboards
+- Core dashboard families
+  - API & inference health: latency, error %, QPS
+  - Model quality: drift, accuracy proxies, safety metrics
+  - Infra/cluster health: GPU, CPU, memory, pod restarts
+  - Data pipeline freshness: feature staleness, Kafka lag
+  - Cost & efficiency: GPU hours, $/1k requests, idle %
+  - SLO compliance: burn rate, uptime %
+- Dashboard hygiene rules
+  - Keep it focused: limit to <=12 panels per dashboard
+  - Group by persona
+  - Be consistent
+  - Prioritize SLOs
+  - Track changes
+- Alerting best practices
+  - Page on user impact: high latency, 5xx errors, drift + KPI dip
+  - Ticket for background issues: storage growth, minor staleness, warnings
+  - Link everything
+  - Reduce noise: suppress duplicate and use hysteresis
+- Stakeholder-friendly views: executive summary dashboard
+  - Uptime percentage this week
+  - Cost trend vs budget
+  - Model drift trend (high-level)
+  - Business impact metrics
+- Recommended dashboard layout
+  - Top Row: SLO gauges - latency, error %, drift, and cost indicators
+  - Middle: Detailed Time-series - latency histograms, drift trends, traffic patterns
+  - Bottom: Logs & Events - related system events, error logs, and deployment markers
+
 ### 356. 354. Generating Documentation for AI Infra
+- Why documentation matters
+  - Faster onboarding
+  - Reduced deployment risk
+  - Audit enablement
+  - Capstone success
+
+Audience | Their needs | Documentation artifacts
+----------|-------------|--------------
+Engineers & ML teams | How to build and run | README, Quickstart, ADRs, API reference, Model/data cards
+SRE/Ops | How to keep up and running | Runbooks, SLOs, Dashboards Guide, HA/Failover Procedures
+Security & Compliance | Evidence & controls | IAM Matrix, Audit Log specifications, Data handling Procedures
+Product & Executives | ROI & risk assessment | KPIs, Cost Plan, Release Notes
+
+- Core documentation set
+  - README/Quickstart
+  - Architecture overview
+  - ADRs 
+  - API reference
+  - Model & data cards
+  - SLO/SLI & dashboards
+  - Runbooks: alert->action procedures for common issues
+  - Security/IAM & Threat model
+  - Cost & FinOps Plan
+  - Release Notes & Changelog
+- Writing principles for technical documentation
+  - Docs-as-code
+  - Single source of truth
+  - Templatize repeatable content
+  - Clear ownership
+  - Make it runnable
+- Architecture Overview Template
+  - Essential Components
+    - Purpose: Explain end-to-end flow & key tradeoffs
+    - Include: Context, constraints, choices, risks, and operational considerations
+    - Format: Mermaid/PlantUML for version-controlled diagrams
+    - Detail level: Component interactions, not implementation details
+- API Reference
+  - Best Practices
+    - Single source: OpenAPI spec should be used to generate both docs and code
+    - Validate: Test spec matches actual API behavior
+    - Publish: Export static HTML with ReDoc or Scalar
+    - Examples: Include request/response examples
+- Model Card Template
+```
+# Model Card 4 **Owner:** @team-ml " **Version:** v1.2.0 " **Date:** 2025-
+08-28
+**Use cases:** sentiment on short texts (f 256 tokens)
+**Training data:** corpus v2025-06 (curated, de-identified)
+**Metrics (eval):** F1=0.89, Acc=0.91 (dataset hash: abc123)
+**Latency (p95):** 240 ms @ 200 rps on A10G
+**Limitations:** poor for dialectal slang; OOD long docs
+**Safety notes:** output filter v0.7 enabled
+**Update policy:** retrain monthly; drift PSI>0.25 triggers review
+```
+- Data Card Template
+```
+# Data Card 4 Corpus v2025-06
+**Owner:** @data-eng
+**Source:** user feedback + public corpora
+**Collection period:** 2025-04 ³ 2025-06
+**License:** internal use, no redistribution
+**PII handling:** de-ID pipeline v2; tokenization; approvals logged
+**Schema:** {id, text, label, ts, region}
+**Quality checks:** null<0.1%, dup<0.2%, lang=en>98%
+**Bias review:** region distribution balanced ±5% vs target
+**Retention:** raw 90d (cold), features 365d
+**Lineage:** DVC commit 9f0d&; GE checkpoint ge://capstone/daily
+```
+- Why Data Cards Matter
+  - Data cards provide critical context about training and evaluation datasets that:
+    - Document data provenance and lineage
+    - Highlight potential biases or limitations
+    - Clarify privacy considerations and handling procedures
+    - Enable reproducibility of results
+    - Support compliance with regulations
+- Runbook Template: High Latency Response
+```
+# Runbook 4 High p95 Latency
+**Alert:** p95 > 300ms for 10m (severity: page)
+**Owners:** @platform-oncall " **Dashboards:** /grafana/api
+## Diagnose
+1. Check error rate panel (5xx spike?).
+2. Compare traffic vs replicas (HPA scaling?).
+3. Inspect feature store p95; if high ³ cache hot keys.
+## Mitigate
+- Scale up: `kubectl scale deploy infer -n ml --replicas=+2`
+- Temporarily increase HPA max to 30.
+- If model vNext just deployed ³ rollback via registry.
+## Root Cause
+Capture trace IDs & graphs, open incident ticket with timelines.
+## Prevent
+Tune batch size, enable KV cache, bump pod CPU limits.
+```
+- Effective Runbooks
+  - Actionable: Clear, copy-paste commands
+  - Contextual: Link to dashboards and alerts
+  - Comprehensive: Cover diagnosis, mitigation, and prevention
+  - Tested: Validated through drills
+- Cost & FinOps Documentation
+  - Budget Tracking
+    - Monthly cap: $X,XXX
+    - GPU hours: planned vs. actual
+    - Cost per 1K requests target: $X.XX
+    - Current trend visualization
+  - Storage Optimization
+    - Lifecycle rules by data tier
+    - Retention periods by data importance
+    - Compression strategies
+    - Hot/cold storage transitions
+  - Resource Controls
+    - Auto-shutdown for idle resources
+    - Quota limits by environment
+    - Right-sizing recommendations
+    - Spot instance usage policy
+- Developer Quickstart
+```
+# Quickstart
+## 1) Setup
+- `pyenv local 3.10 && pip install -r requirements.txt`
+- `docker build -t ghcr.io/org/infer:$USER-dev .`
+## 2) Run locally
+- `docker run -p 8080:8080 ghcr.io/org/infer:$USER-dev`
+- `curl :8080/healthz`
+## 3) Deploy to dev (ephemeral)
+- `make ns=dev-$USER deploy`
+- `make smoke BASE=https://infer-dev-$USER.local`
+## 4) View dashboards
+- `make port-forward-grafana`
+```
+- Architecture Decision Records (ADRs)
+```
+# ADR-0001 4 Triton over FastAPI-only for Inference
+**Context:** Multi-model GPU serving, need dynamic batching.
+**Decision:** Use NVIDIA Triton + gRPC; wrap with HTTP gateway.
+**Status:** Accepted (2025-08-20).
+**Consequences:** Higher ops complexity; better throughput; future multi-model
+support.
+```
+  - ADR Benefits
+    - Documents decision context for future teams
+    - Forces structured thinking about alternatives
+    - Captures trade-offs explicitly 
+    - Creates history of technical evolution
+  - Best Practices
+    - Keep ADRs small, one per decision
+    - Link alternatives considered
+    - Include performance data when relevant
+    - Update status if decisions change
+- Release Notes & Changelog
+  - Structure
+    - Follow SemVer versioning (MAJOR.MINOR.PATCH)
+    - Include for each release:
+      - New features & improvements
+      - Bug fixes with issue references
+      - Performance improvements
+      - Risk notes and special precautions
+    - Attach supporting artifacts:
+      - Performance test reports
+      - Grafana screenshots
+      - Cost delta analysis
+- Documentation Quality Checklist
+  - Ownership & Currency: Every page has clear owner + last updated date
+  - Developer Onboarding: README bootstraps a new developer in f15 minutes
+  - Architecture Accuracy: Architecture diagram matches current production deployment
+  - API Documentation: OpenAPI spec matches deployed API (verified in CI)
+  - Model & Data Transparency: Cards include complete metrics, lineage information, and limitations
+  - Operational Readiness: SLOs are measurable with linked PromQL and runbooks tested in drills
+  - Security & Cost: IAM matrix, threat model, cost plan, and dashboards all linked and current
+  - Version History: Release notes for at least the last two versions included
+
 ### 357. 355. Creating Demo API Endpoints
+- Demo end points
+  - Demonstrate infrastructure + model + monitoring functioning together
+  - Enables hands-on testing
+  - Serves as a safe public-facing showcase
+- Qualities of a good demo endpoint
+  - Simple contract: limited to 1-2 inputs
+  - Fast responses
+  - Safe outputs
+  - Stable version
+  - Monitored
+- Demo-friendly enhancements
+  - Interactive swagger/ReDocUI
+  - Playground UI
+  - Pre-baked examples
+  - Explainability Add-ons
+- Security & limits for demo endpoints
+  - API keys or Demo tokens
+  - Rate limiting
+  - Isolation
+  - Protection mechanisms
+- Observability for demo endpoints
+  - Key metrics to track: latency, error percentage, token usage, cost per 1k requests, request volume by endpoint
+  - Set up alerts for: abuse patterns (high QPS), elevated error rates, token expiry warnings
+- Deployment patterns
+  - Blue/Green
+  - Namespace isolation
+  - Canary
+  - Ephemeral Demos
+- Stakeholder walkthrough
+  - Start with Swagger UI
+  - Demo live monitoring
+  - Conduct failover drill
+  - Review drift reports
+- Polishing for demo day
+  - Documentation
+    - Add friendly documentation at `/docs`
+    - Create detailed guides at `/help`
+  - Visualization
+  - Backup plans: local curl commands if API fails. Jupyter notebook demo as fallback, record short video of successful demo
+- Capstone deliverables
+  - Stable /predict endpoint
+  - Health check suite
+  - API documentation
+  - Monitoring dashboard
+  - Security controls
+
 ### 358. 356. Preparing Final Capstone Report
+- Report Structure
+  - Executive Summary: Business value and high-level results
+  - Problem Statement & Goals: Clear definition of the challenge and success metrics
+  - Architecture Overview: System design and key components
+  - Implementation Details: Technical execution specifics
+  - Testing & Validation: Evidence of system reliability
+  - Monitoring & Cost Management: Operational visibility and efficiency
+  - Security & Compliance: Risk mitigation and protection measures
+  - Lessons Learned & Risks: Transparency about challenges
+  - Future Roadmap: Evolution and enhancement plans
+  - Appendices: Supporting documentation and evidence
+- Executive summary template
+  - 1-2 pages in non-technical language
+  - Clearly articulates the problem solved and its business significance
+- Problem statement & goals
+  - Define the challenge
+- Architecture overview
+- Implementation details
+  - Containerization & orchestration
+  - CI/CD pipeline
+  - HA & autoscaling
+  - Cost infrastructure
+  - Security implementation
+  - Code references
+- Tools to generate report
+  - MkDocs/Docusaurus
+  - Jupyer + nbconvert
+  - CI Pipeline
+  - Pandoc
+  - Mermaid/PlantUML
+
 ### 359. 357. Lab – Capstone Infra Walkthrough
-4min
+- Objective: Deliver a live, end-to-end demo covering: architecture, deploy, health, metrics, HA/failover, drift, cost, and rollback — in ~20–30 minutes.
+```
+✅ Final Deliverable
+
+    A walkthrough script (timed agenda + commands)
+
+    Evidence pack: Grafana screenshots, k6 JSON, drift report, audit log extract
+
+    A one-pager with links (API, dashboards, runbooks, report)
+
+0) Agenda (timeboxed)
+
+    (2m) System overview (diagram, SLOs)
+
+    (5m) Live API (predict + metadata + OpenAPI)
+
+    (6m) Observability (dashboards, alerts, release markers)
+
+    (6m) Resilience drill (kill pod, show steady p95)
+
+    (5m) Governance (drift report, audit logs, IAM check)
+
+    (3m) Rollback (canary → revert)
+
+    (3m) Q&A (known limits + next steps)
+
+1) Preflight (run 10–15 min before demo)
+
+Verify cluster & app
+
+    kubectl get nodes -o wide
+    kubectl -n ml get deploy,svc,hpa,ingress,pdb
+    kubectl -n ml rollout status deploy/infer --timeout=120s
+
+Smoke endpoints
+
+    BASE="https://demo.capstone.local"
+    curl -s $BASE/healthz | jq
+    curl -s $BASE/metadata | jq
+    curl -s -X POST $BASE/predict -H "content-type: application/json" -d '{"text":"hello capstone"}' | jq
+
+Dashboards
+
+    Open Grafana tabs:
+
+        API Inference (latency p95/p99, RPS, error rate)
+
+        GPU Health (util %, memory %, temps)
+
+        Cost ($/1k, GPU hours) if wired
+
+        Drift (PSI/KS, top features)
+
+Data/Drift artifacts
+
+    Evidently HTML report (latest)
+
+    Feature store “gold” snapshot hash (for provenance)
+
+Rollback ready
+
+    # Identify current & previous image tags / model versions
+    kubectl -n ml get deploy infer -o=jsonpath='{.spec.template.spec.containers[0].image}'; echo
+    PREV_TAG=v1.2.3  # set this beforehand
+
+2) Walkthrough Script (what to say & do)
+A. Overview (2m)
+
+    Show architecture diagram (data → training → registry → K8s → dashboards).
+
+    State SLOs: p95 < 300ms, 99.9% availability, drift PSI < 0.25, cost/1k ≤ target.
+
+    Point at HA: 3+ replicas, PodAntiAffinity, PDB, multi-AZ node pools.
+
+B. Live API (5m)
+
+Show OpenAPI & call predict
+
+    curl -s $BASE/openapi.json | head -n 20
+    time curl -s -X POST $BASE/predict -H 'content-type: application/json' \
+      -d '{"text":"I love this course!"}' | jq
+
+    Highlight model version, latency_ms in response.
+
+    Show /readyz dependency checks (feature store, registry).
+
+C. Observability (6m)
+
+    Grafana API board: point to p95, error rate, HPA activity.
+
+    Grafana GPU board: util/mem/power per pod.
+
+    Show release markers from CI/CD and runbook links from alerts panel.
+
+    If wired: show $ per 1k req panel trending during demo traffic.
+
+Generate steady load (optional)
+
+    # 2 minutes at 100 rps
+    cat > script.js <<'EOF'
+    import http from 'k6/http'; export let options={vus:100,duration:'2m'};
+    export default ()=>http.post(__ENV.BASE_URL+'/predict', JSON.stringify({text:'demo'}), {headers:{'Content-Type':'application/json'}});
+    EOF
+    BASE_URL=$BASE k6 run script.js
+
+D. Resilience Drill (5–6m)
+
+Kill a pod; show p95 stays within SLO
+
+    POD=$(kubectl -n ml get pod -l app=infer -o jsonpath='{.items[0].metadata.name}')
+    kubectl -n ml delete pod $POD --force --grace-period=0
+
+    Narrate: HPA/Deployment reschedules; PDB prevents total drain; Ingress/LB keeps service healthy.
+
+    On the dashboard, highlight replica count + no error spike.
+
+E. Governance (Drift & Audit) (5m)
+
+Display drift report (Evidently HTML tab).
+
+    Call out top drifting features & thresholds.
+
+    Show Prometheus drift metrics panel (if integrated).
+    Audit extract (prove nonrepudiation)
+
+    # Example: last 5 inference audit lines (your log path/format may vary)
+    kubectl -n ml logs deploy/infer | tail -n 5
+    # Look for: caller ID/scope, model version, hashed input, trace_id, latency
+
+IAM probe (deny by scope)
+
+    curl -i -H "Authorization: Bearer INVALID" $BASE/predict  # expect 401/403
+
+F. Rollback (3m)
+
+Swap to previous image / model (Blue→Green or Helm set)
+
+    kubectl -n ml set image deploy/infer infer=ghcr.io/org/infer:$PREV_TAG
+    kubectl -n ml rollout status deploy/infer --timeout=120s
+
+    Refresh dashboard: show release marker; verify p95 stable.
+
+    Close the loop: “We can revert within minutes if a canary regresses.”
+
+3) Evidence Capture (during/after demo)
+
+Export quick artifacts
+
+    # Latency/export
+    kubectl -n observability port-forward svc/kube-prom-grafana 3000:80 &   # if needed
+    # (Use Grafana UI: Share → Snapshot → Save, or API if scripted)
+
+Save k6 results
+
+    k6 run --out json=results.json script.js
+
+Bundle drift HTML + snapshots + k6 JSON
+
+    mkdir -p walkthrough_artifacts && cp results.json walkthrough_artifacts/
+    # add drift_report.html and Grafana snapshots manually
+
+4) Success Criteria (checklist)
+
+    API: /predict responds with p95 < target during steady 50–200 rps
+
+    HA: Pod kill didn’t breach latency/error SLO
+
+    Observability: dashboards live; release markers & runbook links visible
+
+    Drift: last window below threshold or acknowledged with mitigation
+
+    Security: unauthorized call denied; audit log shows identity + trace
+
+    Rollback: completed and service remained healthy
+
+5) Troubleshooting (fast paths)
+
+    Ingress 404 / TLS error → check DNS/host header, Ingress Controller status, cert.
+
+    Pods CrashLoop → kubectl describe pod (image, env, port mismatch).
+
+    Latency spike → verify HPA limits, feature store p95, batch size; scale replicas.
+
+    Metrics missing → confirm /metrics endpoint scraped; serviceMonitor selector.
+
+    k6 timeouts → raise --http-debug, confirm LB idle timeouts/keep-alive.
+
+6) Walkthrough One-Pager (paste into README or wiki)
+
+Links:
+
+    API: https://demo.capstone.local/docs
+
+    Dashboards: API / GPU / Drift / Cost (Grafana)
+
+    Runbooks: Latency, Drift, Outage Drill
+
+    Final Report (Day 356) PDF/HTML
+
+    ADR index
+
+Talk Track (60-second summary):
+
+    “This system ingests data → builds features → trains & registers models → serves via autoscaling K8s with GPU nodes. We prove SLOs (p95 < 300ms), show drift governance, and enforce IAM. HA is demonstrated by live pod failure — users see no impact. If a release regresses, we roll back in minutes. Costs and drift are monitored with automated alerts and runbooks.”
+
+7) (Optional) Demo Data Pack
+
+    10–20 safe sample payloads (JSON) that produce varied outputs
+
+    A ‘bad’ payload that triggers a graceful 4xx validation error
+
+    A long payload to show latency budget and server behavior
+
+8) Extra Credit
+
+    GameDay script: sequence multiple chaos events (pod kill → network delay → partial dependency outage) while watching SLOs.
+
+    Shadow traffic: mirror demo requests to vNext, show win-rate panel.
+
+    Cost live: display $/1k req delta as load ramps.
+```
+
+## Section 53: Week 52: Capstone - Presentation & Graduation
 
 ### 360. 358. Preparing Final Demo Environment
+- Characteristics of a Good Demo Environment
+  - Isolated Namespace or Cluster: Complete separation from other environments ensures demo stability and predictability.
+  - Pinned Versions: Lock down your model version, infrastructure components, and all configurations to prevent unexpected changes.
+  - Synthetic but Realistic Test Data: Create data that showcases your system's capabilities without exposing sensitive information.
+  - Stable Traffic Generator: Ensures dashboards display meaningful metrics and prevents "flatline" graphs during your presentation.
+  - Pre-wired Dashboards & Reports: Configure all visualizations in advance for seamless navigation during the demo.
+- Backup plan
+  - Local notebook
+  - Grafana snapshots
+  - Pre-recorded segments
+  - Offline slides
+
 ### 361. 359. Recording Metrics and Performance Benchmarks
+- Why bencmarks matter
+  - Demonstrate maturity
+  - Highlight capabilities
+  - Enable optimization
+- Core SLOs to measure
+  - Latency: p50/p95/p99 response times. Shows consistency across different load conditions
+  - Throughput: Sustained QPS/RPS per GPU/cluster. Demonstrates maximum capacity under load
+  - Error Rate: 4xx/5xx % and timeout frequency. Indicates system reliability and robustness
+  - Availability: Uptime % and failover success rate Proves system resilience during disruptions
+  - Cost Efficiency: $/1k requests and GPU utilization %. Shows resource optimization and financial viability
+  - Model Quality: Drift metrics and win-rate vs baseline. Ensures consistent ML performance
+- Example:
+  - Load Test (200 RPS): System comfortably handles expected traffic
+  - Stress Test (600 RPS): Identifies upper limits where errors increase
+  - Spike Test (400 RPS): Validates ability to handle sudden traffic surges
+  - Soak Test (150 RPS for 3h): Confirms stability over extended periods
+
 ### 362. 360. Building Visuals of Infra Architecture
+- Your Core Diagram Set (Minimum)
+  - System Overview: End-to-end architecture visualization
+  - Dataflow / Bronze3Silver3Gold: Data transformation pipeline visualization
+  - Serving & Autoscaling Path: API -> model -> features visualization
+  - HA & Failover Topology: Zones/regions resilience structure
+  - Observability & SLO Map: Metrics and measurement points
+  - Cost & Ownership Map (Optional): FinOps/RACI visualization
+- Visual Language & Legend
+  - Shape Conventions
+    - Rectangles = services
+    - Cylinders = data stores
+    - Hexagons = gateways
+    - Clouds = external services
+  - Line Styles
+    - Solid = synchronous request
+    - Dashed = asynchronous
+    - Dotted = control/metrics
+  - Color Coding
+    - Blue = real-time serving
+    - Green = batch/ETL
+    - Orange = observability
+    - Red outline = failure domain boundary
+- Tools & exports
+  - Mermaid
+  - PlantUML
+  - diagrams.net/FigJam
+  - Graphviz
+- Dataflow (Bronze ³ Silver ³ Gold)
+  - Bronze (Raw, Append-Only)
+    - Raw events
+    - Unvalidated data
+    - Immutable storage
+  - Silver (Clean, Validated)
+    - Validated tables
+    - Deduped records
+    - Schema enforced
+  - Gold (Features)
+    - Feature tables
+    - Joined data
+    - ML-ready forma
+- Observability & SLO Map
+  - API Metrics
+    - Request Duration Histogram -> p95 < 300ms
+    - Error Rate -> 5xx < 0.1%
+    - Request Volume -> Capacity planning
+  - Model Metrics
+    - Win-rate vs baseline -> QoS stable
+    - Drift PSI -> PSI < 0.25
+    - Prediction latency -> Performance budgeting
+  - Infrastructure Metrics
+    - GPU Utilization % -> >60% avg
+    - Memory consumption -> Rightsizing
+    - Pod restart count -> Stability tracking
+- Failure Mode Overlay
+  - Common Failure Scenarios
+    - Node Failure: Deployment reschedules (PDB prevents 0 replicas)
+    - Feature Store Degradation: Degraded mode (fallback defaults + retry pattern)
+    - Canary Deployment Failure: Automatic rollback via GitOps controller
+
 ### 363. 361. Delivering Stakeholder Presentation
+- Structure of Your Presentation: 15-20 minute framework for maximum impact
+  - Intro & Context: The problem your infrastructure solves
+  - Architecture Overview: Simple, clear diagram of your solution
+  - Demo / Walkthrough: Live or recorded proof of functionality
+  - Results & Benchmarks: Key metrics and dashboard highlights
+  - Business Value: Cost savings, resilience, future growth potential
+  - Closing & Q&A: Risks, roadmap, and key takeaways
+- Business Value: Beyond the Metrics
+  - Resilience - 99.9% uptime means:
+    - Fewer SLA penalties
+    - Improved customer trust
+    - Predictable system behavior
+  - Cost Efficiency - GPU utilization ±40% means:
+    - $10K/month cost savings
+    - Faster ROI on hardware
+    - Lower TCO overall
+  - Compliance - Drift monitoring means:
+    - Early detection of issues
+    - Regulatory compliance
+    - Reduced risk exposure
+
 ### 364. 362. Peer Review and Feedback on Projects
+- Why Peer Review Matters
+  - Identify Blind Spots: After weeks of development, you're too close to your own infrastructure to see what's missing or unclear.
+  - Simulate Stakeholder Questions: Practice answering the tough questions stakeholders will ask in real-world implementation scenarios.
+  - Benchmark Against Peers: See how your solution compares to others, identifying competitive advantages and improvement areas.
+  - Build Professional Skills: Develop the critical collaboration and constructive critique abilities essential in tech leadership roles.
+- Peer Review Framework
+  - Technical Lens: Is the infrastructure reliable, scalable, and secure?
+    - Architecture decisions justified
+    - Failure modes addressed
+    - Technical debt minimized
+  - Evidence Lens: Do metrics and benchmarks prove your claims?
+    - Performance tests documented
+    - Clear before/after metrics
+    - Dashboards showing real data
+  - Impact Lens: Is business value clear and compelling?
+    - ROI calculations presented
+    - Stakeholder benefits explicit
+    - Problem-solution fit demonstrated
+- Giving Good Feedback
+  - Be Specific: Not "dashboards are weak" but "add SLO gauges to your main monitoring dashboard to make performance thresholds immediately visible"
+  - Balance Praise + Critique: Start with strengths before addressing improvements4this builds receptivity and acknowledges effort
+  - Focus on Impact: Address how changes will improve stakeholder understanding or project outcomes, not personal preferences
+  - Suggest Concrete Fixes: Offer actionable solutions, not just criticism: "Consider adding a cost comparison table between current and proposed architecture"
+- Receiving Feedback Effectively
+  - Listen First: Resist the urge to defend or explain immediately. Absorb the feedback completely before responding.
+  - Ask Clarifying Questions: "Can you show me exactly where the architecture diagram was unclear?" or "What specific metrics would make my case stronger?"
+  - Prioritize Strategically: Focus on high-impact, low-effort changes first. Create an action plan for more complex improvements.
+  - Express Appreciation: Thank reviewers specifically for their most helpful insights4this builds a culture of trust and continuous improvement.
+- Incorporating Feedback Effectively
+  - Categorize Feedback: Sort feedback into quick wins vs. major fixes based on effort required and impact on presentation quality.
+  - Quick Wins (1-2 hours)
+    - Add legend to architecture diagram
+    - Reorder slides (problem ³ demo ³ ROI)
+    - Add executive summary slide
+    - Include glossary for technical terms
+    - Enhance visual hierarchy in dashboards
+  - Major Fixes (4+ hours)
+    - Gather additional benchmark evidence
+    - Enhance IAM/RBAC documentation
+    - Create before/after cost comparison
+    - Develop technical debt roadmap
+    - Add failure scenario walkthroughs
+
 ### 365. 363. Reflection on Zero-to-Hero Journey
+
 ### 366. 364. Future Learning Paths in AI Infrastructure
+- Learning Path Archetypes
+  - Deep Specialist: Focus on GPUs, compilers, and kernel-level performance optimization
+  - Infra Generalist: Master full-stack MLOps & cloud scaling across diverse environments
+  - AI+Security Leader: Specialize in privacy preservation, adversarial defense, and secure AI
+  - AI Product/Business Builder: Focus on startups, cost-first scaling, and business-aligned infrastructure
+  - Frontier Explorer: Pioneer quantum and neuromorphic infrastructure for next-gen AI systems
+- Advanced Hardware Track
+  - Next-Gen Accelerators: NVIDIA Hopper/Blackwell, Google TPUs, AWS Trainium/Inferentia
+  - Edge Hardware: NPUs from Qualcomm, Apple, Intel optimized for efficient inference
+  - Specialized Compilers: XLA, TorchDynamo, TVM, Triton for hardware-specific optimization 
+- Research & Frontier Track: Emerging Technologies
+  - AI + Quantum: Hybrid quantum-classical ML systems 
+  - Neuromorphic Computing: Brain-inspired chips like Intel Loihi, SpiNNaker
+  - Sustainable AI: Green AI infrastructure and energy-efficient computing
+- Professional Certifications to Pursue
+  - NVIDIA Certifications: NCA/NCP in Generative AI, Infrastructure, Quantum Computing
+  - Cloud AI Certifications: AWS ML Specialty, GCP ML Engineer, Azure AI Engineer
+  - Kubernetes: CKA, CKS (security), CKAD for container orchestration
+  - Security: CISSP, CCSP, CISA for AI security and compliance
+
 ### 367. 365. Graduation & Certification Showcase
-8min
