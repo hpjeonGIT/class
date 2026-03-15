@@ -320,7 +320,7 @@ List[1,1]: 0x8223
 ### 16. Tuples
 - Tuple is immutable while list is mutable
   - (10) is NOT a tuple
-  - (10,) is a tuple: coman(,) is the primary tuple constructor
+  - (10,) is a tuple: comma(,) is the primary tuple constructor
 ```py
 from typing import Any
 from typing import Tuple
