@@ -319,6 +319,17 @@ WantedBy=multi-user.target
 - Grafana cloud: a fully managed cloud-hosted platform
 
 ### 31. Installing Grafana on Ubuntu
+- https://grafana.com/grafana/download
+- sudo apt-get install -y adduser libfontconfig1 musl
+- wget https://dl.grafana.com/grafana-enterprise/release/12.4.1/grafana-enterprise_12.4.1_22846628243_linux_amd64.deb
+- sudo dpkg -i grafana-enterprise_12.4.1_22846628243_linux_amd64.deb
+- sudo systemctl daemon-reload
+- sudo systemctl enable grafana-server
+- sudo systemctl start grafana-server
+- systemctl status grafana-server
+- Open `http://localhost:3000`
+- Login as admin/admin
+  - Will ask to change passwd
 
 ### 32. Installing Grafana on Amazon Linux, Red Hat, CentOS, RHEL, and Fedora
 
@@ -327,38 +338,115 @@ WantedBy=multi-user.target
 ### 34. Installing Grafana on Mac with Homebrew
 
 ### 35. Configuring Grafana
+- cd /etc/grafana
+- sudo cp grafana.ini custom.ini
+- sudo vi grafana.ini
+  - Remove semicolon in the first column to activate the line
+  - logs = /var/log/grafana
+  - type = sqlite3
+- sudo systemctl restart grafana-server
 
 ### 36. Launching Grafana Stack and Prometheus with Docker
+- https://github.com/aussiearef/grafana-udemy
+- Install docker then reboot
+- https://github.com/aussiearef/grafana-udemy/blob/main/docker/docker-compose.yaml
 
-##
+## Section 5: Using Grafana
 
 ### 37. Dashboard Design Best Practices
+- Browser applications
+- Application Performance Monitoring (APM)/Backend services
+- Infrastructure (host, network, disk etc)
+- Synthetic monitors (Website up?)
+- Business
+- Dashboard design
+  - Browser applications
+```bash  
+|------------------------------------------------------------------------|
+|             HTTT Error Rate       |        Top 10 Error Messages       |
+|------------------------------------------------------------------------|
+|                           Page view load time                          |
+|------------------------------------------------------------------------|
+|                           Page view per minute                         |
+|------------------------------------------------------------------------|
+| Largest Contentful Paint | First Input Delay | Cumulative Layout Shift |
+|         (LCP)            |       (FID)       |         (CLS)           |
+|------------------------------------------------------------------------|
+```
+  - APM Services
+```bash  
+|------------------------------------------------------------------------|
+|         API Call Per Minute    |       Error Rate Per Minute           |
+|------------------------------------------------------------------------|
+|                               Logs                                     |
+|------------------------------------------------------------------------|
+|                         Hosts/Containers                               |
+|------------------------------------------------------------------------|
+|              CPU Usage         |           Memory Usage                | 
+|------------------------------------------------------------------------|
+```
+  - Infrastructure
+```bash  
+|------------------------------------------------------------------------|
+|                             Summary Info                               |
+|                  (Hosts, Applications, Events, Alerts etc)             |
+|------------------------------------------------------------------------|
+|                             Metrics                                    |
+|           (CPU, Memory, Disk Used, Disk Utilization)                   |
+|------------------------------------------------------------------------|
+|                         Hosts/Containers                               |
+|------------------------------------------------------------------------|
+|              Databases         |    Distributed Cache (and similar)    |
+|------------------------------------------------------------------------|
+```
+  - Synthetic Monitors
+```bash  
+|------------------------------------------------------------------------|
+|    Landing Page Up View/Alert   |     APIs Health Check Status         | 
+|------------------------------------------------------------------------|
+|                       Page Load Performance                            |
+|------------------------------------------------------------------------|
+|                      External Systems Status                           |
+|------------------------------------------------------------------------|
+```
+
 ### 38. The ShoeHub Global Company!
+- https://github.com/aussiearef/ShoeHubV2
+
 ### 39. Connecting Grafana to Prometheus
+- From web browser (localhost:3000)
+  - Connections -> Add new connection -> Enter `http://localhost:9090`
+
 ### 40. Creating and Managing Dashboards in Grafana
+
 ### 41. Creating Your First Panel : The Time Series Panel
+
 ### 42. Multiple and Accumulative Queries
-5min
-Start
-43. Exercise: Display Country Data On A Graph Panel
+
+### 43. Exercise: Display Country Data On A Graph Panel
+
 ### 44. Data Transformations
+
 ### 45. Visually Comparing Values with Pie Charts
+
 ### 46. Comparing Metric Data of Two Different Times (Time Shift)
-2min
-Start
-47. Practice : Working with Charts and Thresholds
+
+### 47. Practice : Working with Charts and Thresholds
+
 ### 48. Thresholds in Grafana
+
 ### 49. Variables and Dynamic Dashboards
-6min
-Start
-50. Practie Creating Dynamid Dashboards
+
+### 50. Practie Creating Dynamid Dashboards
+
 ### 51. Solved: Creating Dynamic Dashboards
+
 ### 52. Increasing the visibility of data with logarithmic scaling
+
 ### 53. Working with the Gauge and Bar Gauge Panels
-4min
-Start
-Role Play 3: Chat to Alessandro about Grafana
-Role ### 
+
+## 
+
 ### 54. About Alerts in Grafana
 ### 55. Working with Alert Rules
 ### 56. Notification Policies and Contact Points
