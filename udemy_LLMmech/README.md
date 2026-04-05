@@ -1,7 +1,4 @@
-
-## A deep understanding of AI large language model mechanisms
-
-
+# A deep understanding of AI large language model mechanisms
 
 ## Section 1: Introductions
 
@@ -65,7 +62,6 @@ idx2word = {}
 for i, word in enumerate(vocab):
   idx2word[i] = word
 idx2word
-   
 ```
 
 ### 9. CodeChallenge: Create and visualize tokens (part 1)
@@ -103,24 +99,358 @@ plt.imshow(word_matrix)
 
 
 ### 12. CodeChallenge: Tokenizing The Time Machine
+- Exercise 1: Get and prepare text
+  - Parse the full book into words, vocabulary, and econder and decoder functions
+```py
+f = open("time_machine.txt",'r')
+text = f.readlines()
+f.close()
+import re
+allwords = re.split('\s', ' '.join(text).lower())
+vocab = sorted(set(allwords)) # set() for uniqueness
+# vocab  
+# encoder/decoder
+word2idx = {}
+for i, word in enumerate(vocab):
+  word2idx[word] = i
+idx2word = {}
+for i, word in enumerate(vocab):
+  idx2word[i] = word
+def incoder(word2idx,words):
+  res = []
+  for word in words:
+    res.append(word2idx[word])
+  return res
+def decoder(idx2word,ids):
+  res = []
+  for idx in ids:
+    res.append(idx2word[idx])
+  return res
+```
+- Exercise 2: A random walk through the time machine
+  - Generate 10 random integers and create a sentence from those tokens
+  - Brown noise is the cumulative sum of random numbers
+    - We use only -1 and +1
+  - Generate 30 random token IDs as Brownian noise starting from a randomly selected token ID
+    - Decode to tokens and enjoy the poetry  
+```py
+import random
+rvalue = random.randint(0,len(vocab))
+vsize = len(vocab)
+alist = []
+for n in range(30):
+  rvalue += random.choice([-1,1])
+  if rvalue < 0:
+    rvalue += vsize
+  if rvalue >= vsize:
+    rvalue -= vsize
+  alist.append(rvalue)
+print(alist)  
+print(decoder(idx2word,alist))
+```
+- Exercise 3: Distribution of word lengths
+  - Count the number of characters in each word of the text
+  - Make scatter plot and histogram
+```py
+import matplotlib.pyplot as plt
+x = []
+y = []
+for i, word in enumerate(allwords):
+  x.append(i)
+  y.append(len(word))
+plt.scatter(x,y)  
+plt.show()
+plt.hist(y,bins=30)
+plt.show()
+```
+- Exercise 4: Encode an novel sentence
+  - Find a new word compared with setence = "The space aliens came to Earth to steal watermelons and staplers"
+- Exercise 5: Create a new encoder
+  - When a token is not found, return `<|unk|>`
+```py
+def incoder(word2idx,words):
+  res = []
+  for word in words:
+    if word in vocab:
+      res.append(word2idx[word])
+    else:
+      res.append("<|unk|>")
+  return res
+```
+- Instead of the above code, add `<|unk|>` into the last of word2idx and idx2word, having it as a vocabulary
 
 ### 13. Tokenizing characters vs. subwords vs. words
+- Hello
+  - Character: H, e, l, l, o
+  - Subword: He llo
+  - Word: Hello
+- Character
+  - Language agnostic
+  - Handles misspellings
+  - Compact
+  - Long sequences
+  - Little semantic meaning
+  - Slow learning
+  - Need more data
+- Word
+  - Semantic relations
+  - Memory efficient
+  - Faster learning
+  - Human-interpretable
+  - Large vocab
+  - Language-dependent
+  - OOV (Out-of-Vocab) difficulties  
 
 ### 14. Byte-pair encoding algorithm
+- BPE is simple and widely used in real-world applications
+- BPE motivation and theory
+  - Tokenization efficiency can be improved with tokens that represent longer character sequences - word or subword
+  - "Often appear together" is calculated emprically using large text datasets found online
+- BPE algorithm 
+  - Step 0: initialize a vocabulary comprising only characters (no pairs)
+  - Step 1: Loop through the text and count the frequency of sequential pairs
+    - For "love", sequential pairs are "lo", "ov", "ve"
+  - Step 2: Find the most frequent pair and merge them to create a new token
+  - Step 3: Add that new token to the vocabulary
+  - Step 4: Loop through the text and replace the sequence with that new pair
+    - Only the most frequent pair only
+  - Step 5: Repeate steps 1-4 until the vocabl contains k tokens 
+    - 100,000 tokens at GPT4
+- Demo
+  - Sample text = "like liker love lovely hug hugs hugging hearts"
+  - Characters: ' ', a, e, g, h, ....
+  - Token_pairs: 'li', 'ik', 'ke', 'e ', ' l', ...
+  - Vocab:    
+```py
+import numpy as np
+text = 'like liker love lovely hug hugs hugging hearts'
+chars = list(set(text))
+chars.sort()
+for l in chars:
+  print(f'{l} appears {text.count(l)} times.')
+# make a vocabulary
+vocab = {word:i for i, word in enumerate(chars)}  
+'''
+  appears 7 times.
+a appears 1 times.
+e appears 5 times.
+g appears 5 times.
+h appears 4 times.
+i appears 3 times.
+...
+'''
+origtext = list(text)
+token_pairs = dict()
+for i in range(len(origtext)-1):
+  pair = origtext[i] + origtext[i+1]
+  if pair in token_pairs:
+    token_pairs[pair] += 1
+  else:
+    token_pairs[pair] = 1
+token_pairs    
+'''
+'li': 2,
+ 'ik': 2,
+ 'ke': 2,
+ 'e ': 2,
+ ' l': 3,
+ 'er': 1,
+ ...
+'''
+mostFreqPair_idx = np.argmax(list(token_pairs.values()))
+mostFreqPair_char = list(token_pairs.keys())[mostFreqPair_idx]
+vocab[mostFreqPair_char] = max(vocab.values()) +1
+vocab
+'''
+ ...
+ 't': 12,
+ 'u': 13,
+ 'v': 14,
+ 'y': 15,
+ ' h': 16}
+'''
+# loops
+newtext = []
+i = 0
+while i < (len(origtext)-1):
+  if (origtext[i] + origtext[i+1]) == mostFreqPair_char:
+    newtext.append(mostFreqPair_char)
+    print(f'added "{mostFreqPair_char}"')
+    i+=2
+  else:
+    newtext.append(origtext[i])
+    i+=1
+print(f'Original text: {origtext}')
+print(f'Updated_text: {newtext}')
+'''
+added " h"
+added " h"
+added " h"
+added " h"
+Original text: ['l', 'i', 'k', 'e', ' ', 'l', 'i', 'k', 'e', 'r', ' ', 'l', 'o', 'v', 'e', ' ', 'l', 'o', 'v', 'e', 'l', 'y', ' ', 'h', 'u', 'g', ' ', 'h', 'u', 'g', 's', ' ', 'h', 'u', 'g', 'g', 'i', 'n', 'g', ' ', 'h', 'e', 'a', 'r', 't', 's']
+Updated_text: ['l', 'i', 'k', 'e', ' ', 'l', 'i', 'k', 'e', 'r', ' ', 'l', 'o', 'v', 'e', ' ', 'l', 'o', 'v', 'e', 'l', 'y', ' h', 'u', 'g', ' h', 'u', 'g', 's', ' h', 'u', 'g', 'g', 'i', 'n', 'g', ' h', 'e', 'a', 'r', 't']
+'''
+token_pairs = dict()
+for i in range(len(newtext)-1):
+  pair = newtext[i] + newtext[i+1]
+  if pair in token_pairs:
+    token_pairs[pair] += 1
+  else:
+    token_pairs[pair] = 1
+token_pairs    
+'''
+ ...
+ ve': 2,
+ 'el': 1,
+ 'ly': 1,
+ 'y h': 1,
+ ' hu': 3,
+ 'ug': 3,
+ 'g h': 2,
+ 'gs': 1,
+ 's h': 1,
+ 'gg': 1,
+ ...
+'''
+```
+- Additional steps to create professional tokenizers
+  - Data selection
+  - Cleaning and preprocessing (removing non-ASCII characters, excessive whitespace, formatting)
+  - Subword initialization ("ing", "er", "ly") or constraints (e.g., code, url, numbers)
+  - Experimenting with vocab size
+  - Merge based on bytes not characters !!!
+  - Handling rare words to reduce OOV problems
+  - Post-training adjustments (removing or adding merges
+  - Adding special tokens)
+  - Coding tricks to decrease compute time
 
 ### 15. CodeChallenge: Byte-pair encoding to a desired vocab size
+- Up to 25 tokens of vocab
+```py
+
+def update_vocab(token_pairs, vocab):
+  mostFreqPair_idx = np.argmax(list(token_pairs.values()))
+  mostFreqPair_char = list(token_pairs.keys())[mostFreqPair_idx]
+  vocab[mostFreqPair_char] = max(vocab.values()) +1
+  return vocab, mostFreqPair_char
+
+def make_newtext(pretext, mostFreqPair_char):
+  newtext = []
+  i = 0
+  while i < (len(pretext)-1):
+    if (pretext[i] + pretext[i+1]) == mostFreqPair_char:
+      newtext.append(mostFreqPair_char)
+      print(f'added "{mostFreqPair_char}"')
+      i+=2
+    else:
+      newtext.append(pretext[i])
+      i+=1
+  return newtext
+
+def make_token_pairs(newtext):
+  token_pairs = dict()
+  for i in range(len(newtext)-1):
+    pair = newtext[i] + newtext[i+1]
+    if pair in token_pairs:
+      token_pairs[pair] += 1
+    else:
+      token_pairs[pair] = 1
+  return token_pairs    
+#
+import numpy as np
+text = 'like liker love lovely hug hugs hugging hearts'
+chars = list(set(text))
+chars.sort()
+# make a vocabulary
+vocab = {word:i for i, word in enumerate(chars)}  
+origtext = list(text)
+token_pairs = make_token_pairs(origtext)
+newtext = origtext
+while len(vocab.values()) < 26:
+  vocab, mostFreqPair_char = update_vocab(token_pairs, vocab)
+  newtext = make_newtext(newtext, mostFreqPair_char)
+  token_pairs = make_token_pairs(newtext)
+  print("vocab size = ", len(vocab))
+print(newtext)
+'''
+vocab size =  25
+added "like"
+vocab size =  26
+['like', ' l', 'ike', 'r', ' love', ' love', 'l', 'y', ' hug', ' hug', 's', ' hug']
+'''
+```
 
 ### 16. Exploring ChatGPT4's tokenizer
+- Many tokens with space-padded
+- pip install tiktoken
+- https://github.com/vnglst/gpt4-tokens/blob/main/decode-tokens.ipynb
 
 ### 17. CodeChallenge: Token count by subword length (part 1)
+```py
+import requests
+import re
+text = requests.get('https://www.gutenberg.org/files/35/35-0.txt').text
+# split by punctuation
+words = re.split(r'([,.:;—?_!"“()\']|--|\s)',text)
+words = [item.strip() for item in words if item.strip()]
+print(f'There are {len(words)} words.')
+words[10000:10050]
+# what happens if we just tokenize the raw (unprocessed) text?
+import tiktoken
+tokenizer = tiktoken.get_encoding('cl100k_base')
+tmTokens = tokenizer.encode(text)
+print(f'The text has {len(tmTokens):,} tokens and {len(words):,} words.')
+# The text has 43,053 tokens and 37,786 words.
+```
 
 ### 18. CodeChallenge: Token count by subword length (part 2)
 
 ### 19. How many "r"s in strawberry?
+- Early ChatGPT couldn't answer correctly
+```py
+import tiktoken
+tokenizer = tiktoken.get_encoding('cl100k_base')
+tmTokens = tokenizer.encode('strawberry')
+for t in tmTokens:
+  print(f'{t:5d} = {tokenizer.decode([t])}')
+'''
+  496 = str
+  675 = aw
+15717 = berry
+'''
+r = tokenizer.encode('r')
+print(f'{r} = {tokenizer.decode(r)}')
+r in tmTokens # False
+# let's decode:
+s_string = tokenizer.decode(tmTokens)
+s_string
+r_string = tokenizer.decode(r)
+s_string.count(r_string) # 3 is found
+```
 
 ### 20. CodeChallenge: Create your algorithmic rapper name :)
 
 ### 21. Tokenization in BERT
+- BERT is trained to find missing word in the word completion
+  - Good at classification
+```py
+from transformers import BertTokenizer
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+dir(tokenizer)
+print(tokenizer.vocab_size) # 30522
+text = 'science is great'
+res1 = tokenizer.convert_tokens_to_ids(text)
+res3 = tokenizer.encode(text)
+for i in res3:
+  print(f'Token {i} is "{tokenizer.decode(i)}"')
+'''
+Token 101 is "[CLS]" # classification
+Token 2671 is "science"
+Token 2003 is "is"
+Token 2307 is "great"
+Token 102 is "[SEP]"  # sentence separation
+'''
+```  
 
 ### 22. CodeChallenge: Character counts in BERT tokens
 
