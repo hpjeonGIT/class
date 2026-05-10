@@ -851,14 +851,269 @@ Program terminated with signal SIGSEGV, Segmentation fault.
   - Heap-based overflow
 
 ### 38. Memory debugging tools - Static Code Analysis and Valgrind
+- clang analyzer (static analyzer)
+- valgrind: instrumentation framework
+  - memcheck: memory error detector
+    - Memory leak
+    - Uninitialized memory use
+    - Invalid memory access
+    - Bad frees of heap blocks
+    - Overlapping source and destination pointers in memcpy and related functions
+    - `valgrind --tool=memcheck --leak-check=full ./a.exe`
+  - cachegrind: cache profiler
+  - callgrind: call graph profiler
+  - helgrind: thread error detector
+  - massif: heap profiler
+  - Execution speed signficantly slows down
+- Valgrind with gdb
+  - Valgrind uses a synthetic CPU, not the host CPU, making direct debugging impossible. GDB interacts with valgrind's gdbserver for full debugging within valgrind
+  - valgrind --vgdb=yes --vgdb-error=0 ./a.exe
+- Demo:
+```bash
+#############
+############# First, run following at terminal-1
+#############
+$ valgrind --tool=memcheck --leak-check=full --vgdb=yes --vgdb-error=0 ./mem_leak 
+==10037== Memcheck, a memory error detector
+==10037== Copyright (C) 2002-2022, and GNU GPL'd, by Julian Seward et al.
+...
+==10037==   /path/to/gdb ./mem_leak
+==10037== and then give GDB the following command
+==10037==   target remote | /usr/bin/vgdb --pid=10037
+==10037== --pid is optional if only one valgrind process is running
+==10037== 
+#############
+############# Waiting here. Now open terminal-2 and run:
+#############
+$ gdb ./mem_leak 
+GNU gdb (Ubuntu 15.0.50.20240403-0ubuntu1) 15.0.50.20240403-git
+...
+Reading symbols from ./mem_leak...
+(gdb) target remote | vgdb
+Remote debugging using | vgdb
+relaying data between gdb and process 10037
+warning: remote target does not support file transfer, attempting to access files from local filesystem.
+Reading symbols from /lib64/ld-linux-x86-64.so.2...
+Reading symbols from /usr/lib/debug/.build-id/da/07864eb4c1b06504b8688d25d7e84759fe708d.debug...
+0x000000000401f540 in _start () from /lib64/ld-linux-x86-64.so.2
+(gdb) b main
+Breakpoint 1 at 0x109175: file /home/hpjeon/hw/class/udemy_linuxdbg/git/linux-debug-training/Examples/memory_leak/main.c, line 5.
+(gdb) c
+Continuing.
+...
+Breakpoint 1, main ()
+    at /home/hpjeon/hw/class/udemy_linuxdbg/git/linux-debug-training/Examples/memory_leak/main.c:5
+5	  int *ptr = (int *)malloc(5 * sizeof(int));
+(gdb) n
+7	  printf("Dynamic array allocated with 5 elements\n");
+(gdb) 
+9	  return 0;
+(gdb) c
+Continuing.
+[Inferior 1 (Remote target) exited normally]
+#############
+############# Go to terminal-1 and find:
+#############
+Dynamic array allocated with 5 elements
+==10037== 
+==10037== HEAP SUMMARY:
+==10037==     in use at exit: 20 bytes in 1 blocks
+==10037==   total heap usage: 2 allocs, 1 frees, 1,044 bytes allocated
+==10037== 
+==10037== 20 bytes in 1 blocks are definitely lost in loss record 1 of 1
+==10037==    at 0x4846828: malloc (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
+==10037==    by 0x10917E: main (main.c:5) <----------------- Found the cause
+==10037== 
+==10037== LEAK SUMMARY:
+==10037==    definitely lost: 20 bytes in 1 blocks
+==10037==    indirectly lost: 0 bytes in 0 blocks
+==10037==      possibly lost: 0 bytes in 0 blocks
+==10037==    still reachable: 0 bytes in 0 blocks
+==10037==         suppressed: 0 bytes in 0 blocks
+==10037== 
+==10037== For lists of detected and suppressed errors, rerun with: -s
+==10037== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
+```
 
 ### 39. Sanitizer - Address Sanitizer (ASan)
+- Can detect issues like memory errors, undefined behaviors, race conditions, and similar bugs
+- Each sanitizer relies on compiler instrumentation and shadow memory or similar techniques to find isseus related to memory, threading, and undefined behavior in code
+- For both user-space and kernel code
+- ASan (Address Sanitizer): while compiling, checks into the code to detect memory errors
+  - gcc -fsanitize=address -fno-omit-frame-pointer -g -O1 -o memleak main.c
+  - ASan will print an error message ** during runtime ** and a stack trace, indicating where the issue occurred
+- Check if libasan support your gcc compiler:
+  - apt-cache show libasan8
+  - gcc --version
+  - Now install using sudo apt install libasan8
+- Demo:
+```bash
+$ gcc -O1 -g -fsanitize=address -fno-omit-frame-pointer main.c -o a.exe
+$ ldd ./a.exe 
+	linux-vdso.so.1 (0x00007d665aca4000)
+	libasan.so.8 => /lib/x86_64-linux-gnu/libasan.so.8 (0x00007d665a400000) #<---------- make sure libasan is linked
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007d665a000000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007d665ab96000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007d665ab68000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007d665aca6000)
+$ ./a.exe 
+=================================================================
+==11467==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7e533fa00034 at pc 0x64cf592eb4a9 bp 0x7ffee5909320 sp 0x7ffee5909310
+WRITE of size 4 at 0x7e533fa00034 thread T0
+    #0 0x64cf592eb4a8 in out_of_bounds_access /home/hpjeon/hw/class/udemy_linuxdbg/git/linux-debug-training/Examples/Sanitizers/Asan/main.c:16
+...
+Address 0x7e533fa00034 is located in stack of thread T0 at offset 52 in frame
+    #0 0x64cf592eb2b8 in out_of_bounds_access /home/hpjeon/hw/class/udemy_linuxdbg/git/linux-debug-training/Examples/Sanitizers/Asan/main.c:8 #<--------- out of bounds found
+...
+Shadow bytes around the buggy address:
+  0x7e533f9ffd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7e533f9ffe00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7e533f9ffe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7e533f9fff00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7e533f9fff80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x7e533fa00000: f1 f1 f1 f1 00 00[04]f3 f3 f3 f3 f3 00 00 00 00    #<--------  00 means addressable memory, f1 is stack left redzone. see below
+  0x7e533fa00080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7e533fa00100: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+...
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+```
 
 ### 40. Sanitizer - Memory Sanitizer, Thread Sanitizer and Undefined Behavior Sanitizer
+- MSan (Memory Sanitizer): a runtime uninitialized memory reads detector
+  - Uninitialized value was used in a conditional branch
+  - Uninitialized pointer was used for memory accesses
+  - Uninitialized value was passed or returned from a function call
+  - Uninitialized data was passed into some libc calls
+  - Only available in Clang compiler: clang -fsanitize=memory -fsanitize-memory-track-origins -fPIE -pie -fno-omit-frame-pointer -g -O2 myProgram.c
+- TSan (Thread Sanitizer): detects data races in C/C++ using pthread library
+  - A data race occurs when two threads access the same variable concurrently and at least one of the access is write
+  - Use -fsanitiz=thread: gcc -fsanitize=thread -fno-omit-frame-pointer -g -O1 -o memleak main.c
+- Demo:
+```bash
+$ sudo apt install libtsan2
+$ gcc -fsanitize=thread -fno-omit-frame-pointer -g -O1 main.c -o a.exe
+$ ldd ./a.exe 
+	linux-vdso.so.1 (0x00007a04ac2da000)
+	libtsan.so.2 => /lib/x86_64-linux-gnu/libtsan.so.2 (0x00007a04ab200000)   # <---- libstan is linked
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007a04aae00000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007a04ab117000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007a04ab0e9000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007a04ac2dc000)
+$ ./a.exe 
+FATAL: ThreadSanitizer: unexpected memory mapping 0x5f509825f000-0x5f5098260000
+$ echo 0 | sudo tee /proc/sys/kernel/randomize_va_space  # <---- disabling ASLR (Address Space Layout Randomization)
+0
+$ ./a.exe 
+==================
+WARNING: ThreadSanitizer: data race (pid=12338)
+  Write of size 4 at 0x555555558014 by thread T1:
+    #0 increment_resource /home/hpjeon/hw/class/udemy_linuxdbg/git/linux-debug-training/Examples/Sanitizers/Tsan/main.c:7 (a.exe+0x12ae) (BuildId: a73ec4502acc288dfc832310b833f243af76b1eb)
+
+  Previous read of size 4 at 0x555555558014 by thread T2:
+    #0 increment_resource /home/hpjeon/hw/class/udemy_linuxdbg/git/linux-debug-training/Examples/Sanitizers/Tsan/main.c:7 (a.exe+0x128a) (BuildId: a73ec4502acc288dfc832310b833f243af76b1eb)
+
+  Location is global 'shared_resource' of size 4 at 0x555555558014 (a.exe+0x4014)
+
+  Thread T1 (tid=12340, running) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 main /home/hpjeon/hw/class/udemy_linuxdbg/git/linux-debug-training/Examples/Sanitizers/Tsan/main.c:15 (a.exe+0x130d) (BuildId: a73ec4502acc288dfc832310b833f243af76b1eb)
+
+  Thread T2 (tid=12341, finished) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5ac1a) (BuildId: 2a13a7710e361d06f7babbea53065ca2be93f738)
+    #1 main /home/hpjeon/hw/class/udemy_linuxdbg/git/linux-debug-training/Examples/Sanitizers/Tsan/main.c:16 (a.exe+0x1326) (BuildId: a73ec4502acc288dfc832310b833f243af76b1eb)
+
+SUMMARY: ThreadSanitizer: data race /home/hpjeon/hw/class/udemy_linuxdbg/git/linux-debug-training/Examples/Sanitizers/Tsan/main.c:7 in increment_resource
+==================
+Final value: 1000000
+ThreadSanitizer: reported 1 warnings
+```
+- UBSan (Undefined Behavior Sanitizer): a runtime error detection tool that identifies undefined behavior
+  - Signed integer overflow
+  - Invalid shift operations for example, shifting by a negative or too large number
+  - Dereferencing misaligned or null pointers
+  - Type mismatch or invalid casts b/w different types
+  - Using -fsanitize=undefined
+- Demo:
+```bash
+$ sudo apt install libubsan1
+$ gcc -fsanitize=undefined -fno-omit-frame-pointer -g -O1 main.c -o a.exe
+$ ldd ./a.exe 
+	linux-vdso.so.1 (0x00007ffff7fc3000)
+	libubsan.so.1 => /lib/x86_64-linux-gnu/libubsan.so.1 (0x00007ffff7800000)  #<---- make sure that libubsan is linked
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007ffff7400000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007ffff7000000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007ffff7f70000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007ffff7fc5000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007ffff7e87000)
+$ ./a.exe 
+main.c:9:30: runtime error: division by zero
+Floating point exception (core dumped)
+```
 
 ### 41. Libefence
+- A lightweight library that helps to catch buffer overflow and user-after-free memory errors
+  - It allocates extra memory pages around dynamic memory blocks, marking them **as unreadable**. It triggers a segmentation fault if the program accesses memory beyond its allocated bounds
+  - It can be linked statically or preloaded using `LD_PRELOAD`
+- Demo:
+```bash
+$ sudo apt install electric-fence
+# For core dump
+$ sudo systemctl stop apport.service
+$ ulimit -c unlimited
+$ gcc -fno-omit-frame-pointer -g -O1 main.c -o a.exe
+$ LD_PRELOAD=/usr/lib/libefence.so.0.0 ./a.exe 
+
+  Electric Fence 2.2 Copyright (C) 1987-1999 Bruce Perens <bruce@perens.com>
+System page size: 4096 bytes
+Allocated memory at 0x7ffff7e9c000
+Attempting in-page overflow...
+Attempting overflow in guard page...
+Segmentation fault (core dumped)
+$ gdb ./a.exe -c core
+GNU gdb (Ubuntu 15.0.50.20240403-0ubuntu1) 15.0.50.20240403-git
+Copyright (C) 2024 Free Software Foundation, Inc.
+...
+Downloading separate debug info for /usr/lib/libefence.so.0.0
+--Type <RET> for more, q to quit, c to continue without paging--
+Downloading separate debug info for system-supplied DSO at 0x7ffff7fc3000       
+[Thread debugging using libthread_db enabled]                                   
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+Core was generated by `./a.exe'.
+Program terminated with signal SIGSEGV, Segmentation fault.
+#0  out_of_bounds_access () at main.c:44
+44	    array[page_size] = 'Z'; // Overflowed into guard page
+```
 
 ### 42. Best practices for Memory Management
+- Allocate memory dynamically when needed
+  - Use stack memory for small, short-lived variables
+- Deallocate memory properly
+- Avoid manual memory management: smart pointer or higher abstraction
+- Check for null pointers: before dereferencing a pointer, ensure it is NOT null to avoid crashes
+- Bounds checking: for arrays, use library functions or language features to check bounds like std::vector in C++, strncpy, snprintf for C
+- Avoid memory leaks: regularly inspect and analyze the code using valgrind or AddressSanitizer
+- Understand ownership: define the ownership of objects and memory clearly
+- Defensive programming: validate input paramters, check return values from memory allocation functions, and handle errors gracefully
+- Code reviews
+- Move to memory-safe programming: Rust over C/C++
 
 ## Section 6: Linux Debug Training (Part-1) Closure
 
