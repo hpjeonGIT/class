@@ -5536,3 +5536,349 @@ int main(int argc, char *argv[]) {
 ### 19. Form - More
 - Form driver
     - int form_driver(FORM *form, int c);
+
+# Converting class codes into Python curses
+
+### 3.
+- Basic character effects
+- chap03.py:
+```
+import sys,os
+import curses
+ 
+def draw_menu(stdscr):
+    curses.cbreak()
+    curses.curs_set(0)
+    curses.noecho()
+    stdscr.keypad(True)
+    stdscr.refresh()
+    stdscr.addch('N')
+    stdscr.addch('S', curses.A_STANDOUT)
+    stdscr.addch('U', curses.A_UNDERLINE)
+    stdscr.addch('R', curses.A_REVERSE)
+    stdscr.addch('K', curses.A_BLINK)
+    stdscr.addch('D', curses.A_DIM)
+    stdscr.addch('B', curses.A_BOLD)
+    stdscr.addch('P', curses.A_PROTECT)
+    stdscr.addch('H', curses.A_INVIS)
+    stdscr.addch('A', curses.A_ALTCHARSET)
+    stdscr.addch('I', curses.A_ITALIC)
+    # Refresh the screen
+    stdscr.refresh()
+    # Wait for next input
+    stdscr.getch()
+ 
+def main():
+    curses.wrapper(draw_menu)
+ 
+if __name__ == "__main__":
+    main()
+```
+![py03](./py03.png)
+
+### 4.
+- Drawing basic window with borders
+- chap04.py:
+```py
+import sys,os
+import curses
+ 
+def cr_menu_bar_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.refresh()
+    return win
+def cr_file_list_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.border(0,0,0,0,0,0,0,0)
+    win.refresh()
+    return win
+def cr_content_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.box(0,0)
+    win.refresh()
+    return win
+def cr_debug_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.border('|', '|', '-', '-', '+', '+', '+', '+')
+    win.refresh()
+    return win
+def draw_menu(stdscr):
+    curses.cbreak()
+    curses.curs_set(0)
+    curses.noecho()
+    stdscr.keypad(True)
+    stdscr.refresh()
+    h, w = stdscr.getmaxyx()   
+    # Initialization
+    h_file = h - 1 - 6;
+    w_file = int(w * 0.3);
+    mwin = cr_menu_bar_window(1, w, 0, 0)
+    mwin.refresh()
+    fwin = cr_file_list_window(h_file, w_file, 1, 0)
+    fwin.refresh()
+    cwin = cr_content_window(h_file, w - w_file, 1, w_file)
+    cwin.refresh()
+    dwin = cr_debug_window(6,w,1+h_file,0)
+    dwin.refresh()
+    # Wait for next input
+    k = stdscr.getch()
+ 
+def main():
+    curses.wrapper(draw_menu)
+ 
+if __name__ == "__main__":
+    main()
+```
+![py04](./py04.png)
+
+### 5.
+- chap05.py:
+```py
+import sys,os
+import curses
+ 
+def cr_menu_bar_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.refresh()
+    return win
+def cr_file_list_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.border(0,0,0,0,0,0,0,0)
+    win.refresh()
+    return win
+def cr_content_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.box(0,0)
+    win.refresh()
+    return win
+def cr_debug_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.border('|', '|', '-', '-', '+', '+', '+', '+')
+    win.refresh()
+    return win
+def draw_menu(stdscr):
+    curses.cbreak()
+    curses.curs_set(0)
+    curses.noecho()
+    stdscr.keypad(True)
+    stdscr.refresh()
+    h, w = stdscr.getmaxyx()   
+    # Initialization
+    h_file = h - 1 - 6;
+    w_file = int(w * 0.3);
+    mwin = cr_menu_bar_window(1, w, 0, 0)
+    mwin.refresh()
+    fwin = cr_file_list_window(h_file, w_file, 1, 0)
+    fwin.refresh()
+    cwin = cr_content_window(h_file, w - w_file, 1, w_file)
+    cwin.refresh()
+    dwin = cr_debug_window(6,w,1+h_file,0)
+    dwin.refresh()
+    # Wait for next input
+    k = stdscr.getch()
+ 
+def main():
+    curses.wrapper(draw_menu)
+ 
+if __name__ == "__main__":
+    main()
+```
+
+### 6.
+- List of dirs and files
+- chap06.py:
+```py
+import sys,os,argparse
+import curses
+ncount_debug = 0
+ 
+def cr_menu_bar_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.refresh()
+    return win
+def cr_file_list_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.border(0,0,0,0,0,0,0,0)
+    win.addstr(0,1,"File List")
+    win.refresh()
+    return win
+def fwin_list_dir_file(fwin,dir_path):
+    list_files = []
+    list_dirs = []
+    with os.scandir(dir_path) as entries:
+        for entry in entries:
+            if entry.is_file():
+                 list_files.append(entry.name) 
+            if entry.is_dir():
+                 list_dirs.append(entry.name) 
+    hmax, wmax = fwin.getmaxyx()
+    fwin.border(0,0,0,0,0,0,0,0)
+    fwin.addstr(0,1,dir_path)
+    list_all = list_dirs[:] + list_files[:]
+    n_all = len(list_all)
+    if (n_all == 0):
+        fwin.addstr(1,1,"Nothing")
+    else:
+        for row in range(0,hmax-2):
+            if row >= n_all:
+                break
+            fwin.addstr(row+1,1,list_all[row])
+    fwin.addstr(hmax-1,1,str(n_all))
+def cr_content_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.box(0,0)
+    win.addstr(0,1,"Contents")
+    win.refresh()
+    return win
+def cr_debug_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.border('|', '|', '-', '-', '+', '+', '+', '+')
+    win.addstr(0,1,"Debug")
+    win.refresh()
+    return win
+def debug_line(dwin, str1):
+    global ncount_debug
+    dwin.addstr(ncount_debug+1,1, str(ncount_debug) + " : " + str1 + "\n")
+    ncount_debug = ncount_debug + 1
+    dwin.refresh()
+def draw_menu(stdscr):
+    curses.cbreak()
+    curses.curs_set(0)
+    curses.noecho()
+    stdscr.keypad(True)
+    stdscr.refresh()
+    h, w = stdscr.getmaxyx()   
+    # Initialization
+    ncount_debug = 0
+    h_file = h - 1 - 6;
+    w_file = int(w * 0.3);
+    # argument
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path', type=str, required=True)
+    args = parser.parse_args()
+    dir_path = args.path
+    #
+    mwin = cr_menu_bar_window(1, w, 0, 0)
+    mwin.refresh()
+    fwin = cr_file_list_window(h_file, w_file, 1, 0)
+    fwin_list_dir_file(fwin,dir_path)
+    fwin.refresh()
+    cwin = cr_content_window(h_file, w - w_file, 1, w_file)
+    cwin.refresh()
+    dwin = cr_debug_window(6,w,1+h_file,0)
+    debug_line(dwin,"This is a debug message")
+    debug_line(dwin, "Hello ncurses")
+    dwin.refresh()
+    # Wait for next input
+    k = stdscr.getch()
+ 
+def main():
+    curses.wrapper(draw_menu)
+ 
+if __name__ == "__main__":
+    main()
+```
+![py06](./py06.png)
+
+### 7.
+- chap07.py: 
+```py
+import sys,os,argparse
+import curses
+ncount_debug = 0
+ 
+def cr_menu_bar_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.refresh()
+    return win
+def cr_file_list_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.border(0,0,0,0,0,0,0,0)
+    win.addstr(0,1,"File List")
+    win.refresh()
+    return win
+def fwin_list_dir_file(fwin,dir_path):
+    list_files = []
+    list_dirs = []
+    with os.scandir(dir_path) as entries:
+        for entry in entries:
+            if entry.is_file():
+                 list_files.append(entry.name) 
+            if entry.is_dir():
+                 list_dirs.append(entry.name) 
+    hmax, wmax = fwin.getmaxyx()
+    fwin.border(0,0,0,0,0,0,0,0)
+    if len(dir_path) > wmax-2:
+        dir_path = dir_path[:wmax-2-3] + "..."
+    fwin.addstr(0,1,dir_path)
+    list_all = list_dirs[:] + list_files[:]
+    n_all = len(list_all)
+    if (n_all == 0):
+        fwin.addstr(1,1,"Nothing")
+    else:
+        for row in range(0,hmax-2):
+            if row >= n_all:
+                break
+            fwin.addstr(row+1,1,list_all[row])
+    fwin.addstr(hmax-1,1,str(n_all))
+def cr_content_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.box(0,0)
+    win.addstr(0,1,"Contents")
+    win.refresh()
+    return win
+def cr_debug_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.border('|', '|', '-', '-', '+', '+', '+', '+')
+    win.addstr(0,1,"Debug")
+    win.refresh()
+    return win
+def debug_line(dwin, str1):
+    global ncount_debug
+    dwin.addstr(ncount_debug+1,1, str(ncount_debug) + " : " + str1 + "\n")
+    ncount_debug = ncount_debug + 1
+    dwin.refresh()
+def draw_menu(stdscr):
+    curses.cbreak()
+    curses.curs_set(0)
+    curses.noecho()
+    stdscr.keypad(True)
+    stdscr.refresh()
+    h, w = stdscr.getmaxyx()   
+    # Initialization
+    ncount_debug = 0
+    h_file = h - 1 - 6;
+    w_file = int(w * 0.3);
+    # argument
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path', type=str, required=True)
+    args = parser.parse_args()
+    dir_path = args.path
+    #
+    mwin = cr_menu_bar_window(1, w, 0, 0)
+    mwin.refresh()
+    fwin = cr_file_list_window(h_file, w_file, 1, 0)
+    fwin_list_dir_file(fwin,dir_path)
+    fwin.refresh()
+    cwin = cr_content_window(h_file, w - w_file, 1, w_file)
+    cwin.refresh()
+    dwin = cr_debug_window(6,w,1+h_file,0)
+    debug_line(dwin,"This is a debug message")
+    debug_line(dwin, "Hello ncurses")
+    dwin.refresh()
+    # Wait for next input
+    k = stdscr.getch()
+ 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path', type=str, required=True)
+    args = parser.parse_args()
+    dir_path = args.path
+    if (not os.path.exists(dir_path)):
+        print("!!!! "+ dir_path + " doesn't exist. We stop here")
+        sys.exit()
+    curses.wrapper(draw_menu)
+ 
+if __name__ == "__main__":
+    main()
+```
