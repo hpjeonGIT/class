@@ -6092,3 +6092,261 @@ if __name__ == "__main__":
 ```
 ![py08](./py08.png)
 
+### 9.
+- chap09.py
+```py
+
+import sys,os,argparse
+import curses
+import time
+ncount_debug = 0
+list_debug_lines = []
+current_window = 0
+nwindow = 4 # menu, file, content, debug
+list_window = ['menu', 'file', 'content', 'debug']
+row_selected_fwin = 0
+list_names_fwin = []
+list_types_fwin = []
+init_list_fwin = 0
+last_list_fwin = 9999
+dir_path_fwin = ''
+dir_path_name_fwin = ''
+ 
+def next_window():
+    global nwindow, current_window
+    current_window = current_window + 1
+    if current_window >= nwindow:
+        current_window = current_window % nwindow
+def is_current_window(str1):
+    global current_window, list_window
+    if list_window[current_window] == str1:
+        return True
+    else:
+        return False
+def rf_menu_bar_window(win):
+    if (is_current_window("menu")):
+        win.attron(curses.A_REVERSE)
+    win.addstr(0,1,"MENU")
+    win.attroff(curses.A_REVERSE)
+    win.addstr(1,1,"Types:")
+    win.addstr(1,8,"Directory", curses.color_pair(2))
+    win.addstr(1,18,"File", curses.color_pair(3))
+    win.addstr(1,23,"Not_accessible", curses.color_pair(1))
+    win.refresh()
+ 
+def cr_menu_bar_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    rf_menu_bar_window(win)
+    return win
+def cr_file_list_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.keypad(True)
+    win.border(0,0,0,0,0,0,0,0)
+    win.addstr(0,1,"File List")
+    win.refresh()
+    return win
+def return_dir_content(dir_path):
+    list_files = []
+    list_dirs = []
+    list_not_allowed = []
+    with os.scandir(dir_path) as entries:
+        for entry in entries:
+            if os.access(entry, os.R_OK):
+                if entry.is_file():
+                     list_files.append(entry.name) 
+                if entry.is_dir():
+                     list_dirs.append(entry.name) 
+            else:
+                list_not_allowed.append(entry.name)
+    list_names = list_dirs[:] + list_files[:] + list_not_allowed[:]
+    list_types = [2] * len(list_dirs) + [3]*len(list_files) + [1] * len(list_not_allowed)
+    if (dir_path != '/'): # except the root path
+         list_names = ['.','..'] + list_names
+         list_types = [2,2] + list_types
+    return list_names, list_types
+def enter_file(fwin):
+    global row_selected_fwin, dir_path_fwin, list_names_fwin
+    hmax, wmax = fwin.getmaxyx()
+    n_names = len(list_names_fwin)
+    fwin.clear()
+    row_selected_fwin = row_selected_fwin % n_names # +/ by up down
+    if (list_types_fwin[row_selected_fwin] == 2): #dir
+        new_path = dir_path_fwin + '/' + list_names_fwin[row_selected_fwin]
+        new_path = os.path.abspath(new_path) # .. or ./
+        fwin_list_dir_file(fwin, new_path)
+    #elif (list_types_fwin[row_selected_fwin] == 3): # file
+         # open file in the content window
+def fwin_list_dir_file(fwin, dir_path):
+    global list_names_fwin, list_types_fwin, dir_path_fwin, dir_path_name_fwin
+    hmax, wmax = fwin.getmaxyx()
+    if len(dir_path) > wmax-2:
+        dir_path_name_fwin = dir_path[:wmax-2-3] + "..."
+    else:
+        dir_path_name_fwin = dir_path
+    #
+    list_names_fwin, list_types_fwin = return_dir_content(dir_path)
+def rf_fwin(fwin,dwin):
+    global row_selected_fwin, list_names_fwin, list_types_fwin, init_list_fwin, last_list_fwin, dir_path_name_fwin
+    hmax, wmax = fwin.getmaxyx()
+    n_names = len(list_names_fwin)
+    fwin.clear()
+    fwin.border(0,0,0,0,0,0,0,0)
+    if (is_current_window("file")):
+        fwin.attron(curses.A_REVERSE)
+    fwin.addstr(0,1,dir_path_name_fwin)
+    if (is_current_window("file")):
+        fwin.attroff(curses.A_REVERSE)
+    # scenarios
+    # 1) when file list is empty [. ..] only
+    # 2) when file list is longer than window size
+    # 3) when file list is shorter than window size
+    row_selected_fwin = row_selected_fwin % n_names # +/ by up down
+    init_list_fwin = 0
+    last_list_fwin = hmax-2-1
+    if n_names < hmax-2:
+        last_list_fwin = n_names
+    if (n_names >= (hmax-2)):
+        if (row_selected_fwin < init_list_fwin):
+            init_list_fwin = row_selected_fwin
+            last_list_fwin = init_list_fwin + hmax - 2 - 1
+        if (row_selected_fwin > last_list_fwin): # move the cursor to the bottom
+            last_list_fwin = row_selected_fwin
+            init_list_fwin = last_list_fwin - hmax + 2 + 1
+    #names_list = list_names_fwin[init_list_fwin:last_list_fwin]
+    #types_list = list_types_fwin[init_list_fwin:last_list_fwin]
+    debug_line(dwin,str(init_list_fwin) + ":" + str(last_list_fwin) + " key " + str(row_selected_fwin) )
+    for i in range(0,hmax-2):
+        row = i + init_list_fwin
+        if row >= n_names:
+            break
+        if row == row_selected_fwin:
+            coption = curses.A_REVERSE
+        else:
+            coption = 0
+        if list_types_fwin[row] == 3: # file
+            fwin.addstr(i+1,1,list_names_fwin[row], curses.color_pair(3) | coption)
+        elif list_types_fwin[row] == 2: # dir
+            fwin.addstr(i+1,1,list_names_fwin[row], curses.color_pair(2) | coption)
+        else: # forbidden
+            fwin.addstr(i+1,1,list_names_fwin[row], curses.color_pair(1) | coption)
+    fwin.addstr(hmax-1,1,str(n_names))
+    fwin.refresh()
+def rf_content_window(win):
+    if (is_current_window("content")):
+        win.attron(curses.A_REVERSE)
+    win.addstr(0,1,"Contents")
+    if (is_current_window("content")):
+        win.attroff(curses.A_REVERSE)
+    win.refresh()
+def cr_content_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.box(0,0)
+    rf_content_window(win)
+    return win
+def rf_debug_window(win):
+    win.bkgd(' ', curses.color_pair(4))
+    if (is_current_window("debug")):
+        win.attron(curses.A_REVERSE)
+    win.addstr(0,1,"Debug")
+    if (is_current_window("debug")):
+        win.attroff(curses.A_REVERSE)
+    win.refresh()   
+def cr_debug_window(h: int, w: int, y: int, x: int):
+    win = curses.newwin(h,w,y,x)
+    win.border('|', '|', '-', '-', '+', '+', '+', '+')
+    rf_debug_window(win)
+    return win
+def debug_line(dwin, str1):
+    global ncount_debug, list_debug_lines
+    line = str(ncount_debug) + " : " + str1 + "\n"
+    list_debug_lines.append(line)
+    h, w = dwin.getmaxyx()
+    ncount_debug = ncount_debug + 1
+    if ncount_debug > h-2: # when debug lines are more than window size, remove the upper line
+        list_debug_lines.pop(0)
+        for idx, el in enumerate(list_debug_lines):
+            dwin.addstr(idx+1,1,el)
+    else:
+        dwin.addstr(ncount_debug,1, line)
+    dwin.refresh()
+def handle_key_in_current_window(k, mwin,fwin,cwin,dwin):
+    global row_selected_fwin
+    if is_current_window('file'):
+        #debug_line(dwin, str(k) + " key is clicked")
+        if (k == "KEY_DOWN"):
+            row_selected_fwin = row_selected_fwin + 1
+        elif (k == "KEY_UP"):
+            row_selected_fwin = row_selected_fwin - 1
+        elif (k in ('\n','\r', "KEY_ENTER")):
+            enter_file(fwin)
+        rf_fwin(fwin,dwin)
+ 
+def draw_menu(stdscr):
+    global current_window
+    if curses.has_colors():
+        curses.start_color()
+        curses.init_pair(1,curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(2,curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(3,curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(4,curses.COLOR_WHITE, curses.COLOR_BLUE)
+    curses.cbreak()
+    curses.curs_set(0)
+    curses.noecho()
+    stdscr.keypad(True)
+    stdscr.refresh()
+    h, w = stdscr.getmaxyx()   
+    # Initialization
+    ncount_debug = 0
+    h_file = h - 2 - 6;
+    w_file = int(w * 0.3);
+    # argument
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path', type=str, required=True)
+    args = parser.parse_args()
+    dir_path = args.path
+    #
+    mwin = cr_menu_bar_window(2, w, 0, 0)
+    mwin.refresh()
+    fwin = cr_file_list_window(h_file, w_file, 2, 0)
+    fwin_list_dir_file(fwin,dir_path)
+    cwin = cr_content_window(h_file, w - w_file, 2, w_file)
+    cwin.refresh()
+    dwin = cr_debug_window(6,w,2+h_file,0)
+    debug_line(dwin,"This is a debug message")
+    dwin.refresh()
+    rf_fwin(fwin,dwin)
+    # Wait for next input   
+    k = stdscr.getkey() # getch() returns ascii integer value
+    while(k != 'q'):
+        match k:
+            case 'q':
+                debug_line(dwin, k +  str(current_window))
+                time.sleep(2)
+                break
+            case '\t':
+                next_window()
+                rf_menu_bar_window(mwin)
+                fwin_list_dir_file(fwin,dir_path)
+                rf_fwin(fwin,dwin)
+                rf_content_window(cwin)
+                rf_debug_window(dwin)
+            #case '\n' | '\r' | 'KEY_ENTER':
+            #    break
+            case _:
+                handle_key_in_current_window(k, mwin,fwin,cwin,dwin)
+        #debug_line(dwin, k +  str(current_window) + str(is_current_window("file")))
+        k = stdscr.getkey()        
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path', type=str, required=True)
+    args = parser.parse_args()
+    dir_path = args.path
+    if (not os.path.exists(dir_path)):
+        print("!!!! "+ dir_path + " doesn't exist. We stop here")
+        sys.exit()
+    curses.wrapper(draw_menu)
+ 
+if __name__ == "__main__":
+    main()
+```
+![py09](./py09.png)
