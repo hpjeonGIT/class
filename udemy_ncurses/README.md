@@ -123,7 +123,9 @@ int main(int argc, char *argv[]) {
 }
 ```
   - gcc ch03.c -lncurses
-  ![demo](./ch03.png)
+
+<img src="./ch03.png" height="50">
+
 - Family of getch
   - int getch(void);
   - int wgetch(WINDOW *win);
@@ -191,7 +193,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
-![basic_windows](./ch04.png)
+<img src="./ch04.png" height="300">
 
 ### 5. Output
 - Lab task
@@ -272,7 +274,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
-![window_demo](./ch05_win.png)
+<img src="./ch05_win.png" height="300">
 
 ### 6. List directory
 - Lab task
@@ -378,7 +380,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
-![ch06_demo](./ch06_demo.png)
+<img src="./ch06_demo.png" height="300">
 
 ### 7. List directory - enhancement
 - How to handle long strings
@@ -598,7 +600,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
-![ch08_demo](./ch08_demo.png)
+<img src="./ch08_demo.png" height="300">
 
 ### 9. Color
 - Lab task
@@ -864,7 +866,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
-![ch09_etc](./ch09_etc.png)
+<img src="./ch09_etc.png" height="300">
 
 ### 10. Input
 - Lab task
@@ -1187,7 +1189,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
-![ch10_demo](./ch10_demo.png)
+<img src="./ch10_demo.png" height="300">
 
 ### 11. Mouse
 - Lab task
@@ -1565,7 +1567,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
-![ch11_demo](./ch11_demo.png)
+<img src="./ch11_demo.png" height="300">
 
 ### 12. Scroll
 - Scroll APIs
@@ -1962,7 +1964,8 @@ int main(int argc, char *argv[]) {
 ```    
     - gcc -o ch12.exe ch12.c -lncurses
     - ./ch12.exe /etc
-![ch12_demo](./ch12_demo.png)
+
+<img src="./ch12_demo.png" height="300">
 
     - Click 'd' to print a message in the Debug window
     - It will scroll down but we cannot scroll up yet    
@@ -2449,7 +2452,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
-![ch13_demo](./ch13_demo.png)
+<img src="./ch13_demo.png" height="300">
 
     - Select a file using key or mouse then enter
     - It will show the content of the file in the Content window
@@ -3489,8 +3492,10 @@ int main(int argc, char *argv[]) {
 ```    
 - gcc -o ch15.exe ch15.c -lpanel -lncurses
 - ./ch15.exe /etc
-![](./ch15_before.png)    
-![](./ch15_after.png)    
+
+<img src="./ch15_before.png" height="300">
+<img src="./ch15_after.png" height="300">
+
     - Click 'h' to show Help window. Then Enter to remove it. File/Contents windows refresh pad while Debug window doesn't as it is not implemented yet
 
 ### 16. Menu
@@ -4085,7 +4090,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```    
-![ch16_demo](./ch16_demo.png)
+<img src="./ch16_demo.png" height="300">
 
 ### 17. Menu - More
 - Lab task
@@ -4779,7 +4784,7 @@ int main(int argc, char *argv[]) {
 - gcc -o ch17.exe ch17.c -lpanel -lmenu -lncurses
 - ./ch17.exe /etc
 - Click 'm' to activate menu. Select the first time. In the subsequent menu, use space bar to select/desect then Enter to select entries (dirs or files or links) in the file menu
-![ch17_demo](./ch17_demo.png)
+<img src="./ch17_demo.png" height="300">
 
 ### 18. Form
 - Lab task
@@ -5530,19 +5535,20 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
-![ch18_demo](./ch18_demo.png)
+<img src="./ch18_demo.png" height="300">
+
 - Click 'f' key activates a form - no functionality for now
 
 ### 19. Form - More
 - Form driver
     - int form_driver(FORM *form, int c);
 
-# Converting class codes into Python curses
+## Converting class codes into Python codes using curses package
 
-### 3.
-- Basic character effects
+### 3. Basics
+- Basic character effects such as stand-out, underline, reverse, ...
 - chap03.py:
-```
+```py
 import sys,os
 import curses
  
@@ -5574,9 +5580,9 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-![py03](./py03.png)
+<img src="./py03.png" height="50">
 
-### 4.
+### 4. Window
 - Drawing basic window with borders
 - chap04.py:
 ```py
@@ -5629,9 +5635,10 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-![py04](./py04.png)
+<img src="./py04.png" height="300">
 
-### 5.
+### 5. Output
+- Title of each widow and messages in the debug window
 - chap05.py:
 ```py
 import sys,os
@@ -5695,10 +5702,11 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-![py05](./py05.png)
+<img src="./py05.png" height="300">
 
-### 6.
-- List of dirs and files
+### 6. List directory
+- List of dirs and files in the file window
+    - The location is given from `--path` option
 - chap06.py:
 ```py
 import sys,os,argparse
@@ -5791,9 +5799,10 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-![py06](./py06.png)
+<img src="./py06.png" height="300">
 
-### 7.
+### 7. List directory - enhancement
+- File/directory/unaccessible items are in different colors
 - chap07.py: 
 ```py
 import sys,os,argparse
@@ -5913,9 +5922,10 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-![py07](./py07.png)
+<img src="./py07.png" height="300">
 
-### 8.
+### 8. Attributes
+- Clicking tab will switch the window
 - chap08.py:
 ```py
 import sys,os,argparse
@@ -6090,9 +6100,12 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-![py08](./py08.png)
+<img src="./py08.png" height="300">
 
-### 9.
+### 9. Color
+- By enter key, a text file is scanned (when the size is < 128KB)
+    - Binary file will not be scanned. A warning message is printed
+- From the given path, using up/down keys then can move to other directories
 - chap09.py
 ```py
 
@@ -6349,4 +6362,481 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-![py09](./py09.png)
+<img src="./py09.png" height="300">
+
+## Re-writing Python codes using classes
+
+### 4. Window
+- Make new classes while member data are defined from curses.newwin()
+- Instead of menu/file/content/debug windows above, we define top/file/content/message windows
+    - Each will be objects of twin, fwin, cwin, mwin in the code
+- As many methods can be contained within each class, codes become easy-readable, and code maintenance can be improved
+    - Also we can remove global variables, improving sustainability
+```py
+import sys,os
+import curses
+ 
+class FileWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+        self.win.border(0,0,0,0,0,0,0,0)
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)
+class TopWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)
+class ContentWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+        self.win.box(0,0)
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)
+class MessgWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+        self.win.border('|', '|', '-', '-', '+', '+', '+', '+')
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)  
+ 
+def draw_menu(stdscr):
+    curses.cbreak()
+    curses.curs_set(0)
+    curses.noecho()
+    stdscr.keypad(True)
+    stdscr.refresh()
+    h, w = stdscr.getmaxyx()   
+    # Initialization
+    h_file = h - 1 - 6;
+    w_file = int(w * 0.3);   
+    twin = TopWindow(1, w, 0, 0)
+    twin.refresh()
+    fwin = FileWindow(h_file, w_file, 1, 0)
+    fwin.refresh()
+    cwin = ContentWindow(h_file, w - w_file, 1, w_file)
+    cwin.refresh()
+    mwin = MessgWindow(6,w,1+h_file,0)
+    mwin.refresh()
+    # Wait for next input
+    k = stdscr.getch()
+ 
+def main():
+    curses.wrapper(draw_menu)
+ 
+if __name__ == "__main__":
+    if sys.version_info < (3,10):
+        print("Requires Python 3.10 or newer. We exit now")
+        sys.exit()
+    main()
+```
+<img src="./py04_oop.png" height="300">
+
+### 8. Attributes
+- We introduce WinManager class, which is static - no class object instantiation - but classmethods are used as static functions
+    - This manage next_window() and is_current_window(), allowing tab key can switch among windows
+```py
+import sys,os
+import curses
+ 
+class WinManager:
+    current_window = 0
+    list_window = ['top', 'file', 'content', 'messg']
+    @classmethod
+    def next_window(cls):
+        cls.current_window = cls.current_window + 1
+        cls.current_window = cls.current_window % len(cls.list_window)
+    @classmethod
+    def is_current_window(cls,str1):
+        if cls.list_window[cls.current_window] == str1:
+            return True
+        else:
+            return False
+class FileWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+        self.win.border(0,0,0,0,0,0,0,0)
+        self.win.addstr(0,1,"File List")
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)
+    def rf(self):
+        self.win.border(0,0,0,0,0,0,0,0)
+        if (WinManager.is_current_window("file")):
+            self.win.attron(curses.A_REVERSE)
+        self.win.addstr(0,1,"File List")
+        self.win.attroff(curses.A_REVERSE)
+        self.win.refresh()
+class TopWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)
+    def rf(self):
+        if (WinManager.is_current_window("top")):
+            self.win.attron(curses.A_REVERSE)
+        self.win.addstr(0,1,"Top")
+        self.win.attroff(curses.A_REVERSE)
+        self.win.addstr(1,1,"Types:")
+        self.win.addstr(1,8,"Directory", curses.color_pair(2))
+        self.win.addstr(1,18,"File", curses.color_pair(3))
+        self.win.addstr(1,23,"Not_accessible", curses.color_pair(1))
+        self.win.refresh()
+class ContentWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+        self.win.box(0,0)
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)
+    def rf(self):
+        self.win.box(0,0)
+        if (WinManager.is_current_window("content")):
+            self.win.attron(curses.A_REVERSE)
+        self.win.addstr(0,1,"Content")
+        self.win.attroff(curses.A_REVERSE)
+        self.win.refresh()
+class MessgWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+        self.win.border('|', '|', '-', '-', '+', '+', '+', '+')
+        self.ncount_messg = 0
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)  
+    def rf(self):
+        self.win.border('|', '|', '-', '-', '+', '+', '+', '+')
+        if (WinManager.is_current_window("messg")):
+            self.win.attron(curses.A_REVERSE)
+        self.win.addstr(0,1,"Message")
+        self.win.attroff(curses.A_REVERSE)
+        self.win.refresh()
+    def show_messg(self, str1):
+        self.win.addstr(self.ncount_messg+1,1, str(self.ncount_messg) + " : " + str1 + "\n")
+        self.ncount_messg = self.ncount_messg + 1
+ 
+def draw_menu(stdscr):
+    if curses.has_colors():
+        curses.start_color()
+        curses.init_pair(1,curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(2,curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(3,curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(4,curses.COLOR_WHITE, curses.COLOR_BLUE)
+    curses.cbreak()
+    curses.curs_set(0)
+    curses.noecho()
+    stdscr.keypad(True)
+    stdscr.refresh()
+    h, w = stdscr.getmaxyx()   
+    # Initialization
+    h_file = h - 2 - 6;
+    w_file = int(w * 0.3);   
+    twin = TopWindow(2, w, 0, 0)
+    twin.refresh()
+    fwin = FileWindow(h_file, w_file, 2, 0)
+    fwin.refresh()
+    cwin = ContentWindow(h_file, w - w_file, 2, w_file)
+    cwin.refresh()
+    mwin = MessgWindow(6,w,2+h_file,0)
+    mwin.refresh()
+    # Wait for next input   
+    k = stdscr.getkey() # getch() returns ascii integer value
+    while(k != 'q'):
+        match k:
+            case 'q':
+                debug_line(dwin, k +  str(current_window))
+                time.sleep(2)
+                break
+            case '\t':
+                WinManager.next_window()
+                twin.rf()
+                fwin.rf()
+                cwin.rf()
+                mwin.rf()
+        k = stdscr.getkey()        
+def main():
+    curses.wrapper(draw_menu)
+ 
+if __name__ == "__main__":
+    if sys.version_info < (3,10):
+        print("Requires Python 3.10 or newer. We exit now")
+        sys.exit()
+    main()
+```
+<img src="./py08_oop.png" height="300">
+
+### 9. Color
+- Final version: 
+    - Run command is `python3 chap09_oop.py --path /home`
+- Click tab key to move to the file window. Then using up/down key, you can move among file/dir items. For directories, it will move to the corresponding folder. Entering for text file, it will be scanned and the content will be displayed in the content window. Key stroke is shown in the message window
+- A binary file will not be scanned but warning message is shown in the content window
+- A text file larger than 128KB will not be scanned
+- click 'q' to exit
+```py
+import sys,os,argparse
+import curses
+import time
+def is_binary(filename):
+    fsize = os.path.getsize(filename)
+    with open(filename,'rb') as f:
+        if fsize>1024:
+            chunk = f.read(1024)
+        else:
+            chunk = f.read(fsize)
+        if b'\0' in chunk:
+            return True
+    return False
+class WinManager:
+    current_window = 0
+    list_window = ['top', 'file', 'content', 'messg']
+    @classmethod
+    def next_window(cls):
+        cls.current_window = cls.current_window + 1
+        cls.current_window = cls.current_window % len(cls.list_window)
+    @classmethod
+    def is_current_window(cls,str1):
+        if cls.list_window[cls.current_window] == str1:
+            return True
+        else:
+            return False
+class FileWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+        self.win.border(0,0,0,0,0,0,0,0)
+        self.dir_path = ''
+        self.dir_path_name = '...'
+        self.row_selected = 0
+        self.start_list = 0
+        self.end_list = 999
+        self.list_names = []
+        self.list_types = []
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)
+    def rf(self):
+        self.win.clear()
+        self.win.border(0,0,0,0,0,0,0,0)
+        if (WinManager.is_current_window("file")):
+            self.win.attron(curses.A_REVERSE)
+        self.win.addstr(0,1,self.dir_path_name)
+        self.win.attroff(curses.A_REVERSE)
+        hmax, wmax = self.win.getmaxyx()
+        n_names = len(self.list_names)
+        self.row_selected = self.row_selected % n_names # +/ by up down
+        self.start_list = 0
+        self.end_list = hmax-2-1
+        if n_names < hmax-2:
+            self.end_list = n_names
+        if (n_names >= (hmax-2)):
+            if (self.row_selected < self.start_list):
+                self.start_list = self.row_selected
+                self.end_list = self.start_list + hmax - 2 - 1
+            if (self.row_selected > self.end_list): # move the cursor to the bottom
+                self.end_list = self.row_selected
+                self.start_list = self.end_list - hmax + 2 + 1
+        for i in range(0,hmax-2):
+            row = i + self.start_list
+            if row >= n_names:
+                break
+            if row == self.row_selected:
+                coption = curses.A_REVERSE
+            else:
+                coption = 0
+            if   self.list_types[row] == 3: # file
+                self.win.addstr(i+1,1,self.list_names[row], curses.color_pair(3) | coption)
+            elif self.list_types[row] == 2: # dir
+                self.win.addstr(i+1,1,self.list_names[row], curses.color_pair(2) | coption)
+            else: # forbidden
+                self.win.addstr(i+1,1,self.list_names[row], curses.color_pair(1) | coption)
+        self.win.addstr(hmax-1,1,str(n_names))
+        self.win.refresh()
+    def get_dir_content(self):
+        hmax, wmax = self.win.getmaxyx()
+        if len(self.dir_path) > wmax-2:
+            self.dir_path_name = self.dir_path[:wmax-2-3] + "..."
+        else:
+            self.dir_path_name = self.dir_path
+        list_files = []
+        list_dirs = []
+        list_not_allowed = []
+        with os.scandir(self.dir_path) as entries:
+            for entry in entries:
+                if os.access(entry, os.R_OK):
+                    if entry.is_file():
+                         list_files.append(entry.name) 
+                    if entry.is_dir():
+                         list_dirs.append(entry.name) 
+                else:
+                    list_not_allowed.append(entry.name)
+        list_dirs.sort()
+        list_files.sort()
+        list_not_allowed.sort()
+        self.list_names = list_dirs[:] + list_files[:] + list_not_allowed[:]
+        self.list_types = [2] * len(list_dirs) + [3]*len(list_files) + [1] * len(list_not_allowed)
+        if (self.dir_path != '/'): # except the root path
+             self.list_names = ['.','..'] + self.list_names
+             self.list_types = [2,2]      + self.list_types
+class TopWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)
+    def rf(self):
+        if (WinManager.is_current_window("top")):
+            self.win.attron(curses.A_REVERSE)
+        self.win.addstr(0,1,"** Simple File Scanner ** ")
+        self.win.attroff(curses.A_REVERSE)
+        self.win.addstr(1,1,"Types:")
+        self.win.addstr(1,8,"Directory", curses.color_pair(2))
+        self.win.addstr(1,18,"File", curses.color_pair(3))
+        self.win.addstr(1,23,"Not_accessible", curses.color_pair(1))
+        self.win.refresh()
+class ContentWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+        self.win.box(0,0)
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)
+    def rf(self):
+        self.win.box(0,0)
+        if (WinManager.is_current_window("content")):
+            self.win.attron(curses.A_REVERSE)
+        self.win.addstr(0,1,"Content")
+        self.win.attroff(curses.A_REVERSE)
+        self.win.refresh()
+    def display(self, list_msg):
+        self.win.clear()
+        self.rf()
+        h, w = self.win.getmaxyx()
+        for n, el in enumerate(list_msg):
+            if n > (h-3):
+                break
+            if len(el) > w:
+                el = el[:w-2]
+            self.win.addstr(n+1,1,el)
+        self.win.refresh()
+class MessgWindow:
+    def __init__(self,h,w,y,x):
+        self.win = curses.newwin(h,w,y,x)
+        self.win.border('|', '|', '-', '-', '+', '+', '+', '+')
+        self.ncount_messg = 0
+        self.list_messg = []
+    def __getattr__(self,attr):
+        return getattr(self.win,attr)  
+    def rf(self):
+        self.win.border('|', '|', '-', '-', '+', '+', '+', '+')
+        if (WinManager.is_current_window("messg")):
+            self.win.attron(curses.A_REVERSE)
+        self.win.addstr(0,1,"Message")
+        self.win.attroff(curses.A_REVERSE)
+        self.win.refresh()
+    def show_messg(self, str1):
+        new_str = str(self.ncount_messg) + " : " + str1 + "\n"
+        self.list_messg.append(new_str)
+        h,w = self.win.getmaxyx()
+        self.ncount_messg = self.ncount_messg + 1
+        if self.ncount_messg > (h-2):
+            self.list_messg.pop(0)
+            for idx, el in enumerate(self.list_messg):
+                self.win.addstr(idx+1,1,el)
+        else:
+            self.win.addstr(self.ncount_messg,1, new_str)
+        self.win.refresh()
+def enter_file(fwin,cwin,mwin):
+    hmax, wmax = fwin.getmaxyx()
+    n_names = len(fwin.list_names)
+    fwin.clear()
+    fwin.row_selected = fwin.row_selected % n_names # +/ by up down
+    if (fwin.list_types[fwin.row_selected] == 2): #dir
+        new_path = fwin.dir_path + '/' + fwin.list_names[fwin.row_selected]
+        new_path = os.path.abspath(new_path) # .. or ./
+        fwin.dir_path = new_path
+        fwin.get_dir_content()
+    elif (fwin.list_types[fwin.row_selected] == 3): # file
+        # open file in the content window
+        # only text file less than 128KB will be opened
+        afile = fwin.dir_path + '/' + fwin.list_names[fwin.row_selected]
+        fsize = os.path.getsize(afile)
+        if fsize < 131072: # 1024*128
+            if is_binary(afile):
+                cwin.display(["Warning: This is a binary. Will not be scanned"])
+            else:
+                f = open(afile,'r')
+                ctxt = f.readlines()
+                f.close()
+                cwin.display(ctxt)
+        else:
+            cwin_message(cwin,["Warning: File is too large. Will not be scanned"])
+def handle_key_in_current_window(k, fwin,cwin,mwin):
+    if (k in ('\n','\r', "KEY_ENTER")):
+        mwin.show_messg("Enter key is clicked")
+    else:
+        mwin.show_messg(str(k) + " key is clicked")
+    if WinManager.is_current_window('file'):
+        if (k == "KEY_DOWN"):
+            fwin.row_selected = fwin.row_selected + 1
+        elif (k == "KEY_UP"):
+            fwin.row_selected = fwin.row_selected - 1
+        elif (k in ('\n','\r', "KEY_ENTER")):
+            enter_file(fwin,cwin,mwin)
+        fwin.rf()
+    mwin.rf()
+ 
+def draw_menu(stdscr):
+    # preparation
+    if curses.has_colors():
+        curses.start_color()
+        curses.init_pair(1,curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(2,curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(3,curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(4,curses.COLOR_WHITE, curses.COLOR_BLUE)
+    curses.cbreak()
+    curses.curs_set(0)
+    curses.noecho()
+    stdscr.keypad(True)
+    stdscr.refresh()
+    h, w = stdscr.getmaxyx()   
+    # Initialization
+    h_file = h - 2 - 6;
+    w_file = int(w * 0.3);   
+    twin = TopWindow(2, w, 0, 0)
+    fwin = FileWindow(h_file, w_file, 2, 0)
+    cwin = ContentWindow(h_file, w - w_file, 2, w_file)
+    mwin = MessgWindow(6,w,2+h_file,0)
+    # argument
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path', type=str, required=True)
+    args = parser.parse_args()
+    fwin.dir_path = args.path
+    fwin.get_dir_content()
+    #
+    twin.rf()
+    fwin.rf()
+    cwin.rf()
+    mwin.rf()
+    # Wait for next input
+    k = stdscr.getkey() # getch() returns ascii integer value
+    while(k != 'q'):
+        match k:
+            case '\t':
+                WinManager.next_window()
+                twin.rf()
+                fwin.rf()
+                cwin.rf()
+                mwin.rf()
+            case _:
+                handle_key_in_current_window(k, fwin,cwin,mwin)
+        k = stdscr.getkey()        
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path', type=str, required=True)
+    args = parser.parse_args()
+    dir_path = args.path
+    if (not os.path.exists(dir_path)):
+        print("!!!! "+ dir_path + " doesn't exist. We stop here")
+        sys.exit()
+    curses.wrapper(draw_menu)
+ 
+if __name__ == "__main__":
+    if sys.version_info < (3,10):
+        print("Requires Python 3.10 or newer. We exit now")
+        sys.exit()
+    main()
+```
+<img src="./py09_oop.png" height="300">
