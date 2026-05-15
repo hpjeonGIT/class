@@ -142,3 +142,6 @@ int main() {
      └──────────────────────────────────────────────────────────────────┘
 
 ```
+
+## Python curses package
+- Find the 2nd half of the lecture at https://github.com/hpjeonGIT/class/tree/main/udemy_ncurses
