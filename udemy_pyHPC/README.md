@@ -603,37 +603,673 @@ print(foo, id(foo)) # {'sample': 5} 131354301808128
 - Use @classmethod polymorphism to construct objects generically
 
 ### 25. Prefer helper classes over bookkeeping
+- The instructor claims: With many classes and good abstractions and good interfaces, it's really easy to expand and understand. And so when you when you see yourself using a lot of dictionaries and tuples, considered refactoring your code into classes so that you have something that's better.
 
 ### 26. Use plain attributes instead of get and set methods
+- A class using setter/getter:
+```py
+class oldR(object):
+  def __init__(self, ohms):
+    self.ohms = ohms
+  def get_ohms(self):
+    return self.ohms
+  def set_ohms(self,ohms):
+    self.ohms = ohms
+r0 = oldR(50e3)
+r0.set_ohms(r0.get_ohms() + 5e3)
+```
+- In pythonic way:
+```py
+class pyR(object):
+  def __init__(self,ohms):
+    self.ohms = ohms # no data validation
+r1 = pyR(50e3)    
+r1.ohms += 5e3
+print(r1.ohms)
+```
+- This code may accept negative resistance value, which is not valid
+```py
+class pyR(object):
+  def __init__(self,val):
+    self.rsst = val # this calls the setter below
+  @property
+  def ohms(self): # note that the name of the function is ohm while the actual attribute name is rsst
+    return self.rsst
+  @ohms.setter
+  def ohms(self, val):
+    if val <= 0:
+      raise ValueError('%f R must be >0'% val)
+    self.rsst = val
+r1 = pyR(1000)    
+# r1.ohms(1000e3) This is illegal
+r1.ohms = 1000e3 # This is allowed
+r1.ohms += -1000e3 # Value error as expected
+print(r1.ohms)
+```
+- `@property`: defines a method but accesses it like an attribute. This works like a getter
+- `@<name>.setter`: When an value is assigned to the attribute, the method below is called, working like a setter
+  - Type checker might be implemented
+  - __init__() calls the function below for initialization
+  - The function below is NOT callable
+- `@<name>.deleter`: works like `del` keyword
 
 ### 27. Prefer public attributes over private ones
+```py
+class MyTest(object):
+  def __init__(self):
+    self.public_data = 123
+    self.__private_data = 456
+  def return_private(self):
+    return self.__private_data
+t1 = MyTest()
+print(t1.public_data)     # 123
+#print(t1.__private_data) # 'MyTest' object has no attribute '__private_data'
+print(t1.return_private())# 456
+```
+- `__` triggers the variable as private
 
 ### 28. Learn to Use @classmethod polymorphism
+- Ref: https://medium.com/@kqy7yu/python-polymorphic-constructors-and-utility-functions-the-staticmethod-and-classmethod-advantages-ec53282e4cbf
+- Ref: https://gist.github.com/kyoungrok0517/4e08b4bbf187bcf6edad38107bca8632
+  - In Python, __init__() is allowed only once
+  - To overload class construct like c++, we may use @classmethod, employing different construct argument
 
-17min
+
+## Section 6: Parllelism & Concurrency
 
 ### 29. Introduction
+- use subprocess to manage child processes
+- Use threads for blocking IO, avoid for parallelism
+- Use Lock to prevent data races in threads
+- Use Queue to coordinate work b/w threads
+- Consider concurrent, futures for true parallelism
+
 ### 30. Learn to Use subprocess to manage child processes
+- ?
+
 ### 31. Learn to Use threads for blocking I/O, avoid for parallelism
+```py
+import time
+def factorize(number):
+  for i in range(1, number+1):
+    if number%i == 0:
+      yield i
+numbers = [2139079,1232472,3213932,2314921]
+start = time.time()
+for n in numbers:
+  list(factorize(n))
+end = time.time()
+print('Took %.3f' % (end-start)) # 0.299
+```
+- Parallelize the above python code
+```py
+import time
+import threading
+def factorize(number):
+  for i in range(1, number+1):
+    if number%i == 0:
+      yield i
+class FactorizeThread(threading.Thread):
+  def __init__(self,number):
+    super().__init__()
+    self.number = number
+  def run(self):
+    self.factor = list(factorize(self.number))
+numbers = [2139079,1232472,3213932,2314921]
+start = time.time()
+threads = []
+for n in numbers:
+  thread = FactorizeThread(n)
+  thread.start()
+  threads.append(thread)
+for thread in threads:
+  thread.join()
+end = time.time()
+print('Took %.3f' % (end-start)) # 0.314 - slower than above
+```
+- Actually this is slower than serial code
+  - Too many syscalls?
+
 ### 32. Learn to Use Lock to prevent data races in threads
+```py
+import threading
+class Counter(object):
+  def __init__(self):
+    self.count = 0
+    self.lock = threading.Lock()
+  def increment(self,offset):
+    with self.lock:
+      self.count += offset
+worker_count = 5
+barrier = threading.Barrier(worker_count)    
+def worker(sensor_index, how_many, counter):
+  barrier.wait()
+  for _ in range  (how_many):
+    counter.increment(1)
+threads = []
+how_many = 1000000
+counter = Counter()
+for i in range(5):
+  args = (i,how_many, counter)
+  thread = threading.Thread(target=worker,args=args)
+  thread.start()
+  threads.append(thread)
+for thread in threads:
+  thread.join()
+print(counter.count)
+```
+
 ### 33. Learn to Use Queue to coordinate work between threads
+```py
+from queue import Queue
+from threading import Thread
+import time
+queue = Queue(1)
+def consumer():
+  time.sleep(0.1)
+  queue.get()
+  print('Consumer got 1')
+  queue.get()
+  print('Consumer got 2')
+thread = Thread(target=consumer)  
+thread.start()
+print('Producer putting')
+queue.put(object())
+print('Producer put 1')
+queue.put(object())
+print('Producer put 2')
+queue.put(object())
+thread.join()
+print('Producer done')
+'''
+Producer putting
+Producer put 1
+Consumer got 1
+Producer put 2
+Consumer got 2
+Producer done
+'''
+from queue import Queue
+from threading import Thread
+in_queue = Queue()
+def consumer():
+  print('Consumer waiting')
+  work = in_queue.get()
+  print('Consumer working')
+  print('Consumer done')
+  in_queue.task_done()
+thread = Thread(target=consumer)
+thread.start()
+in_queue.put(object())
+print('Producer is waiting')
+in_queue.join()
+print('Producer is done')
+'''
+Consumer waiting
+Producer is waiting
+Consumer working
+Consumer done
+Producer is done
+'''
+from queue import Queue
+from threading import Thread
+class ClosableQueue(Queue):
+  SENTINEL = object()
+  def close(self):
+    self.put(self.SENTINEL)
+  def __iter__(self):
+    while True:
+      item = self.get()
+      try:
+        if item is self.SENTINEL:
+          return
+        yield item
+      finally:
+        self.task_done()
+class StoppableWorker(Thread):
+  def __init__(self,func,in_queue, out_queue):
+    super().__init__()
+    self.func = func
+    self.in_queue = in_queue
+    self.out_queue = out_queue
+  def run(self):
+    for item in self.in_queue:
+      result = self.func(item)
+      self.out_queue.put(result)
+def download(item):
+  return item
+def resize(item):
+  return item
+def upload(item):
+  return item
+download_queue = ClosableQueue()
+resize_queue = ClosableQueue()
+upload_queue = ClosableQueue()
+done_queue = ClosableQueue()
+threads = [
+  StoppableWorker(download, download_queue,resize_queue),
+  StoppableWorker(resize, resize_queue, upload_queue),
+  StoppableWorker(upload, upload_queue, done_queue),
+]
+for thread in threads:
+  thread.start()
+for _ in range(1000):
+  download_queue.put(object())
+download_queue.close()
+download_queue.join()
+resize_queue.close()
+resize_queue.join()
+upload_queue.close()
+upload_queue.join()
+print(done_queue.qsize(), 'item finished')
+```
+
 ### 34. Consider concurrent.futures for true parallelism
-10min
+- A sample serial code:
+```py
+def gcd(pair):
+  a,b = pair
+  low = min(a,b)
+  for i in range(low, 0, -1):
+    if a%i ==0 and b%i == 0:
+      return i
+  return 1
+print(gcd((128,76))) # 4
+n = [(1963309,2265973),(2030677,3814172),
+     (1551645,2229620),(2039045,2020802)]
+import time
+start = time.time()
+result = list(map(gcd, n))
+end = time.time()
+print(end-start) # 0.26
+```
+- A sample multi-threads code:
+```py
+from concurrent.futures import ThreadPoolExecutor
+def gcd(pair):
+  a,b = pair
+  low = min(a,b)
+  for i in range(low, 0, -1):
+    if a%i ==0 and b%i == 0:
+      return i
+  return 1
+print(gcd((128,76))) # 4
+n = [(1963309,2265973),(2030677,3814172),
+     (1551645,2229620),(2039045,2020802)]
+pool = ThreadPoolExecutor(max_workers=2)
+import time
+start = time.time()
+result = list(pool.map(gcd, n))
+end = time.time()
+print(end-start) # 0.25
+```
+  - Almost same speed
+- A sample multi-processes code
+```py
+from concurrent.futures import ProcessPoolExecutor
+def gcd(pair):
+  a,b = pair
+  low = min(a,b)
+  for i in range(low, 0, -1):
+    if a%i ==0 and b%i == 0:
+      return i
+  return 1
+print(gcd((128,76))) # 4
+n = [(1963309,2265973),(2030677,3814172),
+     (1551645,2229620),(2039045,2020802)]
+pool = ProcessPoolExecutor(max_workers=2)
+import time
+start = time.time()
+result = list(pool.map(gcd, n))
+end = time.time()
+print(end-start) # 0.17
+```
+  - Now 1.5x faster
+- How multiprocessing works
+  - Takes each item from the n input data to map
+  - Serializes it into binary data using the pickle module
+  - Copies the serialized data from the main interpreter process to a child interpreter proces over a local socket
+  - Deserializes the data back into Python objects using pickle in the child processes
+  - Imports the Python module containing the gcd function
+  - Runs the function on the input data in parallel with other child processes
+  - Serializes the result back into bytes
+  - Copies those bytes back through the socket
+  - Deserializes the bytes back into Python objects in the parent process
+  - Merges the results from multiple children into a single list to return
+- When to use multiprocessing
+  - Isolated
+    - Functions that don't share data
+  - High leverage
+    - Small amount of data -> large amount of computation
+
 ### 35. Python Concurrency Approaches
-1min
+- async/await and concurrent.futures are two different approaches for achieving concurrency in Python. Both methods are used to run tasks concurrently, allowing you to improve the performance of your programs by executing tasks in parallel, especially when tasks are I/O-bound.
+  - async/await: This is a more modern approach to concurrency introduced in Python 3.5, built on top of the asyncio library. It allows you to write asynchronous code using a more readable and concise syntax. With async/await, you define coroutines using the async def keyword, and you can use await to pause the execution of the coroutine until a specific operation is completed. The asyncio event loop handles the execution of these coroutines concurrently.
+- Here's a basic example of using async/await:
+```py
+    pythonCopy code
+    import asyncio
+     
+    async def my_coroutine():
+        print("Start")
+        await asyncio.sleep(1)
+        print("End")
+     
+    async def main():
+        tasks = [my_coroutine() for _ in range(3)]
+        await asyncio.gather(*tasks)
+     
+    asyncio.run(main())
+```
+  - concurrent.futures: This is an older approach to concurrency, introduced in Python 3.2. It provides a high-level interface for asynchronously executing callables using thread or process-based parallelism. The ThreadPoolExecutor and ProcessPoolExecutor classes are used to manage the execution of tasks in a pool of worker threads or processes, respectively.
+- Here's a basic example using concurrent.futures with a thread pool:
+```py
+    pythonCopy code
+    import concurrent.futures
+    import time
+     
+    def my_function():
+        print("Start")
+        time.sleep(1)
+        print("End")
+     
+    def main():
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            tasks = [executor.submit(my_function) for _ in range(3)]
+            concurrent.futures.wait(tasks)
+     
+    main()
+```
+- In general, async/await is more suitable for I/O-bound tasks, such as networking or file I/O, whereas concurrent.futures can be used for both I/O-bound and CPU-bound tasks. When using concurrent.futures, you should choose the appropriate executor based on the nature of the tasks you're running (thread-based for I/O-bound tasks and process-based for CPU-bound tasks)
+
+## Section 7: Learn How To Make Your Programs Robust
 
 ### 36. Introduction
+- Use virtual environments isolated and reproducible dependencies
+- Consider interactive debugging with pdb
+- Profile before optimization
+- Use tracemalloc to understand memory usage and leaks
+
 ### 37. Learn to Use virtual environments
+~~- pyvenv -h~~ This command is obsolete since 3.8
+- python -m venv myproject 
+- cd myproject
+- source bin/activate
+  - Now you're on venv
+
 ### 38. Test with unittest
+- There is no static type checking in Python
+```py
+from unittest import TestCase, main
+from tempfile import TemporaryDirectory
+class UtilsTestCase(TestCase):
+  def setUp(self):
+    self.test_dir = TemporaryDirectory()
+  def tearDown(self):
+    self.test_dir.cleanup()
+  def test_a(self):
+    print(self.test_dir)
+  def test_addition(self):
+    self.assertEqual(1+1, 2)
+if __name__ == '__main__':
+  main()
+```
+- Demo:
+```bash
+$ python3 ch38.py 
+<TemporaryDirectory '/tmp/tmprpwzxe_9'>
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+OK
+```
+- When to write tests
+  - One TestCase for each set of related tests
+  - One TestCase for testing a single class its methods
+  - Unit tests: Testing functionality in isolatin
+  - Integration tests: Verifying interactions b/w functionality
+  - Need to write both types of tests
+
 ### 39. Consider interactive debugging with pdb
+- Inject `import pdb; pdb.set_trace()` into ROI
+- A sample code:
+```py
+def bubble_sort(data):
+  for _ in range(len(data)):
+    one_pass(data)
+def one_pass(data):
+  for i in range(len(data)):
+    compare_and_swap(data,i)
+def compare_and_swap(data,i):
+  import pdb; pdb.set_trace() # <-- inject pdb here
+  if data[i]>data[i+1]:
+    data[i],data[i+1] = data[i+1],data[i]
+from random import randint
+data = [randint(0,1000) for _ in range(10)]
+print(data)
+bubble_sort(data)
+print(data)
+```
+- Demo:
+```bash
+python3 ch39.py 
+[843, 737, 363, 2, 486, 387, 949, 334, 466, 790]
+> /.../udemy_pyHPC/myproject/ch39.py(9)compare_and_swap()
+-> if data[i]>data[i+1]:
+(Pdb) i
+0
+(Pdb) bt
+  /.../udemy_pyHPC/myproject/ch39.py(14)<module>()
+-> bubble_sort(data)
+  /.../udemy_pyHPC/myproject/ch39.py(3)bubble_sort()
+-> one_pass(data)
+  /.../udemy_pyHPC/myproject/ch39.py(6)one_pass()
+-> compare_and_swap(data,i)
+> /.../udemy_pyHPC/myproject/ch39.py(9)compare_and_swap()
+-> if data[i]>data[i+1]:
+(Pdb) up
+> /.../udemy_pyHPC/myproject/ch39.py(6)one_pass()
+-> compare_and_swap(data,i)
+(Pdb) bt
+  /.../udemy_pyHPC/myproject/ch39.py(14)<module>()
+-> bubble_sort(data)
+  /.../udemy_pyHPC/myproject/ch39.py(3)bubble_sort()
+-> one_pass(data)
+> /.../udemy_pyHPC/myproject/ch39.py(6)one_pass()
+-> compare_and_swap(data,i)
+  /.../udemy_pyHPC/myproject/ch39.py(9)compare_and_swap()
+-> if data[i]>data[i+1]:
+(Pdb) data
+[843, 737, 363, 2, 486, 387, 949, 334, 466, 790]
+(Pdb) down
+> /.../udemy_pyHPC/myproject/ch39.py(9)compare_and_swap()
+-> if data[i]>data[i+1]:
+(Pdb) continue
+> /.../udemy_pyHPC/myproject/ch39.py(9)compare_and_swap()
+-> if data[i]>data[i+1]:
+```
+- If some condition is required (like i==9), you can inject like:
+```py
+    if (i==9):
+      import pdb; pdb.set_trace() 
+```      
+
 ### 40. Profile before optimizing
+- Dynamic behavior has surprising performance impact
+- Profiling is easy to do using built-in modules
+- Focus on measurable sources of trouble
+- A sample code:
+```py
+from random import randint
+from cProfile import Profile
+from pstats import Stats
+def insertion_sort(data):
+  result = []
+  for value in data:
+    insert_value(result,value)
+  return result
+def insert_value(array,value):
+  for i, existing in enumerate(array):
+    if existing > value:
+      array.insert(i,value)
+      return
+  array.append(value)
+max_size = 10000
+data = [randint(0,max_size) for _ in range(max_size)]
+profiler = Profile()
+profiler.runcall(lambda: insertion_sort(data))
+print('Done')
+stats = Stats(profiler)
+stats.strip_dirs()
+stats.sort_stats('cumulative')
+stats.print_stats()
+```
+- Result
+```
+Done
+         20003 function calls in 0.900 seconds
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.900    0.900 3307648883.py:18(<lambda>)
+        1    0.002    0.002    0.900    0.900 3307648883.py:4(insertion_sort)
+    10000    0.894    0.000    0.899    0.000 3307648883.py:9(insert_value)
+     9989    0.005    0.000    0.005    0.000 {method 'insert' of 'list' objects}
+       11    0.000    0.000    0.000    0.000 {method 'append' of 'list' objects}
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+```
+- Or try `stats.print_callers()` to see cumulative time
+```
+Done
+   Ordered by: cumulative time
+
+Function                                          was called by...
+                                                      ncalls  tottime  cumtime
+3258165172.py:18(<lambda>)                        <- 
+3258165172.py:4(insertion_sort)                   <-       1    0.002    0.906  3258165172.py:18(<lambda>)
+3258165172.py:9(insert_value)                     <-   10000    0.899    0.904  3258165172.py:4(insertion_sort)
+{method 'insert' of 'list' objects}               <-    9988    0.005    0.005  3258165172.py:9(insert_value)
+{method 'append' of 'list' objects}               <-      12    0.000    0.000  3258165172.py:9(insert_value)
+{method 'disable' of '_lsprof.Profiler' objects}  <- 
+```
+
 ### 41. Learn to Use tracemalloc to understand memory usage and leaks
-8min
+- Python uses reference counting for garbage collection
+- Cycle detector for looping references
+  - In practice, hard to figure out why references are held
+- waste_memory.py
+```py
+import os
+import hashlib
+class MyObj(object):
+  def __init__(self):
+    self.x = os.urandom(100)
+    self.y = hashlib.sha1(self.x).hexdigest()
+def get_data():
+  values = []
+  for _ in range(100):
+    obj = MyObj()
+    values.append(obj)
+  return values
+def run():
+  deep_values = []
+  for _ in range(100):
+    dimport os
+import hashlib
+class MyObj(object):
+  def __init__(self):
+    self.x = os.urandom(100)
+    self.y = hashlib.sha1(self.x).hexdigest()
+def get_data():
+  values = []
+  for _ in range(100):
+    obj = MyObj()
+    values.append(obj)
+  return values
+def run():
+  deep_values = []
+  for _ in range(100):
+    deep_values.append(get_data())
+  return deep_values
+eep_values.append(get_data())
+  return deep_values
+```
+- Garbage collection:
+```py
+import gc
+found_objects = gc.get_objects()
+print('%d object before' % len(found_objects))
+import waste_memory
+x = waste_memory.run()
+found_objects = gc.get_objects()
+print('%d object after ' % len(found_objects))
+for obj in found_objects[:3]:
+  print(repr(obj)[:100])
+'''
+201989 object before
+212128 object after  # 212128 > 201989
+<waste_memory.MyObj object at 0x7722a3d28850>
+<waste_memory.MyObj object at 0x7722a3d288b0>
+<waste_memory.MyObj object at 0x7722a3d28910>
+'''
+```
+- Tracemalloc:
+```py
+import tracemalloc
+tracemalloc.start(10)
+t1 = tracemalloc.take_snapshot()
+import waste_memory
+x = waste_memory.run()
+t2 = tracemalloc.take_snapshot()
+stats = t2.compare_to(t1,'lineno')
+for stat in stats[:3]:
+  print(stat)
+'''
+/.../udemy_pyHPC/waste_memory.py:5: size=2314 KiB (+2314 KiB), count=29988 (+29988), average=79 B
+/.../udemy_pyHPC/waste_memory.py:6: size=869 KiB (+869 KiB), count=10000 (+10000), average=89 B
+/.../udemy_pyHPC/waste_memory.py:10: size=469 KiB (+469 KiB), count=10000 (+10000), average=48 B
+'''
+import tracemalloc
+tracemalloc.start(10)
+t1 = tracemalloc.take_snapshot()
+import waste_memory
+x = waste_memory.run()
+t2 = tracemalloc.take_snapshot()
+stats = t2.compare_to(t1,'traceback')
+top = stats[0] # The highest only
+print('\n'.join(top.traceback.format()))
+'''
+  File "/.../anaconda3/2023.03/lib/python3.10/site-packages/IPython/core/interactiveshell.py", line 2961
+    result = self._run_cell(
+  File "/.../anaconda3/2023.03/lib/python3.10/site-packages/IPython/core/interactiveshell.py", line 3016
+    result = runner(coro)
+  File "/.../anaconda3/2023.03/lib/python3.10/site-packages/IPython/core/async_helpers.py", line 129
+    coro.send(None)
+  File "/.../anaconda3/2023.03/lib/python3.10/site-packages/IPython/core/interactiveshell.py", line 3221
+    has_raised = await self.run_ast_nodes(code_ast.body, cell_name,
+  File "/.../anaconda3/2023.03/lib/python3.10/site-packages/IPython/core/interactiveshell.py", line 3400
+    if await self.run_code(code, result, async_=asy):
+  File "/.../anaconda3/2023.03/lib/python3.10/site-packages/IPython/core/interactiveshell.py", line 3460
+    exec(code_obj, self.user_global_ns, self.user_ns)
+  File "/tmp/ipykernel_12478/3480769391.py", line 5
+    x = waste_memory.run()
+  File "/.../udemy_pyHPC/waste_memory.py", line 16
+    deep_values.append(get_data())
+  File "/.../udemy_pyHPC/waste_memory.py", line 10
+    obj = MyObj()
+  File "/.../udemy_pyHPC/waste_memory.py", line 5
+    self.x = os.urandom(100)
+'''  
+```
+
+## Section 8: Outro
 
 ### 42. Course Summary
-1min
+
+## Section 9: Source Code
 
 ### 43. Source Code
-1min
+
 ### 44. You Are Now a High-Performance Developer!
-1min
