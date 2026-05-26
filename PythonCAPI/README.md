@@ -119,8 +119,6 @@ print(f'Ctypes is {(py_runtime/c_runtime):3.1f}x faster')
     - Ctype took 0.952sec
   - Data conversion is very heavy
 
-## cffi
-
 ## Cython
 - A new language (?) of C + Python
 - Why ctypes is slower than Cython?
@@ -156,8 +154,7 @@ setup(ext_modules = cythonize(ext_modules))
 - run_test.py:
 ```py
 # Source - https://stackoverflow.com/q/78571450
-# Posted by rakmo97, modified by community. See post 'Timeline' for change histo
-ry
+# Posted by rakmo97, modified by community. See post 'Timeline' for change history
 # Retrieved 2026-05-25, License - CC BY-SA 4.0
 
 import time
@@ -254,9 +251,209 @@ print('Cython is {}x faster'.format(py_runtime/cy_runtime))
   - Cython took 0.011 sec
 
 ### Functions of numpy array arguments
+- Same Python/Cython code above
+- run_arr.py
+```py
+import arr_test
+import arr_test_cy
+import time
+import numpy as np
+import array
+nsize = 10_000_000
+tic = time.perf_counter()
+a_list = np.random.randint(-5,5,nsize,np.int32)
+print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 3.4sec
+# Run test on python script
+tic = time.perf_counter()
+y = arr_test.sumArray(a_list)
+py_runtime = time.perf_counter() - tic
+print(f'Python results= {y} {py_runtime:5.3f} sec')
+# cython
+tic = time.perf_counter()
+y = arr_test_cy.sum_array_cy(a_list)
+cy_runtime = time.perf_counter() - tic
+# Print results
+print(f'Cython results= {y} {cy_runtime:5.3f} sec')
+print(f'Cython is {(py_runtime/cy_runtime):3.1f}x faster')
+```
+- Cython is 50-70x faster than Python
+  - Python took 0.438 sec
+    - This is 2x slower than array.array(). Why?
+  - Cython took 0.006 sec
+
+## cffi
+- ABI vs API
+- Ref: 
+  - https://kindatechnical.com/high-performance-python-guide/using-cffi-for-c-interfacing.html
+  - https://www.iditect.com/faq/python/how-to-pass-a-numpy-array-into-a-cffi-function-and-how-to-get-one-back-out.html
+
+### ABI example
+- hello.c:
+```c
+#include <stdio.h>
+void hello() {
+    printf("Hello from C!\n");
+}
+```
+- `gcc -shared -o libhello.so -fPIC hello.c -Ofast`
+- run.py:
+```py
+from cffi import FFI
+ffi = FFI()
+ffi.cdef("void hello();")
+C = ffi.dlopen("./libhello.so")
+C.hello()
+```
+
+### API example
+```py
+from cffi import FFI
+ffi = FFI()
+
+ffi.cdef("""
+    void hello();
+""")
+
+C = ffi.verify("""
+    #include <stdio.h>
+
+    void hello() {
+        printf("Hello from C!\\n");
+    }
+""")
+
+C.hello()
+```
+
+### Functions of numpy array arguments
+- arr_test.py:
+```py
+def sumArray(arr):
+  y = 0
+  for i in arr:
+    y += i
+  return y
+```
+- myarr.c:
+```c
+int arr_sum(int *x, int nsize)
+{
+  int y = 0;
+  for(int i=0; i<nsize; i++) y += x[i];
+  return y;
+}
+```
+- `gcc -Ofagcc -Ofast -shared -fPIC -o libmyarr.so myarr.c`
+- run_arr.py:
+```py
+import arr_test
+import time
+import numpy as np
+from cffi import FFI
+nsize = 10_000_000
+tic = time.perf_counter()
+a_list = np.random.randint(-5,5,nsize,np.int32)
+print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 3.4sec
+# Run test on python script
+tic = time.perf_counter()
+y = arr_test.sumArray(a_list)
+py_runtime = time.perf_counter() - tic
+print(f'Python results= {y} {py_runtime:5.3f} sec')
+# cffi
+ffi = FFI()
+tic = time.perf_counter()
+mylib = ffi.dlopen('./libmyarr.so')
+ffi.cdef("""
+int arr_sum(int *x, int nsize);
+""")
+y = mylib.arr_sum(ffi.cast("int*", a_list.ctypes.data), nsize)
+cy_runtime = time.perf_counter() - tic
+# Print results
+print(f'cffi results= {y} {cy_runtime:5.3f} sec')
+print(f'cffi is {(py_runtime/cy_runtime):3.1f}x faster')
+```
+- cffi is 34-40x faster than Python code
+  - Python took 0.436 sec
+  - cffi took 0.012 sec
 
 ## Pybind11
 - Easy to use but performance would be lower than Cython
+- Ref: https://medium.com/@ahmedfgad/pybind11-tutorial-binding-c-code-to-python-337da23685dc
+- myarr.cpp:
+```cpp
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+int arr_sum(pybind11::array_t<int> x, int nsize)
+{
+  auto buf = x.request(); // buffer info from numpy array
+  int *ptr = static_cast<int *>(buf.ptr);  
+  int y = 0;
+  for(int i=0; i<nsize; i++) y += ptr[i];
+  return y;
+}
+PYBIND11_MODULE(myarr, m) {
+    m.doc() = "pybind11 myarr module"; // Optional module docstring
+    m.def("arr_sum", &arr_sum, "A function that sums the elements of an array",
+          pybind11::arg("x"), pybind11::arg("nsize"));
+}
+```
+- setup.py:
+```py
+from setuptools import setup, Extension
+import pybind11
+ext_modules = [
+    Extension(
+        "myarr",  # Module name
+        ["myarr.cpp"],  # Source files
+        include_dirs=[pybind11.get_include()],  # Include pybind11 headers
+        language="c++",  # Specify C++ as the language
+    )
+]
+setup(
+    name="myarr",
+    version="0.1",
+    ext_modules=ext_modules,
+)
+```
+  - Adding `extra_compile_args=['-Ofast'],` doesn't work, still compiling with -O2
+- Build command: `python3 setup.py build`
+  - `python3 setup.py install` will install the produced library into python's site-packages
+  - Just copy the produced build/lib.linux-x86_64-cpython-313/myarr.cpython-313-x86_64-linux-gnu.so into the current path
+- arr_test.py:
+```py
+def sumArray(arr):
+  y = 0
+  for i in arr:
+    y += i
+  return y
+```
+- run_arr.py:
+```py
+import arr_test
+import time
+import numpy as np
+import myarr # from myarr.cpython-313-x86_64-linux-gnu.so
+nsize = 10_000_000
+tic = time.perf_counter()
+a_list = np.random.randint(-5,5,nsize,np.int32)
+print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 3.4sec
+# Run test on python script
+tic = time.perf_counter()
+y = arr_test.sumArray(a_list)
+py_runtime = time.perf_counter() - tic
+print(f'Python results= {y} {py_runtime:5.3f} sec')
+# cffi
+tic = time.perf_counter()
+y = myarr.arr_sum(a_list, nsize)
+py11_runtime = time.perf_counter() - tic
+# Print results
+print(f'Pybind11 results= {y} {py11_runtime:5.3f} sec')
+print(f'Pybind11 is {(py_runtime/py11_runtime):3.1f}x faster')
+```
+- Pybind11 is 80-90x faster than Python
+  - Python took 0.458 sec
+  - Pybind11 took 0.006 sec
+    - Almost same speed of Cython!
 
 ## Numpy
 
