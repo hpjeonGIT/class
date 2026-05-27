@@ -9,9 +9,11 @@
 - Available integration methods
   - ctypes: simple but infamous for the overhead of data marshaling
   - cython: need to rewrite a new code of cython
+  - cffi: ?
   - pybind11: known as slower than cython
   - swig: highly complicated but applicable to large-scale projects
   - numpy: bare PyObject API (?)
+  - CPython: bare PyObject API - what benefit would be there?
 
 ## ctypes
 
@@ -262,7 +264,7 @@ import array
 nsize = 10_000_000
 tic = time.perf_counter()
 a_list = np.random.randint(-5,5,nsize,np.int32)
-print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 3.4sec
+print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 0.1sec
 # Run test on python script
 tic = time.perf_counter()
 y = arr_test.sumArray(a_list)
@@ -353,7 +355,7 @@ from cffi import FFI
 nsize = 10_000_000
 tic = time.perf_counter()
 a_list = np.random.randint(-5,5,nsize,np.int32)
-print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 3.4sec
+print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 0.1sec
 # Run test on python script
 tic = time.perf_counter()
 y = arr_test.sumArray(a_list)
@@ -436,7 +438,7 @@ import myarr # from myarr.cpython-313-x86_64-linux-gnu.so
 nsize = 10_000_000
 tic = time.perf_counter()
 a_list = np.random.randint(-5,5,nsize,np.int32)
-print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 3.4sec
+print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 0.1sec
 # Run test on python script
 tic = time.perf_counter()
 y = arr_test.sumArray(a_list)
@@ -455,7 +457,84 @@ print(f'Pybind11 is {(py_runtime/py11_runtime):3.1f}x faster')
   - Pybind11 took 0.006 sec
     - Almost same speed of Cython!
 
-## Numpy
+## CPython
+
+### cosine function module
+- Ref: https://lectures.scientific-python.org/advanced/interfacing_with_c/interfacing_with_c.html 
+- cos_module.c
+```c
+/*  Example of wrapping cos function from math.h with the Python-C-API. */
+
+#include <Python.h>
+#include <math.h>
+
+/*  wrapped cosine function */
+static PyObject* cos_func(PyObject* self, PyObject* args)
+{
+    double value;
+    double answer;
+
+    /*  parse the input, from python float to c double */
+    if (!PyArg_ParseTuple(args, "d", &value))
+        return NULL;
+    /* if the above function returns -1, an appropriate Python exception will
+     * have been set, and the function simply returns NULL
+     */
+
+    /* call cos from libm */
+    answer = cos(value);
+
+    /*  construct the output from cos, from c double to python float */
+    return Py_BuildValue("f", answer);
+}
+
+/*  define functions in module */
+static PyMethodDef CosMethods[] =
+{
+     {"cos_func", cos_func, METH_VARARGS, "evaluate the cosine"},
+     {NULL, NULL, 0, NULL}
+};
+
+/* module initialization */
+/* Python version 3*/
+static struct PyModuleDef cModPyDem =
+{
+    PyModuleDef_HEAD_INIT,
+    "cos_module", "Some documentation",
+    -1,
+    CosMethods
+};
+
+PyMODINIT_FUNC
+PyInit_cos_module(void)
+{
+    return PyModule_Create(&cModPyDem);
+}
+```
+- setup.py
+```py
+from setuptools import setup, Extension
+# define the extension module
+cos_module = Extension("cos_module", sources=["cos_module.c"])
+# run the setup
+setup(ext_modules=[cos_module])
+```
+- Demo:
+```bash
+$ python setup.py build_ext --inplace # produces cos_module.cpython-313-x86_64-linux-gnu.so
+$ python3
+Python 3.13.5 | packaged by Anaconda, Inc. | (main, Jun 12 2025, 16:09:02) [GCC 11.2.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import cos_module
+>>> dir(cos_module)
+['__doc__', '__file__', '__loader__', '__name__', '__package__', '__spec__', 'cos_func']
+>>> cos_module.cos_func(1.0)
+0.5403023058681398
+```
+
+### Coupling with Numpy
+
+
 
 ## SWIG
 
