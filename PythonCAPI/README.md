@@ -533,8 +533,102 @@ Type "help", "copyright", "credits" or "license" for more information.
 ```
 
 ### Coupling with Numpy
-
-
+- Ref:
+  - https://realpython.com/build-python-c-extension-module/
+  - https://lectures.scientific-python.org/advanced/interfacing_with_c/interfacing_with_c.html
+- sum_module_np.c:
+```c
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#include <numpy/arrayobject.h>
+#include <math.h>
+ 
+static PyObject* sum_func_np(PyObject* self, PyObject* args)
+{
+    PyObject *input_obj;
+    if(!PyArg_ParseTuple(args,"O", &input_obj)) { return NULL;}
+    if(!PyArray_Check(input_obj)) { PyErr_SetString(PyExc_TypeError, "not numpy array"); return NULL; }
+    PyArrayObject *clean_array = NULL;
+    clean_array = (PyArrayObject*) PyArray_FROM_OTF( input_obj,
+                   NPY_INT32, NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED);
+    npy_intp asize = PyArray_SIZE(clean_array);   
+    int *data_ptr = (int *)PyArray_DATA(clean_array);
+    npy_intp sum = 0;
+    for (npy_intp i=0;i<asize;i++) sum +=data_ptr[i];
+    Py_DECREF(clean_array);
+    return PyLong_FromLong((long)sum);
+}
+ 
+/*  define functions in module */
+static PyMethodDef SumMethods[] =
+{
+     {"sum_func_np", sum_func_np, METH_VARARGS,
+         "evaluate the sum on a NumPy array"},
+     {NULL, NULL, 0, NULL}
+};
+  
+static struct PyModuleDef cModPyDem = {
+    PyModuleDef_HEAD_INIT,
+    "sum_module_np", "Some documentation",
+    -1,
+    SumMethods
+};
+PyMODINIT_FUNC PyInit_sum_module_np(void) {
+    PyObject *module;
+    module = PyModule_Create(&cModPyDem);
+    if(module==NULL) return NULL;
+    /* IMPORTANT: this must be called */
+    import_array();
+    if (PyErr_Occurred()) return NULL;
+    return module;
+}
+```
+- setup.py:
+```py
+from setuptools import setup, Extension
+import numpy
+# define the extension module
+my_ext_module = Extension(
+    "sum_module_np", sources=["sum_module_np.c"], include_dirs=[numpy.get_include()]
+)
+# run the setup
+setup(ext_modules=[my_ext_module])
+```
+- Build command: `python3 setup.py build_ext --inplace` # This produces sum_module_np.cpython-313-x86_64-linux-gnu.so
+- arr_test.py:
+```py
+def sumArray(arr):
+  y = 0
+  for i in arr:
+    y += i
+  return y
+```
+- run_arr.py:
+```py
+import arr_test
+import time
+import numpy as np
+import sum_module_np
+nsize = 10_000_000
+tic = time.perf_counter()
+a_list = np.random.randint(-5,5,nsize,np.int32)
+print(f"random list took {(time.perf_counter() - tic):3.1f} sec") 
+# Run test on python script
+tic = time.perf_counter()
+y = arr_test.sumArray(a_list)
+py_runtime = time.perf_counter() - tic
+print(f'Python results= {y} {py_runtime:5.3f} sec')
+# cpython with numpy
+tic = time.perf_counter()
+y = sum_module_np.sum_func_np(a_list)
+cp_runtime = time.perf_counter() - tic
+# Print results
+print(f'CPython results= {y} {cp_runtime:5.3f} sec')
+print(f'CPython is {(py_runtime/cp_runtime):3.1f}x faster')
+```
+- CPython is 70-100x faster than python
+  - Python took 0.447sec
+  - CPython took 0.006sec 
 
 ## SWIG
 
