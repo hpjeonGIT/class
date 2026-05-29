@@ -11,10 +11,9 @@
   - cython: need to rewrite a new code of cython
   - cffi: ?
   - pybind11: known as slower than cython
-  - swig: highly complicated but applicable to large-scale projects
-  - numpy: bare PyObject API (?)
   - CPython: bare PyObject API - what benefit would be there?
-
+  - swig: highly complicated but applicable to large-scale projects
+  
 ## ctypes
 
 ### Functions of a single argument
@@ -631,7 +630,160 @@ print(f'CPython is {(py_runtime/cp_runtime):3.1f}x faster')
   - CPython took 0.006sec 
 
 ## SWIG
+- Download numpy.i: https://github.com/numpy/numpy/blob/main/tools/swig/numpy.i
+- Download source of swig: https://github.com/swig/swig
 
+### Simple functions
+- calc.h
+```cpp
+double add(double a, double b);
+double subtract(double a, double b);
+```
+- calc.cpp
+```cpp
+#include "calc.h"
+
+double add(double a, double b) {
+    return a + b;
+}
+
+double subtract(double a, double b) {
+    return a - b;
+}
+```
+- calc.i
+```js
+%module calc
+%{
+#include "calc.h"
+%}
+
+/* Tell SWIG to wrap everything in this header */
+%include "calc.h"
+```
+- setup.py
+```py
+from setuptools import setup, Extension
+
+calc_module = Extension(
+    '_calc',
+    sources=['calc_wrap.cxx', 'calc.cpp'],
+)
+
+setup(
+    name='calc',
+    version='0.1',
+    ext_modules=[calc_module],
+    py_modules=["calc"],
+)
+```
+- Steps to compile:
+  - `swig -python -c++ calc.i` # this produces calc_wrap.cxx and calc.py
+  - `python3 setup.py build_ext -i` # this produces _calc.cpython-312-x86_64-linux-gnu.so
+- Running setup.py is equivalent to:
+```bash
+g++ -g -O2 -Wall -fPIC -I/usr/include/python3.12 -c calc.cpp -o calc.o
+g++ -g -O2 -Wall -fPIC -I/usr/include/python3.12 -c calc_wrap.cxx -o calc_wrap.o
+g++  -shared calc.o calc_wrap.o -L/usr/lib/x86_64-linux-gnu -o _calc.cpython-312-x86_64-linux-gnu.so 
+```
+- Demo:
+```bash
+$ python3
+>>> import calc
+>>> calc.add(4.567,3.14)
+7.707000000000001
+>>> calc.subtract(4.567,3.14)
+1.427
+```
+
+### With numpy array
+- ex.h:
+```cpp
+void sum_array(int * vec1, int n1, int *res);
+```
+- ex.cpp:
+```cpp
+#include "ex.h"
+void sum_array(int* vec1, int n1, int *res) { // note that the function return type is void, not int. 
+    *res = 0;  // Return value res is defined as a pointer
+    for(int i=0; i<n1; i++) *res += vec1[i];
+}
+```
+- ex.i:
+```js
+%module ex
+%{
+#define SWIG_FILE_WITH_INIT
+#include "ex.h"
+%}
+
+/* Include the NumPy typemaps */
+%include "numpy.i"
+
+%init %{
+import_array();
+%}
+
+/* Map (double* vec, int n) to a 1D NumPy input array */
+%apply (int* IN_ARRAY1, int DIM1) {(int* vec1, int n1)};
+%apply (int* OUTPUT) {int* res}; /* return type is defined as a pointer */
+
+%include "ex.h"
+```
+- setup.py:
+```py
+from setuptools import setup, Extension
+import numpy
+ex_module = Extension(
+    '_ex',
+    sources=['ex_wrap.cxx', 'ex.cpp'],
+    include_dirs = [numpy.get_include()],
+)
+
+setup(
+    name='ex',
+    version='0.1',
+    ext_modules=[ex_module],
+    py_modules=["ex"],
+)
+```
+- LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6 swig -python -c++ calc.i
+- python3 setup.py build_ext -i
+- arr_test.py:
+```py
+def sumArray(arr):
+  y = 0
+  for i in arr:
+    y += i
+  return y
+```
+- run_arr.py:
+```py
+import arr_test
+import time
+import numpy as np
+import ex
+nsize = 10_000_000
+tic = time.perf_counter()
+a_list = np.random.randint(-5,5,nsize,np.int32)
+print(f"random list took {(time.perf_counter() - tic):3.1f} sec") # took 3.4sec
+# Run test on python script
+tic = time.perf_counter()
+y = arr_test.sumArray(a_list)
+py_runtime = time.perf_counter() - tic
+print(f'Python results= {y} {py_runtime:5.3f} sec')
+# cffi
+tic = time.perf_counter()
+y = ex.sum_array(a_list)
+swig_runtime = time.perf_counter() - tic
+# Print results
+print(f'swig results= {y} {swig_runtime:5.3f} sec')
+print(f'swig is {(py_runtime/swig_runtime):3.1f}x faster')
+```
+- Swig is ~80x faster than Python
+  - Python took 0.445 sec
+  - Swig took 0.006 sec
+  
 ## Benchmark
 
 ## References
