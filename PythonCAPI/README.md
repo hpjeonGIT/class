@@ -8,11 +8,15 @@
   - Data from C/C++ then ML in Python. Results to C/C++ back
 - Available integration methods
   - ctypes: simple but infamous for the overhead of data marshaling
+    - When numpy array is used, the performance is equivalent to other APIs
   - cython: need to rewrite a new code of cython
   - cffi: ?
+    - Similar to ctypes, loading external shared libs and simple. Performance must be tested though.
   - pybind11: known as slower than cython
+    - In this study, the performance is quite equivalent to cython/swig/CPython
   - CPython: bare PyObject API - what benefit would be there?
   - swig: highly complicated but applicable to large-scale projects
+    - C/C++ code must be written according to the swig *.i files. Existing C/C++ code cannot be used without modification
   
 ## ctypes
 
@@ -119,6 +123,40 @@ print(f'Ctypes is {(py_runtime/c_runtime):3.1f}x faster')
     - Python took 0.204sec
     - Ctype took 0.952sec
   - Data conversion is very heavy
+
+### Using numpy array
+- Same arr_test.c and arr_test.py above
+- test_arr_np.py
+```py
+import arr_test
+import ctypes
+import time
+import random
+import numpy as np
+nsize = 10_000_000
+tic = time.perf_counter()
+a_list = np.random.randint(-5,5,nsize,np.int32)
+print(f"np random list took {(time.perf_counter() - tic)} sec") # took 
+# Run test on python script
+tic = time.perf_counter()
+y = arr_test.sumArray(a_list)
+py_runtime = time.perf_counter() - tic
+print(f'Python results= {y} {py_runtime:5.3f} sec')
+# C types: gcc -Ofast -fPIC -shared -o libsum_arr.so arr_test.c
+tic = time.perf_counter()
+libarr = ctypes.cdll.LoadLibrary("./libsum_arr.so")
+libarr.sumArrayC.argtypes= [ np.ctypeslib.ndpointer(dtype=np.int32,ndim=1, flags
+='C_CONTIGUOUS'), ctypes.c_size_t]
+libarr.restype = ctypes.c_size_t
+y= libarr.sumArrayC(a_list,nsize) # no conversion of data type
+c_runtime = time.perf_counter() - tic
+# Print results
+print(f'ctype results={y} {c_runtime:5.3f}sec')
+print(f'Ctypes is {(py_runtime/c_runtime):3.1f}x faster')
+```
+- Ctypes is 40-120x faster than Python
+  - Ctypes took 0.004-0.014 sec
+  - Python took 0.4-0.5 sec
 
 ## Cython
 - A new language (?) of C + Python
@@ -535,18 +573,19 @@ Type "help", "copyright", "credits" or "license" for more information.
 - Ref:
   - https://realpython.com/build-python-c-extension-module/
   - https://lectures.scientific-python.org/advanced/interfacing_with_c/interfacing_with_c.html
-- sum_module_np.c:
+- sum_array.c:
 ```c
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include <math.h>
  
-static PyObject* sum_func_np(PyObject* self, PyObject* args)
+static PyObject* calc(PyObject* self, PyObject* args)
 {
     PyObject *input_obj;
     if(!PyArg_ParseTuple(args,"O", &input_obj)) { return NULL;}
-    if(!PyArray_Check(input_obj)) { PyErr_SetString(PyExc_TypeError, "not numpy array"); return NULL; }
+    if(!PyArray_Check(input_obj)) { PyErr_SetString(PyExc_TypeError, "not numpy 
+array"); return NULL; }
     PyArrayObject *clean_array = NULL;
     clean_array = (PyArrayObject*) PyArray_FROM_OTF( input_obj,
                    NPY_INT32, NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED);
@@ -561,18 +600,19 @@ static PyObject* sum_func_np(PyObject* self, PyObject* args)
 /*  define functions in module */
 static PyMethodDef SumMethods[] =
 {
-     {"sum_func_np", sum_func_np, METH_VARARGS,
+     {"func_sum_np_array", calc, METH_VARARGS,
          "evaluate the sum on a NumPy array"},
      {NULL, NULL, 0, NULL}
 };
-  
+ 
+ 
 static struct PyModuleDef cModPyDem = {
     PyModuleDef_HEAD_INIT,
-    "sum_module_np", "Some documentation",
+    "module_sum_np", "Some documentation",
     -1,
     SumMethods
 };
-PyMODINIT_FUNC PyInit_sum_module_np(void) {
+PyMODINIT_FUNC PyInit_module_sum_np(void) {
     PyObject *module;
     module = PyModule_Create(&cModPyDem);
     if(module==NULL) return NULL;
@@ -588,12 +628,13 @@ from setuptools import setup, Extension
 import numpy
 # define the extension module
 my_ext_module = Extension(
-    "sum_module_np", sources=["sum_module_np.c"], include_dirs=[numpy.get_include()]
+    "module_sum_np", sources=["sum_array.c"], include_dirs=[numpy.get_include()]
 )
 # run the setup
 setup(ext_modules=[my_ext_module])
 ```
 - Build command: `python3 setup.py build_ext --inplace` # This produces sum_module_np.cpython-313-x86_64-linux-gnu.so
+  - Or `python3 setup.py build_ext -i`
 - arr_test.py:
 ```py
 def sumArray(arr):
@@ -607,7 +648,7 @@ def sumArray(arr):
 import arr_test
 import time
 import numpy as np
-import sum_module_np
+import module_sum_np
 nsize = 10_000_000
 tic = time.perf_counter()
 a_list = np.random.randint(-5,5,nsize,np.int32)
@@ -619,7 +660,7 @@ py_runtime = time.perf_counter() - tic
 print(f'Python results= {y} {py_runtime:5.3f} sec')
 # cpython with numpy
 tic = time.perf_counter()
-y = sum_module_np.sum_func_np(a_list)
+y = module_sum_np.func_sum_np_array(a_list)
 cp_runtime = time.perf_counter() - tic
 # Print results
 print(f'CPython results= {y} {cp_runtime:5.3f} sec')
@@ -628,6 +669,67 @@ print(f'CPython is {(py_runtime/cp_runtime):3.1f}x faster')
 - CPython is 70-100x faster than python
   - Python took 0.447sec
   - CPython took 0.006sec 
+- Discuss why a following cpp function is slower:
+```cpp
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#include <numpy/arrayobject.h>
+#include <vector>
+#include <iostream>
+ 
+static PyObject* process_data(PyObject* self, PyObject* const* args,
+                             size_t nargs, PyObject* kwnames) {
+    if (nargs < 1) {
+        PyErr_SetString(PyExc_TypeError, "Expected at least 1 argument");
+        return NULL;
+    }
+ 
+    // Treat the first argument as a NumPy array
+    PyArrayObject* arr = (PyArrayObject*)args[0];
+    if (!PyArray_Check(arr)) {
+        PyErr_SetString(PyExc_TypeError, "Argument must be a numpy array");
+        return NULL;
+    }
+ 
+    // 1. Extract data into std::vector
+    int* data_ptr = (int*)PyArray_DATA(arr);
+    npy_intp size = PyArray_SIZE(arr);
+    std::vector<int> vec(data_ptr, data_ptr + size);
+ 
+    // 2. Perform a simple operation with std::vector
+    int sum = 0;
+    for (int val : vec) sum += val;
+    return PyLong_FromLong((long)sum);
+}
+ 
+// Module definition
+static PyMethodDef MyMethods[] = {
+    {"func_sum_np_array", (PyCFunction)process_data, METH_FASTCALL, "Process num
+py array"},
+    {NULL, NULL, 0, NULL}
+};
+ 
+static struct PyModuleDef mymodule = {
+    PyModuleDef_HEAD_INIT, "mod_sum_np_array", NULL, -1, MyMethods
+};
+ 
+PyMODINIT_FUNC PyInit_mod_sum_np_array(void) {
+    import_array(); // Initialize NumPy C-API
+    return PyModule_Create(&mymodule);
+}
+```
+- setup.py
+```py
+from setuptools import setup, Extension
+import numpy
+# define the extension module
+my_mod = Extension(
+    "mod_sum_np_array", sources=["sum_array.cpp"],
+    include_dirs=[numpy.get_include()],
+    language="c++")
+# run the setup
+setup(ext_modules=[my_mod])
+```
 
 ## SWIG
 - Download numpy.i: https://github.com/numpy/numpy/blob/main/tools/swig/numpy.i
