@@ -62,6 +62,11 @@ prepend-path    LD_LIBRARY_PATH $TOP/lib
 ## Running Rmpi
 - Only batch mode
 - No interactive session is allowed with MPI libraries
+- Sample command: `mpirun -n 10 Rscript my_mpi_script.R`
+
+# Introductory topics
+
+## Serial version of Hello world with Rscript
 - hello.R:
 ```r
 cat("Hello world\n")
@@ -71,8 +76,6 @@ cat("Hello world\n")
 $ Rscript hello.R 
 Hello world
 ```
-
-# Introductory topics
 
 ## Sample Hello world over multiple ranks
 - hello_mpi.R:
@@ -89,15 +92,10 @@ quit("yes")
 - Demo:
 ```bash
 $ module load R_4.6 openmpi_5.0.10
-$ mpirun -n 4 Rscript hello_mpi.R 
-hello world from  2 and  hakuneMini  out of  4 
-hello world from  3 and  hakuneMini  out of  4 
-[1] 1
-hello world from  1 and  hakuneMini  out of  4 
-[1] 1
-hello world from  0 and  hakuneMini  out of  4 
-[1] 1
-[1] 1
+$ mpirun -n 3 Rscript hello_mpi.R 
+hello world from  1 and  hakuneMini  out of  3 
+hello world from  2 and  hakuneMini  out of  3 
+hello world from  0 and  hakuneMini  out of  3 
 ```
 
 ## Sample collective calls
@@ -137,11 +135,78 @@ At rank  1  the broadcasted value =  100
 At rank  2  the broadcasted value =  100 
 ```
 
-## Sample send/receive codes
+## Sample send/receive code
+```r
+library(Rmpi)
+my_rank <- mpi.comm.rank(comm=0)
+n_ranks <- mpi.comm.size(comm=0)
+my_list <- c()
+if (my_rank == 0) {
+  my_list <- c()
+  for (i in 1:(n_ranks-1)) {
+    x <- integer(2) # irecv/recv argument is a vector as isend/send can send a vector
+    ierr = mpi.recv(x,type=1,source=i, tag=i, comm=0)
+    my_list <- c(my_list,x)
+  }
+  cat("At rank 0, all received data are ", my_list, "\n")
+} else {
+    x <- c(my_rank + 100, my_rank + 200)
+    cat("At rank ", my_rank, " am sending ", x, "\n")
+    ierr = mpi.send(x,type=1,dest=0,tag =my_rank, comm=0)
+}
+ierr <- mpi.barrier(comm=0)
+mpi.quit()
+quit("yes")
+```
+- Demo:
+```bash
+$ mpirun -n 4 Rscript mpi_sendrecv.R 
+At rank  2  am sending  102 202 
+At rank  3  am sending  103 203 
+At rank  1  am sending  101 201 
+At rank 0, all received data are  101 201 102 202 103 203 
+```
+
+## Async send
+```py
+library(Rmpi)
+my_rank <- mpi.comm.rank(comm=0)
+n_ranks <- mpi.comm.size(comm=0)
+my_list <- c()
+if (my_rank == 0) {
+  ncount <- 0
+  for (i in 1:(n_ranks-1)) {
+    x <- integer(2) # irecv/recv argument is a vector as isend/send can send a vector
+    ierr = mpi.recv(x,type=1,source=i, tag=i, comm=0)
+    my_list <- c(my_list,x)
+  }
+  cat("At rank 0, all received data are ", my_list, "\n")
+} else {
+    x <- c(my_rank + 100, my_rank + 200)
+    cat("At rank ", my_rank, " am sending ", x, "\n")
+    ierr = mpi.isend(x,type=1,dest=0,tag=my_rank, comm=0, request=0)
+    mpi.wait(request=0,status=0)
+}
+ierr <- mpi.barrier(comm=0)
+mpi.quit()
+quit("yes")
+```
+- Demo:
+```bash
+$ mpirun -n 4 Rscript mpi_waitall.R 
+At rank  3  am sending  103 203 
+At rank  1  am sending  101 201 
+At rank  2  am sending  102 202 
+At rank 0, all received data are  101 201 102 202 103 203 
+```
+- In order to use async irecv, we need a long vector then must be able to access the vectory by index inside of irecv(). However, Rmpi may not allow such vector index approach
 
 # Advanced topics
 
 ## Setting different random number seeds per rank
+- The main idea on random number seed on MPI is that every rank must have different seeds
+- The common approach is to broadcast some value (like 123) then each rank uses that value + its own rank number to get the unique number
+- If multiple ranks have the same random number seed, they will do the same thing and it may hurt the statistics of simulations/computations
 
 ## Parallelizing existing packages
 
