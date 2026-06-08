@@ -33,6 +33,13 @@ $ make install
 $ R CMD INSTALL Rmpi_0.7-3.4.tar.gz --configure-args="--with-Rmpi-include=/home/hpjeon/sw_local/openmpi/5.0.10/include/ --with-Rmpi-libpath=/home/hpjeon/sw_local/openmpi/5.0.10/lib --with-Rmpi-type=OPENMPI"
 ```
 
+## Installing pbdMPI
+```bash
+$ module load R_4.6 openmpi_5.0.10
+$ R CMD INSTALL ./float_0.3-3.tar.gz 
+$ R CMD INSTALL pbdMPI_0.5-5.tar.gz --configure-args="--with-Rmpi-include=/home/hpjeon/sw_local/openmpi/5.0.10/include/ --with-Rmpi-libpath=/home/hpjeon/sw_local/openmpi/5.0.10/lib --with-Rmpi-type=OPENMPI"
+```
+
 ## Sample environmental module files
 - R_4.6.0
 ```tcl
@@ -97,6 +104,15 @@ hello world from  1 and  hakuneMini  out of  3
 hello world from  2 and  hakuneMini  out of  3 
 hello world from  0 and  hakuneMini  out of  3 
 ```
+- For pbdMPI:
+```r
+library(pbdMPI, quietly=TRUE)
+my_rank <- comm.rank()
+n_ranks <- comm.size()
+cat("hello world from ", my_rank, " out of ", n_ranks, "\n")
+ierr <- barrier();
+finalize();
+```
 
 ## Sample collective calls
 ```r
@@ -134,6 +150,30 @@ At rank  0  the broadcasted value =  100
 At rank  1  the broadcasted value =  100 
 At rank  2  the broadcasted value =  100 
 ```
+- For pbdMPI:
+```r
+library(pbdMPI, quietly=TRUE)
+my_rank <- comm.rank()
+n_ranks <- comm.size()
+## Reduce example:
+res <- reduce(my_rank,NULL,op="sum",rank.dest=0,comm=0)
+if (my_rank==0) { cat("At rank0, the sum of all ranks = ", res, "\n") }
+## Allreduce example:
+res <- allreduce(my_rank,NULL,op="sum", comm=0)
+cat("At rank ", my_rank, " the all reduced value = ", res,'\n');
+## Broadcast example
+if (my_rank == 0) { 
+  my_value <- 100;
+} else {
+  my_value <- 10000;
+}
+my_value <- bcast(my_value, rank.source=0, comm=0) # unlike regular MPI_Bcast, my_value is not updated in other ranks. The return value must be assigned
+Sys.sleep(my_rank)
+cat("At rank ", my_rank, " the broadcasted value = ", my_value,'\n');
+# 
+ierr <- barrier(comm=0)
+finalize()
+```
 
 ## Sample send/receive code
 ```r
@@ -165,6 +205,28 @@ At rank  2  am sending  102 202
 At rank  3  am sending  103 203 
 At rank  1  am sending  101 201 
 At rank 0, all received data are  101 201 102 202 103 203 
+```
+- For pbdMPI:
+```r
+library(pbdMPI, quietly=TRUE)
+my_rank <- comm.rank()
+n_ranks <- comm.size()
+my_list <- c()
+if (my_rank == 0) {
+  my_list <- c()
+  for (i in 1:(n_ranks-1)) {
+    x <- integer(2) # irecv/recv argument is a vector as isend/send can send a vector
+    x = recv(NULL, rank.source=i, tag=i, comm=0)
+    my_list <- c(my_list,x)
+  }
+  cat("At rank 0, all received data are ", my_list, "\n")
+} else {
+    x <- c(my_rank + 100, my_rank + 200)
+    cat("At rank ", my_rank, " am sending ", x, "\n")
+    ierr = send(x,rank.dest=0,tag=my_rank, comm=0)
+}
+ierr <- barrier(comm=0)
+finalize()
 ```
 
 ## Async send
