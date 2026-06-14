@@ -1,6 +1,7 @@
 # Objectives
 - How to integrate C/C++ code into Python?
   - Run C/C++ functions in Python environment
+    - You may not be able to run C/C++ functions directly from Python environment. You will need helper functions, running brokers b/w those Python C/C++ APIs and existing C/C++ source codes
   - Script or interactive
 - For HPC
   - Must be fast - no overhead of memory copy/data marshaling
