@@ -274,4 +274,217 @@ At rank 0, all received data are  101 201 102 202 103 203
 
 ### Exhaustive search
 
+#### Source of exhaustive search from FSelector package
+- Source: https://cran.r-project.org/web/packages/FSelector/index.html
+  - Download the source package and find search.exhaustive.R
+```r
+exhaustive.search <- function(attributes, eval.fun) {
+	len = length(attributes)
+	if(len == 0)
+		stop("Attributes not specified")
+	
+	eval.fun = match.fun(eval.fun)
+	best = list(
+		result = -Inf,
+		attrs = rep(0, len)
+	)
+	
+	# main loop
+	# for each subset size
+	for(size in 1:len) {
+		child_comb = combn(1:len, size)
+		# for each child
+		for(i in 1:dim(child_comb)[2]) {
+			subset = rep(0, len)
+			subset[child_comb[, i]] = 1
+			result = eval.fun(attributes[as.logical(subset)])
+			if(result > best$result) {
+				best$result = result
+				best$attrs = subset
+			}
+		}
+	}
+	return(attributes[as.logical(best$attrs)])
+}
+```
+- As shown above, the exhaustive search is composed of 2 for-loops. Looping over the given length, number of combinations is calcuated then 2nd loop runs through those combinations
+  - Outer loop: 1-len
+  - Inner loop: 1-child_comb per each outer loop index
+- Parallelization strategy:
+  - Total number of calculation = outer_loop \* inner_loop
+  - We divide the total number of calculation with the number of ranks available
+  - Then we find the initial loop index and final index per rank
+
+#### Divider of workload
+- A sample case
+  - When len=10, inner loops are 10, 45, 120, 210, 252, 210, 120, 45, 10, 1 and total inner loops are 1023
+  - When 4 ranks are used, we may divide them with 256 each while the last rank has 255
+    - 256 + 256 + 256 + 255 = 1023
+  - Rank 0 will have 1-10, 1-45, 1-120, and 1-81 (partial loop over 210)
+  - Rank 1 will have 82-210 and 1-127 over 252
+  - Rank 2 will have 128-252 and 1-131 over 210
+  - Rank 3 will have 132-210, 1-120, 1-45, 1-10, 1-1
+- A following script shows such division over 4 ranks
+```r  
+divider <- function(inner, indx_start, indx_end) {
+  outer <- c()
+  inner_s <- c()
+  inner_e <- c()
+  tsum <- 0
+  for(size in 1:length(inner)){
+     dt <- inner[size]
+     tsum <- tsum +  dt
+     if (tsum >= indx_start) {
+       outer <- c(outer, size)
+       istart = dt-(tsum-indx_start)
+       if (istart <0) istart=1
+       inner_s <- c(inner_s, istart)
+       if (tsum <= indx_end) {
+         inner_e <- c(inner_e, dt)
+       } else {
+         inner_e <- c(inner_e, dt- (tsum-indx_end))
+         break
+       }
+     }
+  }
+  return(list(outer=outer, inner_s=inner_s, inner_e=inner_e))
+}
+##
+len <- 10
+tsum <-0
+inner <- c()
+for(size in 1:len) {
+  child_comb = combn(1:len, size)
+  x = dim(child_comb)[2]
+  inner <- c(inner, x)
+  tsum <- tsum + x
+#cat (size, " ", x, "\n")
+}
+cat("total size =", tsum, "\n")
+cat("inner loop = ", inner, "\n")
+ncpus = 4
+div = round(tsum/ncpus)
+test_sum <- 0
+for (my_rank in 0:(ncpus-1)) {
+  indx_start = div*my_rank + 1
+  indx_end = indx_start + div - 1
+  if (my_rank == (ncpus-1)) indx_end = tsum
+  ###
+  res <- divider(inner, indx_start, indx_end)
+  outer <- res$outer
+  inner_s <- res$inner_s
+  inner_e <- res$inner_e
+  cat("my rank = ", my_rank, " outloop = ", outer, " inner loop starting index = ", inner_s, " inner loop end index= ", inner_e, "\n")
+  for(i in 1:length(outer)) {
+    for (j in inner_s[i]:inner_e[i]) {
+      test_sum <- test_sum + 1
+    }
+  }
+}
+cat("after division, total sum = ", test_sum, "\n")
+## 210 = (rank 0: 1 : 2)
+## 210 = (rank 0: 1)
+## 210 = (rank 0)
+```
+#### Implementation of Rmpi over exhaustive search
+```r
+divider <- function(inner, indx_start, indx_end) {
+  outer <- c()
+  inner_s <- c()
+  inner_e <- c()
+  tsum <- 0
+  for(size in 1:length(inner)){
+     dt <- inner[size]
+     tsum <- tsum +  dt
+     if (tsum >= indx_start) {
+       outer <- c(outer, size)
+       istart = dt-(tsum-indx_start)
+       if (istart <0) istart=1
+       inner_s <- c(inner_s, istart)
+       if (tsum <= indx_end) {
+         inner_e <- c(inner_e, dt)
+       } else {
+         inner_e <- c(inner_e, dt- (tsum-indx_end))
+         break
+       }
+     }
+  }
+  return(list(outer=outer, inner_s=inner_s, inner_e=inner_e))
+}
+exhaustive.search.Rmpi <- function(attributes, eval.fun) {
+	len = length(attributes)
+	if(len == 0)
+		stop("Attributes not specified")
+	
+	eval.fun = match.fun(eval.fun)
+	best = list(
+		result = -Inf,
+		attrs = rep(0, len)
+	)	
+	best.out = as.integer(0)
+	best.inn = as.integer(0)
+	rs.vec = rep(0,mpi.ncpus)
+  rs.out = rep(as.integer(0), mpi.ncpus) # outer loop index
+	rs.inn = rep(as.integer(0), mpi.ncpus) # inner loop index
+  # Estimation of total loops
+	tsum <-0
+	inner <- c()
+	for(size in 1:len) {
+		child_comb = combn(1:len, size)
+		x = dim(child_comb)[2]
+		inner <- c(inner, x)
+		tsum <- tsum + x
+	}
+	div = round(tsum/mpi.ncpus)
+	indx_start = div*mpi.my_rank + 1
+  indx_end = indx_start + div - 1
+  if (mpi.my_rank == (mpi.ncpus-1)) indx_end = tsum
+  res <- divider(inner, indx_start, indx_end)
+  outer <- res$outer
+  inner_s <- res$inner_s
+  inner_e <- res$inner_e
+	# Now we have outer, inner_s, inner_e
+	# main loop
+	# for each subset size
+	#for(size in 1:len) {
+	for (nsize in 1:length(outer)) {	
+		size = outer[nsize]
+		child_comb = combn(1:len, size)
+		# for each child
+		#for(i in 1:dim(child_comb)[2]) {
+		for(i in inner_s[nsize]:inner_e[nsize]) {
+			subset = rep(0, len)
+			subset[child_comb[, i]] = 1
+			result = eval.fun(attributes[as.logical(subset)])
+			if(result > best$result) {
+				best$result = result
+				best$attrs = subset
+				best.out <- as.integer(size)
+				best.inn <- as.integer(i)
+			}
+		}
+	}
+  mpi.allgather(best$result, type=2, rs.vec, comm=0)
+	mpi.allgather(best.out,    type=1, rs.out, comm=0)
+	mpi.allgather(best.inn,    type=1, rs.inn, comm=0)
+	update <- FALSE
+	for (i in 1:mpi.ncpus) {
+		if (rs.vec[i] > best$result) {
+				best$result <- rs.vec[i]
+				best.out  <- rs.out[i]
+				best.inn  <- rs.inn[i]
+				update <- TRUE
+		}
+	}
+	if (update) {
+		  child_comb = combn(1:len,best.out)
+			subset = rep(0, len)
+			subset[child_comb[, best.inn]] = 1
+			best$attrs <- subset
+	}
+	return(attributes[as.logical(best$attrs)])
+}
+```
+- To find maximum value, we may use reduce() or allreduce() but as we cannot reduce `best$attrs` as this is a vector. Therefore, we allgather `best$result` and `best$attrs` then find max value locally
+
 ### Greedy search
