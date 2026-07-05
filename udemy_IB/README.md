@@ -187,48 +187,258 @@ $ ibv_devinfo
 ## Section 6: Infiniband Addressing
 
 ### 20. 19 - Getting Details of IB Adapter
-### 21. 20 - Global Unique Identifier
-### 22. 21 - Local Identifier
+```bash
+$ ibstat
+...
+```
+- CA: Channel Adapter
+- ibp1s0: PCI location of IB device
+- MT4099: HW model
+- Rate: Link speed. 40 means 40Gb/sec
+- Base lid: Local Identifier assigned by Subnet Manager
+- LMC: 0 means only 1 lid assigned
+- SM lid: LID of the Subnet Manager (SM)
+- Capability mask: Bitmask - mostly used for low-level diagnostics
+
+### 21. 20 - Global Unique Identifier (GUID)
+- 64bit value burned into HW (by manufacture)
+- Used by SM to assign LIDs
+
+### 22. 21 - Local Identifier (LID)
+- A 16-bit address assigned to each IB port (Range: 0x0001->0xFFFE)
+- Unique within a subnet, used for routing packets within a subnet
+- Assigned dynamically by the SM
+- Why LID is needed?
+  - Enables efficient HW-level routing
+  - Allows switches to forward packets using lookup tables (LFTs)
+  - Decopules communication from GUID
+
+| Feature | LID (16bit) | GUID(64bit)|
+|---------|-------------|------------|
+| Scope   | Local(subnet) | Global   |
+| Assigned by| Subnet Manager | Manufacturer |
+| Changes | Yes          | No         |
+| Used for routing | Yes | No         |
 
 ## Section 7: Infiniband Utilities
 
 ### 23. 22 - Checking Connectivity
+- ibping
+  - A tool test connectivity b/w IB nodes
+  - Works at IB layer (LID/GUID)
+  - Similar to ping but not IP-based
+  - When one node runs as server: `ibping -S`
+  - Another node sends ping requests: `ibping -L <LID>`
+
 ### 24. 23 - Topology Discovery
+- ibnetdiscover
+  - A tool to discover and map the entire IB fabric
+  - Shows
+    - Nodes (HCAs)
+    - Switches
+    - Ports and connections
+<img src="./sec24_topo.png" height="300">
+<img src="./sec24_found.png" height="500">
+
 ### 25. 24 - InfiniBand Utilities - Part 1
+
+| Tool          |  Purpose   | When to use  |
+| ------------- |------------| -------------|
+| iblinkinfo | Shows link-level | Quick topology check |
+| ibtracert  | Traces path b/w nodes | Identify hops/switches |
+| ibhosts    | Lists all IB hosts | Fabric discovery |
+| ibswitches | Lists switches | Switch inventory |
+| ibnodes    | List all nodes | Full fabric view (nodes + switches) |
+| ibv_devinfo | Detailed HCA capabilities | HW validation
+
 ### 26. 25 - InfiniBand Utilities - Part 2
-4min
+<img src="./sec25_tools.png" height="200">
+
+## Section 8: Remote Direct Memory Access (RDMA)
 
 ### 27. 26 - Direct Memory Access
-### 28. 27 - Remote DMA
+- DMA (Precursor to RDMA)
+  - A HW feature that lets supported devices transfer data to/from memory without the CPU actigin as middle-man
+- Without DMA:
+  - CPU must copy every byte from device to memory
+  - CPU utilization up to 90-100% for data transfer
+- With DMA:
+  - Device controller handles transfers directly
+  - CPU utilization: 5-10%
+  - 10-100x faster data movement
+
+<img src="./sec27_dma.png" height="300">
+
+### 28. 27 - Remote DMA (RDMA)
+- DMA over the network
+  - Allows one computer to directly read or write memory on another computer without involving the CPU or OS
+  - IB or RoCE or iWARP
+
+<img src="./sec28_rdma.png" height="200">
+
 ### 29. 28 - Traditional Data Transfer
+<img src="./sec29_data.png" height="300">
+
+- High latency due to multiple SW layers
+- CPU bottlenecks
+- Inefficient data handling
+  - Repeated memory copies add overhead and reduce efficiency
+
 ### 30. 29 - RDMA - Analogy
+- RDMA removes layers, offloads the CPU, and eliminates copies
+
+<img src="./sec30_rdma.png" height="300">
+
 ### 31. 30 - Zero Copy Transfer
+- Traditional data transfer needs to copy data from application to kernel then to NIC
+  - Heavy CPU utilization
+  - Destination host repeats the steps inversely to get data in application
+
+<img src="./sec31_zerocopy.png" height="400">
+
 ### 32. 31 - RDMA Verbs
-2min
+- Basic commands (APIs) that applications use to talk directly to the network HW
+  - Low-level instructions to perform RDMA operations
+- Why "verbs"?
+  - Because they are literally actions like create, register, send, write, read, poll  
+- Application <--> Verbs <--> RDMA supporting HW like IB, iWARP, RoCE
+
+## Section 9: Key Infiniband features
 
 ### 33. 32 - Key InfiniBand Features
+- IB is a natural fit for RDMA because it provides:
+  - Queue Pair (QP) built into HW
+  - Memory Registration + Key mechanism
+  - HW Offload capability
+  - Lossless, credit-based flow control
+
 ### 34. 33 - Queue Pairs
-### 35. 34 - Memory Registration
+<img src="./sec34_qp.png" height="300">
+
+- Application: 
+  - Creates a QP using RDMA verbs (ibv_create_qp)
+  - Posts work requests -> Send Queue (SQ)
+- Once work is posted
+  - NIC reads the request from SQ
+  - Fetches data using DMA
+  - Sends packets over fabric (ibv_post_send)
+  - Remote NIC processes and places data in memory
+  - Completion is written to Completion Queue (CQ)
+- Application:
+  - Polls for completion -> CQ(ibv_poll_cq)
+
+### 35. 34 - Memory Registration (MR)
+- A block of memory registered with the RDMA NIC to enable direct memory access through RDMA operations
+- Each MR is associated with two keys used to authorize RDMA access
+  - Local key (lkey): used by the local RDMA NIC for internal access to the memory
+  - Remote key (rkey): shared with remote peers to grant them access, based on the permissions set during registration
+
 ### 36. 35 - Hardware Offload
+- IB HCAs move transport logic, data movement, and flow control from the CPU-driven SW stack into dedicated HW
+- Top 5 things HCA does in HW
+
+| Function | IB HCA (HW) |
+|----------|-------------|
+| Transport processing | Handles sequencing, ACK/NACK, retransmissions, in-order delivery in HW |
+| Data movement | Direct memory-to-memory transfer via DMA (zero-copy) |
+| Request execution model| Processes RDMA operations via Queue Pairs (QP) in HW |
+| Packetization & reassembly | Segmentation and reassembly done in NIC HW |
+| Memory protection & access control | Validates lkey/rkey, enforces memory region boundaries in HW|
+
 ### 37. 36 - Lossless, Credit Based Flow
+- IB doesn't deal with packet loss - it prevents it from happening in the first place
+- Sender only sends data when the receiver is ready - so nothing gets dropped
+- Credit-based flow control 
+  - Credits are pre-approved permission to send data - just like a credit limit of your credit card is pre-approved permission to send
+
+<img src="./sec37_credit.png" height="250">
+
 ### 38. 37 - RDMA Demo
-9min
+```bash
+$ ibstat
+...
+$ ibping -S # in the first node
+$ ibping 4 # in the second node
+```
+- Bandwidth and latency test
+```bash
+$ ib_write_bw # in the first node
+$ ib_write_bw 192.168.0.xx # in the second node
+...
+$ ib_write_lat 192.168.0.yy
+```
+<img src="./sec38_test.png" height="350">
+
+## Section 10: How Nvidia is using RDMA?
 
 ### 39. 38 - GPUDirect RDMA
+<img src="./sec39_gpuDMA.png" height="400">
+
 ### 40. 39 - GPUDirect Storage
+- Direct GPU-to-storage transfers bypassing CPU and system memory
+- Reduces IO bottlenecks in training
+
+<img src="./sec40_gpuDirectStorage.png" height="400">
+
 ### 41. 40 - GPUDirect RDMA vs GPUDirect Storage
-3min
+<img src="./sec41_comparison.png" height="400">
+
+## Section 11: Comparing IB
 
 ### 42. 41 - Ethernet vs InfiniBand
+<img src="./sec42_ethervsIB.png" height="400">
+
 ### 43. 42 - TCP-IP vs InfiniBand
-3min
+<img src="./sec43_TCPvsIB.png" height="400">
+
+## Section 12: Going beyond a subnet
 
 ### 44. 43 - Going Beyond an InfiniBand Subnet
+- Spine vs leaf switches
+  - Spine: upper hierarchy switches
+  - Leaf: lower hierarcy switches
+- Is One Subnet sufficient?
+  - A subnet is optimized for speed and simplicity, not infinite scale
+    - Each node in a subnet gets a LID
+    - LIDs are assigned by the subnet manager (SM)
+    - Routing is LID-based within the subnet
+  - So the subnet size is fundamentally tied to LID space
+
+<img src="./sec44_limit.png" height="200">
+
+- Challenges with single subnet design
+  - Scalability limit
+  - Subnet manager bottleneck
+  - Large fault domain
+  - Shared congestion domain
+- Different topologies
+  - To optimize performance, scalability, and cost based on workload patterns, traffic flow, and cluster size
+
+<img src="./sec44_topo.png" height="200">
+
 ### 45. 44 - InfiniBand Router
+- An IB router connects multiple IB subnets, enabling communication across separate subnet while maintaining isolation and scalability
+- Not commonly used
+- But might be asked in certificate exams
+
+<img src="./sec45_fabric.png" height="500">
+
 ### 46. 45 - InfiniBand Packet
+<img src="./sec46_packet.png" height="400">
+
+- ibdump: capturing IB packet
+```bash
+$ ibping -S #  in the first node
+$ ibping 2 # in the 2nd node
+$ ibdump -d mlx4_0 -i 1 -w ib_capture.pcap # in the first node
+```
+- Wireshark can open *.pcap files
+
 ### 47. 46 - Global ID (GID)
+
 ### 48. 47 - GUID vs. LID vs. GID
-3min
+
+## Section 13: Nvidia Infiniband Stack
 
 ### 49. 48 - NVIDIA InfiniBand Stack
 ### 50. 49 - NVIDIA InfiniBand Hardware Stack
