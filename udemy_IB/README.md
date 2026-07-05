@@ -435,23 +435,59 @@ $ ibdump -d mlx4_0 -i 1 -w ib_capture.pcap # in the first node
 - Wireshark can open *.pcap files
 
 ### 47. 46 - Global ID (GID)
+- A globally unique address used to identify a device across multiple IB subnets
+- LID works only within a single subnet that's why GID is needed when communication goes across subnets (via IB router)
+- Used for global routing across subnets
+- GID follows IPv6 format (128-bit addressing)
+  - Subnet prefix (64bits, identifies the IB subnet) + Interface ID (64bits, unique identifier of the device (HCA port))
+  - `ibv_devinfo -v` or `rdma link show` or `ib_addr` to view GIDs
 
 ### 48. 47 - GUID vs. LID vs. GID
+<img src="./sec48_address.png" height="400">
 
 ## Section 13: Nvidia Infiniband Stack
 
 ### 49. 48 - NVIDIA InfiniBand Stack
+<img src="./sec49_history.png" height="400">
+
 ### 50. 49 - NVIDIA InfiniBand Hardware Stack
+<img src="./sec50_hw1.png" height="400">
+<img src="./sec50_hw2.png" height="400">
+
 ### 51. 50 - NVIDIA InfiniBand Software Stack
+<img src="./sec51_sw.png" height="400">
+
 ### 52. 51 - OpenFabrics Enterprise Distribution - Part 1
+- OFED Drivers
+  - Drivers shipped with OS may not be optimized for ConnectX adapters
+  - For the best performance, replace it with optimized drivers
+  - MLNX_OFED: ConnectX-3..5
+  - DOCA_OFED: ConnectX-5..8
+    - BlueField-2/3 DPU
+```bash
+$ lsmod |grep mlx
+...
+$ modinfo mlx5_core | grep filename
+...
+$ ofed_info
+...
+```
+
 ### 53. 52 - OpenFabrics Enterprise Distribution (OFED) - Part 2
-3min
+- Mellanox driver: https://network.nvidia.com/products/infiniband-drivers/linux/mlnx_ofed/
+- sudo ./mlnxofedinstall --add-kernel-support --fw-update
+
+## Section 14: Traffic Isolation in InfiniBand
 
 ### 54. 53 - Traffic Isolation in InfiniBand
+
 ### 55. 54 - Power of Partition Key (PKey)
+
 ### 56. 55 - Configuring Partitions
+
 ### 57. 56 - 3 Node Partitioning
-12min
+
+## Section 15: Network Topology and Routing
 
 ### 58. 57 - Network Topology and Routing
 ### 59. 58 - Control Plane and Data Plane
