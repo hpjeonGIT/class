@@ -952,23 +952,51 @@ Switch (config interface mgmt0)# exit
   - admin: full access (configuration + management)
   - monitor: read-only access (view configs, status)
 - This separation ensures operational safety and role-based access control
-
+- XML users -> tools/automation (UFM, scripts, APIs)
+  - xmladmin: same power as admin but for automation tools
+  - xmluser: read-only access via APIs
 
 ### 100. 99 - Mellanox OS - Web Interface
+- Virtual Protocol Interconnect
+  - IB
+  - Ethernet
+
+<img src="./sec100_gui.png" height="300">  
 
 ### 101. 100 - Upgrade Procedure
+- CLI upgrade
+  - Log in to the switch via SSH
+  - Verify current version: `show version`
+  - Fetch the new image: `image fetch scp://username:passwd@server/path/to/image.img`
+  - Install the image: `image install <image_name>`
+  - Set the next boot partition: `image boot next`
+  - Verify the update is scheduled: `show images`
+  - Save configuration: `configuration write`
+  - Reload the switch: `reload`
 
 ## Section 19: Troubleshooting InfiniBand
 
 ### 102. 102 - Troubleshooting Issues
+<img src="./sec102_tools.png" height="300">  
 
 ### 103. 103 - Performance Issues
+- Categorization
+  - Performance issues
+  - Connectivity issues
+  - Physical layer issues
+
+<img src="./sec103_perf.png" height="200">  
 
 ### 104. 104 - Connectivity Issues
+<img src="./sec104_command.png" height="300">  
 
 ### 105. 105 - Connectivity Issues
+<img src="./sec105_command.png" height="300">  
 
 ### 106. 106 - Physical Layer Issues
+- CVT: Cable Validation Tool
+
+<img src="./sec106_hw.png" height="300">  
 
 ## Section 20: Next Steps
 
