@@ -480,74 +480,496 @@ $ ofed_info
 ## Section 14: Traffic Isolation in InfiniBand
 
 ### 54. 53 - Traffic Isolation in InfiniBand
+- Why traffic isolation is critical?
+  - In a shared IB fabric, uncontrolled communication can lead to security risks, performance interference, and operational instability
+- Real-World Scenarios
+  - Multi-tenant AI clusters: prevent data leakage and interference b/w teams sharing GPU infrastructure
+  - Dev/Test/Production: avoid accidental cross-communication and protect production stability
+  - Healthcare & research workloads: enforce strict data prviacy and regulatory compliance
+  - Mixed workloads: Prevent performance degradation caused by competing traffic patterns
+- Traffic isolation ensures security, predictable performance, and efficient resource sharing on a single IB fabric
+- How to implement isolation?
+  - PKey (Partition Key) is a 16bit field in IB used to logically isolate traffic within the same physical fabric
+  - The subnet Manager
+    - Defines partitions
+    - Assigns PKeys to nodes (HCAs)
+    - Distribute PKey tables across the fabric
+  - The node (HCA/host)
+    - Stores assigned PKeys in its PKey table
+    - Tags outgoing packets with a selected PKey
+    - Validates incoming packets against its PKey table
+    - Accepts or drops traffic based on PKey membership
+    - Enforces partition isolation(data plane enforcement)
 
 ### 55. 54 - Power of Partition Key (PKey)
+- Configuring PKey
+  - Define partitions (partitions.conf)
+  - Create membership
+    - Full: full member can talk to everyone in the same partition
+    - Limited: Limited member can only talk to Full members - never to other Limited members
+      - Control plane traffic (SM) is always allowed
+      - PKey only influences Data Plane Traffic
 
 ### 56. 55 - Configuring Partitions
+- Steps
+  - Point OpenSM to configuration file: `opensm -P /etc/opensm/partitions.conf`
+  - Add required entries: `vi /etc/opensm/partitions.conf`
+  - Restart OpenSM service: `sudo systemctl restart opensm`
+- Multiple partitions can be defined for complex partition setup
+  - Different partitions will not talk to each other
 
 ### 57. 56 - 3 Node Partitioning
+- Demo using 3 nodes
+```bash
+$ smpquery PKeys <LID> <PORT>
+...
+$ cat /etc/opensm/partitions.conf
+...
+$ ibdiagnet
+...
+```
 
 ## Section 15: Network Topology and Routing
 
 ### 58. 57 - Network Topology and Routing
+- Network topologies
+  - Physical connectivity of hosts and switches
+  - Fat Tree
+  - Full Mesh
+  - Dragon Fly+
+  - Torus 3D
+
 ### 59. 58 - Control Plane and Data Plane
+- Subnet Manager (Control Plane) workflow
+  - Discover topology
+  - Assigns LIDs (to all nodes)
+  - Choose routing algorithm
+  - Compute paths
+  - Program linear forwarding table (LFT) in switches
+- Switch (Data Plane) workflow  
+  - Receive packet
+  - Lookup LFT (using destination LID)
+  - Select output port (based on routing type)
+  - Forward packet to next hop
+
 ### 60. 59 - One Switch Setup
+- Linear Forwarding Table
+  - Inside of every IB switch
+  - Maps destination LID to an output port
+  - Enables fast, HW-based forwarding
+  - Pre-programmed by Subnet Manager
+  - Stored in swtich ASIC (Application-Specific Integrated Circuit)
+- When packet arrives
+  - Switch reads destination LID
+  - Looks up LFT
+  - Sends packet out correct port
+- To view LFT: `ibroute <switch_lid>`
+  - Other useful commands
+    - `ibnetdiscover`
+    - `ibtracert <src_lid> <dst_lid>`
+- Demo using 3 nodes
+```bash
+$ ibhosts
+...
+$ ibswitches
+...
+$ ibnodes # hosts + switches
+...
+$ ibroute 4 # 4 is the LID of the switch here. Shows LFT
+```
+
+<img src="./sec61_demo.png" height="400">
+
 ### 61. 60 - Two Switch Setup
+- Using LID 4 and 5 for two switches
+```bash
+$ ibnetdiscover
+... # copy/paste the content into chatGPT then ask a diagram of the topology
+$ ibtracert 1 2 # LID 1 -> LID 4 (switch) -> LID 2
+```
+
 ### 62. 61 - Direct or Through Switch
+```bash
+$ ibroute 4 # shows different ports when direct or through another switch
+...
+$ ibroute 5 # compare the results with the above
+```
+
 ### 63. 62 - Routing Algorithms
+- MINHOP: default algorithms
+- UPDN: 
+- Fat-tree
+- Adaptive Routing: in AI/HPC
+
+<img src="./sec63_alg.png" height="100">
+
 ### 64. 63 - MINHOP Routing
+- Minimum hops: Always picks least number of hops, first available shortest path
+  - No congestion awareness: certain switchs might be saturated easily
+  - Other paths are ignored (even if better)
+
 ### 65. 64 - UPDN Routing
+- Traffic must go UP (towards spine) then DOWN (towards destination)
+  - No zig-zag
+  - Never go up again to prevent loops
+
 ### 66. 65 - Fat Tree Routing
+- Uses ALL equal-cost paths simultaneously
+  - Traffic is split across both spines
+  - Achieves load balancing and high throughput
+  - No congestion awareness
+
 ### 67. 66 - Adaptive Routing
-### 68. 67 - Chagning Routing Algorithm
+- Chooses path based on congestion in real time
+- If congestion changes, path can change mid-flow
+  - Needs modern-smart switches: Quantum series
+
+### 68. 67 - Changing Routing Algorithm
+- View current routing algorithm
+  - `cat /etc/opensm/opensm.conf |grep routing_engine`
+- Change routing algorithm
+  - `routing_engine`: minhop/updn/ftree
+- Restart Opensm: `systemctl restart opensm`
+
 ### 69. 68 - Why Adaptive Routing?
+- Why adaptive routing is well suited for AI workload?
+  - Spreads elephant flows across multiple paths dynamically
+    - Large, long-lived traffic that consume significant BW
+      - Distributed AI training
+      - Checkpointing
+      - Large dataset transfers
+    - Elephant flows = few but dominant flows
+      - Heavy load
+      - Fill switch buffers quickly
+      - Occupy links for long duration
+      - Traditional load balancing breaks as hashing doesn't distribute them well
+  - Avoids static flow-based load balancing that creates congestion hotspots
+    - In static flow-based load balancing, each flow is assigned a fixed path based on a hash and does not change, regardless of network conditions
+    - How it works?
+      - Uses hashing (source/destination IP, ports)
+      - Selects one path from multiple equal-cost paths
+      - Flow stays on that path for its entire lifetime
+    - Static load balancing can place multiple elephant flows on the same path
+  - Balances low-entropy traffic using real-time path selection
+    - Entropy: a measure of the amount of disorder in a system
+    - Low-entropy traffic means there is very little disorder in communication patterns - traffic is highly predictable, repetitive, and concentrated b/w the same set of nodes
+    - In AI workloads:
+      - Same GPUs talk to the same GPUs again and again
+      - Large flows follow similar paths repeatedly
+      - Very little variation (low randomness) in traffic
+
 ### 70. 69 - Configuring Adaptive Routing
+- Confirm your switches support it
+  - In Switch: `show system capabilities`
+- Install supported openSM
+  - opensm binary form MLNX_OFED, not OS distribution
+- /etc/opensm/ib-osm-roots.cfg:
+```bash
+ar_mode 1
+enable_ar_by_device_cap TRUE
+ar_transport_mask 0x000A
+ar_sl_mask 0x01
+guid 0x0
+```
+- root_guid_file
+  - Identify your core/spine switches and create a root_guid_file
+  - Root = switch that connects to the most other switches
+  - Secondary roots = switches that connect to root AND leaves
+  - /etc/opensm/ib-som-roots.cfg:
+```bash
+# Core/spine switch
+0x0002c90200425380
+# Secondary roots
+0x0002c90300759bc0
+0x506b4b0300599750
+```  
+
 ### 71. 70 - Adaptive Routing Demo - Part 1
+- Why a single HCA has multiple LIDs?
+  - LMC (Lid Mask Control): an IB feature that allows a single port (HCA or switch port) to be assigned multiple LIDs
+- Demo of multiple-paths:
+```bash
+$ ibstat
+...
+$ ibaddr
+...
+$ ibtracert 8 10 # from LID 8 to LID 10
+...
+```
+<img src="./sec71_demo.png" height="300">
+
 ### 72. 71 - Adaptive Routing Demo - Part 2
+- Demo of BW shift
+- Server: `ib_send_bw -d lmx5_0 -i 1 -q 8 -s 65536 --run_infinitely`
+- Client: `ib_send_bw -d mlx5_0 -i 1 -q 8 -s 65536 --run_infinitely 192.168.0.48`
+- Observation: `watch -n 1 'echo "SX6036:" perfquery 5 4 | grep XmitData; echo "SwitchX:"; perfquery 7 4 | grep XmitData'`
+
 ### 73. 72 - LID Mask Control - LMC
+- An IB feature that allows a single port (HCA or switch port) to be assigned multiple LIDs
+- Each LID maps to a different path in the forwarding tables. So same destination node gets different routes
+- Why LMC?
+  - Path diversity (multipathing)
+  - Improved performance
+  - Works with Adaptive Routing
+- In /etc/opensm/opensm.conf:
+```
+lmc 0 # default 0 -> 1LID, 1 -> 2LIDs, 2-> 4LIDs
+```
+- `ibaddr` shows the status of LMC 
+
 ### 74. 73 - Network Congestion
+- A condition where network traffic exceeds available bandwidth, causing packet delays, queue buildup, and performance degradation
+- Why it happens:
+  - Multi-send
+  - Hotspot
+  - Oversubscribed
+  - Buffer limit
+- Symptoms:
+  - Increased latency
+  - Packet drops/retransmissions
+  - Reduced throughput
+  - GPU/CPU underutilization (waiting for data)
+- Congestion in AI/HPC context
+  - Slows down distributed training
+  - Causes straggler nodes
+  - Impacts synchronization across GPUs
+  - Reduces overall cluster efficiency
+  - How it is handled
+    - Congestion control
+    - QoS priority
+    - Adaptive Routing
+    - Fabric Design
+- How nvidia (Mellanox) switches eliminate congestion?
+  - IB prevents congestion instead of reacting to it
+    - Adaptive routing: spreads traffic across alternate paths to avoid hot links and balance load under changing conditions
+    - Congestion control: uses explicit notifications and rate reduction so sources slow down before congestion gets worse
+    - QoS and Virtual lanes: QoS assigns priority to traffic, and Virtual Lanes isolate it, ensuring critical flows are not impacted during congestion
+    - Shared-buffer: absorb short traffic spikes by dynamically allocating memory across ports, preventing packet loss during microbursts
+
 ### 75. 74 - Credit Loops
+- A credit loop occurs when switches in a cyclic path wait on each other for buffer credits, creating a deadlock across the traffic
+- Demo of creating deadlock:
+
+<img src="./sec75_demo.png" height="300">
+
+- Key take-aways
+  - Credit loops may occur: if there are 2 circular flows
+  - Credit loop is NOT per host: it happens across switches (fabric-level problem)
+  - Exact devices in loop: only the switches forming the cycle are stuck - not entire network
+
 ### 76. 75 - How to avoid Credit Loops?
-### 77. 76 - Algorithm Comparision
-6min
+- Use deadlock-free routing such as UPDN or Fat-Tree (avoid MINHOP)
+- Use adaptive routing to balance congestion, but do not rely on it alone for deadlock prevention
+- Configur Virtual Lanes properly to isolate traffic and reduce blocking
+- Reduce hotspots by avoiding many-to-one patterns
+- Use Unified Fabirc Manager (UFM) to monitor congestion and fabric behavior
+
+### 77. 76 - Algorithm Comparison
+<img src="./sec77_comparison.png" height="300">
+
+## Section 16: Traffic Prioritization
 
 ### 78. 77 - Traffic Prioritization
+- Policy -> QoS
+- Tagging -> Service Level
+- Path -> Virtual Lane
+
 ### 79. 78 - Quality of Service (QoS)
+- QoS controls how different traffic types share the network to ensure predictable performance
+- OoS ensures:
+  - Priority handling
+  - Fair BW allocation
+  - Predicatable performance
+- QoS is defined by the Subnet Manager, applied by the HCA, and enforced by the switches
+- Service Level (SL)
+  - 4-bit QoS marking assigned to IB packets
+  - SLs are packet labels used to classify and prioritize traffic in IB
+  - Used to determine:
+    - Which VL the packet uses
+    - How congestion & arbitration are handled
+  - SL is used for setting priority and mapping to virtual lanes (VLs)
+- Virtual Lane
+  - Creates multiple logical channels withing a single physical IB link
+  - Enables traffic isolation (e.g., storage vs AI vs control traffic)
+  - Avoids network deadlocks
+  - Improves performance and predicatability under congestion
+  - VL0 -> VL14 (total 15 usable VLs)
+    - VL15 is reserved for Subnet Manager Traffic
+
 ### 80. 79 - QoS vs SL vs VL
+
 ### 81. 80 - Configuring QoS - Part 1
+- A multi-tenant cluster
+
+<img src="./sec81_demo.png" height="300">
+
+- Configuring QoS
+  - opensm.conf
+    - Activates QoS and defines the rules
+    - Defines VL arbitration weights and SL2VL table which is pushed to every switch port
+  - qos-polic.conf
+    - Assigns those rules to tenants - tenant awareness
+    - Define port groups by GUID and it assigns a Service Levels (SL) to each group
+    
 ### 82. 81 - Configuring QoS - Part 2
+- opensm.conf
+  - qos TRUE # Turn QoS on
+  - qos_max_vls 4 # use 4 virtual laens
+  - qos_policy_file /etc/opensm/qos-policy.conf # details for tenant rules
+  - qos_sl2vl 0,1,2,3,3,3,3,3,3,3,3,3,3,3,3,15
+  - qos_vlarb_high 0:100,1:50,2:20,3:10 # VL 0 has the highest weight as 100, VL1 has 50, VL2 has 20, VL3 has 10
+    - Weights are relative
+
+<img src="./sec82_mapping.png" height="300">
+
+<img src="./sec82_weights.png" height="300">
+
 ### 83. 82 - Configuring QoS - Part 3
+- qos-policy.conf
+  - Who 
+  - Which
+  - Matching Engine
+
 ### 84. 83 - Verify QoS
+- The subnet management packet query tool (smpquery) sends MADs (Management Datagram) directly to fabric devices to read their configuration
+- Query service level to virtual lane mapping table
+  - `smpquery sl2vl <LID>`
+- Query the VL Arbitration table
+  - `smpquery vlarb <LID>`
+- Management Datagram (MAD)
+  - The native management message format in IB
+  - It is how the Subne Manager (OpenSM), management tools (smpquery, perfquery, ibstat), and fabric devices (HCAs, swithces) all talk to each other for management and configuration purposes - completely separate from your data traffic
+
 ### 85. 84 - QoS in Action
-9min
+- Bandwidth test - ib_write_bw for 2 node system
+
+<img src="./sec85_demo.png" height="300">
+
+<img src="./sec85_result.png" height="300">
+
+## Section 17: Unified Fabric Manager
 
 ### 86. 85 - Unified Fabric Manager
+- Why UFM?
+  - Without UFM you rely on CLI tools, manual configs, reactive troubleshooting
+    - This will work for small setups (2-10 nodes) in labs/demos but breaks down quickly when:
+      - You scale to 100+ nodes
+      - AI workloads start stressing the network
+      - You need visibility or automation
+- UFM is Nvidia's centralized platform to monitor, manage, and optimize high performance network fabrics (IB & Ethernet for AI/HPC)
+  - Full fabric visibility
+  - Faster troubleshooting
+  - Telemetry & performance monitoring
+  - Predictive analysis (Cyber-AI)
+  - Multi-tenancy & isolation
+  - Automation & control
+  - Scale management
+
 ### 87. 86 - UFM Architecture
+<img src="./sec87_arch.png" height="400">
+
 ### 88. 87 - UFM Platform Capabilities
+- UFM Telemetry: real-time monitoring
+- UFM Enterprise: fabric visibility and control
+- UFM Cyber-AI: cyber intelligence and analytics
+- https://www.nvidia.com/en-gb/networking/infiniband/ufm/
+
 ### 89. 88 - Getting Started with UFM
+
 ### 90. 89 - UFM Traffic Map
+
 ### 91. 90 - UFM Quick Tour
+<img src="./sec91_graph.png" height="300">
+
 ### 92. 91 - Topology File
+- A text-based representaion of your fabric layout - it describes all nodes, switches, ports, and how they are connected
+  - Generated using `ibdiagnet` tool
+
 ### 93. 92 - Important UFM Messages
+<img src="./sec93_messg.png" height="300">
+
 ### 94. 93 - Role Based Access Control
+- Role-Based Access Control (RBAC) is a security model where:
+  - You don't give permissions directly to users
+  - Instead, you:
+    - Define roles (Admin, Operator, Viewer, etc)
+    - Assign permissions to roles
+    - Then assign users to roles
+- Why RBAC is important in IB/UFM
+  - Security - prevent unauthorized configuration changes
+  - Stability - avoid accidental misconfiguration of: routing, Pkeys, QoS
+  - Multi-tenancy - different teams/tenants get controlled access
+
 ### 95. 94 - UFM Cyber-AI
-3min
+- Turns telemetry into intelligence - detecting, predicting, and preventing network issues
+  - AI-powered anomaly detection
+  - Security threat detection
+  - Predictive failure analysis
+  - Performance bottleneck identification
+  - Behavioral baseline modeling
+
+## Section 18: Mellanox OS (MLNX OS)
 
 ### 96. 95 - Device Level Management
+- UFM: controller/orchestrator
+- MLNX-OS: the switch's OS
+  - Similar in concept to Cisco's IOS or Juniper's Junos
+- UFM sends commands to switches
+- MLNX-OS executes those commands on the device
+
 ### 97. 96 - Accessing Switch Console Port
+- Console port with RJ45 connector
+- USB port is for loading instruction from usb memory stick or installing OS image
+
 ### 98. 97 - Initial Configuration
+- In putty
+  - Connection -> Serial
+    - Speed (baud): 9600
+  - Session: serial
+    - Then click connect
+- Initial configuration
+```bash
+Switch> enable
+Switch# configure terminal
+Switch (config)# interface mgmt0
+Switch (config interface mgmt0)# dhcp
+Switch (config interface mgmt0)# exit
+```
+
 ### 99. 98 - Some Useful Commands
+- MLNX-OS will be deprecatd while Onyx and Cumulus will replace it
+
+<img src="./sec99_history.png" height="300">
+
+- Useful commands
+  - show version
+  - show inventory
+  - show username
+  - show system capabilities
+  - show users
+  - show interfaces
+- MLNX-OS defines two primary roles
+  - admin: full access (configuration + management)
+  - monitor: read-only access (view configs, status)
+- This separation ensures operational safety and role-based access control
+
+
 ### 100. 99 - Mellanox OS - Web Interface
+
 ### 101. 100 - Upgrade Procedure
-5min
+
+## Section 19: Troubleshooting InfiniBand
 
 ### 102. 102 - Troubleshooting Issues
+
 ### 103. 103 - Performance Issues
+
 ### 104. 104 - Connectivity Issues
+
 ### 105. 105 - Connectivity Issues
+
 ### 106. 106 - Physical Layer Issues
-7min
+
+## Section 20: Next Steps
 
 ### 107. Next Steps
-1min
-
