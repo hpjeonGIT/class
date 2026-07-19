@@ -2690,26 +2690,276 @@ end
 
 ### 69. What's Next?
 
-## 
+## Section 6: Web Game Development
 
 ### 70. LÖVE for Web Overview
+- No official support for web interface
+- https://github.com/TannerRogalsky/love.js/
+  - Works for Love 0.10.0
+
 ### 71. Love.js Setup and Installation
+- git clone https://github.com/TannerRogalsky/love.js.git
+- git submodule update --init --recursive
+- Requires Python 2.7
+
 ### 72. Building and Running with Love.js
+- Make your code compatible with Love 0.10.0
+- Download Love 0.10.0 and test
+  - Released 2015
+- Common issues
+  - love.graphics.setColor()
+    - 1 -> 255
+  - Conflict from external libraries
+- At the folder of love.js/debug 
+  - python ../emscripten/tools/file_packager.py game.data --preload ZombieShooter@/ --js-output=game.js
+    - Produces game.data and game.js
+  - python -m SimpleHTTPServer 4444 # hosting a server
+  - In a web-browser: localhost:4444
+
 ### 73. Hosting Your Game
-6min
+- Free web hosting service: 000webhost.com
+- Copy game.js and game.data into release-compatibility folder
+  - Edit index.html as necessary
+- Upload all files to the server
+
+## Section 7: Mobile Game Development
 
 ### 74. Mobile Overview
+
 ### 75. Touching the Screen
+- love.touch: https://love2d.org/wiki/love.touch
+  - https://love2d.org/wiki/love.touch.getPressure
+- main.lua:
+```lua
+function love.load()
+
+	-- Setting the scale and adjusting screen size
+    coreWidth = 720
+    coreHeight = 960
+    scale = 1
+    shiftDown = 0
+    osString = love.system.getOS()
+    if osString == "Android" or osString == "iOS" then
+        scale = love.graphics.getWidth()/coreWidth
+        shiftDown = (love.graphics.getHeight() - (coreHeight * scale)) / 2 / scale
+    else
+        scale = 0.6
+    end
+
+    love.window.setMode(coreWidth * scale, coreHeight * scale)
+
+    -- Import libraries
+    wf = require "libraries/windfield/windfield"
+    timer = require "libraries/hump/timer"
+    lume = require "libraries/lume/lume"
+    require "libraries/show"
+    require 'pipe'
+
+    -- Creating the physics world using windfield (wf)
+    world = wf.newWorld(0, 1200, false)
+    world:addCollisionClass('Bird')
+    world:addCollisionClass('Pipe')
+
+    birdCollider = world:newBSGRectangleCollider(coreWidth/2, -100, 40, 40, 10, {collision_class = "Bird"})
+
+    -- All sprites in the game
+    sprites = {}
+    sprites.bird = love.graphics.newImage('sprites/bird.png')
+    sprites.pipe = love.graphics.newImage('sprites/pipe.png')
+    sprites.logo = love.graphics.newImage('sprites/logo.png')
+    sprites.bg = love.graphics.newImage('sprites/bg.png')
+
+    -- All fonts in the game
+    fonts = {}
+    fonts.menuFont = love.graphics.newFont("fonts/BalooTamma2-Regular.ttf", 62)
+
+    -- All sound effects in the game
+    sounds = {}
+    sounds.flap = love.audio.newSource('sounds/flap.wav', "static")
+    sounds.hurt = love.audio.newSource('sounds/hurt.wav', "static")
+    sounds.flap:setPitch(1.5)
+
+    spawnPipes()
+    timer.every(3, spawnPipes)
+
+    -- 0 = main menu, 1 = gameplay
+    gamestate = 0
+    score = 0
+
+    -- saveData contains all data that will be saved via filesystem
+    saveData = {}
+    saveData.highScore = 0
+
+    if love.filesystem.getInfo("data.lua") then
+        local data = love.filesystem.load("data.lua")
+        data()
+    end
+
+end
+
+function love.update(dt)
+
+    if gamestate == 1 then
+        world:update(dt)
+        timer.update(dt)
+        updatePipes(dt)
+
+        local birdY = birdCollider:getY()
+
+        -- Game ends if the bird hits a pipe, or flies too high/low
+        if birdCollider:enter('Pipe') or birdY < -100 or birdY > coreHeight + shiftDown*2 then
+            gamestate = 0
+            sounds.hurt:play()
+
+            if score > saveData.highScore then
+                saveData.highScore = score
+                love.filesystem.write("data.lua", table.show(saveData, "saveData"))
+            end
+        end
+    end
+
+end
+
+function love.draw()
+
+	-- Scaling all graphics
+    love.graphics.scale(scale)
+    love.graphics.draw(sprites.bg, -10, -10)
+    
+    -- Uncomment to visually see the collider boxes
+    -- world:draw()
+
+    local bx, by = birdCollider:getPosition()
+    love.graphics.draw(sprites.bird, bx, by, nil, nil, nil, sprites.bird:getWidth()/2, sprites.bird:getHeight()/2)
+
+    drawPipes()
+
+    love.graphics.setFont(fonts.menuFont)
+    love.graphics.printf("Score: " .. score, 0, coreHeight/1.3 + shiftDown, coreWidth, "center")
+
+    if gamestate == 0 then
+        drawMenu()
+    end
+
+end
+
+function love.mousepressed(x, y)
+
+	-- Transition from the menu to the main game
+    if gamestate == 0 then
+        gamestate = 1
+        score = 0
+        destroyDeletedPipes(true)
+        birdCollider:setPosition(coreWidth/2, coreHeight/2)
+    end
+
+    -- Make the bird flap when the screen is tapped
+    birdCollider:setLinearVelocity(0, 0)
+    birdCollider:applyLinearImpulse(0, -2000)
+    sounds.flap:play()
+
+end
+
+function drawMenu()
+
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.draw(sprites.logo, coreWidth/2, coreHeight/3 + shiftDown, nil, nil, nil, sprites.logo:getWidth()/2, sprites.logo:getHeight()/2)
+
+    love.graphics.setFont(fonts.menuFont)
+    love.graphics.printf("Tap anywhere to start!", 0, coreHeight/1.5 + shiftDown, coreWidth, "center")
+
+    love.graphics.printf("High Score: " .. saveData.highScore, 0, coreHeight/1.15 + shiftDown, coreWidth, "center")
+
+end
+```
+
 ### 76. Adapting to Screen Size
+- Core Gameplay Window
+  - 720x960
+  - 360x480
+  - 900x1200
+- 4:3 vs 16:9 vs 4:3.5 ?  
+  - Scaling with `love.graphics.scale(scale)`
+- `shiftDown` for moving screen vertically into the center of a mobile device
+
 ### 77. Installing Android Tools
+- love-android
+  - Tool used to package LOVE games into .apk (app) format
+  - https://github.com/love2d/love-android
+  - git clone --recursive-submodules https://github.com/love2d/love-android/love-android.git
+- Android SDK
+  - Install android studio
+  - Find SDK location after installation
+- Android NDK
+  - From android studio, install NDK as well
+  - Find NDK location
+
 ### 78. Generating the APK
+- conf.lua:
+```lua
+function love.conf(t)
+  t.window.width = 720
+  t.window.height = 960
+  t.modules.joystick = false -- decrease the file size by removing joystick modules
+  t.externalstorage = true
+end
+```
+- Zip entire files/folders into game.love
+  - No *.zip extension
+  - Love2D can execute this game.love file
+- In love-android/app/src/main/assets folder  
+  - Copy game.love here
+- In love-android/app/src/main, edit AnroidManifest.xml
+  - android:label
+  - android:screenOrientation
+    - "landscape" or "portrait"
+- In love-android folder
+  - `./gradlew assembleNormal`
+  - Will download and build
+  - Make take ~10min
+- Produces love-android/app/build/outputs/apk/normal/debug/app-normal-debug.apk
+
 ### 79. Installing on Your Android Device
+- Connect a mobile device using a USB cable
+- Connectivity set: File Transfer
+- Make a new folder as DebugApps
+- Copy app-normal-debug.apk in the folder
+- Install a file explorer or manager
+- By default, standalone execution is not allowed
+- Settings -> Special App Access -> File Manager -> Allow from Source
+- Execute -> Love package will be installed
+
 ### 80. Signing Your App
+- KeyStore
+  - Collection of security certificates and keys
+- Keytool
+  - Used to create KeyStores
+- Jarsigner
+  - Signs the application using the KeyStore
+- Zipalign
+  - Important optimizations after signing
+- `./gradlew assemble`
+  - Took ~28min  
+  - Produces love-android/app/build/outputs/apk/playstore/release/app-playstore-release-unsigned.apk
+- At jdk: `./keytool -genkey -v -keystore /XXX/android/release-key.keystore -alias abcde_key -keyalg RSA -keysize 2048 -validity 10000`
+  - Enter passwd
+  - Enter response to incoming questions...
+  - release-key.keystore is produced
+  - `./jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore /XXXX/android/release-key.keystore /XXXX/android/app-playstore-release-unsigned.apk abcde_key
+    - Now the certificate is self-signed
+- In android sdk folder
+  - `./zipalign -f -v 4 /XXXX/anroid/app-playstore-release-unsigned.apk /XXXX/anroid/lovebird-signed.apk`
+  - Produces lovebird-signed.apk
+
 ### 81. Publishing Your App
-3min
+- Sign in Google play
+  - Pay one time fee of $25 in USA
+- Create application
+
+## Section 8: Bonus Lectures
 
 ### 82. Command Line and Git Basics
-7min
+
 
 
 
