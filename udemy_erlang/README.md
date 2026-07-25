@@ -1,3 +1,715 @@
+# Erlang Masterclass: The Fundamentals
+- Instructor: Daniel Hjerpe
+
+## Section 1: Practical info
+
+### 1. Introduction
+
+### 2. Course materials
+
+### 3. Setting up the environment on a Mac
+
+### 4. Setting up the environment on a PC
+
+### 5. Setting up the environment on Linux
+- https://www.erlang.org/
+- sudo apt install erlang
+- erlang plugin for VScode
+
+## Section 2: Getting started
+
+### 6. Introduction to the Erlang shell
+```bash
+$ erl
+Erlang/OTP 25 [erts-13.2.2.5] [source] [64-bit] [smp:8:8] [ds:8:8:10] [async-threads:1] [jit:ns]
+
+Eshell V13.2.2.5  (abort with ^G)
+1> 1+7 %% does nothing
+1> .   %% now executes
+8
+2> q() %% when exiting the console
+2> .
+ok
+```
+
+### 7. The slightly awkward syntax of Erlang
+- Most of syntax from Prolog
+
+### 8. Different types of data
+- Data types
+  - Number
+    - Integer
+    - Float
+  - Atom: start with lower characters
+  - Tuples: collection of a fixed terms
+  - Maps: contains variable number of key-value pairs
+  - Lists: collection of a variable number of terms
+  - fun: function data type
+  - References: unique tag
+    - Enables us to identify processes
+  - Ports: communicate with the external world
+  - Records: tuple. Access field by name
+
+### 9. Numbers and operators
+- Integers
+  - Arbitrary precision arithmetic
+  - No limit
+  - Up to the physical memory
+- Floats
+  - Approximation of real numbers
+```erlang
+4> 123456789123456789+1.
+123456789123456790
+5> 1+0.00000000001.
+1.00000000001
+6> 1+0.0000000000000001. %% truncated
+1.0
+7> 1 == 1.
+true
+8> 5 > 7.
+false
+9> 2/1 =:= 1
+9> .
+false
+13> (1 /= 2) and (5 > 7).
+false
+14> (1 /= 2) or (5 > 7). 
+true
+15> (1 /= 2) or not (5 > 7).
+true
+16> (1 /= 2) xor (5 > 7).   
+true
+```
+
+### 10. Putting it all together
+- Tuples: 
+  - `{"banana", "apple"}`
+  - `{fruit, "apple", 123}`
+    - Here fruit is a tag
+- List
+  - `[1,2,3]`
+  - [ Head | Tail]
+    - `["apple" | ["banana", "pear"]]`
+```erlang
+24> hd(["apple" | ["banana","pear"]])
+24> .
+"apple"  %% head
+25> tl(["apple" | ["banana","pear"]]).
+["banana","pear"] %% tail
+...
+23> ["a","b"] ++ ["c","d"].
+["a","b","c","d"]
+```
+
+### 11. Splitting the atom
+- Atom is not garbage-collected
+- Similar to enum in C/C++
+```erlang
+26> apple.
+apple
+27> true.
+true
+28> false.
+false
+29> 'banana and fruit'
+29> .
+'banana and fruit'
+```
+
+### 12. Oh variables, where art thou?
+- Variables: start with a capital letter
+  - Immutable: after creation, we cannot modify
+```erlang  
+30> MyFruit = {banana, apple}.
+{banana,apple}
+31> MyFruit = {banana, apple, pear}.
+** exception error: no match of right hand side value 
+                    {banana,apple,pear}
+32> myBag = {fruit, "Apple", 123}.
+** exception error: no match of right hand side value 
+                    {fruit,"Apple",123}
+33> MyBag = {fruit, "Apple", 123}.
+{fruit,"Apple",123}
+34> {Type, Name, Price} = MyBag.
+{fruit,"Apple",123}
+35> Type.
+fruit
+36> Name.
+"Apple"
+37> Price.
+123
+32> myBag = {fruit, "Apple", 123}. %% error as the first char is not Capital
+** exception error: no match of right hand side value 
+                    {fruit,"Apple",123}
+33> MyBag = {fruit, "Apple", 123}.
+{fruit,"Apple",123}
+34> {Type, Name, Price} = MyBag.
+{fruit,"Apple",123}
+35> Type.
+fruit
+36> Name.
+"Apple"
+37> Price.
+123
+38> b().  %% showing current variables
+MyBag = {fruit,"Apple",123}
+MyFruit = {banana,apple}
+Name = "Apple"
+Price = 123
+Type = fruit
+ok
+39> f(Price). %% freeing variables
+ok
+40> b(). %% now Price is gone
+MyBag = {fruit,"Apple",123}
+MyFruit = {banana,apple}
+Name = "Apple"
+Type = fruit
+ok
+```
+
+### 13. Exercises
+
+## Section 3: Sequential Erlang
+
+### 14. Greetings from the world of Erlang!
+- hello.erl:
+```erlang
+-module(hello).
+-author("abc def").
+greetings() -> io:format("Greetings from the world of Erlang! ~n").
+```
+- Demo:
+```bash
+$ erl
+Erlang/OTP 25 [erts-13.2.2.5] [source] [64-bit] [smp:8:8] [ds:8:8:10] [async-threads:1] [jit:ns]
+
+Eshell V13.2.2.5  (abort with ^G)
+1> c(hello).
+hello.erl:3:1: Warning: function greetings/0 is unused
+%    3| greetings() -> io:format("Greetings from the world of Erlang! ~n").
+%     | ^
+
+{ok,hello}
+2> c(hello).
+
+hello.erl:3:1: Warning: function greetings/0 is unused
+%    3| greetings() -> io:format("Greetings from the world of Erlang! ~n").
+%     | ^
+
+{ok,hello}
+2> hello:greetings().
+** exception error: undefined function hello:greetings/0 # not defined
+3> c(hello,[export_all]).
+{ok,hello}
+4> hello:greetings().    
+Greetings from the world of Erlang! 
+ok # now runs OK
+```
+- Let's add export_all to the source code:
+```erlang
+-module(hello).
+-author("abc def").
+-compile(export_all).
+greetings() -> io:format("Greetings from the world of Erlang! ~n").
+hull_speed(Lwl) -> 
+  Vhull = 1.34*math:sqrt(Lwl),
+  knots_to_kmph(Vhull).
+knots_to_kmph(Knots) -> 
+  Knots *1.852001.
+```
+- Demo again:
+```bash
+11> c(hello).            
+hello.erl:3:2: Warning: export_all flag enabled - all functions will be exported
+%    3| -compile(export_all).
+%     |  ^
+
+{ok,hello}
+12> hello:hull_speed(40).
+15.695530922277458
+```  
+- Instead of export_all, we can select which functions will be exported:
+```erlang
+-module(hello).
+-author("abc def").
+%%-compile(export_all).
+-export([greetings/0, hull_speed/1]).
+greetings() -> io:format("Greetings from the world of Erlang! ~n").
+hull_speed(Lwl) -> 
+  Vhull = 1.34*math:sqrt(Lwl),
+  knots_to_kmph(Vhull).
+knots_to_kmph(Knots) -> 
+  Knots *1.852001.
+```
+- Calling hello:knots_to_kmph() will error as it is not exported
+
+### 15. Go with the flow
+- cf.erl:
+```erlang
+-module(cf).
+-author("John Scott").
+-export([greetings/1]).
+%% Pattern matching
+greetings([]) -> "Hello stranger";
+greetings(Name) -> "Hello " ++ Name.
+```
+- Demo
+```bash
+17> c(cf).
+{ok,cf}
+18> cf:greetings("").
+"Hello stranger"
+19> cf:greetings("Amy").
+"Hello Amy"
+20> cf:greetings(Amy).  
+* 1:14: variable 'Amy' is unbound
+```
+- Shadowing:
+  - For the following code, 3rd definition is never executed as function call with argument will activate 2nd definition, shadowing 3rd definition
+```erlang
+greetings([]) -> "Hello stranger";
+greetings(Name) -> "Hello " ++ Name;
+greetings({Firstname,Surname}) -> %% SHADOWED!
+"hello " ++ Firstname ++ " " ++ Surname.
+```
+  - Therefore, we change the order of definitions as:
+```erlang
+greetings([]) -> "Hello stranger";
+greetings({Firstname,Surname}) -> %% SHADOWED!
+"hello " ++ Firstname ++ " + " ++ Surname;
+greetings(Name) -> "Hello " ++ Name.
+```
+- cf.erl:
+```erlang
+-module(cf).
+-author("John Scott").
+-export([greetings/1]).
+-export([beverage/1]).
+-export([beverage3/2]).
+%% Pattern matching
+greetings([]) -> "Hello stranger";
+greetings({Firstname,Surname}) -> %% SHADOWED!
+"hello " ++ Firstname ++ " + " ++ Surname;
+greetings(Name) -> "Hello " ++ Name.
+%%
+beverage(Type) ->
+  case Type of 
+    coffee -> "Good coffee";
+    tea -> "Boild water";
+    _ -> unknown
+  end.
+beverage3(Type,Temp) ->
+  case {Type, Temp>70} of
+    {coffee, true} -> "Hot coffee";
+    {coffee,_} -> "Not Hot";
+    {tea, _} -> "boild water";
+    _ -> unknown
+  end.
+```
+- Demo:
+```bash
+31> c(cf).                     
+{ok,cf}
+32> cf:beverage(coffee).
+"Good coffee"
+33> cf:beverage(tea).   
+"Boild water"
+34> cf:beverage(coke).
+unknown
+52> cf:beverage3(coffee,70).
+"Not Hot"
+53> cf:beverage3(coffee,73).
+"Hot coffee"
+```
+
+### 16. Recursion
+- rec.erl:
+```erlang
+-module(rec).
+-author("Amy Brown").
+-export([factorial/1]).
+-export([list_len/1]).
+%% Factorial
+factorial(0) -> 1;
+factorial(N) when N > 0, is_integer(N) -> 
+  N*factorial(N-1).
+list_len([]) -> 0;
+list_len([_Head|Tail]) ->
+  1+ list_len(Tail).
+```
+- Demo:
+```bash
+55> c(rec).
+{ok,rec}
+56> rec:factorial(3).
+6
+57> rec:factorial(-1).
+** exception error: no function clause matching 
+                    rec:factorial(-1) (rec.erl, line 5)
+58> rec:factorial(1.234).
+** exception error: no function clause matching 
+                    rec:factorial(1.234) (rec.erl, line 5)
+61> rec:list_len(["a", "b", "c", "D"]).
+4
+```
+
+### 17. Tail recursion
+```erlang
+-module(rec).
+-author("Amy Brown").
+-export([factorial/1, list_len/1, list_len2/1, list_len2/2, reverse/1, reverse/2]).
+%% Factorial
+factorial(0) -> 1;
+factorial(N) when N > 0, is_integer(N) -> 
+  N*factorial(N-1).
+list_len([]) -> 0;
+list_len([_Head|Tail]) ->
+  1+ list_len(Tail).
+list_len2(L) -> list_len2(L,0).
+list_len2([],Acc) -> Acc;
+list_len2([_|Tl],Acc) -> 
+  list_len2(Tl,1+Acc).
+reverse(L) -> reverse(L,[]).
+reverse([],Acc) -> Acc;
+reverse([Hd|Tl], Acc) -> reverse(Tl,[Hd|Acc]).
+```
+- Demo:
+```bash
+7> c(rec).
+{ok,rec}
+8> rec:list_len2(["Jussi","Peter","Christ"],0).
+3
+9> rec:reverse([1,2,3,4,5,6]).                 
+[6,5,4,3,2,1]
+10> 
+```
+- Why we use accumulator?
+  - Erlang will optimize and can save stack memory
+  - Tail Call Optimization (TCO)
+  - https://medium.com/@themissouri.md/recursion-tail-recursion-in-erlang-59caf740b345
+
+### 18. Tail or body recursion?
+- How to avoid stack overflow?
+  - Use accumulator
+```erlang
+-module(rec).
+-author("Amy Brown").
+-export([doubles/1, doubles2/1, doubles2/2]).
+%%
+doubles([]) -> [];
+doubles([Hd|Tl]) ->
+  [Hd*2|doubles(Tl)].
+%%
+doubles2(L) -> doubles2(L,[]).
+doubles2([],Acc) -> Acc;
+doubles2([Hd|Tl],Acc) -> 
+  doubles2(Tl,[Hd*2|Acc]).
+```  
+- Demo:
+```bash
+17> c(rec).
+{ok,rec}
+18> rec:doubles([1,2,3,4]).
+[2,4,6,8]
+19> rec:doubles2([1,2,3,4]).
+[8,6,4,2]
+```
+
+### 19. Keep calm and let it crash!
+- Compile time error
+  - Syntax error
+  - Head mismatch
+  - Variables are not used
+- Logical error
+  - Can be resolved through tests/unit-tests
+- Run-time error
+  - Bad match, where pattern match fails
+  - Bad argument of built-in functions
+  - Case-clause fails
+- Generated error
+  - Exceptions at runtime
+  - Exit/throw
+
+### 20. Exercises
+
+## Section 4: Becoming a functional hipster
+
+### 21. Fun fun functions!
+- Anonymous function
+  - Lambda
+  - Can be defined as an expression "on the fly"
+```bash
+20> Even = fun(Num) -> Num rem 2 ==0 end.
+#Fun<erl_eval.42.3316493>
+21> Even(1).
+false
+22> Even(2).
+true
+```
+- fff.erl:
+```erlang
+-module(fff).
+-author("ABC DEF").
+-export([doubles/1]).
+doubles([]) -> [];
+doubles([Hd|Tl]) -> 
+  Double = fun(X) -> X*2 end,
+  [Double(Hd)|doubles(Tl)].
+```
+- Demo:
+```bash
+23> c(fff).
+{ok,fff}
+24> fff:doubles([1,2,3,4,5]).
+[2,4,6,8,10]
+```
+
+### 22. Map
+```bash
+27> Double = fun(X) -> X*2 end.
+#Fun<erl_eval.42.3316493>
+28> lists:map(Double,[1,2,3]).
+[2,4,6]
+```
+- hof.erl:
+```erlang
+-module(hof).
+-author("ABC DEF").
+-export([opera/0]).
+opera() ->
+  OperaSingers = [
+    {tenor, "Jssi"},
+    {baritone, "Peter"},
+    {soprano, "Elin"},
+    {mezzo, "Malena"}],
+  VoiceMap = fun({Voice,Name}) ->
+    NewVoice = case Voice of 
+      soprano -> "High voice";
+      tenor -> "High voice";
+      baritone -> "Middle voice";
+      mezzo -> "Low voice"
+    end,
+    {NewVoice,Name} end,
+  _OperaForDummies = lists:map(VoiceMap,OperaSingers).
+```
+- Demo:
+```bash
+35> c(hof).
+{ok,hof}
+36> hof:opera().              
+[{"High voice","Jssi"},
+ {"Middle voice","Peter"},
+ {"High voice","Elin"},
+ {"Low voice","Malena"}]
+```
+
+### 23. Filter
+- Using a predicate function, input data are filtered
+  - `lists:filter(predicate_ftn, input)`
+- hof2.erl:
+```erlang
+-module(hof2).
+-author("ABC DEF").
+-export([double_r_diner/0]).
+double_r_diner() ->
+  DoubleROrders = [
+    {coffee, "Dale"},
+    {coffee, "John"},
+    {pie, "Harry"},
+    {pancakes, "Nadine"}],
+    FilterItems = fun(Orders, ItemPredicate) ->
+      lists:filter(fun({Item,_Customer}) ->
+        Item == ItemPredicate end,
+        Orders) end,
+    CoffeeOrders = FilterItems(DoubleROrders,coffee),
+    PieOrders = FilterItems(DoubleROrders, pie),
+    io:format("Coffee orders: ~p~n Pie orders: ~p~n",
+      [CoffeeOrders,PieOrders]).
+```
+- Demo:
+```bash
+41> c(hof2).             
+{ok,hof2}
+42> hof2:double_r_diner().
+Coffee orders: [{coffee,"Dale"},{coffee,"John"}]
+ Pie orders: [{pie,"Harry"}]
+ok
+```
+
+### 24. Fold
+- lists::foldl/3: a higher order function used to reduce or collapse a list into a single value by trasverse it from left to right
+- hof3.erl:
+```erlang
+-module(hof3).
+-author("dummy John").
+-export([fruit_market/0]).
+fruit_market() ->
+  Fruits = [
+    {banana,0.95,2},
+    {apple,1.20, 3},
+    {grapes,1, 2.25}],
+  lists:foldl(fun({_Item,Price,Quantity},Sum) ->
+    (Price*Quantity) + Sum end, 0, Fruits).
+```
+- Demo:
+```bash
+44> c(hof3).
+{ok,hof3}
+45> hof3:fruit_market().
+7.75
+```
+
+### 25. Just add another layer of abstraction
+
+### 26. List comprehension
+- hof4.erl
+```erlang
+-module(hof4).
+-author("ABC DEF").
+-export([main/0]).
+main() ->
+  Evens = [X || X <- [1,2,3,4], X rem 2 == 0],
+  io:format("Even nubmers: ~p~n", [Evens]),
+  OperaSingers = [
+    {tenor, "Jssi"},
+    {baritone, "Peter"},
+    {soprano, "Elin"},
+    {mezzo, "Malena"}],
+  FormattedOperaSingers = 
+    [Name ++ ": " ++ atom_to_list(Voice) || {Voice,Name} <- OperaSingers],
+  io:format("Opera singers: ~p~n",[FormattedOperaSingers]).
+```
+- Demo:
+```bash
+60> c(hof4).     
+{ok,hof4}
+61> hof4:main().
+Even nubmers: [2,4]
+Opera singers: ["Jssi: tenor","Peter: baritone","Elin: soprano",
+                "Malena: mezzo"]
+ok
+```
+
+### 27. A short note on side effects
+
+### 28. Exercises
+
+## Section 5: Bonus: More ways to work with data
+
+### 29. Records
+- Records
+  - Access field by name
+  - Add fields over time
+  - Allows us to use default values of fields
+- rr(): Read records
+- twin_records.erl:
+```erlang
+-module(twin_records).
+-author("ABD DEF").
+-export([is_suspect/1, make_suspect/1, clear_suspect/1]).
+-record(citizen,
+  {name,
+    date_of_birth,
+    address,
+    suspect=false}).
+%is_suspect({_Name,_DoB,Suspect,_Street,_PostalCode,_City}) ->
+%  Suspect.
+%is_suspect(C) ->
+%  C#citizen.suspect.
+is_suspect(#citizen{suspect=Suspect} = _C) ->
+  Suspect.
+make_suspect(C) ->
+  C#citizen{suspect=true}.
+clear_suspect(C) ->
+  C#citizen{suspect=false}.
+```
+- Demo:
+```bash
+62> c(twin_records).
+twin_records.erl:4:2: Warning: record citizen is unused
+%    4| -record(citizen,
+%     |  ^
+
+{ok,twin_records}
+63> #citizen(name="John", date_of_birth="Apri 19,
+ 1999").
+* 1:9: syntax error before: '('
+63> #citizen{name="John", date_of_birth="Apri 19,
+ 1999"}.
+* 1:1: record citizen undefined
+64> rr(twin_records).
+[citizen]
+65> Audrey = #citizen{date_of_birth="August 24, 1
+997", name="Audrey Horne"}.
+#citizen{name = "Audrey Horne",
+         date_of_birth = "August 24, 1997",
+         address = undefined,suspect = false}
+66> record_info(fields, citizen).
+[name,date_of_birth,address,suspect]
+67> record_info(size, citizen).
+5
+68> c(twin_records).                             
+twin_records.erl:15:1: Warning: function make_suspect/1 is unused
+%   15| make_suspect(C) ->
+%     | ^
+
+twin_records.erl:17:1: Warning: function clear_suspect/1 is unused
+%   17| clear_suspect(C) ->
+%     | ^
+
+{ok,twin_records}
+69> c(twin_records).                     
+{ok,twin_records}
+70> PrimeSuspect = twin_records:make_suspect(Audr
+ey).
+#citizen{name = "Audrey Horne",
+         date_of_birth = "August 24, 1997",
+         address = undefined,suspect = true}
+71> twin_records:is_suspect(PrimeSuspect).
+true
+```
+
+### 30. Macros
+- Make code more readable
+- Using `?XXX`
+
+### 31. Macros and debug flags
+```erlang
+-ifdef(my_debug_flag).
+  -define(DEBUG(Statement),io:format("*DEBUG* ~p~n", [Statement])).
+-else.
+  -define(DEBUG(Statement), ok).
+-endif.
+```
+
+### 32. Maps
+```erlang
+85> Tea = #{price=>3, ingredients=>["boiled water", "
+dried leaves"]}.
+#{ingredients => ["boiled water","dried leaves"],
+  price => 3}
+86> FlammKuchen = #{price=>7, ingredients=>["spinnage
+", "garlic"]}.
+#{ingredients => ["spinnage","garlic"],price => 7}
+87> Menu = #{flammkuchen=>FlammKuchen, tea => Tea}.
+#{flammkuchen =>
+      #{ingredients => ["spinnage","garlic"],
+        price => 7},
+  tea =>
+      #{ingredients =>
+            ["boiled water","dried leaves"],
+        price => 3}}
+88> erlang:system_info(atom_limit).
+1048576
+```
+
+## Section 6: Thank you !
+
+### 33. Outro
+
+************************************************
+
 ## Erlang: The Complete Beginner's Guide
 - Instructor: Catalin Stefan
 
