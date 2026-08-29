@@ -302,46 +302,286 @@ STORE ebx, A
       3. How many cycles does each instruction take to execute?
         - Cycles per Instructions (CPI) or reciprocal, Instructions per Cycle (IPC)
   - Execution time = (instructions/program) * (seconds/cycle) * (cycles/instruction)
-
+- Comparing machines
+  - Metrics
+    - Execution time
+    - Throughput
+    - CPU time
+    - MIPS: millions of instructions per second
+    - MFLOPS: millions of floating point operations per second
+    
 ### 19. Calculating CPU Time
+- Response time: the time b/w the start and completion of a task, including time spent on CPU, disk, memory, waiting for IO and other processes + OS overhead. Also referred as execution time
+- Throughput: the total amount of work done in a given time
+- CPU execution time: total time a CPU spends computing on a given task - excludes time for IO or running other programs - referred as CPU time
 
 ### 20. Understanding CPU Clock
+- A computer clock runs at a constant rate and determines when events take placed in HW
+- The clock cycle time is the amount of time for one clock period to eplase (e.g. 5ns)
+- The clock rate is the inverse of the clock cycle time
+  - 200MHz -> 5ns
+- Is # of cycles ==  # of instructions?
+  - No. Different instructions take different amounts of time on different machines  
+
 ### 21. Calculating CPU Time
+- CPU time = CPU clock cycles x clock cycle time
+- CPU time = CPU clock cycles / clock rate
+- CPU clock cycles = (instructions/program) x (clock cycles/instruction) = Instruction count x CPI
+  - CPU time = Instruction count x CPI x clock cycle time
+  - CPU time = Instruction count x CPI / clock rate
+- Which factors are affected by each of the following?
+
+|   | Instr. Count | CPI | clock rate |
+|----|-------------|-----|------------|
+| Program | x      |     |            |
+| Compiler |x      |  x  |            |
+| ISA |x           |  x  |            |
+| Organization |   |  x  |            |
+| Technology   |   |     |  x         |
+
 ### 22. Exercise - Solving CPU Time Calculations
+- Ex1
+  - CPU clock rate is 1 MHz
+  - Program takes 45 million cycles to execute
+  - CPU time = 45e6 * (1/1e6) = 45 sec
+- Ex2
+  - CPU clock rate is 500 MHz
+  - Program takes 45 million cycles to execute
+  - CPU time = 45e6 * (1/500e6) = 0.09 sec
+
 ### 23. Exercise - Solving CPI Calculations
+- Ex
+  - A benchmark as 100 instructions
+  - 25 instructions are loads/stores, each taking 2 cycles
+  - 50 instructions are adds, taking 1 cycle each
+  - 25 instructions are square root, each taking 50 cycles
+  - CPI = (2 * 25/100) + (1 * 50/100) + (50 * 25/100) = 13.5
+- Benchmark
+  - Allows us to make performance comparisons based on execution times
+  - Must
+    - be representative of the type of applications run on the computer
+    - not be overly depedent on one or two features of a computer
+  - Can vary greatly in terms of their complexity and their usefulness
+
 ### Coding Exercise 1: Coding Activity: Measuring CPU Benchmarking with Matrix Multiplication in Python
+
 ### 24. CPU Benchmarking Lecture Materials
+
 ### 25. Extra Resource
 
 ## Section 7: CPU Organization and Structure
 
 ### 26. Introduction to CPU Structure
+- Requirement of processor
+  - Fetch instruction: reads an instruction from memory
+  - Interpret instruction: determines what action to perform
+  - Fetch data: if necessary read data from memory or an IO module
+  - Process data: if necessary perform arithmetic/logical operation on data
+  - Write data: if necessary write data to memroy or an IO module
+- Major components of the processor
+  - ALU (Arithmetic and Logic Unit): performs computation or processing of data
+  - Control unit: moves data and instructions in and out of the processor. Also controls the operation of the ALU
+  - Registers: internal memory
+  - System bus: acting as a pathway b/w processor, memory, and IO module
+
+<img src="./ch26_cpu.png" height="300">
+
 ### 27. Registers in CPU
+- Registers in the processor perform two roles
+  - User-visible registers
+    - Used as internal memory by the assembly language programmer
+  - Control and status registers
+    - Used to control the operation of the processor
+    - Used to check the status of the processor/ALU
+- User-visible registers
+  - Referenced by the programmer, categorized into 4 categories
+  1. General purpose
+      - Memory reference & backup
+      - Register reference & backup
+      - Data reference & backup
+  2. Data
+      - May be used only to hold data and cannot hold addresses
+      - Must be able to hold values of most data types
+      - Some machines allow two contiguous registers to be used, for holding double-length values
+  3. Address
+      - Used to hold addresses of stack pointer, program counter, index registers
+      - Must be at least long enough to hold the largest address
+  4. Condition codes/flags
+      - Holding condition codes/flags which are bits set by processor as the result of operations
+      - Condition code bits are collected into one or more control register
+      - As an example, an arithmetic operation can produce: positive result, negative result, zero result, overflow result
+- Control and status registers
+  - Mostly not visible to the user
+  - Program Counter (PC): contains instruction address to be fetched
+  - Instruction Register (IR): contains the last instruction fetched
+  - Memory Address Register (MAR): contains memory location address
+  - Memory Buffer Register (MBR): contains a word of data to be written to memory or a word of data read from memory
+  - Those registers are used for
+    - Data movement b/w processor and memory
+    - Within the processor, data must be presented to the ALU for processing
+      - ALU may have direct access to the MBR and user-visible registers
+      - Alternatively:
+        - There may be additional buffering registers within ALU
+        - These registers serve as input and output registers for the ALU
+        - These registers exchange data with the MBR and user-visible registers
+
 ### 28. Understanding CPU Interruptions
+- Interruption cycle
+  - Contents of the PC must be saved
+  - The contents of PC are:
+    - Transferred to the MBR to be written into memory
+    - Special memory location is loaded into MAR
+      - E.g: Stack Pointer (SP)
+    - PC is loaded with the address of the interrupt routine
+
 ### 29. Techniques to Improve CPU Performance
+- How to increase processor performance?
+  - Increase frequency - faster number of clock ticks per unit of time
+  - Increase cache-levels - reduce number of read/writes from high latency memory
+  - Multi-core architecture - parallel processing
+  - Reduce physical size of the processor - electrical signals travel shorter distances
+  - CPU pipelining
+
 ### 30. CPU Organization and Structure Lecture Materials
+
 ### Quiz 1: Registers in the CPU
-Not completed
-Start
-31. Extra Reading Material
-2min
+
+### 31. Extra Reading Material
+
+## Section 8: CPU Pipelining
 
 ### 32. What is CPU Pipelining
+<img src="./ch32_pipelining.png" height="200">
+
+- Pipelining breaks instruction execution down into several stages
+  - Puts registers b/w stages to buffer data and control
+  - Executes one instruction
+  - As first starts second stage, executes second instruction, etc
+  - Speeds up same as number of stages as long as pipe is full
+
+<img src="./ch32_sample.png" height="300">
+
+- Without pipelining, 9 instructions will take 9x6 = 54 time units
+- With pipelining, all instructions can be done in 14 time units
+
 ### 33. Resource Hazards
+- Hazards do not permit continued pipeline execution
+  - Also called pipeline bubble
+  - Types of hazards
+    - Resource
+    - Data
+    - Control
+- Resource hazards
+  - Two or more instructions in pipeline need same resource (bus, memory, cache)
+  - Executed in serial rather than parallel for part of pipeline
+  - Also called structural hazard
+  - If main memory has a single port, read or write cannot be performed in parallel with instruction fetch
+  - Single ALU may have the same issue
+  - Solutions
+    - Multiple main memory ports
+    - Multiple ALUs
+
 ### 34. Data Hazards
+- Conflict in access of an operand location
+- Two instructions to be executed in sequence
+- Both access a particular memory or register operand
+- If in strict sequence, no problem
+- If in a pipeline, operand value could be updated so as to produce different result from strict sequential execution
+
+<img src="./ch34_datahazard.png" height="300">
+
+- Types of Data Hazard
+  - Read After Write (RAW), or true dependency
+    - An instruction modifies a register or memory location
+    - Succeeding instruction reads data in that location
+    - Hazard if read takes place before write complete
+  - Write after read (RAW), or antidependency
+    - An instruction reads a register or memory location
+    - Succeeding instruction writes to location
+    - Hazard if write completes before read takes place
+  - Write after write (WAW), or output dependency
+    - Two instructions both write to same location
+    - Hazard if writes take place in reverse of order intended sequence
+  - Previous example is RAW hazard
+  
 ### 35. Control Hazards and Branch Prediction
+- Control hazard
+  - Known as branch hazard
+  - Pipeline makes wrong decision on branch prediction
+  - Brings instructions into pipeline that must subsequently be discarded
+  - Dealing with branches
+    - Multiple streams
+    - Prefetch branch target
+    - Loop buffer
+    - Branch prediction
+    - Delayed branching
+
 ### 36. Branch Prediction Strategies
+- Predict never taken
+  - Assumes that jump will not happen
+  - Always fetch next instruction
+  - 68020 & VAX 11/780
+- Predict always taken
+  - Assume that jump will happen
+  - Always fetch target instruction
+- Branch prediction strategies
+  - Predict by opcode
+    - Some instructions are more likely to result in a jump than others
+    - Can get up to 75% success
+  - Taken/not taken switch
+    - Based on previous history
+    - Good for loops
+    - Refined by two-level or correlation-based branch history
+  - Correlation-based
+    - In loop-closing branches, history is good predictor
+    - In more complex structures, branch direction correlates with that of related branches
+      - Use recent branch history as well
+  - Delayed branch
+    - Do not take jump until you have to
+    - Rearrange instructions
+
 ### 37. Practical Example for Pipelining - Intel 80486
+- Fetch
+  - From cache or external memory
+  - Put in one of two 16-byte prefetch buffers
+  - Fill buffer with new data as soon as old data consumed
+  - Average 5 instructions fetched per load
+- Independent of other stages to keep buffers full
+  - Decode stage 1
+  - Opcode & address-mode info
+  - At most first 3 bytes of instruction
+  - Can direct D2 stage to get rest of instruction
+- Decode stage 2
+  - Expand opcode into control signals
+  - Computation of complex address modes
+- Execute
+  - ALU operations, cache access, register update
+- Writeback
+  - Update registers & flags
+  - Results sent to cache & bus interface write buffers
+
 ### 38. CPU Overclocking
+
 ### 39. CPU Pipelining Lecture Materials
-1min
+
+## Section 9: Input-Output Organization
 
 ### 40. Introduction to I/O
+- Input or output devices attached to the computer are called "peripherals"
+- IO interface
+  - Provides a method for transferring information b/w internal storage (such as memory and CPU registers) and external IO devices
+  - They are special HW components b/w CPU and peripherals to supervise and synchronize all input and output transfer
+  - They are called interface units because they interface b/w the processor bus and the peripheral device
+
 ### 41. I/O Mapping
+
 ### 42. Asynchronous Data Transfer
+
 ### 43. Modes of Data Transfer
+
 ### 44. Input-Output Organization Lecture Materials
-1min
+
+## Section 10: Memory Organization
 
 ### 45. Introduction to Memory Hierarchy
 ### 46. Deep dive into Computer Memory Hierarchy
@@ -356,22 +596,20 @@ Start
 ### 55. SDRAM and DDR SDRAM Explained
 ### 56. Memory Organization Lecture Materials
 ### 57. Extra Reading Material
-1min
+
+## Section 11: Hierarchical Bus Organization
 
 ### 58. Introduction to Hierarchical Bus Structures
 ### 59. Single and Multiple Bus Implementations and Examples
 ### 60. Bus Types, Timing, and Additional Details
 ### 61. Hierarchical Bus Organization Lecture Materials
-1min
 
-Not completed
-Start
-Practice Test 1: Mixed Instruction Benchmark in Computer Organization and Architecture
-Not completed
-Start
-Practice Test 2: Mixed Instruction Benchmarking in Computer Organization and Architecture
+## Section 12: Course-level Practice Test
 
+### Practice Test 1: Mixed Instruction Benchmark in Computer Organization and Architecture
+### Practice Test 2: Mixed Instruction Benchmarking in Computer Organization and Architecture
+
+## Section 13: Conclusion
 ### 62. Summary
 ### 63. Course Summary Short Note - Mind Map
 ### 64. Thank you
-1min
