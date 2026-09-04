@@ -37,8 +37,9 @@ $ R CMD INSTALL Rmpi_0.7-3.4.tar.gz --configure-args="--with-Rmpi-include=/home/
 ```bash
 $ module load R_4.6 openmpi_5.0.10
 $ R CMD INSTALL ./float_0.3-3.tar.gz 
-$ R CMD INSTALL pbdMPI_0.5-5.tar.gz --configure-args="--with-Rmpi-include=/home/hpjeon/sw_local/openmpi/5.0.10/include/ --with-Rmpi-libpath=/home/hpjeon/sw_local/openmpi/5.0.10/lib --with-Rmpi-type=OPENMPI"
+$ R CMD INSTALL pbdMPI_0.5-5.tar.gz --configure-args="--with-mpi-include=/home/hpjeon/sw_local/openmpi/5.0.10/include/ --with-mpi-libpath=/home/hpjeon/sw_local/openmpi/5.0.10/lib --with-mpi-type=OPENMPI"
 ```
+- To remove, `R CMD REMOVE pbdMPI`
 
 ## Sample environmental module files
 - R_4.6.0
