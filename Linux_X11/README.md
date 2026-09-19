@@ -25,7 +25,7 @@
   - `sudo init 0` # shutdown/halt
   - Systemd targets: runlevel0.target, poweroff.target
 - Runlevel 1
-  -`sudo init 1` # single user mode
+  - `sudo init 1` # single user mode
   - Systemd targets: runlevel1.target, rescue.target
 - Runlevel 2
   - `sudo init 2` # multi user without networking
@@ -121,6 +121,9 @@ Sessions: *2
          └─/sys/devices/virtual/misc/rfkill
            misc:rfkill
 ```
+- How to find the owner of the magic cookie? 
+  - Find display number like :0, :1, ... from xauth list
+  - `ps aux |grep :10`
 - `tmp/.X11-unix/X0`
   - Unix Domain Socket (UDS) for X11 display
   - https://unix.stackexchange.com/questions/196677/what-is-tmp-x11-unix
@@ -172,12 +175,39 @@ Sessions: *2
   - https://medium.com/@nadzeya/ssh-x-forwarding-or-how-to-open-desktop-applications-on-linux-server-c198b00a6a55
   - https://medium.com/@saicoumar/configuring-x11-forwarding-over-ssh-1a5a21fc707b
 
+
+## XDG (X Desktop Group)
+- XDG_RUNTIME_DIR
+  - temporary file for user isolation
+  - specifications.freedesktop.org/basedir/latest
+    - XDG_DATA_HOME
+    - XDG_CONFIG_HOME
+    - XDG_STATE_HOME
+    - XDG_DATA_DIRS
+    - XDG_CONFIG_DIRS
+    - XDG_CACHE_HOME
+- xfce vs gnome vs kde
+  
+## what is flatpak
+- universal sw packaging and deployment system for Linux
+- sandboxed system. not yum nor dnf
+- no sudo. rootless per-user installation
+```bash
+flatpak install flathub org.gimp.GIMP
+flatpak search gimp
+flatpak run org.gimp.GIMP
+flatpak list --app
+```
+
 ## From x11 to Wayland
 - Since ubuntu 25
 - No more xterm or xeyes
 - tigervnc not working anymore
 - gnome-remote-desktop as rdp in MobaXterm?
-
+- ssh -X or ssh -Y will not work natively on wayland
+  - waypipe ssh server1
+  - Xwayland runs in backend of wayland
+ 
 ## RDP for Rocky8 and mobaxterm
 - Steps:
   - sudo dnf install xrdp             
@@ -188,7 +218,6 @@ Sessions: *2
   - At mobaXterm, make a new RDP session - it conflicts with X11 at seat0. wayland doesn't support xrdp
   - xrdp vs gnome-remote-desktop
   - Mobaxterm doesn't support native wayland yet (Sept 2026)
-
 
 ### What is Active Directory?
 - Active directory
@@ -260,3 +289,46 @@ Addr Line File Flags
   - LLVM uses DIBuilder for debug_info    
 - How DWARF works: Debug information entries
   - https://calabro.io/dwarf/die  
+
+## How to use patch command
+- `diff -u old.txt new.txt > patch_file`
+- `patch -N -R -p0 < patch_file` # Testing patches
+- `patch original_file < patch_file`
+- Why we don't just over-write?
+  - Only diffencs can be updated
+  - Potential scenario:
+    - `diff -u old new > patch_content`
+    - Edit old file, adding some comments or something
+    - Overwriting with new will lose those comments in old
+    - `patch old < patch_content` will update the differences, keeping the comments made above
+
+## How/when to use a binary editor
+- ImHex
+  - https://github.com/WerWolv/ImHex
+- Let's write a C code producing a binary file:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+int main() {
+  int x = 5;
+  int v[3] = {9, 10, 11};
+  FILE *f = fopen("test.bin","wb");
+  size_t err;
+  err = fwrite(&x, sizeof(int), 1, f);
+  err = fwrite(v,  sizeof(int), 3, f);
+  char c[5] = {'h','e','l','l','o'};
+  err = fwrite(c,  sizeof(char), 5, f);
+  fclose(f);
+  return 0;
+}  
+```
+- Open the test.bin using imhex or ghex:
+
+<img src="./imhex.png" height="100">
+
+- The value 5 is stored at 00-03. As `int` is 32bits or 4 bytes, it consumes 4 address cells. Note that 5 is stored at 00, not 03, as this is little-endian
+- 09 is found at address 04
+- 0A (which is 10 in decimal) at address 08
+- As 4 int values (5,9,10,11) consume the first 64bit addresses, 'hello' is stored in the next address 00000010
+
+
