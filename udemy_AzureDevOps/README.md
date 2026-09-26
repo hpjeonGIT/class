@@ -148,62 +148,70 @@
 
 ### 24. Lesson 24: How to Add Values to Work Item Pick Lists in Azure DevOps
 
-
 ### 25. Lesson 25: Enhancing Azure DevOps Work Items with Custom Fields
-
 
 ### 26. Lesson 26: Creating a Work Item Rule
 - Organization settings->Process->All processes->ADOAgileProcess->Task->Rules
 
 ### 27. Lesson 27: Adding a New Page to a Custom Work Item
 
-
 ### 28. Lesson 28: Unlocking Flexibility: Creating Custom Work Items in Azure DevOps
 
-
 ### 29. Lesson 29: Creating Color-Coded Tags
-
+- Project settings -> Boards -> User Story - Add Tags
+- Tag colors can be changed from Boards -> Settings -> Tag colors
 
 ### 30. Lesson 30: Mastering Project Wikis in Azure DevOps
-
+- Overview -> Wiki
+- Markdown format
+- Using "Mention a work item", each Epic/Feature/User story can be injected
 
 ### 31. Lesson 31: Using the Copy Work Item Feature
 
-
 ### 32. Lesson 32: How to Standardize Your Process with Templates in Azure DevOps
-
+- Project Settgings -> Team configuration -> Templates
+  - For every work item like Bug, Epic, Feature, User Story, ...
 
 ### 33. Lesson 33: Exploring More Customization Options for Azure Boards
 
-
-Not completed
-Start
-Quiz 3: Test Your Expertise: ADO Project Settings Customization
+## Section 4: Getting Started with Azure DevOps Queries
 
 ### 34. Lesson 34: An Introduction to Section 4
 
-
 ### 35. Lesson 35: ADO Queries Part 1 (What are ADO Queries)
-
+- ADO Queries
+  - Flat
+  - Tree
+  - Linked
+- Benefits of using queries
+  - Prioritization and planning
+  - Cross-Project queries
+  - Query tags
+  - Using query reports (aggregated work item data)  
+  - Tracking dependencies
+  - Quality assurance (severity, test status, code review status)
+  - A primary purpose of queries is for dashboarding
+- Project -> Boards -> Queries
 
 ### 36. Lesson 36: ADO Queries Part 2: Creating a Flat Query
 
-
 ### 37. Lesson 37: ADO Queries Part 3: Flat Queries Continued and Linked Queries
+- Changing query types:
 
+<img src="./ch38_queries.png" height="200">
 
 ### 38. Lesson 38: ADO Queries Part 4: Exploring the Tree Query
 
 
 ### 39. Lesson 39: ADO Queries Part 5: Visualize Charts, Format Reports, Bulk Editing
+- Boards -> Queries -> My Queries -> Results
+  - Preview option is available
+- After queries, selecting items then we can change their column values altogether
 
-
-Not completed
-Start
-Quiz 4: Test Your Knowledge: ADO Query Types
+## Section 5: Step-by-Step Process for Building a Project from the Ground Up!
 
 ### 40. Lesson 40: An Introduction to Section 5
-
+- Installing extension for visualization
 
 ### 41. Lesson 41: Building an ADO Project Together: Hands-On Tutorial
 
