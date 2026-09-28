@@ -35,6 +35,8 @@
 ### 6. Lesson 6: How a Project is related to an Azure DevOps Organization
 - When creating a project, click advanced menu and configure Process as Basic or Agile as necessary
   - Changing Process later in the existing project is not recommended as manual adjustment is required
+  - Make a new process inheriting the current one and the replacement would be OK
+  - To change the current process, Organization settings -> All processes -> Select the current one -> Projects -> Click (...) of the corresponding project to change the process
 
 ### 7. Lesson 7: What are the Azure DevOps User Access Levels
 
@@ -202,7 +204,6 @@
 
 ### 38. Lesson 38: ADO Queries Part 4: Exploring the Tree Query
 
-
 ### 39. Lesson 39: ADO Queries Part 5: Visualize Charts, Format Reports, Bulk Editing
 - Boards -> Queries -> My Queries -> Results
   - Preview option is available
@@ -214,144 +215,192 @@
 - Installing extension for visualization
 
 ### 41. Lesson 41: Building an ADO Project Together: Hands-On Tutorial
+- Board columns as New, Analysis, Design, Development, In Testing, Blocked
+- Then using the enclosed excel sheet, add Epic/Features/User story items
+  - In Boards -> Backlogs
 
+<img src="./ch41_items.png" height="300">
 
 ### 42. Lesson 42: Estimating the Scope of Work in Our Project
-
+- Each task
+  - Original estimate as 10 hours
 
 ### 43. Lesson 43: Setting Up Our Backlog to View Task Estimates
-
+- 30 hour for each story points
 
 ### 44. Lesson 45: Let's Install and Explore the 'Visualize' Extension
+- Organization settings
+  - Market place in Top-right menu
+  - Select "Work Item Visualization"
+- Now Boards -> Backlogs -> Select Epic item -> Top-right More Actions (:) -> Visualize
 
+<img src="./ch44_tree.png" height="500">
 
 ### 45. Lesson 46: Final Thoughts on Assigning Work Across Sprints
 
-
 ### 46. Lesson 47: Setting Up the Sprint Resource Capacity Model
-
+- Test or dummy users can be added from Organization settings
+  - Email needs not to be valid
+- Allocate hours in Boards -> Sprints -> Capacity in each person  
 
 ### 47. Lesson 44: How to Set Sprint Dates and Plan Work for Each Sprint
 
-
 ### 48. Lesson 48: Why You Should Standardize the Backlog for Better Project Management
 
-
 ### 49. Lesson 49: How to Create a Strategic-Level Work Item in the Backlog
-
+- Organization settings -> Process -> Backlog levels
+  - Adding Initiative as a higher hierarchy
+- An existing Epic can be located below this higher item using Add Link menu in the Epic item setting  
 
 ### 50. Lesson 50: Final Thoughts on Customizing the Backlog for Maximum Impact
-
+- Organization settings -> Board -> Processes -> Backlog levels
+  - Default Agile/Basic/Scrum do not allow changes
+  - Make a new process inheriting one of them. Then backlog levels/work items can be edited
 
 ### 51. Lesson 51: Creating a Delivery Plan: Tracking Dependencies Along the Way
+- Dependency track from Market Place
+- Visualizes work across teams and ensures timelines align with goals
 
+### Assignment 1: Building an ADO Project from the Ground Up!
+1. Create a Project and assign the Agile process. This step is unnecessary if you've already created a default project when setting up your ADO Organization.
+2. Create a custom child process based on the Agile parent process.
+3. Install the "Visualize" extension from the Azure DevOps Marketplace.
+4. Create Work Items for your project using the provided MS Excel resource called "Customer Service AI Chatbot Project Work Items" file.
+5. Verify your Backlog to ensure it matches the items in the worksheet.
+6. Set iteration dates or rename them as Sprints in the Project Configuration section of ADO.
+7. Add Iterations to the project through the Team Configuration section in ADO.
+8. Enable the Planning Pane in the Backlog view by selecting "View Options" and toggling it on, so the Iterations are visible.
+9. Assign planned work to your Iterations as I've demonstrated how to do.
+10. Create a custom work item named "Compliant" and add a field called "Compliance" with the following values: HIPP, SOX, GXP. Then, add this field to the Details page.
+11. Next, create a new "Compliant" work item to verify that the custom work item and its associated field and values were successfully created.
+12. Link the custom "Compliant" work item to any User Story.
+13. Lastly, go to the Organization Settings menu and add the "Compliant" work item to the Iteration Backlog located under `Boards/Process/<select your custom process>`, then navigate to the tab called "Backlog levels.
+14. Confirm that the "Compliant" work item is linked to the User Story is displayed in the Backlog as part of the hierarchy.
 
 ### 52. Lesson 52: Navigating ADO Analytic Views for Better Insights
 
-
-Not completed
-Start
-Assignment 1: Building an ADO Project from the Ground Up!
-Not completed
-Start
-Quiz 5: Test Your Knowledge: ADO Project Building Essentials
+## Section 6: Mastering ADO Dashboards and Queries: A Deep Dive
 
 ### 53. Lesson 53: An Introduction to Section 6
 
-
 ### 54. Lesson 54: How to Navigate ADO Dashboards: An Introduction
-
+- Widget catalogue
+- Dashboard can be visible to other teams or team members
 
 ### 55. Lesson 55: Building Dashboards with Corresponding Queries: Part 1
-
+- Work Item query
+  - Shows a list of work items based on a predefined query
 
 ### 56. Lesson 56: Building Dashboards with Corresponding Queries: Part 2
-
+- Widget settings can refresh dashboard every 5min
 
 ### 57. Lesson 57: Building Dashboards with Corresponding Queries: Part 3
 
-
 ### 58. Lesson 58: Building Dashboards with Corresponding Queries: Part 4
-
 
 ### 59. Lesson 59: Building Dashboards with Corresponding Queries: Part 5
 
-
 ### 60. Lesson 60: Building Dashboards with Corresponding Queries: Part 6
-
+- Velocity
+- Burndown
 
 ### 61. Lesson 61: Building Dashboards with Corresponding Queries: Part 7
 
-
 ### 62. Lesson 62: Building Dashboards with Corresponding Queries: Part 8
-
 
 ### 63. Lesson 63: Building Dashboards with Corresponding Queries: Part 9
 
-
 ### 64. Lesson 64: The Process of Exporting and Importing Work Items in ADO
 
-
-Not completed
-Start
-Assignment 2: Building a Dashboard for Your Project Assignment
-Not completed
-Start
-Quiz 6: Test Your Knowledge: Creating ADO Dashboards
+## Section 7: Azure Test Plans
 
 ### 65. Lesson 65: The Basics of Testing with Azure DevOps
-
+- Functional testing
+  - Unit testing
+  - Iterative testing
+    - Across spreads
+    - Early detection of issues
+    - Increased Quality
+  - Integration or End-to-End Testing
+    - Comprehensive validation of requirements
+    - Validation of non-functional requirements
+  - System Testing
+  - Regression Testing
+  - User acceptance Testing (UAT)
+  - Smoke Testing
+- Non functional testing
+  - Performance Testing
+  - Security Testing
+  - Usability Testing
+  - Compatibility Testing
 
 ### 66. Lesson 66: Installing the Test and Feedback Extension
-
+- Test Plans in each Project
+- Test & Feedback from Market place
+  - Supports Chrome and Edge browser
+  - Supporting Firefox will be retired Nov 2026
+- Not free?
+  - 30 days free trial only
 
 ### 67. Lesson 67: Install Azure Test Plans and Create our first Test Plan
-
+- Azure Test Plans is a management tool but not a testing tool. Testing must be coupled with Azure Pipelines
 
 ### 68. Lesson 68: Explore Executing Test Cases with the Web App called Test Runner
 
-
 ### 69. Lesson 69: Let's Create a Test Case Shared Step(s) for Repeatability
-
 
 ### 70. Lesson 70: Let's Create a Test Case Shared Parameter for Repeatability
 
-
 ### 71. Lesson 71: Creating and Assigning Test Configurations for Repeatability
-
 
 ### 72. Lesson 72: Building a Requirements-Based Test Suite in Azure Test Plans
 
-
 ### 73. Lesson 73: Creating a Static and Query Based Test Suite
-
 
 ### 74. Lesson 74: Creating Test Management Charts and add to a Dashboard
 
-
 ### 75. Lesson 75: We'll Conduct Exploratory Testing with the Test & Feedback Extension
 
-
-Not completed
-Start
-Quiz 7: Test Your Knowledge: Azure DevOps Test Management
-Not completed
-Start
-76. Exercise: Azure Test Plans Hands-On Practice - Optional (Downloadable Resource)
-
-
+## Section 8: A Beginner's Guide to Continuous Integration and Delivery
 
 ### 77. Lesson 76: An Introduction to Section 8
 
-
 ### 78. Lesson 77: Starting Your Journey with Azure DevOps CI and CD
-
+- Ref: https://learn.microsoft.com/en-us/azure/devops/?view=azure-devops
+- The anatomies of Azure DevOps CI/CD (automation)
+  - Azure Repo with Git & GitHub
+  - A Deep Dive into Branching
+  - The anatomy of the build pipeline
+  - The anatomy of a YAML for automation
+  - The anatomy of the release pipeline
+  - Connecting the dots an end-2-end build & release scenario
+- Continuous Integration
+  - Developers write and commit code to a repo frequently
+  - Automated build process compiles the code and run tests to create Artifacts
+  - Automated tests (unit-tests, integration tests) to validate the code changes
+  - Package the compiled code and dependencies in deployable packages
+- Continuous Delivery
+  - Automated deployment processes push the build Artifacts to straging or production environment
+  - Automating the Release of the SW to suers or customers
+  - Monitoring the Application in production to ensure it functions correctly
 
 ### 79. Lesson 78: Getting to Know Git: Distributed Code Management Demystified
-
+- Git: a version control system that allows for distributed code management
+- TFVC is still running
+- Git anatomy
+  - Commits: a snapshot of changes made to files in a repo
+  - Fetch: retrieves updates from a remote repo without merging them into the local branch
+  - Fork: a personal copy of a repo
+  - Clone: creates a local copy of a remote repo
+  - Push: uploads local commints from your repo to a remote repo
+  - Pull-Request: merge changes from one branch into another
+  - Merge: a process that combines changes from different branches into a single branch
+  - Branching: enables multiple features or fixes to be developed simultaneously without interfering with the main codebase
 
 ### 80. Lesson 79: Creating Your First "Git" Repo in Azure DevOps
-
+- Create a new project
+- Create a new repo from Repos -> Files -> New Repositories
+  - Default README.md is created
 
 ### 81. Lesson 80: How to Create Your First Branch in Azure DevOps
 
