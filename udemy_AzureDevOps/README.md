@@ -401,15 +401,44 @@
 - Create a new project
 - Create a new repo from Repos -> Files -> New Repositories
   - Default README.md is created
+- Practice of edit/commit of README.md
 
 ### 81. Lesson 80: How to Create Your First Branch in Azure DevOps
-
+- When creating a new branch, a User story can be linked
+- **Branch policy** is not accessible from Repo->Branches anymore (Sept 2026)
+  - Project settings -> Repo -> All Repositories -> Select your repo -> Policies -> Find the branch in the bottom
+  - If the branch is yours (i.e., main), adjust:
+    - Minimum number of reviewers as 1
+    - Enable "Allow requestors to approve their own changes"
+  - Disable the branch policy of temporary branch so you can edit files anytime
+- Why do we need a separate branch than main?
+  - Why not keeping main branch only?
+    - It is OK to have main branch only
+    - Best suited for solo developers, prototyping, or small projects
+    - No code review required
+    - Not recommended but team-based/large scale projects
+  - The benefits of multiple-branches
+    - For production-ready applications
+    - Easy prototyping or adding new feature, without breaking the current workflow
+    - Pull-requests are necessary for merging into main
 
 ### 82. Lesson 81: Creating Your First Pull Request in Azure DevOps
+- Scenario:
+    1. In main branch, edit README.md
+    2. Make a new branch of PRTest, coupling with a User story
+    3. Edit README.md in PRTest branch
+    4. Commit in PRTest branch
+    5. Create a Pull-Request. Add Reviewer
+    6. Now in Review. Add comment and click a) Approve then b) Complete
+    7. Go to Repos -> Branches and confirm that PRTest branch is gone, as the corresponding User Story is completed  
+    8. Confirm that README.md in main branch has the content created from PRTest branch
 
+<img src="./ch82_PR.png" height="200">
+<img src="./ch82_approve.png" height="200">
+<img src="./ch82_complete.png" height="200">
 
 ### 83. Lesson 82: How to install the Microsoft IDE (Integrated Development Environment)
-
+- Visual Studio Download
 
 ### 84. Lesson 83: Creating a Web Project with Git Repository in Your IDE
 
@@ -418,52 +447,278 @@
 
 
 ### 86. Lesson 85: Getting Started with Build Pipelines: Understanding the YAML File
-
+- Pipeline -> Setup a build -> Review your pipeline YAML
 
 ### 87. Lesson 86: How to Set Up Your First ADO Pipeline for a Web Application
-
+- Artifacts are deleted after pipeline builds. How to keep them for future work?
 
 ### 88. Lesson 87: How to Publish Your Web App Build Artifact with YAML
+- azure-pipelines.yaml:
+```yaml
+trigger:
+- master
 
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  solution: '**/*.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+
+steps:
+- task: NuGetToolInstaller@1
+ 
+- task: NuGetCommand@2
+  inputs:
+    restoreSolution: '$(solution)'
+
+- task: DotNetCoreCLI@2
+  displayName: Run Tests
+  inputs:
+    command: test
+    projects: '**/*.Test/*.csproj'  # Specify the path to your test projects
+    arguments: '--configuration $(buildConfiguration) --logger trx'  # TRX logger to generate test results for Azure DevOps
+
+- task: DotNetCoreCLI@2
+  displayName: Build
+  inputs:
+    command: build
+    projects: '**/*.csproj'
+    arguments: '--configuration $(buildConfiguration)'
+
+# Run tests
+- task: DotNetCoreCLI@2
+  displayName: Run Tests
+  inputs:
+    command: test
+    projects: '**/*.MyTestWebApp.csproj' # Ensure this points to your test project
+    arguments: '--configuration $(buildConfiguration) --logger trx --results-directory $(System.DefaultWorkingDirectory)/TestResults'
+
+# Publish test results
+- task: PublishTestResults@2
+  inputs:
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '$(System.DefaultWorkingDirectory)/TestResults/*.trx'
+    searchFolder: '$(System.DefaultWorkingDirectory)'
+    mergeTestResults: true
+
+- task: DotNetCoreCLI@2
+  inputs:
+    command: publish
+    publishWebProjects: True
+    arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(Build.ArtifactStagingDirectory)' 
+    artifactName: 'MyWelcomePage-artifact'
+```
 
 ### 89. Lesson 88: How to Set Up a Release Pipeline with Azure Web App Service
-
+- Continuous Delivery (CD)
 
 ### 90. Lesson 89: Automating Your Pipeline Workflow from Start to Finish
-
+- Classic build/Release pipelines are disabled as default in organization settings
+  - YAML customization is recommended
 
 ### 91. Lesson 90: How to Build a Multi-Stage Release Pipeline
+- Adding UAT (User Acceptance Test)
+  - Muti-Stage YAML Pipeline
+```yaml
+trigger:
+  - main
+  - develop
 
+stages:
+# 1. BUILD STAGE
+- stage: Build
+  displayName: 'Build Application'
+  jobs:
+  - job: BuildJob
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: echo "Building and packaging code..."
+    # Add tasks to publish your build artifacts here
+
+# 2. DEV DEPLOYMENT STAGE
+- stage: Dev
+  displayName: 'Deploy to Dev'
+  dependsOn: Build
+  jobs:
+  - deployment: DeployDev
+    environment: 'Dev'
+    pool:
+      vmImage: 'ubuntu-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo "Deploying to Dev Environment"
+
+# 3. UAT DEPLOYMENT STAGE
+- stage: UAT
+  displayName: 'Deploy and Validate UAT'
+  dependsOn: Dev # Ensures UAT only runs after Dev succeeds
+  jobs:
+  - deployment: DeployUAT
+    displayName: 'Deploy to UAT Environment'
+    # This targets the Environment created in Step 1, triggering the Approvals Check
+    environment: 'UAT' 
+    pool:
+      vmImage: 'ubuntu-latest'
+    variables:
+      # Inject UAT-specific configurations here
+      - name: EnvironmentName
+        value: 'uat'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+            displayName: 'Download Build Artifacts'
+          
+          - script: |
+              echo "Applying UAT configurations..."
+              echo "Deploying to the UAT environment..."
+            displayName: 'Execute UAT Deployment Tasks'
+```
+- Adding CMake unit-test into pipelines
+```yaml
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest' # Or 'windows-latest' / 'macOS-latest' (CMake is pre-installed on all)
+
+variables:
+  buildConfiguration: 'Release'
+  buildDirectory: '$(Build.ArtifactStagingDirectory)/build'
+
+steps:
+# 1. Configure the CMake project
+- task: CMake@1
+  displayName: 'CMake Configure'
+  inputs:
+    workingDirectory: '.'
+    cmakeArgs: '-B $(buildDirectory) -DCMAKE_BUILD_TYPE=$(buildConfiguration)'
+
+# 2. Build the target(s) and test executables
+- task: CMake@1
+  displayName: 'CMake Build'
+  inputs:
+    workingDirectory: '.'
+    cmakeArgs: '--build $(buildDirectory) --config $(buildConfiguration)'
+
+# 3. Execute the tests via CTest
+# We use a script/bash task so we can instruct CTest to export results to a standard JUnit XML format
+- script: |
+    cd $(buildDirectory)
+    ctest -C $(buildConfiguration) --output-on-failure --junit CTestResults.xml
+  displayName: 'Run CMake Unit Tests'
+  continueOnError: true # Prevents the entire pipeline from halting immediately so results can be published
+
+# 4. Publish the Test Results to the Azure DevOps Dashboard
+- task: PublishTestResults@2
+  displayName: 'Publish CTest Results'
+  inputs:
+    testResultsFormat: 'JUnit'
+    testResultsFiles: '$(buildDirectory)/CTestResults.xml'
+    searchFolder: '$(buildDirectory)'
+    testRunTitle: 'CMake CTest Run'
+  condition: succeededOrFailed() # Ensures this runs even if step 3 fails
+```
 
 ### 92. Lesson 91: Creating a Parallel Release Pipeline and Setting Up Release Approvals
-
+- Release into multiple environments simultaneously
 
 ### 93. Lesson 92: How to Create Pipeline Deployment Gates for Conditional Deployment
-
+- Gated condition
+  - Using Pipeline classic Release
 
 ### 94. Lesson 93: Building a Simple Dashboard for Build and Release History
-
+- Project Overview -> DashBoards -> Create Pipeline overview
 
 ### 95. Lesson 94: Exploring the Azure DevOps Service: Artifacts
 
 
 ### 96. Lesson 95: Closing Thoughts on Continuous Integration and Delivery
+- Install Azure Boards on Github
+  - https://learn.microsoft.com/en-us/azure/devops/boards/github/install-github-app?view=azure-devops
+- When commiting, commit with title `SomeName#123` while 123 is the number given in Azure Boards item. Then they are automatically coupled after commit
 
+### 97. Exercise: CI/CD Pipeline Hands-On Practice - Optional (Downloadable Resource)
+- Give this assignment a try—it’s the most challenging section of the course. Don’t worry if you can’t complete everything; the most important thing is understanding the core concepts, not necessarily performing each step perfectly. I’ve been doing this for years, and while I try to make it look easy, it’s more complex than it seems. So, take your time, give it your best effort, and remember: if you get stuck, just focus on grasping the concepts.
+This hands-on assignment will guide you through practical steps to familiarize you with key DevOps concepts in Azure DevOps. You’ll be working with Git repositories, creating pipelines, and deploying web applications using Azure DevOps services. Follow each section carefully, and don’t hesitate to refer to the linked video tutorials if you need help.
+- Assignment Instructions (Remember if you get stuck on a certain step or steps refer to the video referenced in this assignment.)
+- Part 1: Video: Creating Your First "Git" Repo in Azure DevOps
+    1. Create a new Git repository in Azure DevOps.
+    2. Take note of the repository's name and URL.
+- Part 2: Video: How to Create Your First Branch in Azure DevOps
+    1. Create a new branch in your repository.
+    2. Commit a simple change to your new branch.
+    3. Push the changes back to the repository, following along on the video.
+- Part 3: Video: Creating Your First Pull Request in Azure DevOps
+    1. From your newly created branch, create a pull request to merge the changes back into the main branch.
+    2. Review and complete the pull request process, following along on the video.
+- Part 4: Video: How to Install Microsoft IDE Visual Studio (Integrated Development Environment)
+    1. Download and install Visual Studio on your machine from the Microsoft IDE Webpage.
+    2. Set up Visual Studio with the necessary components for Git, following along on the video.
+- Part 5: Video: Creating a Web Project with Git Repository in Your IDE
+    1. In Visual Studio, create a new web project (e.g., an ASP.NET Core web app) from the home page.
+    2. Initialize a Git repository for this project and link it to the Azure DevOps repository you created, following along on the video, following along in the video.
+- Part 6: Video: How to Clone and Fork a Repo: Understanding the Process
+    1. Clone the repository you created earlier to your local machine.
+    2. Fork another repo (choose any public repository) to your Azure DevOps account and clone it.
+- Part 7: Video: Getting Started with Build Pipelines: Understanding the YAML File
+    1. Learn about YAML and how it’s used in Azure DevOps for build pipelines.
+    2. Set up your first build pipeline using YAML to automate the build of your web application, following along in the video.
+- Part 8: Video: How to Set Up Your First ADO Pipeline for a Web Application
+    1. Create your first Azure DevOps pipeline using the YAML file you created.
+    2. Connect your build pipeline to your Git repository and trigger a build, following along in the video.
+- Part 9: Video: How to Publish Your Web App Build Artifact with YAML
+    1. Configure your pipeline to publish build artifacts (e.g., a .zip file or web app package).
+    2. Ensure that your artifact is stored and accessible for the release process.
+- Part 10: Video: How to Set Up a Release Pipeline with Azure Web App Service
+    1. Set up a release pipeline to deploy your web app using Azure Web App Service.
+    2. Configure your pipeline to deploy the build artifact created in the previous step, following along in the video.
+- Part 11: Video: How to Create Pipeline Deployment Gates for Conditional Deployment
+    1. Implement deployment gates to ensure that your release only proceeds under   certain conditions (e.g., approvals or successful tests), following along in the video.
+- Part 12: Video: Building a Simple Dashboard for Build and Release History
+    1. Create a simple dashboard in Azure DevOps to track the build and release history of your project.
+    2. Customize your dashboard with useful widgets to monitor your pipeline's status, following along in the video.
+- Part 13: Video: Exploring the Azure DevOps Service: Artifacts
+    1. Familiarize yourself with Azure Artifacts and explore how to publish and manage packages.
+    2. Create and manage your own feed to store and share code packages, following along in the video.
 
-Not completed
-Start
-Quiz 8: Assess Your Understanding of Continuous Integration and Delivery
-Not completed
-Start
-97. Exercise: CI/CD Pipeline Hands-On Practice - Optional (Downloadable Resource)
+- Checklist
+  - Part 1: Creating Your First "Git" Repo in Azure DevOps
+  - Part 2: How to Create Your First Branch in Azure DevOps
+  - Part 3: Creating Your First Pull Request in Azure DevOps
+  - Part 4: How to Install Microsoft IDE Visual Studio (Integrated Development Environment)
+  - Part 5: Creating a Web Project with Git Repository in Your IDE
+  - Part 6: How to Clone and Fork a Repo: Understanding the Process
+  - Part 7: Getting Started with Build Pipelines: Understanding the YAML File
+  - Part 8: How to Set Up Your First ADO Pipeline for a Web Application
+  - Part 9: How to Publish Your Web App Build Artifact with YAML
+  - Part 10: How to Set Up a Release Pipeline with Azure Web App Service
+  - Part 11: How to Create Pipeline Deployment Gates for Conditional Deployment
+  - Part 12: Building a Simple Dashboard for Build and Release History
+  - Part 13: Exploring the Azure DevOps Service: Artifacts
 
-
+## Section 9: Master ADO Integrations: How to Set Them Up in Your Azure DevOps Instance
 
 ### 98. Lesson 96: An Introduction to Section 9
-
+- Integrating:
+  - AI
+  - Github
+  - MS Teams
+  - MS Excel
 
 ### 99. Lesson 97: Part 1: Using Artificial Intelligence to Automate Work Item Creation
-
+- Tachyon work item assistant from Market place
 
 ### 100. Lesson 98: Part 2: Configuring the AI Work Item Assistant for Automation
 
@@ -488,10 +743,7 @@ Start
 
 ### 107. Lesson 105: Part 2: Connecting MS Excel with Azure DevOps
 
-
-Not completed
-Start
-Quiz 9: Evaluate Your Knowledge on Azure DevOps Integrations
+## Section 10: Setting Up Scaled Agile Releases in Azure DevOps
 
 ### 108. Lesson 106: An Introduction to Section 10
 
@@ -510,10 +762,7 @@ Quiz 9: Evaluate Your Knowledge on Azure DevOps Integrations
 
 ### 113. Lesson 111: Part 5: Setting Up Scaled Agile in Azure DevOps
 
-
-Not completed
-Start
-Quiz 10: Test Your Knowledge on Setting Up Scaled Agile in Azure DevOps
+## Section 11: Agile, Scrum, and More: Methods for Success in Azure DevOps
 
 ### 114. Lesson 112: An Introduction to Section 11
 
