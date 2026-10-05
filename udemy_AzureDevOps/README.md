@@ -722,24 +722,22 @@ This hands-on assignment will guide you through practical steps to familiarize y
 
 ### 100. Lesson 98: Part 2: Configuring the AI Work Item Assistant for Automation
 
-
 ### 101. Lesson 99: Part 1: GitHub Integration with Azure DevOps
 
-
 ### 102. Lesson 100: Part 2: GitHub Integration with Azure DevOps
-
+- In githup, azure pipeline is available in market place
 
 ### 103. Lesson 101: Part 3: GitHub Integration with Azure DevOps
-
+- Azure boards in Market Place of GitHub
 
 ### 104. Lesson 102: Part 1: Setting Up Msft Teams Integration with Azure DevOps Boards
-
+- Making Azure board visible in Teams app
 
 ### 105. Lesson 103: Part 2: Setting Up Msft Teams Integration with Azure DevOps Boards
 
-
 ### 106. Lesson 104: Part 1: Connecting MS Excel with Azure DevOps
-
+- Organizatin settings -> Extensions -> install Azure DevOps in Excel
+- Can download data from ADO using queries into a excel sheet
 
 ### 107. Lesson 105: Part 2: Connecting MS Excel with Azure DevOps
 
@@ -747,9 +745,15 @@ This hands-on assignment will guide you through practical steps to familiarize y
 
 ### 108. Lesson 106: An Introduction to Section 10
 
-
 ### 109. Lesson 107: Part 1: Setting Up Scaled Agile in Azure DevOps
-
+- Scaled Agile Projects in Azure DevOps
+  - Integrated environment
+  - Support for agile practices
+  - Customization and flexibility
+  - CI/CD
+  - Reporting and analytics
+  - Scalability
+  - Integration with other tools
 
 ### 110. Lesson 108: Part 2: Setting Up Scaled Agile in Azure DevOps
 
@@ -758,7 +762,7 @@ This hands-on assignment will guide you through practical steps to familiarize y
 
 
 ### 112. Lesson 110: Part 4: Setting Up Scaled Agile in Azure DevOps
-
+- Portfolio Project extension from Market Place
 
 ### 113. Lesson 111: Part 5: Setting Up Scaled Agile in Azure DevOps
 
@@ -766,45 +770,199 @@ This hands-on assignment will guide you through practical steps to familiarize y
 
 ### 114. Lesson 112: An Introduction to Section 11
 
-
 ### 115. Lesson 113: Explore the PMI Project Management Model in Azure DevOps
-
+- Work items
+  - Process Group
+  - Knowledge Area
+  - Process
+  - Deliverable
 
 ### 116. Lesson 114: Understanding the Agile Manifesto in the Context of Azure DevOps
+- Agile Manifesto from Market Place
+- https://agilemanifesto.org/principles.html
+```text
+Principles behind the Agile Manifesto
 
+
+We follow these principles:
+
+Our highest priority is to satisfy the customer
+through early and continuous delivery
+of valuable software.
+
+Welcome changing requirements, even late in
+development. Agile processes harness change for
+the customer's competitive advantage.
+
+Deliver working software frequently, from a
+couple of weeks to a couple of months, with a
+preference to the shorter timescale.
+
+Business people and developers must work
+together daily throughout the project.
+
+Build projects around motivated individuals.
+Give them the environment and support they need,
+and trust them to get the job done.
+
+The most efficient and effective method of
+conveying information to and within a development
+team is face-to-face conversation.
+
+Working software is the primary measure of progress.
+
+Agile processes promote sustainable development.
+The sponsors, developers, and users should be able
+to maintain a constant pace indefinitely.
+
+Continuous attention to technical excellence
+and good design enhances agility.
+
+Simplicity--the art of maximizing the amount
+of work not done--is essential.
+
+The best architectures, requirements, and designs
+emerge from self-organizing teams.
+
+At regular intervals, the team reflects on how
+to become more effective, then tunes and adjusts
+its behavior accordingly.
+```
 
 ### 117. Lesson 115: How the Stages of Team Formation Apply in Azure DevOps
-
+- Tuckman's 5 stages of group/team development
+    1. Forming
+    2. Storming
+    3. Norming
+    4. Performing
+    5. Adjourning
 
 ### 118. Lesson 116: Scrum Ceremonies and Their Role in Azure DevOps
-
+- Scrum lifecycle
+  - Product backlog -> sprint planning -> sprint backlog -> sprint execution/daily scrum -> sprint review -> potentially shippable increment
+  - The entire lifecycle is completed in fixed time periods called sprints
+  - A sprint is typically one-to-four weeks long
+- The core Scrum ceremonies
+  - The sprint itself
+  - Sprint planning
+  - The daily scrum (scrum of scrums)
+  - The end of sprint review
+  - The end of sprint retrospective
 
 ### 119. Lesson 117: Understanding the Definition of Done (DOD) with an Extension
-
+- Definition of Done extension in Market Place
 
 ### 120. Lesson 118: Playing Planning Poker in Azure DevOps to Estimate Work
-
+- Planning Poker for Azure extension in Market Place
 
 ### 121. Lesson 119: The Retrospective Extension: A Tool for Continuous Improvement
-
+- Retrospectives extension in Market Place
+- Providing feedback/chatbot
 
 ### 122. Lesson 120: Part 1: Managing Timesheets in Azure DevOps with an Extension
-
+- Timetracker in Market Place
+  - Not free: free trial for 28 days
 
 ### 123. Lesson 121: Part 2: Managing Timesheets in Azure DevOps with an Extension
 
-
 ### 124. Lesson 122: Something Extra: Future Proofing Your Career in an AI Dr
 
-
-Not completed
-Start
-Quiz 11: Test Your Knowledge of Various Azure DevOps Extensions
 ### 125. Bonus Section
 
+### 126. Claiming PMI PDU's for this Course
 
-Not completed
-Start
-126. Claiming PMI PDU's for this Course
+## A sample Azure DevOps project with C++/CMake
 
+### Code structure
+```bash
+.
+├── CMakeLists.txt
+└── src
+    ├── CMakeLists.txt
+    ├── func01.cpp
+    ├── func01.h
+    ├── main.cpp
+    └── test
+        ├── CMakeLists.txt
+        └── unit_test.cpp
+```
+- CMakeLists.txt
+```cmake
+cmake_minimum_required(VERSION 3.0.0)
+project(CALC_project VERSION 1.0.0)
+enable_testing() # this must be present prior to including test folders
+add_subdirectory(src)
+```
+- src/CMakeLists.txt
+```cmake
+set(ext_func_src func01.h func01.cpp)
+add_library(ext_func SHARED ${ext_func_src})
+add_executable(a.exe main.cpp)
+target_link_libraries(a.exe ext_func)
+include_directories(${CMAKE_SOURCE_DIR}/src)
+install(TARGETS a.exe DESTINATION ${CMAKE_BINARY_DIR}/bin)
+install(TARGETS ext_func DESTINATION ${CMAKE_BINARY_DIR}/bin)
+add_subdirectory(test)
+```
+- src/func01.cpp
+```cpp
+int ret_2x(int &x) {
+  return x*2;
+}
+```
+- src/func01.h
+```cpp
+int ret_2x(int &x);
+```
+- src/main.cpp
+```cpp
+#include <iostream>
+#include "func01.h"
+int main(){
+  int x = 123;
+  int z = ret_2x(x);
+  std::cout << "Input = " << x << " Answer = " << z << std::endl;
+  return 0;
+}
+```
+- src/test/CMakeLists.txt
+```cmake
+include_directories(${CMAKE_SOURCE_DIR}/src)
+add_executable(test_2x   unit_test.cpp)
+target_link_libraries(test_2x PRIVATE ext_func)
+add_test(NAME run_test_2x   COMMAND test_2x )
+```
+- src/test/unit_test.cpp
+```cpp
+// ref=https://coderefinery.github.io/cmake-workshop/testing/
+#include<iostream>
+#include "func01.h"
+int main() {
+  int x = 123;
+  int z = ret_2x(x);
+  if (z == x*2) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+```
+- Build steps
+```bash
+$ cmake -B build
+$ cd build
+$ make all
+$ make install
+$ ctest
+Test project /home/hpjeon/hw/class/udemy_AzureDevOps/prj1/build
+    Start 1: run_test_2x
+1/1 Test #1: run_test_2x ......................   Passed    0.00 sec
 
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   0.00 sec
+```
+
+### Deploying on Azure DevOps
+- Project title : SampleCppCmake
+- Process: basic (not agile)
