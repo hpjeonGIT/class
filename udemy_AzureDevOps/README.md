@@ -947,7 +947,7 @@ int main() {
   }
 }
 ```
-- Build steps
+- Build steps at CLI
 ```bash
 $ cmake -B build
 $ cd build
@@ -966,3 +966,180 @@ Total Test time (real) =   0.00 sec
 ### Deploying on Azure DevOps
 - Project title : SampleCppCmake
 - Process: basic (not agile)
+- Azure Pipelines handle all of CI/CD
+  - Azure Artifacts is not related with this activity
+
+### Using Azure Pipelines  
+- When CI/CD are employed, will disk consumption be charged?
+  - 2GB is free per organization at artifact
+  - Up to 10GB for scratch disk - building/compiling/testing
+- How to have multiple yaml files? for Different configuration/different OS build wise?
+  - build multiple pipelines, selecting its own yaml
+- How to couple yaml with local PC or slurm for ctest?
+  - need to install Azure agent on PC
+- Hierarchy
+  - stages -> jobs -> steps
+
+## Sample pipeline YAML
+- Basic cmake configure/build/ctest:
+```yaml
+trigger:
+- main  # update on main branch will trigger to run
+pool:
+  vmImage: ubuntu-latest
+variables:
+  buildConfig: 'Release'
+  buildDir: '$(Build.BinariesDirectory)/build'
+stages:
+- stage: CI
+  jobs:
+  - job: BuildJob
+    steps:
+    - script: |
+        mkdir build
+        cd build
+        cmake ..
+      displayName: 'Configure CMake'
+    - script: |
+        cd build
+        make -j 3
+      displayName: 'Build Project'
+    - script: |
+        cd build
+        ctest
+      displayName: 'Run CTest'
+``` 
+- Adding CI/CD:
+```yaml
+trigger:
+- main  # update on main branch will trigger to run
+pool:
+  vmImage: ubuntu-latest
+variables:
+  buildConfig: 'Release'
+  buildDir: '$(Build.BinariesDirectory)/build'
+stages:
+- stage: CI
+  jobs:
+  - job: BuildJob
+    steps:
+    - script: |
+        mkdir build
+        cd build
+        cmake ..
+      displayName: 'Configure CMake'
+    - script: |
+        cd build
+        make -j 3
+      displayName: 'Build Project'
+    - script: |
+        cd build
+        ctest
+      displayName: 'Run CTest'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(System.DefaultWorkingDirectory)/build'
+        ArtifactName: 'cpp-binaries'
+        publishLocation: 'container'
+      displayName: 'Publish Build Artifacts'
+- stage: CD
+  dependsOn: CI
+  condition: succeeded()
+  jobs:
+  - deployment: DeployEXE
+    displayName: 'Deploy to Target Environment'
+    environment: 'production'  ## required in deployment block. a corresponding environment must be created in auzre pipeliens -> Environments
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: 'cpp-binaries'
+            displayName: 'Download Build Artifacts'
+          - script: |
+              ls -la $(Pipeline.Workspace)/cpp-binaries
+            displayName: 'Execute Deployment Script'
+``` 
+  - Manual approval for the permission to production environment is necessary
+  - Downloaded files are found in the published artifacts link in the summary of pipelines, not Artifacts section
+  - A snapshot when the first stage is running and the second stage is pending
+<img src="./cicd01.png" height="150">
+  - Final summary
+<img src="./cicd02.png" height="300">
+  - Downloaded files are found in the link of published links in the summary page
+<img src="./cicd03.png" height="150">
+
+- Sample azure-piplelines.yaml (not tested):
+```yaml
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+pr:
+  branches:
+    include:
+      - main
+      - develop
+ 
+# Use Microsoft-hosted Ubuntu agent
+pool:
+  vmImage: 'ubuntu-latest'
+ 
+variables:
+  buildType: 'Release'
+  buildDir: 'build'
+ 
+stages:
+  - stage: Build
+    displayName: "Build C++ Project"
+    jobs:
+      - job: Build
+        steps:
+          # Ensure dependencies are installed
+          - task: Bash@3
+            displayName: "Install dependencies"
+            inputs:
+              targetType: 'inline'
+              script: |
+                sudo apt-get update
+                sudo apt-get install -y build-essential cmake
+ 
+          # Configure CMake
+          - task: CMake@1
+            displayName: "CMake Configure"
+            inputs:
+              workingDirectory: '$(buildDir)'
+              cmakeArgs: '.. -DCMAKE_BUILD_TYPE=$(buildType)'
+ 
+          # Build with CMake
+          - task: CMake@1
+            displayName: "CMake Build"
+            inputs:
+              workingDirectory: '$(buildDir)'
+              cmakeArgs: '--build . --config $(buildType)'
+ 
+          # Run tests (if CTest is configured)
+          - script: |
+              cd $(buildDir)
+              ctest --output-on-failure
+            displayName: "Run Unit Tests"
+ 
+          # Publish build artifacts
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Build Output"
+            inputs:
+              PathtoPublish: '$(buildDir)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
+ 
+  - stage: Deploy
+    displayName: "Deploy Stage"
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: Deploy
+        steps:
+          - script: echo "Deploying application..."
+            displayName: "Deployment Placeholder"
+```
