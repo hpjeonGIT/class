@@ -332,3 +332,16 @@ int main() {
 - As 4 int values (5,9,10,11) consume the first 64bit addresses, 'hello' is stored in the next address 00000010
 
 
+## Netmask in ip setup
+- Netmask 255.255.255.0 vs 255.255.255.192
+- 255.255.255.0 = 11111111.11111111.11111111.00000000 => /24 => 24 of 1 and left-over as zero
+  - one larger netwok with 254 hosts
+- 255.255.255.192 = 11111111.11111111.11111111.11000000 => /26 => 26 of 1 and left-over as zero
+  - four smaller networks, each with 62 hosts
+  - 192.168.1.0/26, 192.168.1.64/26, 192.168.1.128/26, 192.168.1.192/26
+
+## Asymmetric subnetting
+- 192.168.1.101 couldn't reach 192.168.1.201
+  - Found that 101 vs 201 had different netmask => Asymmetric subnetting
+- 192.168.1.101 has /26. When it tries to reach 201, it will send packet to default gateway as it thinks 201 is outside of subnet
+- 192.168.1.201 has /24. Now it tries to respond but it thinks 101 is inside of subnet, and ARPs directly to 101. So handshake fails
