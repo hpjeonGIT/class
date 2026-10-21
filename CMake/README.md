@@ -6,7 +6,17 @@ $ mkdir build
 $ cd build
 $ cmake ..
 $ make -j 3
-# if google test build is later than src build, it crashes. Run make -j 3 again then
+...
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- 
+-- INCLUDE_DIRECTORIES are:
+--   /XXXX/sample1_gtest/b2/extern/include
+--   /XXXX/sample1_gtest/src
+-- Configuring done (0.3s)
+-- Generating done (0.0s)
+...
 $ ctest
 Test project /home/hpjeon/hw/class/cmake/sample1_gtest/b2
     Start 1: run_test_2x
