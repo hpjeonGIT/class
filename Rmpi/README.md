@@ -19,7 +19,7 @@ $ sudo apt install libreadline6-dev
 $ sudo apt install libx11-dev libxt-dev libbz2-dev liblzma-dev libpcre2-dev libcurl4-gnutls-dev
 $ tar xvf R-4.6.0.tar.xz 
 $ cd R-4.6.0/
-$ ./configure --prefix=/home/hpjeon/sw_local/R/4.6.0
+$ ./configure --prefix=/home/hpjeon/sw_local/R/4.6.0 --enable-R-shlib  # R-studio needs libR.so
 $ make -j 10
 $ make install
 # OpenMPI install
