@@ -234,6 +234,22 @@ List fitDisp(...){
   #pragma omp for schedule(static)
   for (int i = 0; i < y_n; i++) { 
 ...  
+List fitBeta(...) {
+...
+  int y_n = y.n_rows;
+...
+  #ifdef _OPENMP
+    #pragma omp parallel
+    #pragma omp master
+    std::cout << "In fitBeta(). Number of threads for openMP = " << omp_get_num_threads() << std::endl;
+    std::cout << "y_n = " << y_n << std::endl;
+  #endif 
+...
+  #pragma omp parallel default(private) shared(y, nf, x, y_n, y_m, x_p, alpha_hat, beta_mat, beta_var_mat, contrast_num, contrast_denom, hat_diagonals, lambda, contrast, maxit, weights, useWeights, useQR, tol, minmu, large, iter, deviance)  
+  {
+  #pragma omp for schedule(static)
+  for (int i = 0; i < y_n; i++) {
+...    
 ```
 - Demo:
 ```bash
@@ -250,7 +266,7 @@ fitting model and testing
 Took 4.678947 sec
 ...
 $ export OMP_NUM_THREADS=4
-$ Rscript omp_run.R
+$ Rscript omp_run.R   # 
 ...
 Starting DESeq()
 estimating size factors
@@ -264,24 +280,10 @@ In fitDisp(). Number of threads for openMP = 4
 y_n = 22369
 fitting model and testing
 In fitBeta(). Number of threads for openMP = 4
-Took 3.900765 sec #<------------- Reduced but not much difference
+y_n = 22369
+Took 3.80582 sec # <------------- Reduced but not much difference
 ...
 ```
 - Confirmed that they yield the same results
 - Performance gain is very slight
   - Too small data set? (22,369 might not large enough for parallel processing)
-
-## Project 5
-- In order to use the above-mentioned OMP version of DESeq(), the regular package of DESeq2 must be removed then the OMP version must be installed 
-  - Due to namespace conflict, only one package is allowed
-  - How can we have OMP version in addition to the regular DESeq2 package?
-  - Let's add an extra function of DESeq_OMP() in the DESeq2 package
-- Adjusting DESeq2 source files
-  - Package in DESCRIPTION
-  - useDynLib() in NAMESPACE
-- OpenMP parallelization of DESeq2
-  - Update DESeq2.cpp with OpenMP parallelization
-  - The other files are not changed
-  - Only Namespace is changed as DESeq2_OMP
-- DESCRIPTION
-  - Regarding Version, only number and . are allowed. No character
