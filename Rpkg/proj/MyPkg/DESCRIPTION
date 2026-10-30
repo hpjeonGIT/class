@@ -1,0 +1,10 @@
+Package: MyPkg
+Title: A function returns x+1
+Version: 0.0.0.9000
+Authors@R: 
+    person("Byoungseon", "Jeon", email="bjeon11@gmail.com", role = c("aut","cre"))
+Description: A test package for R/BioConductor. 
+License: `use_gpl3_license()`
+Config/roxygen2/version: 8.1.1
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
