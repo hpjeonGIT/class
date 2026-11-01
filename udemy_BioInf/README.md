@@ -529,55 +529,295 @@ AED95813.1        84 LSSYVSDLENMI----------ATTSLTLTQ    104
   - Gene enrichment analysis
 
 ### 29. Gene prediction analysis
+- softberry.com -> site is down
+  - Use https://cello.life.nctu.edu.tw/
 
 ### 30. Gene structure prediction
+- https://gsds.gao-lab.org
+- Using:
+  - https://www.ncbi.nlm.nih.gov/nuccore/NM_000518.5?report=fasta
+  - https://www.ncbi.nlm.nih.gov/nuccore/NG_059281.1?report=fasta
+
+<img src="./chap30.png" height="300">
+
+- The site failed to respond
 
 ### 31. Genome annotation and visualization
 
+<img src="./chap31_download.png" height="300">
+
+- https://proksee.ca
+
+<img src="./chap31_proksee.png" height="200">
+
 ### 32. Gene location on chromosome
+- http://mg2c.iask.in/mg2c_v2.1/
 
 ### 33. Gene functional enrichment analysis
+- https://bioinformatics.sdstate.edu/go81/
 
 ### Assignment 5: Project 5: Genomics Analysis using Bioinformatics Tools
-
-<img src="./" height="100">
-<img src="./" height="100">
 
 ## Section 6: Proteomics
 
 ### 34. Introduction to Proteomics
+- Studying protein's structures, functions, and interactions
+- Protein structure and function
+  - Primary structure: linear amino acid sequence
+  - Secondary structure: local folding patterns - alpha-helices and beta-sheet
+  - Tertiary structure: overall 3D shape of a single protein
+  - Quaternary structure: multiple protein subunites forming a complex
+- Techniques in proteomics
+  - Mass spectrometry: identifies and quantifies proteins
+  - X-ray crystallography
+  - NMR spectroscopy
+  - PPI Assays
+- Protein identification and sequencing
+  - Sample preparation: proteins extracted and digested into peptides
+  - MS/MS Analysis
+  - Database search
+  - Protein identification
+- Quantitative proteomics
+  - Label-free techniques: direct comparison of peptide intensities b/w samples
+  - Labeling techniques
+    - SILAC: metabolic labeling
+    - iTRAQ: chemical labeling
+  - Differential expression: identify up/down-regulated proteins b/w conditions
+- Protein function prediction
+  - Sequence-based methods: 
+    - BLAST: Compares sequences
+    - HMMs: Detect remote homologs
+  - Structure-based methods: 
+    - Homology modeling: predicts 3D structure
+    - Docking: simulates interactions
+  - ML approaches
+  - Integrative methods: combine multiple approaches for accurate predictions
+- Protein-protein interaction networks
+  - Network contruction: integrate experimental data and predictions
+  - Database sources
+    - STRING: known and predicted interactions
+    - BioGRID: literature-curated
+  - Network analysis: identify hubs, modules, and functional clusters
+  - Biological insights: reveal protein complexes and cellular pathways
+- Data integration and systems biology
+  - Genomics
+  - Transcriptomics
+  - Proteomics
+  - Metabolomics
+- Bioinformatics tools for proteomics analysis
+  - MaxQuant: MS data analysis, Qunatification, identification
+  - Mascot: Database search, protein identification
+  - Cytoscape: network visualization, PPI network analysis
+  - DAVID: Functional annotation, Gene ontology enrichment
+- Analysis list for proteomics
+  - Motifs analysis
+  - Domains analysis
+  - Protein pathway
+  - Protein physical parameters
+
 ### 35. Motifs analysis
+- Motifs
+  - Protein motifs are short, conserved sequences within proteins that have a specific function or structural role
+  - These motifs are crucial for the protein's activity, stability, or interaction with other molecules
+- https://meme-suite.org/meme/
+- Sample Fast data from gemini:
+```
+>Motif_1_Zinc_Finger_C2H2
+MTEKYVCQVCGKTFRQKSDLVKHQRTHTGEKPYKCPECGKSFSQKSNLTRHQRVHTG
+>Motif_2_Leucine_Zipper
+MKQLQSQLKELQSQLKELQSQLKELQSQLKELQSQLKELQSQLKELQSQLKELQSQLK
+>Motif_3_SH2_Domain_Core
+MRKGGWEEGEIPNYLPRNYVTPKYIIVQGPKQTKRSGRYVRYHSVRK
+>Motif_4_EF_Hand_Calcium_Binding
+MDKDGDGTITTKELGTVMRSLGQNPTEAELQDMINEVDADGNGTIDFPEFLTMMARK
+>Motif_5_Walker_A_P_loop
+MAENKLTQLLNIGPSGSGKSTLLKLLAGATEGEYEWTKDGTPV
+```
+- Input GUI
+
+<img src="./chap35_meme_input.png" height="200">
+
+- Results summary
+
+<img src="./chap35_meme_result.png" height="100">
+
+- HTML results
+
+<img src="./chap35_html.png" height="300">
+
+- SVG results
+
+<img src="./chap35_svg.png" height="100">
+
+
 ### 36. Domains Analysis
+- Protein domains are distinct structural and functional unites within a protein. Each domain can evolve, function, and exist independently of the rest of the protein
+- https://www.ncbi.nlm.nih.gov/cdd/
+- Batch search at https://www.ncbi.nlm.nih.gov/Structure/bwrpsb/bwrpsb.cgi
+- For visualization: https://github.com/CJ-Chen/TBtools-II
+
 ### 37. PPI Networks
+- Protein-protein interactions (PPIs) refer to the physical contacts established b/w two or more protein molecules as a result of biochemical events and/or electrostatic forces
+- https://string-db.org
+
 ### 38. Protein physical parameters
+- https://web.expasy.org/protparam/
+
+
 ### Assignment 6: Project 6: Proteomics Analysis Using Tools
 
-## Section 7: 
+
+<img src="./" height="100">
+<img src="./" height="100">
+
+
+<img src="./" height="100">
+<img src="./" height="100">
+
+## Section 7: Evolutionary Bioinformatics
+
 ### 39. Introduction to evolutionary Bioinformatics
+- The role of bioinformatics in phylogenetic analysis
+  - Sequence alignment: aligning DNA or protein sequences to identify shared similarities and differences, providing clues about evolutionary relationship
+  - Tree construction: building phylogenetic trees based on sequence alignments, represending evolutionary relationship b/w species and their divergence times
+  - Data visualization
+- Computational Methods for Sequence Alignment
+  - Pairwise alignment: Aligns two sequences at a time, highlighting shared and divergent regions to estimate evolutionary distances.
+  - Multiple sequence alignment: Aligns multiple sequences simultaneously, identifying conserved regions and providing insights into evolutionary relationships.
+- Phylogenetic Tree Construction Algorithms
+  - Distance-based: Calculate evolutionary distances between species based on their sequence differences and use these distances to construct trees.
+  - Character-based: Analyze shared characteristics or mutations between species and use these data points to reconstruct evolutionary relationships.
+  - Bayesian methods: Utilize statistical models to estimate the probability of different evolutionary trees, providing a more robust analysis of relationships.
+- Comparative Genomics and Evolutionary Relationships
+  - Genome-Wide Comparisons: Analyzing entire genomes to identify regions of similarity and difference, revealing evolutionary relationships and shared ancestry.
+  - Gene Family Evolution: Studying the evolution of gene families across different species, providing insights into gene function and the adaptation of organisms.
+- Applications of evolutionary bioinformatics
+  - Drug discovery
+  - Disease research
+  - Conservation efforts: for endangered species
+- Challenges and limitations in the field
+  - Data quality
+  - Computational power
+  - Interpretation
+
 ### 40. Practical building Phylogenetic trees
+
 ### Assignment 7: Project 7: Phylogenic Analysis using Iqtree and Itol
 
-## Section 8: 
+## Section 8: Command Line Bioinformatics
 
 ### 41. Introduction to Linux
+- Bio-Linux: https://en.wikipedia.org/wiki/BioLinux
+  - Not linux distribution
+- Bioinformatics tools on Linux
+  - BLAST
+  - SAMtools
+  - HISAT2
+  - MaxQuant
+
 ### 42. Environment setup on Windows
+
 ### 43. Navigating the Linux file system
+
 ### 44. Basic Linux commands for bioinformatics
+
 ### 45. Installing bioinformatics tools
+- conda install -c bioconda fastqc
+- conda create -n bioinfo_env python=3.9
+- conda activate bioinfo_env
+
 ### 46. Bash scripting for bioinformatics
+
 ### Assignment 8: Project 8: Scripting for Bioinformatics
 
-## Section 9: 
+## Section 9: Transcriptomics
 
 ### 47. Introduction to Transcriptomics
+1. RNA transcript study: explore full set of RNA from genome
+2. Gene exrepssion insights: analyze regulation and activity patterns
+3. Biomedical applications: identify disease markers and drug targets
+- Central dogma and RNA's role
+  - DNA: genetic blueprint storage
+  - RNA: Transcriptomics focus: gene activity messenger
+  - Protein: Functional molecules in cells
+- Transcriptomics techniques
+  - RNA-seq: high accuracy RNA quantification
+  - Microarrays: simultaneous analysis of thousands of genes
+  - Single-cell RNA-Seq: Gene expression at individual cell level
+- RNA sequencing workflow
+  - Sample collection: extract RNA from biological samples
+  - Library preparation: convert RNA to cDNA for sequencing
+  - Sequencing: high-throughput reading of cDNA fragments
+  - Data analysis: map, quantify, and analyze expression levels
+- Data analysis in transcriptomics
+  - Alignment: map reads to reference genome
+  - Quantification: calculate transcript abundance levels
+  - Differential expression: identify gene changes across conditions
+- Bioinformatics tools  
+  - Alignment: STAR, HISAT2
+  - Quantification: RSEM, Cufflinks
+  - Expression Analysis: DESeq2, edgeR
+  - Visualization: IGV, heatmaps, PCA  
+- Challenges in transcriptomics
+  - Data complexity: requires significant computational resources
+  - Technical variability: platform differences impact results
+  - Interpretation: translating RNA data to biological insights
+- Future directions
+  - Gene expression insights
+  - Single-cell advancements
+  - Omics integration
+- Analysis list for the transcriptomics
+  - Microarray data analysis (GUI on GEO2R)
+  - RNA-seq data analysis using Linux CLI
+    - Quality control and preprocessing
+    - Alignment to reference genome
+    - Quantification
+
 ### 48. Microarray Data analysis
+- https://www.ncbi.nlm.nih.gov/geo/
+- GEO2R
+
 ### Assignment 9: Project 9: Microarray Analysis on Transcriptomics Data
 
-## Section 10 : 
+## Section 10 : RNA-Seq Data Analysis
 
 ### 49. Introduction to RNA-Seq Data Analysis
+- Defnition: RNA-seq is a high-throughput sequence method used to capture a snapshot of RNA presence and quantify in a genome at a give moment
+- Main function: it measures gene expression levels, discovers new transcripts, and detects variants and gene fusions
+- Capturing RNA landscape
+  - Gene expression
+  - Transcript discovery
+  - Variant detection
+  - Fusion detection
+- Single-end vs Paired-end reads
+  - Single-end reads: sequenced from one end of the DNA fragment
+  - Paired-end reads: sequenced from both ends of the DNA fragment
+- SRA database: a repository of sequencing data
+  - https://www.ncbi.nlm.nih.gov/sra
+- RNA sequencing data: insights into gene expression
+  - FASTQ format
+  - Gene expression
+- Data preprocessing: ensuring data quality
+  - Quality control: Access data quality with FastQC
+  - Quality trimming: remove a low-quality bases with Fastp
+- Reads alignment: matching reads to the genome
+  - Reference genome
+  - Genome indexing
+- Popular alignment tools
+  - BWA: fast and efficient. Large genomes/RNA-seq
+  - HISAT2: high-performance. RNA-seq data
+  - STAR: rapid and sensitive. Large RNA-seq datasets
+- Quantification: measuring gene expression levels
+  - FeatureCounts
+  - Gene expression
+
 ### 50. Retrieving RNA-Seq Data
+- Sample data: SRA GSM461177
+
 ### 51. Preprocessing of RNA-Seq Data
+
 ### 52. Indexing And Alignment To Reference Genome
+
 ### 53. Quantifications Of BAM Files
+
 ### Assignment 10: Final Project 10: RNA-Seq Data Analysis using Linux
