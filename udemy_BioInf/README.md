@@ -1,3 +1,766 @@
+# Learn Bioinformatics From Scratch (Theory & Practical)
+- Instructor: Naeem Mahmood Ashraf
+
+## Section 1: Module 1 Databases
+
+### 1. Definition of Databases
+- Data storage
+- Systematic storage
+- Some important terms
+  - Query
+  - Entry (or row/record)
+  - Field (or column/attribute)
+
+### 2. Database Design
+- Flat file format
+  - Easy to construct
+  - Slower
+  - Unsuitable for large data sets
+  - Lack knowledge discovery
+- Relational database
+  - SQL
+- Object oriented database
+  - Small DB
+
+### 3. Knowledge Discovery
+- Fundamental features of modern databases
+- Identifying hidden linkages amon datapoints which were unknown during data acquisition
+
+### 4. Biological Databases
+- Primary database
+  - Contains data directly from experiments like sequencing data, microarray expression analysis, X-ray crystallography
+  - NCBI
+  - PDB
+  - GEO
+  - ZINC
+- Secondary databases
+  - Contains information derived from pirmary or experimental data like translated sequences of protein
+  - CATH
+  - UniProt
+- Specialized databases
+  - contain information about one specific domain of biology
+  - HIV
+  - SNPs
+  - HCV
+  - ONIM
+  - GWAS Catalog
+
+### 5. Take Home Key Points
+- Most of bioinformatics analysis begins from the retrieving information from database
+
+### 6. Practical -1: NCBI Nucleotide Database
+- What is nucleotide?
+  - The basic structural building block of nucleic acids, specifically DNA and RNA
+  - 3 components of nucleotide
+    - A nitrogen-containing base (nucleobase): Carries genetic instructions. In DNA, the bases are adenine (A), thymine (T), guanine (G), and cytosine (C). In RNA, uracil (U) replaces thymine.
+    - A five-carbon (pentose) sugar: This is deoxyribose in DNA or ribose in RNA.
+    - A phosphate group: Connects to the sugar of the next nucleotide to form the backbone of the strand
+- https://www.ncbi.nlm.nih.gov/
+  - Primary DB: nucleotide
+  - Secondary DB: OMIM
+  - Specialized DB: 
+- FASTA format:
+  - Begins with `>`
+- Downloading multiple sequences in a single download
+
+### 7. Practical-2: Protein Databank (PDB)
+- https://www.rcsb.org
+- PDB ID is alpha-numeric four digit
+- Experimentally, 3D structures of proteins are determined using:
+  - X-ray crystallography
+  - Nuclear Magnetic Resonance (NMR)
+  - Cryo-Electron Microscopy (Cryo-EM)
+- Structure annotation helps to understand the structure
+
+### Quiz 1: Quiz 1
+
+### Assignment 1: Assignment 1
+- Download FASTA data of:
+  - KT749721.1: 2160+57 = 2217
+  - GBYX01270392.1: 660 + 53 = 713
+  - KR711802.1: 2160+27 = 2187
+- Find how many nucleotides are present in each gene
+- No info of nucleotides length in FASTA. GenBank format shows size of nucleotides in a simple view
+
+### 8. Recent Update About Protein Databank
+- Results of Alpha fold and Rosetta fold are added as of 2022
+- Experimental data in a flask symbol while computing model data in a symbol of a computer
+
+### Role Play 1: Searching the Sequences in Databases
+
+## Section 2: Module 2 Sequence Alignment
+
+### 9. What is Sequence Alignment?
+- The way to identify the evolutionary sequence similarities and differences is called Sequence Alignment
+
+### 10. Some Important Terms
+- Homologous sequences
+  - When sequences shared enough resemblance than they are said to be homologous and this phenomenon is called "Homology"
+  - Up to 40% identity, safe zone
+  - B/w 20-40%, twilight zone
+  - Less than 20%, mid night zone
+- In case of DNA, identiy == similarities
+- Identity vs similarity  
+
+### 11. Types of Sequence Alignment
+- Pair-wise sequence alignment
+  - Global pairwise sequence alignment: from head to tail
+    - Carried out b/w related sequences
+  - Local pairwise sequence alignment: some fraction
+    - B/w unrelated sequences
+- Multiple sequence alignment
+- How to know they are related or not?
+  - Look at the length of sequences
+  - Related sequences have comparable length
+
+### 12. What is Algorithms?
+- A logical way to solve problem
+- Algorithms for pairwise sequence alignment
+  - Dot matrix: qualitative type sequence comparison
+  - Dynamic programming: quantitative sequence comparison
+  - Word method: quantitative comparison but mostly used in DB searching
+
+### 13. Dot Matrix Algorithm; How Does It Work?
+- For AAAAGCTAGCT vs AAAAGCTAGCTA:
+  - Draw a dot when row vs col match
+  - Then draw a line along diagonal terms
+
+<img src="./part13_dot.png" height=200>
+
+### 14. Dot Matrix Algorithm; How to Interpret The Results?
+- From the diagonal lines drawn, we can find corresponding ranges
+  - Diagonal lines which are biased are local sequence alignment
+  - Centered diagonal lines are global sequence alignment
+
+<img src="./part14_dot.png" height=200>
+
+### 15. Dot Matrix Algorithm; Identification of Repeat Sequences
+
+### 16. Dot Matrix Algorithm; Advantages Vs Disadvantages
+- Pros
+  - Visual analysis of sequence comparison
+  - Tells us about repeat sequences
+  - Local and global alignment at the same time
+- Cons
+  - Qualitative type of sequence comparison
+  - Not depicting whole evolutionary history
+    - No info of deletion and insertion
+
+### 17. Practical-3: Dot Matcher for Qualitative Comparison of Sequences (EMBOSS Tool)
+- https://www.ebi.ac.uk/jdispatcher/
+  - https://www.ebi.ac.uk/jdispatcher/seqstats/emboss_dotmatcher
+
+<img src="./part17_menu.png" height=300>
+
+- Window size can be controlled to remove noises
+
+<img src="./part17_plot.png" height=200>
+
+### 18. Practical-3 (Optional): DotMatcher for Qualitative Comparison of Sequence
+- Dotmatcher is a qualitative technique to compare two sequences with one another
+- https://emboss.bioinformatics.nl/cgi-bin/emboss/dotmatcher
+- Comparison of sequences is also known as **Alignment**
+- Central diagonal line is global alignment
+- Continuous diagonal line indicates that more or less sequences on both axis are same
+- CNGA3 Human vs CNGA3 Mouse
+- Many small parallel lines
+
+### Assignment 2: Assignment 2
+- KT749721.1 vs KR711802.1 
+```fasta
+>KT749721.1 Neotrygon kuhlii clone NEOKU_c36860_g6_i1 cGMP-gated cation channel alpha-3 mRNA, complete cds
+ATGGCTACAGTCAGCACACAGCGGTCGTATCCAGCCCTTCACAGACTCTCGGTCAGAAACAATGATGAAG
+ATCTGGAAAGGATAGAAAATGGCAGCAGCAGGACCCACTCGTTGTGTGAAGACTCGTCGTCTGAGCTTCA
+GGCAGTGACGTCTGCAGAACCTAAAGACCAGCATGAATCCCGGCGGAGTTCTTTCACAGGCAATGGAGCT
+TTTGCCAGGCTAACTAATTTCATCATTGTGCTGAGGAACTGGGCCACCCAGCAAATCCACGATGAAGACC
+AGAGACCAGATTCGTTCTTGGAGCGCTTCAGGGGACCAGACATAAAGGATGTATCAAGCCGGGAGAGCAA
+CACGCAGTCAGCCGCAGGTGATCCTGAGCACCAAGGCCGGAGTAAGAAGATTCTGGCAAAGTTCAATGTC
+AACAAATGCAACAACGAAGAAAACTTTTGCCCCTTGGCACAGTTCAATGTAAACAACAACAACAACACCA
+ACAACAACAAGGATGGAGGCAAGGTGGAAGAAAAGAAAGACGTGAAAAAGGAGGAAAAGAAAGATGAGAA
+AAAGAAGGAAGAAAAGAAAGATATATACATTATTGATCCTGCAGACAATCTTTACTATCGATGGCTGTCC
+ATTATCGCAATGCCTGTGATGTACAACTGGTGTATGCTTGTGTGCAGAGCTTGTTTTGAAGAACTTCAAA
+CAAAGCACCTTGCTTTATGGTTGGTGTTGGATTATGTATCAGATGCGATCTACATCGTGGATTCAATTGT
+AAGGTTTCGAACAGGTTTTCTTGAACAAGGATTGCTGGTCAAAGACGGAAAGAAATTAAGAGATAATTAC
+ATGAAGATGCCTCAGTTTAAGTTGGATACCCTCTCCCTTTTACCAACAGATTTAGCATACCTTACAATGG
+GAATGAATTACCCTGAGGTGCGATTTAATCGTCTGTTCCGCTTCAGTCGAATGTTTGAATTCTTTGATCG
+TACAGAAACCAGAACAAACTACCCTAACGTATTTCGAATTGGAAATCTTGTTTTGTATATCCTCATCATT
+ATCCACTGGAATGGCTGCATTTATTATGCAATCTCCAAATCAATTGGGTTTGGCGTCGATACTTGGGTCT
+ATCCAAACATATCCCACCCTGAATATGGACGACTTAGCAGAAAATACATCTATTGCCTTTACTGGTCCAC
+CTTGACCTTGACCACCATTGGAGAAACCCCTCCTCCAGTAAAGGATGAGGAATTTCTGTTTGTGGTCATT
+GACTTCCTGGTGGGAGTGCTTATCTTTGCAACCATTGTTGGTAATGTGGGCTCCATGATCTCGAACATGA
+ATGCCTCTCGGGCCGAATTCCAATCCAAAATTGACGCCATCAAACAGTACATGCAGTTCCGTAAAGTGAG
+CAAAGACCTGGAGGTCAGGATCATTAAGTGGTTTGACTACTTGTGGATCAACAAGAAGAGTATAAATGAG
+AAGGAAGTCCTCAAGAGCCTACCTGACAAACTAAAGGCTGAAATTGCCATCAATGTCCACTTGGAAACAC
+TAAAGAAAGTCCGAATTTTTGCAGATTGCGAAGCTGGCCTCTTAATCGAGCTGGTGCTAAAGCTGCAACC
+TCAGGTATACAGCCCCGGAGACTACATCTGCCGCAAGGGAGACATTGGCAGAGAAATGTATATCATCAAA
+GAGGGCAAACTGGCGGTGGTGGCTGACGATGGGGTAACACAATTTGTGGTCTTGAGTGACGGCAGCTACT
+TTGGGGAAATCAGCATCTTAAACATAAAGGGCAGTAAAGCTGGGAACAGGCGAACAGCCAACATTAGAAG
+TATCGGCTACTCCGATCTCTTCTGCCTCTCCAAGGTTGATCTGATGGAAGCCCTGACTGAATATCCGGAT
+GCCAAGAAGATTCTGGAAGAAAAAGGACGTCAGATTCTGATGAAGGATAATTTAATCGATGAAGAAGCAG
+CAAAAGAGGGGGCAGACCCGAAGGACCTGGAAGAGAAAGTGGAAAGAATGGAGGCCTCCCTGGACACTTT
+GCAAACCAAGTTTGCCAGGCTCATGGCAGAGTACAAATCCACACAGCTCAAACTGAAGCAAAGGATCACA
+AAGGTGGAAAATAAAGTAAAGAACTTTGGCAGTGGATACCTGTCTGATGGCTTTGACAGTGCGACTGATA
+CCGAAGGAGGAAAATGA
+>KR711802.1 Synthetic construct Homo sapiens clone CCSBHm_00031025 CNGA3 (CNGA3) mRNA, encodes complete protein
+GTTCGTTGCAACAAATTGATGAGCAATGCTTTTTTATAATGCCAACTTTGTACAAAAAAGTTGGCACCAT
+GGCCAAGATCAACACCCAATACTCCCACCCCTCCAGGACCCACCTCAAGGTAAAGACCTCAGACCGAGAT
+CTCAATCGCGCTGAAAATGGCCTCAGCAGAGCCCACTCGTCAAGTGAGGAGACATCGTCAGTGCTGCAGC
+CGGGGATCGCCATGGAGACCAGAGGACTGGCTGACTCCGGGCAGGGCTCCTTCACCGGCCAGGGGATCGC
+CAGGCTGTCGCGCCTCATCTTCTTGCTGCGCAGGTGGGCTGCCAGGCATGTGCACCACCAGGACCAGGGA
+CCGGACTCTTTTCCTGATCGTTTCCGTGGAGCCGAGCTTAAGGAGGTGTCCAGCCAAGAAAGCAATGCCC
+AGGCAAATGTGGGCAGCCAGGAGCCAGCAGACAGAGGGAGAAGCGCCTGGCCCCTGGCCAAATGCAACAC
+TAACACCAGCAACAACACGGAGGAGGAGAAGAAGACGAAAAAGAAGGATGCGATCGTGGTGGACCCGTCC
+AGCAACCTGTACTACCGCTGGCTGACCGCCATCGCCCTGCCTGTCTTCTATAACTGGTATCTGCTTATTT
+GCAGGGCCTGTTTCGATGAGCTGCAGTCCGAGTACCTGATGCTGTGGCTGGTCCTGGACTACTCGGCAGA
+TGTCCTGTATGTCTTGGATGTGCTTGTACGAGCTCGGACAGGTTTTCTCGAGCAAGGCTTAATGGTCAGT
+GATACCAACAGGCTGTGGCAGCATTACAAGACGACCACGCAGTTCAAGCTGGATGTGTTGTCCCTGGTCC
+CCACCGACCTGGCTTACTTAAAGGTGGGCACAAACTACCCAGAAGTGAGGTTCAACCGCCTACTGAAGTT
+TTCCCGGCTCTTTGAATTCTTTGACCGCACAGAGACAAGGACCAACTACCCCAATATGTTCAGGATTGGG
+AACTTGGTCTTGTACATTCTCATCATCATCCACTGGAATGCCTGCATCTACTTTGCCATTTCCAAGTTCA
+TTGGTTTTGGGACAGACTCCTGGGTCTACCCAAACATCTCAATCCCAGAGCATGGGCGCCTCTCCAGGAA
+GTACATTTACAGTCTCTACTGGTCCACCTTGACCCTTACCACCATTGGTGAGACCCCACCCCCCGTGAAA
+GATGAGGAGTATCTCTTTGTGGTCGTAGACTTCTTGGTGGGTGTTCTGATTTTTGCCACCATTGTGGGCA
+ATGTGGGCTCCATGATCTCGAATATGAATGCCTCACGGGCAGAGTTCCAGGCCAAGATTGATTCCATCAA
+GCAGTACATGCAGTTCCGCAAGGTCACCAAGGACTTGGAGACGCGGGTTATCCGGTGGTTTGACTACCTG
+TGGGCCAACAAGAAGACGGTGGATGAGAAGGAGGTGCTCAAGAGCCTCCCAGACAAGCTGAAGGCTGAGA
+TCGCCATCAACGTGCACCTGGACACGCTGAAGAAGGTTCGCATCTTCCAGGACTGTGAGGCAGGGCTGCT
+GGTGGAGCTGGTGCTGAAGCTGCGACCCACTGTGTTCAGCCCTGGGGATTATATCTGCAAGAAGGGAGAT
+ATTGGGAAGGAGATGTACATCATCAACGAGGGCAAGCTGGCCGTGGTGGCTGATGATGGGGTCACCCAGT
+TCGTGGTCCTCAGCGATGGCAGCTACTTCGGGGAGATCAGCATTCTGAACATCAAGGGGAGCAAGTCGGG
+GAACTGCAGGACGGCCAACATCCGCAGCATTGGCTACTCAGACCTGTTCTGCCTCTCAAAGGACGATCTC
+ATGGAGGCCCTCACCGAGTACCCCGAAGCCAAGAAGGCCCTGGAGGAGAAAGGACGGCAGATCCTGATGA
+AAGACAACCTGATCGATGAGGAGCTGGCCAGGGCGGGCGCGGACCCCAAGGACCTTGAGGAGAAAGTGGA
+GCAGCTGGGGTCCTCCCTGGACACCCTGCAGACCAGGTTTGCACGCCTCCTGGCTGAGTACAACGCCACC
+CAGATGAAGATGAAGCAGCGTCTCAGCCAACTGGAAAGCCAGGTGAAGGGTGGTGGGGACAAGCCCCTGG
+CTGATGGGGAAGTTCCCGGGGATGCTACAAAAACAGAGGACAAACAACAGTTGCCAACTTTCTTGTACAA
+AGTTGGCATTATAAGAAAGCATTGCTTATCAATTTGTTGCAACGAAC
+```
+
+- Window size = 10:
+
+<img src="./part18_window10.png" height=200>
+
+- Window size = 50:
+
+<img src="./part18_window50.png" height=200>
+
+- Window size = 100:
+  - There are small parallel diagonal lines along with the central diagonal line. These small parallel lines indicate the local similarities between sequences
+
+<img src="./part18_window100.png" height=200>
+
+### 19. Dynamic Programming Method: How Does It Work?
+- Build a matrix along the row/col using each sequence
+  - Sequential analysis
+    - The sequence of operation matters
+  - 1 when matching, 0 otherwise
+  - If neighboring cells have values, then the highest score is allocated
+
+<img src="./part19_dyn_1.png" height="100">
+
+  - If neighboring cells have values and row/colum matches, then aggregate those values
+    - G-G =>1 then another 1 from neighbor
+
+<img src="./part19_dyn_2.png" height="100">
+
+  - The final matrix:
+
+<img src="./part19_dyn_final.png" height="100">
+
+### 20. How to Transform Scoring Matrix to Alignment?
+- "|" for matching, "." for substitute, "-" for deletion
+  - As we compare 4 sequence with 3 sequence, diagonal is broken
+
+<img src="./part20_dynProgram.png" height="200">
+
+### 21. Dynamic Programming; Some Important Terms to Understand
+
+1. Gaps are inserted in alignment when diagonal is broken, this is known as gap penalty
+2. When diagonal is broken and penalty is assigned, this is know as gap opening
+3. When diagonal line is resumed, this is known as gap closing
+4. Each gap represents deletion or insertion
+- Different scoring matrix methods are used for protein and nucleotide sequences like BLOSUM and PAM
+
+### 22. Comparison Between DotMatrix and Dynamic Programming
+
+| Dot-matrix | Dynamic Programming |
+|---------------------|------------------------|
+| Qualitative type of comparison | Quantitative type of comparison|
+| There is only information about substitution| There is information about substitution, deletion and insertion|
+| Related and unrelated sequences can be aligned using same protocol| Related and unrelated sequences are aligned using different type of protocols |
+| Easy to visualize the relationship b/w two | No visual analysis |
+| No idea about similarity and identity in case of amino acids |  Identity and similarity can be identified in protein sequences easily |
+| Same sequence can be compared to identify repeat sequences | Same sequences can not be aligned to identify repeat |
+
+### 23. Practical-4: Global Pairwise Sequence Alignment Using DNA Sequences
+- Needle algorithm from EMBOSS: https://www.ebi.ac.uk/jdispatcher/psa/emboss_needle
+- Menu:
+
+<img src="./part23_needle_menu.png" height="200">
+
+- Result:
+  - "-" in the sequence is gap
+
+<img src="./part23_needle_result.png" height="200">
+
+### 24. Practical-5: Pairwise Sequence Alignment Using Protein
+- Select protein option in the menu
+- Menu:
+
+<img src="./part24_menu.png" height="200">
+
+- Result:
+  - ":" for when both matching is similar
+  - As there is no insertion or deletion, gaps is 0%
+
+<img src="./part24_result.png" height="200">
+
+### 25. Practical-6: Local Pairwise Sequence
+- Water method in EMBOSS: https://www.ebi.ac.uk/jdispatcher/psa/emboss_water
+- When two proteins have different lengths
+
+### Assignment 3: Assignment 3
+- KT749721.1 vs KR711802.1 using EMBOSS NEEDLE
+```bash
+#=======================================
+#
+# Aligned_sequences: 2
+# 1: KT749721.1
+# 2: KR711802.1
+# Matrix: EDNAFULL
+# Gap_penalty: 10.0
+# Extend_penalty: 0.5
+#
+# Length: 2407
+# Identity:    1517/2407 (63.0%)
+# Similarity:  1517/2407 (63.0%)
+# Gaps:         410/2407 (17.0%)
+# Score: 4864.5
+# 
+#
+#=======================================
+```
+- Why Identity and Similarity are same?
+  - In DNA, identity and similarity is the same thing
+
+### 26. Introduction to Database Searching; BLAST
+- Biological databases
+  - NCBI nucleotide database contains million of sequences
+  - Protein databank contain many thousand 3D structure of protein and other biological molecules
+- How BLAST is designed
+  - High sensitivity: ability of algorithm to include all TRUE POSITIVE values  
+  - High specificity: ability of algorithm to exclude all FALSE POSITIVE vlaues
+  - Less time
+
+### 27. Type of Algorithms
+- Exhaustive algorithm: high sensitivity and high specificity, high amount of time
+- Heuristic algorithm: low sensitivity and low specificity, low amount of time
+- Limited computational resources
+  - Cannot turn on system for long time
+  - Most of users have limited primary memory (RAM)
+- Final choice?
+  - Word Algorithm
+
+### 28. How Does Word Algorithm Work? (Part-1)
+- Compares query sequence with millions of sequences present in database in few minutes
+  - Heuristic type of algorithm
+  - Six step algorithm
+
+### 29. How Does Word Algorithm Work? (Part-2)
+1. Break down a query into pieces
+    - Query: M R D P Y N K I L S
+    - Make a word from them: [PYN]
+2. Scan every word against all sequences present in the database
+3. One of the word matches with the sequence in database
+    - PYN vs PYN PFN PFQ, ...
+4. For each match score will be calculated using appropriate scoring matrix
+    - PYN=20, PFN=16, PFQ=10, ...
+5. Sequence from best matching pair will be selected from database to extend the alignment in both direction
+    - Extension to left or right
+6. Alignment will be extended until the score up to certain threshold
+
+### 30. A Important Term For Word Algorithm
+- HSP: High Scoring Pair
+  - When a fraction of query seq matches database seq, this decides HSP
+
+<img src="./part30_wordalgorithm.png" height="200">
+
+### 31. Important Statistical Values to Evaluate the BLAST Results
+- Query coverage
+
+<img src="./part31_querycoverage.png" height="200">
+
+- E-value
+  - When E-value is less than 1.E-6, good
+  - When E-value is larger than 1.E-6, false-positive
+
+<img src="./part31_Evalue.png" height="200">
+
+- Percentage Idenity or Maximum Identity
+  - How many exact matches are found during alignment
+  - In case of protein, this value is important
+- There are always chances of FALSE POSITIVE results
+- For ideal results:
+  - High query coverage
+  - Less than 1E-6 E-value
+  - High maximum identity
+- **Just considering E-value can be misleading**
+
+### 32. Different Type of BLAST Associated with NCBI Databases
+- Nucleotide BLAST: query is nucleotide and it is searched in nucleotide database
+- Protein BLAST: query is protein and it is searched in protein database
+- blastx: query is nucleotide and it is searched in protein database
+- tblastn: query is protein and it is searched in nucleotide database
+
+### 33. Practical -7: How to Use BLAST Program
+- https://blast.ncbi.nlm.nih.gov/Blast.cgi?PROGRAM=blastp&PAGE_TYPE=BlastSearch&LINK_LOC=blasthome
+  - Select blastp instead of Quick BLASTP in algorithm menu
+
+### Assignment 4: Assignment 4
+```fasta
+>Protein_sequence_BLAST_Assignment 
+MATVSTQRSYPALHRLSVRNNDEDLERIENGSSRTHSLCEDSSS
+ELQAVTSAEPKDQHESRRSSFTGNGAFARLTNFIIVLRNWATQQIHDEDQRPDSFLER
+FRGPDIKDVSSRESNTQSAAGDPEHQGRSKKILAKFNVNKCNNEENFCPLAQFNVNNN
+NNTNNNKDGGKVEEKKDVKKEEKKDEKKKEEKKDIYIIDPADNLYYRWLSIIAMPVMY
+NWCMLVCRACFEELQTKHLALWLVLDYVSDAIYIVDSIVRFRTGFLEQGLLVKDGKKL
+RDNYMKMPQFKLDTLSLLPTDLAYLTMGMNYPEVRFNRLFRFSRMFEFFDRTETRTNY
+PNVFRIGNLVLYILIIIHWNGCIYYAISKSIGFGVDTWVYPNISHPEYGRLSRKYIYC
+LYWSTLTLTTIGETPPPVKDEEFLFVVIDFLVGVLIFATIVGNVGSMISNMNASRAEF
+QSKIDAIKQYMQFRKVSKDLEVRIIKWFDYLWINKKSINEKEVLKSLPDKLKAEIAIN
+VHLETLKKVRIFADCEAGLLIELVLKLQPQVYSPGDYICRKGDIGREMYIIKEGKLAV
+VADDGVTQFVVLSDGSYFGEISILNIKGSKAGNRRTANIRSIGYSDLFCLSKVDLMEA
+LTEYPDAKKILEEKGRQILMKDNLIDEEAAKEGADPKDLEEKVERMEASLDTLQTKFA
+RLMAEYKSTQLKLKQRITKVENKVKNFGSGYLSDGFDSATDTEGGK
+```
+- Menu:
+
+<img src="./assgn4_menu.png" height="100">
+
+- Result:
+
+<img src="./assgn4_result.png" height="100">
+
+- From Aligments menu, manual inspection is available
+  - Bit-score provides a normalized measure of alignment quality that is independent of database size
+  
+<img src="./assgn4_bitscore.png" height="100">
+
+### 34. Optional: How to Use PSI-BLAST
+- Sensitivity means inclusion of all positive values
+- Performs multiple repetitions of search
+  - PSSM (Position Specific Score Matrix) or profile
+
+### 35. Multiple Sequence Alignment; An Introduction
+
+### 36. Algorithms for Multiple Sequence Alignment
+- Exhaustive algorithm
+  - Dynamic programming: costs too much time
+- Heuristic algorithm
+  - Local multiple sequence alignment
+    - Block based method
+  - Global multiple sequence alignment
+    - Progressive sequence alignment
+    - Iteractive sequence alignment
+
+### 37. Progressive Sequence Alignment Algorithm
+
+<img src="./part34_prog_1.png" height="100">
+
+<img src="./part34_prog_2.png" height="100">
+
+- From the distance matrix, A/B and C/D are closer each other
+- Consensus sequence: a sequence representing sampled sequences
+  - By looking at the most frequent nucleotide or amino acid at each column position (e.g., using a 50% rule or threshold)
+  - Gaps introduced during this alignment become part of the profile structure
+
+<img src="./part34_prog_3.png" height="100">
+
+<img src="./part34_prog_4.png" height="100">
+
+- Final consensus sequence is determined
+
+### 38. Tools for Multiple Sequence Alignment
+- Some famous MSA tools
+  - ClustalW
+  - T-COFFEE
+- Greedy nature of algorithm
+  - Once there is an error, there is always an error
+- ClustalW can only bu used for highly related sequences
+  - Global alignment only
+- T-COFFEE can handle global or local alignment
+
+### 39. Practical -9: How to Use T-COFFEE
+- https://www.ebi.ac.uk/jdispatcher/msa/tcoffee
+- Use output format as "HTML", not ClustalW
+- Conserved position (or conserved site/region) refers to a column or residue in a Multiple Sequence Alignment (MSA) where the amino acid or nucleotide is identical or chemically similar across multiple evolutionarily related sequences
+
+### 40. Practical -8: How to Use CLUSTAL-W
+- BioEdit: https://thalljiscience.github.io/page2.html
+
+### Assignment 5: Assignment 5
+```fasta
+>ANV21110.1 cGMP-gated cation channel alpha-3 [Neotrygon kuhlii]
+MATVSTQRSYPALHRLSVRNNDEDLERIENGSSRTHSLCEDSSSELQAVTSAEPKDQHESRRSSFTGNGAFARLTNFIIV
+LRNWATQQIHDEDQRPDSFLERFRGPDIKDVSSRESNTQSAAGDPEHQGRSKKILAKFNVNKCNNEENFCPLAQFNVNNN
+NNTNNNKDGGKVEEKKDVKKEEKKDEKKKEEKKDIYIIDPADNLYYRWLSIIAMPVMYNWCMLVCRACFEELQTKHLALW
+LVLDYVSDAIYIVDSIVRFRTGFLEQGLLVKDGKKLRDNYMKMPQFKLDTLSLLPTDLAYLTMGMNYPEVRFNRLFRFSR
+MFEFFDRTETRTNYPNVFRIGNLVLYILIIIHWNGCIYYAISKSIGFGVDTWVYPNISHPEYGRLSRKYIYCLYWSTLTL
+TTIGETPPPVKDEEFLFVVIDFLVGVLIFATIVGNVGSMISNMNASRAEFQSKIDAIKQYMQFRKVSKDLEVRIIKWFDY
+LWINKKSINEKEVLKSLPDKLKAEIAINVHLETLKKVRIFADCEAGLLIELVLKLQPQVYSPGDYICRKGDIGREMYIIK
+EGKLAVVADDGVTQFVVLSDGSYFGEISILNIKGSKAGNRRTANIRSIGYSDLFCLSKVDLMEALTEYPDAKKILEEKGR
+QILMKDNLIDEEAAKEGADPKDLEEKVERMEASLDTLQTKFARLMAEYKSTQLKLKQRITKVENKVKNFGSGYLSDGFDS
+ATDTEGGK
+>XP_041054593.1 cyclic nucleotide-gated channel cone photoreceptor subunit alpha [Carcharodon carcharias]
+MATISTQHSYPPVHRLSVRNNDDELERIENGNSRTHSLCEDTSSELQGVISMETKGQPESRRSSFAGRGALARFTQFILM
+LRNWTTQQTRSEDQRPDSFLERFRGPEMKDVSSRESNTQSAIGNLEHPVRSKNQWSLAHFNVNNCNNKDEGKEKLEANDK
+EAENKETGKVEEKKDENKEGKKDEKKEGKKDEKKKEEKKEVYVIDPAENLYYRWLSIIAVPVMYNWCMLVSRACFDELQV
+KNLALWLVLDYISDTIYIMDSAVRFRTGFLEQGLLVKDAKKLRENYMRMPQFKLDMLSLLPTDLSYIWLGSNYPEVRFNR
+LFRFGRMFEYFDRTETRTNYPNIFRIGNLVLYILIIIHWNGCVYYAISKSIGFGIDTWVYPNISHPEYGRLSRKYIYCLY
+WSTLTLTTIGETPPPVKDVEYLFVVIDFLVGVLIFATIVGNVGAMISNMNASRAEFQSKIDSIKQYMQFRKVSKDLEARI
+IKWFDYLWINKKSVDEKEVLKNLPDKLKAEIAINVHLDTLKKVRIFSDCEAGLLIELVLKLQPQVYSPGDYICRKGDIGR
+EMYIIKEGKLAVVADDGVTQFVVLSDGSYFGEISILNIKGSKAGNRRTANIRSIGYSDLFCLSKVDLMEALTEYPDAKKI
+LEEKGRQILMKDNLIDEEVAKVGADPKDLEEKVERMESSLDSLQTRFARLMAEYKSSQMKLKQRLTKVENRVRGYGSGYL
+SDELDSLTDTELEKQ
+>XP_026506077.1 cyclic nucleotide-gated channel cone photoreceptor subunit alpha-like isoform X1 [Terrapene carolina triunguis]
+MAKINTQHSYPAMHRLSVRTTDEEIERIENGFSRTHSLCEDTSSELQRVISMETRGLSESRRSSFTGTGAMARLSRFILS
+MRSWATRHLHHEDQRPDSFLERIRGPELKEVSSRESNTHSNLSNNEQPGKVKNHWSLARFNVNNSNNTNEDKNKEKNEAK
+EEKKEEKKEEKKEEKKDDKKDDKKKEEKKKEIFVIDPSSNLYYRWLTIIATPVFYNWCLLVCRACFDELQTKHIILWVVL
+DYSSDIIYILDTFVRFRTGFLEQGLLVQDEKKLRQHYTTTVQFRLDMLSLLPTDLAYLKLGLNYPELRFNRLLRFARLFE
+FFDRTETRTNYPNMFRIGNLVLYILIIIHWNACIYFAISKLIGFGTDSWVYPNVSHPEYGRLSRKYIYCLYWSTLTLTTI
+GETPPPVKDEEYLFVVIDFLVGVLIFATIVGNVGSMISNMNASRADFQAKIDSIKQYMHFRKVTKDLEARIIKWFDYLWT
+NKKTVDEQEVLKNLPDKLKAEIAINVHLDTLKKVRIFQDCEAGLLIELVLKLRPTVFSPGDYICKKGDIGREMYIIKEGK
+LAVVADDGITQFVVLSDGSYFGEISILNIKGSKSGNRRTANIRSIGYSDLFCLSKDDLMEALTEYPDAKKALEEKGRQIL
+MKDNLIDEEAAKAGADPKDLEEKVERLESTLDNLQTRFARLMAEYNSTQLKVKQRLTKVENKMKKYGSGFLSDGGEESVK
+TEEVEKKN
+>TFK05491.1 sodium/hydrogen exchanger 4 [Platysternon megacephalum]
+MAKINTQHSYPAMHRLSVRSTDEEIERIENGFSRTHSLCEDTSSELQRVISMETRGQSESRRSSFTGTGAMARLSRFILS
+LRSWVTRHLHHEDQRPDSFLERIRGPELKEVSSRESNTHSNLSNYEQPGKVKNHWSLARFNVNNSNNTNEDKNKEKKEAE
+EKKEEKKEEKKEEKKDDKKDDKKKEEKKKEIFVIDPSSNLYYRWLTIIATPVFYNWCMLVCRACFDELQTEHIILWLVLD
+YSSDTIYILDTFVRFRTGFLEQGLLVQDEKKLRQHYTTTVQFRLDMLSLLPTDLAYLKFGLNYPELRFNRLLRFARLFEF
+FDRTETRTNYPNMFRIGNLVLYILIIIHWNACIYFAISKLIGFGTDSWVYPNVTHPEYGRLSRKYIYSLYWSTLTLTTIG
+ETPPPVKDEEYLFVVIDFLVGVLIFATIVGNVGSMISNMNASRADFQTKIDSIKQYMHFRKVTKDLEARVIKWFDYLWTN
+KKTVDEQEVLKNLPDKLKAEIAINVHLDTLKKVRIFQDCEAGLLIELVLKLRPTVFSPGDYICKKGDIGREMYIIKEGKL
+AVVADDGITQFVVLSDGSYFGEISILNIKGSKSGNRRTANIRSIGYSDLFCLSKDDLMEALTEYPDAKKALEEKGRQILM
+KDNLIDEEAAKAGADPKDLEEKVERLESTLDNLQTRFARLMAEYNSTQLRVKQRLTKVENKMKKYGSGFLSDGGEESVKT
+EEVEKKN
+>XP_037754602.1 cyclic nucleotide-gated cation channel alpha-3 isoform X2 [Chelonia mydas]
+MAKINTQHSCPAMHRLSVRTIDEEIERIENGFSRTHSLCEDTSSELQRDISMETRGLSESRRSSFTGTGAMARLSRFVLS
+LRSWVTRHLHHEDQRPDSFLERIRGPELKEVSSRESNTHSNLSNYEQPGKVKSHWSLARFNVNNSNNTNEDKNKEKKEAK
+EEKKEEKKEEKKEEKKDDKKDDKKKEEKKKEIFVVDPSSNLYYRWLTIIATPVFYNWCMLVCRACFDELQTKHIILWLVL
+DYSSDILYILDTLVRFRTGFLEQGLLVQDEKKLRQHYTTTAQFRLDMLSLLPTDLAYLKLGFNYPELRFNRLLRFARLFE
+FFDRTETRTNYPNMFRIGNLVLYILIIIHWNACIYFAISKLIGFGTDSWVYPNVTYPEYGRLSRKYIYCLYWSTLTLTTI
+GETPPPVKDEEYLFVVIDFLVGVLIFATIVGNVGSMISNMNASRAEFQAKVDSIKQYMHFRKVTKDLEARVIKWFDYLWT
+NKKTVDEKEVLKSLPDKLKAEIAINVHLDTLKKVRIFQDCEAGLLIELVLKLRPTVFSPGDYICKKGDIGREMYIIKEGK
+LAVVADDGITQFVVLSDGSYFGEISILNIKGSKSGNRRTANIRSIGYSDLFCLSKDDLMEALTEYPDAKKALEEKGRQIL
+MKDNLIDEEAAKAGADPKDLEEKVERLESALDNLQTRFARLMAEYNSTQLRVKQRLTRVENKVKKYGSDSLSDGGEEPVK
+TEEVEKKN
+>XP_006137448.1 cyclic nucleotide-gated cation channel alpha-3 [Pelodiscus sinensis]
+MAKINTQNSYPAMHRVSVRTTDEDIERIENGFSRTNSLCEDTSSELQRVISMETRGLSESRRSSFTGTGAMARLSRFILS
+MRSWARGHLHDEDQRPDSFLDRIRGPDLKEAPNRESNTHSNLSNYEQPGKVKSHWSLARFNVNNSNNNEDKNKEKKEVKE
+EKKEEKKEEKKEEKKDDKKDDKKKEEKKKEIFVVDPSSNLYYRWLTIIATPVFYNWCLLVCRACFDELQSNHIILWVVLD
+YCSDIIYVLDIFVRFRTGFLEQGLLVQDEKKLRKHYTTTVQFRLDVLSLLPTDLAYLKLGLNYPELRFNRLLRFARLFEF
+FDRTETRTNYPNMFRIGNLVLYILIIIHWNACIYYAISKLIGFGTDSWVYPNVTHPEYGRLSRKYIYCLYWSTLTLTTIG
+ETPPPVKDEEYLFVVIDFLVGVLIFATIVGNVGSMISNMNASRAEFQAKVDSIKQYMHFRKVTKDLEARVIKWFDYLWTN
+KKTVDEKEVLKNLPDKLKAEIAINVHLDTLKKVRIFQDCEAGLLIELVLKLRPTVFSPGDYICKKGDIGREMYIIKEGKL
+AVVADDGITQFVVLSDGSYFGEISILNIKGSKSGNRRTANIRSIGYSDLFCLSKDDLMEALTEYPDAKKALEEKGRQILL
+KDNLIDEEAAKAGADPKDLEEKVERLESALDSLQTRFARLMAEYNSAQLKVKQRLTKVENKVKKYGSGFLSDGGEESIKP
+EEVEKKN
+>NXS41187.1 CNG1 protein [Balaeniceps rex]
+MAKINTQHSYPGMHRLSVRTTDEDIERIENGCIRTHSPCEDASSELQRVISAEGRHLSESQTSSFTGRGAMARLSRFVIS
+VRSWATRHLHHEDQRPDSFLERIRGPELIEVSSRQSNIRSFLGIRERPGGVNSHWPLARFNVNYSNNTNEDKKEEKKEVK
+EEKKEEKKEEKKEEKKEEKKDDKKDDKKKEEKKKEIFVIDPSSNIYYHWLTIIAVPVFYNWCMLVCRACFDELQVDHIKL
+WLVLDYSSDIIYVLDVFVRFRTGFLEQGLLVQDEKKLRDHYTKTVQFKLDVLSLLPTDLAYLKLGLNYPELRFNRLLRIS
+RLFEFFDRTETRTNYPNMFRIGNLVLYILIIIHWNACIYFAISKLIGFGTDSWVYPNVSVPEYGRLSRKYIYSLYWSTLT
+LTTIGETPPPVKDEEYLFVVIDFLVGVLIFATIVGNVGSMISNMNASRAEFQAKVDSIKQYMHFRKVTKDLEARVIKWFD
+YLWTNKKTVDEKEVLKNLPDKLKAEIAINVHLDTLKKVRIFQDCEAGLLIELVLKLKPTVFSPGDYICKKGDIGREMYII
+KEGKLAVVADDGITQFVVLSDGSYFGEISILNIKGSKSGNRRTANIRSIGYSDLFCLSKDDLMEALTEYPEAKKALEEKG
+RQILMKDNLIDEEAAKAGADPKDLEEKVERLETALDTLQTRFARLLAEYTSSQQKVKQRLARVETRVKKYGSGTLSVGEE
+ESEQPEEEKK
+>NXE50928.1 CNG1 protein [Casuarius casuarius]
+MAKINTQHSYPATHRLSVRNTDEDIERIENGFIRTHSLCEDTSSELQRVISVEGRGLPESQTSSFTGRGAMARLSQFLVS
+LRSWATRHLHHEDQRPDSFLERIRGPELIEVSSRQNKIHASLGVDEQPGRLNSHWPLASFNVNYSNNTNEDKKEEKKEVK
+EEKKEEKKEEKKEEKKDDKKDDKKDDKKKEEKKREIFVIDPSSNMYYNWLTIIAAPVFYNWCMIVCRACFDELQTDHVRL
+WLVLDYCSDIIYVFDMFFRFRTGFLEQGLLVRDEKKLRHHYTKTIQFKLDVLSLLPTDLAYLKLGLNYPELRFNRLLRIS
+RLFEFFDRTETRTNYPNMFRIGNLVLYILIIIHWNACIYFAISKLIGFGTDSWVYPNVSIPEYGRLSRKYIYSLYWSTLT
+LTTIGETPPPVKDEEYLFVVIDFLVGVLIFATIVGNVGSMISNMNASRAEFQAKIDSIKQYMHFRKVTKDLEARVIKWFD
+YLWTNKKTVDEKEVLKNLPDKLKAEIAINVHLDTLKKVRIFQDCEAGLLIELVLKLKPTVFSPGDYICKKGDIGREMYII
+KEGKLAVVADDGITQFVVLSDGSYFGEISILNIKGSKSGNRRTANIRSIGYSDLFCLSKDDLMEALTEYPDAKKALEEKG
+RQILMKDNLIDEEAAKAGADPKDLEEKIERLETALDTLQTRFARLLAEYTSSQQKVKQRLAKVENRVKKYGSGTVSEAEA
+PKPEEEKK
+>NXI97872.1 CNG1 protein [Psophia crepitans]
+MAKINTQHSYPGMQRLSVRTTDEDIERLENGRIRTHSLCEDASSELQRVISVEGRHLPESQTSSFTGRGAMARLSRFVVS
+VRSWATRHLHHEDQRPDSFLERFRGPELIEVSSRQSNIRSFLGIRQRPGGVNSHWPLARFNVNYSNNTNEDKKEEKKEVK
+EEKKEEKKEEKKDDKKDDKKKEEKKKEIFVIDPSSNIYYNWLTIIAAPVFYNWCMLVCRACFDELQVDHIKLWLFLDYGS
+DIVYVLDMFVRFRTGFLEQGLLVKDEKKLRDHYTETMQFKLDVLSLLPTDLAYLKLGLNYPELRFNRLLRISRLFEFFDR
+TETRTNYPNMFRIGNLVLYILIIIHWNACIYFAISKVIGFGTDSWVYPNVSIPEYGRLSRKYIYSLYWSTLTLTTIGETP
+PPVKDEEYLFVVIDFLVGVLIFATIVGNVGSMISNMNASRAEFQAKVDSIKQYMHFRKVTKDLEARVIKWFDYLWTNKKT
+VDEKEVLKNLPDKLKAEIAINVHLDTLKKVRIFQDCEAGLLIELVLKLKPTVFSPGDYICKKGDIGREMYIIKEGKLAVV
+ADDGITQFVVLSDGSYFGEISILNIKGSKSGNRRTANIRSIGYSDLFCLSKDDLMEALTEYPEAKKALEEKGRQILMKDN
+LIDEEAAKAGADPKDLEEKIEKLETALDTLQTRFARLLAEYTSSQQKVKQRLARVETRVKKYGSGTLSVGESEAGKPEEE
+KK
+```
+- Sequences are conserved considering the amounts of "*" signs
+- "---" dashes are INDELS (insertion and deletion)
+- The strick (*) signs indicate the identical amino acids.
+- The colon (:) indicates a high level of similarity while dot signs (.) show moderately similar amino acids.
+
+<img src="./assgn5_alignment.png" height="150">
+
+### Quiz 2: Quiz 2
+
+### Role Play 2: Explain Your Junior What you have Learned of Sequence Alignment
+
+## Section 3: Module 3: Genomic Bioinformatics
+
+### 41. Introduction of Module 3
+- We will learn:
+  - Deoxyribo nucleotide (DNA)
+  - Features of Gene
+  - Regulatory Elements of Gene
+  - Difference b/w Eukaryotic and Prokayrotic Genes
+  - Difference b/w Eukaryotic and Prokayrotic Regulatory Element
+  - Algorithms for Predictions of Prokaryotic Genes
+  - Algorithms for Predictions of Prokaryotic Genes Regulatory elements
+  - Algorithms for Predictions of Eukaryotic Genes
+  - Algorithms for Predictions of Eukaryotic Genes Regulatory Elements
+  - Microarray studies and its data analysis
+
+### 42. What is DNA?
+- Double stranded long helical molecule
+- Its polymer and monomers are nucleotides
+- In nucleotide there can be four different nitrogenous bases
+  - Adenine (A) – A double-ringed purine that pairs with thymine via two hydrogen bonds.
+  - Thymine (T) – A single-ringed pyrimidine that pairs with adenine via two hydrogen bonds.
+  - Guanine (G) – A double-ringed purine that pairs with cytosine via three hydrogen bonds.
+  - Cytosine (C) – A single-ringed pyrimidine that pairs with guanine via three hydrogen bonds.
+
+### 43. Where Is Our DNA is Located?
+- In nucelus of a cell
+
+### 44. What Is Role of DNA?
+- Controls of physical features
+- How does DNA control phenotype?
+  - Non-coding DNA
+  - Coding DNA (Gene)
+    - Makes protein: structural and functional unit of a body
+- Processes of making protein (gene expression)
+  - Transcription: DNA to mRNA
+  - Translation: mRNA to protein
+
+### 45. What Does Gene Have?
+- What does coding DNA have?
+  - ORF (Open Reading Frame)
+  - Genetic code is specific combination of three nucleotides
+  - Degeneracy
+  - Exons and Introns
+- What else coding DNA have?
+  - Promoter sequences + Coding sequences + Terminatin sequences  
+  - Some more features:
+    - Start code: always A U G
+    - Stop code: U A A
+    - Transcription start site
+
+### 46. Algorithms for Gene Prediction-1
+- Difference b/w Eukaryotes & Prokaryotes genes
+  - Prokaryotic gene structure is very different from Eukaryotic one
+    - Tandem arrangement of genes and no introns in Prokaryotes
+    - Disperse arrangements of genes and lot of introns in Eukaryotes
+- Difference b/w Eukaryotes & Prokaryotes
+  - Ribosomal binding site
+    - In Prokaryotic genes, this sequence is known as Shine-Delgarno sequence (AGGAGGT)
+    - In Eukaryotic genes, this sequence is known as Kozak Sequence (CCGCCATGG)
+    - In Eukaryotic genes, CpG island may also be present especially with Housekeeping Genes (CGCGCGCG)
+
+
+### 47. Algorithms for Gene Prediction-2
+
+### 48. GC-Bias and Test Code; An Ab-initio Type of Algorithm
+### 49. Introduction of Markov Model (Part-1)
+### 50. Introduction of Markov Model (Part-2)
+### 51. Machine Learning and Gene Prediction
+### 52. Practical-10: Prediction of Prokaryotic Gene
+### Assignment 6: Assignment 6
+### 53. Practical-11: Prediction of Eukaryotic Genes
+### Assignment 7: Assignment 7
+### 54. What is Sanger Sequencing to Sequence the DNA?
+### 55. Sanger Sequencing Data and Issues
+### 56. Practical-12: How Check Quality of Sanger Sequencing Data?
+### Quiz 3: Quiz 3
+
+
+<img src="./" height="100">
+<img src="./" height="100">
+
+## Section 4: Module 4: Structural Bioinformatics
+
+### 57. Introduction of Module 4
+### 58. What is Protein? (Part-1)
+### 59. What is Protein? (Part-2)
+### 60. Some Important Points
+### 61. Role of Amino Acids in 3D Structure
+### 62. Peptide Bond; A link between Amino Acids
+### 63. Double Bond like Character in Peptide Bond & Ramachandran Plot
+### 64. Forces Stabilizing The Protein Structure
+### 65. Secondary Structures of Proteins
+### 66. Practical 13: Visualization of Protein Structure in Pymol
+### 67. Practical 13(A): Visulization of Protein Structure in Chimera (Part-1)
+### 68. Practical 13(B): Visulization of Protein Structure in Chimera (Part-2)
+### 69. Why Protein Structure Prediction is So Important?
+### 70. Protein Secondary Structure Prediction Algorithms (Part-1)
+### 71. Protein Secondary Structure Prediction Algorithms (Part-2)
+### 72. Practical-15: Prediction of Globular Protein Secondary Structure
+### Assignment 8: Assignment 8
+### 73. Algorithm for Secondary Structure Prediction of Transmembrane Proteins
+### 74. Practical-16: Prediction of Transmembrane Helix Secondary Structure
+### Assignment 9: Assignment 9
+### 75. 3D Structure Prediction Algorithms
+### 76. Homology Based Algorithm (Part-1)
+### 77. Homology Based Algorithm (Part-2)
+### 78. Homology Based Algorithm (Part-3)
+### 79. Homology Based Algorithm (Part-4)
+### 80. Model Validation & Draw back of Homology Based Algorithm
+### 81. Practical-17: Prediction of 3D structure Using Homology Modeling (Mdeller)
+### Assignment 10: Assignment 10
+### 82. Threading Algorithm for 3D Structure Prediction
+### 83. Practical-18: Prediction of 3D structure Using Threading Technique (I-TASSER)
+### Assignment 11: Assignment 11
+### 84. (Very Important) Practical Learn How to Use Alpha-Fold 2
+### 85. Practical Learn How to Use Alpha-Fold3
+### Assignment 12: Assignment 12
+### 86. How to Make Publication Quality Images In Pymol? (Very Important)
+### Quiz 4: Quiz 4
+### 87. (Optional) Practical-18.1: Use of InterPro
+### 88. (Optional) Practical-20: How to Perform Docking Easily Using Vina
+### 89. (Optional) Practical-21: How to Analyze the Docking Data
+### 90. (Optional) Practical 3: ZINC Database for Drug Searching
+### 91. Update Another GOR-IV Server for Secondary Structure Predictions
+3min
+
+### 92. What is Evolution and Phylogenetics
+### 93. Some Important Terms To Understand Phylogenetic Tree
+### 94. Different Type of Phylogenetic Trees
+### 95. Steps To Construct Phylogenetic Tree
+### 96. Selection of Molecular Marker for Tree Construction
+### 97. Alignment for Tree Construction
+### 98. Evolutionary Model Selection
+### 99. Methods To Construct Tree
+### 100. Validation of Tree By Bootstrapping
+### 101. Practical -19: Building Phylogenetic Tree
+### Assignment 13: Assignment 12
+### 102. Practical-19.1: Building Beautiful Circular Phylogenetic Tree
+### Quiz 5: Quiz 5
+
+### 103. Practical-22: How to install Linux in Windows for Bioinformatics Analysis
+### 104. Practical-24: How to Download Chemsketch
+### 105. Practical-25: Ligand Drawing and Making of Ligand 3D Structure
+### 106. How to Use AI to Do Literature Review Smartly
+11min
+
+
+
+
+
 # Learn Bioinformatics - Beginner to Master Through Projects
 - Instructor: Rafiq Ur Rehman
 
@@ -663,16 +1426,7 @@ MAENKLTQLLNIGPSGSGKSTLLKLLAGATEGEYEWTKDGTPV
 ### 38. Protein physical parameters
 - https://web.expasy.org/protparam/
 
-
 ### Assignment 6: Project 6: Proteomics Analysis Using Tools
-
-
-<img src="./" height="100">
-<img src="./" height="100">
-
-
-<img src="./" height="100">
-<img src="./" height="100">
 
 ## Section 7: Evolutionary Bioinformatics
 
@@ -815,9 +1569,128 @@ MAENKLTQLLNIGPSGSGKSTLLKLLAGATEGEYEWTKDGTPV
 - Sample data: SRA GSM461177
 
 ### 51. Preprocessing of RNA-Seq Data
+```bash
+#!/bin/bash
+
+#Install FastQC and Fastp installed
+#sudo apt install fastqc
+#sudo apt install fastp
+
+# Create directories for output
+mkdir -p FastQC_Results Preprocessed_FASTQ
+
+# Loop through all FASTQ files in the input directory
+for file in ./Input_FASTQ/*.fastq; do
+    # Extract the file name without the path and extension
+    filename=$(basename $file .fastq)
+    
+    # Run FastQC
+    fastqc $file --outdir=FastQC_Results
+    
+    # Run Fastp
+    fastp \
+    -i $file \
+    -o Preprocessed_FASTQ/${filename}_trimmed.fastq \
+    -h Preprocessed_FASTQ/${filename}_fastp.html \
+    -j Preprocessed_FASTQ/${filename}_fastp.json
+
+done
+
+echo "Preprocessing complete. Results are in FastQC_Results and Preprocessed_FASTQ directories."
+```
 
 ### 52. Indexing And Alignment To Reference Genome
+```bash
+#!/bin/bash
+
+# Activate your conda environment with BWA installed (if applicable)
+#sudo apt install bwa
+
+# Path to the reference genome FASTA file
+REFERENCE_GENOME=./ReferenceData/genome.fa
+
+# Directory to store the BWA genome index
+GENOME_INDEX_DIR=./GenomeIndex
+
+# Create the directory if it does not exist
+mkdir -p $GENOME_INDEX_DIR
+
+# Change to the genome index directory
+cd $GENOME_INDEX_DIR
+
+# Run BWA to generate the genome index
+bwa index $REFERENCE_GENOME
+
+echo "Genome indexing complete. The index files are stored in the GenomeIndex directory."
+```
+- `bwa index genome.fs`
+```bash
+#!/bin/bash
+
+# Activate your conda environment with BWA and SAMtools installed
+#sudo apt install bwa
+#sudo apt install samtools
+
+# Paths to the reference genome and directories
+GENOME_INDEX_PATH=./GenomeIndex/genome.fa
+INPUT_FASTQ_DIR=./Input_FASTQ
+OUTPUT_DIR=./Aligned_Results
+
+# Create output directory if it does not exist
+mkdir -p $OUTPUT_DIR
+
+# Loop through all paired-end FASTQ files and run BWA-MEM for alignment
+for R1_FILE in $INPUT_FASTQ_DIR/*_1_subsampled_trimmed.fastq; do
+    base_name=$(basename $R1_FILE _1_subsampled_trimmed.fastq)
+    R2_FILE=$INPUT_FASTQ_DIR/${base_name}_2_subsampled_trimmed.fastq
+    
+    if [[ -f $R1_FILE && -f $R2_FILE ]]; then
+        # Align reads to the reference genome using BWA-MEM
+        bwa mem -t 24 $GENOME_INDEX_PATH $R1_FILE $R2_FILE > $OUTPUT_DIR/${base_name}.sam
+        
+        # Convert SAM to BAM, sort and index using SAMtools
+        samtools view -bS $OUTPUT_DIR/${base_name}.sam > $OUTPUT_DIR/${base_name}.bam
+        samtools sort -o $OUTPUT_DIR/${base_name}_sorted.bam $OUTPUT_DIR/${base_name}.bam
+        samtools index $OUTPUT_DIR/${base_name}_sorted.bam
+        
+        # Remove the intermediate SAM file to save space
+        rm $OUTPUT_DIR/${base_name}.sam
+    else
+        echo "Paired file for $R1_FILE not found. Skipping..."
+    fi
+done
+
+echo "Alignment complete. Results are in the Aligned_Results directory."
+```
+- BWA and samtools tutorial: https://dibsi-rnaseq.readthedocs.io/en/latest/variant-calling.html
 
 ### 53. Quantifications Of BAM Files
+```bash
+#!/bin/bash
+
+# Activate your conda environment with featureCounts installed
+#sudo apt install subread
+
+# Paths to the input BAM files, annotation file, and output directory
+BAM_DIR=./Aligned_Results
+ANNOTATION_FILE=./ReferenceData/genes.gtf
+OUTPUT_DIR=./Results/Counts
+
+# Create output directory if it does not exist
+mkdir -p $OUTPUT_DIR
+
+# Run featureCounts for paired-end reads
+featureCounts -T 4 -s 2 -p -a $ANNOTATION_FILE -o $OUTPUT_DIR/FeatureCounts.txt $BAM_DIR/*_sorted.bam
+
+# Process the FeatureCounts Matrix to keep only the columns needed in downstream analysis
+cut -f1,7-12 $OUTPUT_DIR/FeatureCounts.txt > $OUTPUT_DIR/FeatureCounts_Mod.txt
+
+# Additional processing to clean up the column names (optional)
+# Example: Remove the first line, path, and _sorted.bam from the file to make simple column names
+# You can edit the file manually using a text editor or further automate the process if needed
+
+echo "Read counting complete. Results are in the Counts directory."
+```
 
 ### Assignment 10: Final Project 10: RNA-Seq Data Analysis using Linux
+
