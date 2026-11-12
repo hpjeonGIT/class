@@ -55,6 +55,9 @@
     - A nitrogen-containing base (nucleobase): Carries genetic instructions. In DNA, the bases are adenine (A), thymine (T), guanine (G), and cytosine (C). In RNA, uracil (U) replaces thymine.
     - A five-carbon (pentose) sugar: This is deoxyribose in DNA or ribose in RNA.
     - A phosphate group: Connects to the sugar of the next nucleotide to form the backbone of the strand
+- bp: base pair
+  - Definition: A base pair consists of two complementary nucleotide bases (adenine paired with thymine/uracil, or guanine paired with cytosine) held together by hydrogen bonds in double-stranded DNA or RNA
+  - Usage: It is the standard unit of measurement used to express the length or size of a nucleic acid sequence (such as a DNA fragment, gene, or read length from sequencing)   
 - https://www.ncbi.nlm.nih.gov/
   - Primary DB: nucleotide
   - Secondary DB: OMIM
@@ -672,60 +675,390 @@ KK
     - In Eukaryotic genes, this sequence is known as Kozak Sequence (CCGCCATGG)
     - In Eukaryotic genes, CpG island may also be present especially with Housekeeping Genes (CGCGCGCG)
 
-
 ### 47. Algorithms for Gene Prediction-2
+- Algorithms used for gene and regulatory elements prediction
+  - Ab-initio based
+  - Homology based
+  - Consensus based
+- Currently, Ab-initio based algorithms using hidden Markov Model and ML are famous
 
 ### 48. GC-Bias and Test Code; An Ab-initio Type of Algorithm
+- GC content refers to the percentage of nitrogenous bases in a DNA or RNA molecule that are either guanine (G) or cytosine (C) out of the total bases (A + T + G + C)
+  - Understanding GC content is essential in detecting coding sequences, as regions with higher guanine and cytosine content are often indicative of functional genes. This concept is fundamental in genetic analysis, reinforcing the relationship between GC bias and gene identification
+- GC bias is a sequencing artifact where genomic regions with extreme (high or low) GC content are over- or under-represented 
+- TestCode is a statistical algorithm used to identify protein-coding regions in a DNA sequence
+
 ### 49. Introduction of Markov Model (Part-1)
+- For prediction of genes
+- Markov & hidden Markov model
+  - Chain of event which occur one after another
+  - Eachj event determines the probability of next event
+  - This probability is known as Transition Probability
+  - If transition probability is affected by non-observed factors then this is known as Hidden Markov Model (HMM)
+  - In ab-initio algorithms, HMM is used to make gene prediction
+
 ### 50. Introduction of Markov Model (Part-2)
+- Hidden Markov Model & Gene prediction
+  - Zero order Markov model
+  - First order Markov model
+  - Second order Markov model
+  - ...
+  - Sixth order Markov moddel is normally used to predict coding regions
+
 ### 51. Machine Learning and Gene Prediction
+- Using features of hexamer frequencies (sixth-order Markov model), intron start and intron end site, transcription start site, and so on
+
 ### 52. Practical-10: Prediction of Prokaryotic Gene
+- https://proksee.ca
+- After uploading FASTA data, Tools -> Bakta
+  - Genetic code: 11 - Bacterial and Plant Plastid
+  - Gram Type: Unknown
+  - Submit
+  - In summary, find CDS
+  - Click "Add features to the MAP"
+  - Use default option
+- Try to add "GC Content"
+- Circular map vs linear map
+
 ### Assignment 6: Assignment 6
+- Using NZ_ABKZ01000654.1 from NCBI database
+  - FASTA file is 26KB
+- How many total genes are predicted by Bakta?
+  - 27
+  - OriC is not counted
+- Please click on HAD IB Family Hydrolyase gene and tell its start and end position?
+  - Start: 4,876 bp
+  - Stop: 5,499 bp
+- Please copy and paste the protein sequence of HAD IB Hydrolyase gene.
+  - DNA:
+```
+ATGAACGAGACCGTGTCCCTCGAAACACGCGAAGTACGCTTTCTCTCCGTGTTCGACTTCGACGGTACGCTGACATACCGAGACAGCTTCGTGCCCTTCCTGCGCTTCGCCTTCGGCAACCGAGTGTTCGTCCGCCGCATGCTGCGCATGGCAGGACCCAGCCTGGCCTATCTCTGCCGGCGTATCGGCCGCGACGACCTGAAGGCGCGCCTGATCGCCACCTTCCTCACCGATGTGCCCGTACATGTGCTGGAAGAGCGGGCGCTGGCCTACCAGAACCGCTTCTGGGAAACACTGATGCGTCCCCACGCATTGACCGCGGTGGCCGACCAGGTCAGCAGCGGCAGCACCGTGACCATCTGTTCCGCCTCCCCTTCGCTGCTACTCAGGCCGTTCGCCGAGAAGCTCGGCGTGCACCTGATCGCCACCGAGCTGGAAGTGGTAGACGGCGTACTGACCGGCAGGATCGTCGGCCGCAACTGCCGGCGCGACGAGAAAGTCTGCCGCCTGGAGCGGCACTACGGTCCGCTGACCCAATACTCCCTACGCGCCTGGGGCGACTCGCGCGGCGATACGGAACTGCTGGCGGCGGCGCTGGAGCGCTTCTGGAAACCGTTCCGCTGA
+```
+  - AA:
+```
+MNETVSLETREVRFLSVFDFDGTLTYRDSFVPFLRFAFGNRVFVRRMLRMAGPSLAYLCRRIGRDDLKARLIATFLTDVPVHVLEERALAYQNRFWETLMRPHALTAVADQVSSGSTVTICSASPSLLLRPFAEKLGVHLIATELEVVDGVLTGRIVGRNCRRDEKVCRLERHYGPLTQYSLRAWGDSRGDTELLAAALERFWKPFR*
+```
+
+<img src="./assgn6_proksee.png" height="300">
+
 ### 53. Practical-11: Prediction of Eukaryotic Genes
+- https://bioinf.uni-greifswald.de/augustus/
+- Alternative transcripts
+  - None/few/middle/many
+
 ### Assignment 7: Assignment 7
+- NG_000007.1 from NCBI database
+  - ORGANISM: Homo sapiens
+- Total 4 genes are predicted
+
 ### 54. What is Sanger Sequencing to Sequence the DNA?
+
 ### 55. Sanger Sequencing Data and Issues
+- Sanger sequencing limitation
+  - Slow
+  - Noise data especially at start and end
+  - In case of multiple files, hard to compare quality data
+
 ### 56. Practical-12: How Check Quality of Sanger Sequencing Data?
+- https://ugene.net
+
 ### Quiz 3: Quiz 3
-
-
-<img src="./" height="100">
-<img src="./" height="100">
 
 ## Section 4: Module 4: Structural Bioinformatics
 
 ### 57. Introduction of Module 4
+- We will learn:
+  - Amino acid: buidling block of a protein
+  - Peptide bonds
+  - Ramachandran plot and its significance
+  - Protein secondary structure
+  - Protein 3D structure
+  - Protein secondary structure prediction
+  - Protein 3D structure prediction
+  - Protein 3D structure visualization in Pymol
+  - Protein-ligand docking
+  - Molecular dynamics simulation for proteins
+
 ### 58. What is Protein? (Part-1)
+- Proteins are structural and functional unit of life
+- Two types of proteins in our body
+  - Fibrous protein: muscle, hair, nail, ...
+  - Globular protein: water soluble. Enzyme, ...
+- Proteins are polymer and made up of amino acids
+```
+      H
+      |
+H2N - C - COOH
+      |
+      R
+```
+
 ### 59. What is Protein? (Part-2)
+- Amino acids
+  - Polar
+    - Polar charged
+    - Polar uncharged
+  - Non-polar
+
 ### 60. Some Important Points
+- Protein folding: primary structure of proteins transit into secondary structure of protein
+- In 3D strucutre, polar and charged amino acids are present at surface of protein
+- In 3D structure, hydrophobic amnio acids are present in the core
+
 ### 61. Role of Amino Acids in 3D Structure
+
+| Amino acid type | Name of amino acids | Role in structure |
+|---------|-----------------------|--------------|
+| Small Non-polar| Glycine, Proline, Alanine | Proline and Glycine are normally present in coils and loops. They disrupt the secondary structures
+| Small Polar| Serine, Cystine, Threonine | Involve in post-translation modification and enzymatic reaction due to the polar groups present in them|
+| Large Non-polar Aliphatic |  Leucine, Isoleucine, Methionine, Valine | Present in the core of protein and making hydrophobic interactions |
+| Large Non-Polar Aromatic | Phenylalanine, Tyrosine, Tryptophane | Involve in hydrophobic interactions. Tyrosine and Tryptophane have slightly polar aromatic ring therefore act as phosphorylation sites|
+| Large Polar | Glutamine, Asparagine| Present at surface of protein and from hydrogen bonds |
+| Large Polar Acidic| Aspartate, Glutamate| Present at surface of protein and form salt bridges|
+| Larg Polar Basic | Lysine, Arginine, Histidine | Present at surface of protein and form salt bridges|
+
 ### 62. Peptide Bond; A link between Amino Acids
+
+<img src="./part62_peptide_bond_before.png" height="100">
+
+<img src="./part62_peptide_bond_after.png" height="100">
+
 ### 63. Double Bond like Character in Peptide Bond & Ramachandran Plot
+
+- $\phi$ and $\psi$ angle in peptide bond:
+
+<img src="./part63_peptide_bind.png" height="100">
+
+- Ramachandran plot
+
+<img src="./part63_ramachandran_plot.png" height="200">
+
+- Ramachandran plot can be used to verify the 3D structure
+
 ### 64. Forces Stabilizing The Protein Structure
+1. Hydrogen bonds
+2. Vander Waal interactions
+3. Hydrophobic interactions
+
 ### 65. Secondary Structures of Proteins
+- Alpha-helix in protein secondary structure
+  - Naturally occurring alpha-helixes are right-handed
+  - In alpha-helix, each turn have 3.6 amino acids
+  - Alpha-helix is stabilized by hydrogen bonds. There is i, i+4, formula to make hydrogen bonds
+  - Gly and Pro are not present in helix
+  - $\phi$ and $\psi$ in right handed alpha-helix is around b/w 60 and 45 degrees
+
+<img src="./part65_alphahelix.png" height="100">
+
+- Beta-sheet in protein secondary structure
+  - Each region is known as beta-strand
+  - Hydrogen bonds b/w adjacent strands are stabilizing forces in beta-sheet
+  - $\phi$ and $\psi$ are located in the uppoer left region of Ramachandran plot
+
+<img src="./part65_betasheet.png" height="100">
+
+- Coil and loops in protein structure
+  - Hot-spot regions: high solvent exposure, structural flexibility
+  - Less sensitive to mutations
+
+<img src="./part65_loopcoil.png" height="100">
+
 ### 66. Practical 13: Visualization of Protein Structure in Pymol
+- https://pymol.org
+  - One month free then license is required
+- https://www.ovito.org
+
 ### 67. Practical 13(A): Visulization of Protein Structure in Chimera (Part-1)
+- https://www.rbvi.ucsf.edu/chimerax/
+
 ### 68. Practical 13(B): Visulization of Protein Structure in Chimera (Part-2)
+
 ### 69. Why Protein Structure Prediction is So Important?
+- Limitation of experimental methods
+  - X-ray Crystallography: converting protein into crystal requires long time job
+  - NMR Spectroscopy: for small protein less than 20k dalton
+  - Cryo-EM: only for large protein more than 20k dalton
+- Huge gap b/w protein sequence database and protein structure database
+
 ### 70. Protein Secondary Structure Prediction Algorithms (Part-1)
+- Protein
+  - Globular proteins
+  - Trans-membrane proteins
+- There are separate sets of algorithms for secondary structure prediction in both type of proteins
+- Secondary structure prediction algorithms
+  - Ab-initio based algorithm
+    - Chou-Fasman
+    - GOR
+  - Homology based algorithm
+
 ### 71. Protein Secondary Structure Prediction Algorithms (Part-2)
+- Chou-Fasman algorithm for prediction of secondary structure: by considering relative propensities of each amino acid to be present in specific confirmation
+  - Propensities are basically intrinsic tendencies of amino acids
+  - (x/m)/(y/n) is used o calculate the frequency
+  - For example, glycine propensity in alpha-helix so
+    - n is total number of residues in 3D structures
+    - m is total number of residues in alpha-helix of 3D structures
+    - y is total number of glycine in 3D structures
+    - x is total number of glycine in helixes 3D structures
+- GOR algorithm: considering individual tendency of amoni acids may not lead to accurate predictions
+  - Neighboring amino acids may influence the tendency of amino acid to be in specific confirmation
+  - This algorithm considers the neighboring effect phenomenon
+  - This algorithm considers the window of 17 amino acid residues to predict the confirmation of middle 9th residue
+- Homology based algorithm
+  - Basic assumption: secondary structures are more conserved as compared to primary sequences
+  - If we know the secondary structure of homolog then based on the homolog structure, we can predict the secondary structure of our protein sequence
+  
 ### 72. Practical-15: Prediction of Globular Protein Secondary Structure
+- GOR-IV
+- Now Ochanomizu University server is offline
+- Use https://npsa.lyon.inserm.fr/cgi-bin/npsa_automat.pl?page=/NPSA/npsa_gor4.html
+
 ### Assignment 8: Assignment 8
+```
+>AXI68674.1 serine protease [Pseudomonas aeruginosa]
+MHTLKRCMAAMVALLALSLAMTARAELPDFTPLVEQASPAVVNISTRQKLPDRAMARGQLSIPDLEGLPP
+MFRDFLERSIPQVPRNPRGQQREAQSLGSGFIISNDGYILTNNHVVADADEILVRLSDRSEHKAKLIGAD
+PRSDVAVLKIEAKNLPTLKLGDSNKLKVGEWVLAIGSPFGFDHSVTAGIVSAKGRSLPNESYVPFIQTDV
+AINPGNSGGPLLNLQGEVVGINSQIFTRSGGFMGLSFAIPIDVALNVADQLKKAGKVSRGWLGVVIQEVN
+KDLAESFGLDKPSGALVAQLVEDGPAAKGGLQVGDVILSLNGQSINESADLPHLVGNMKPGDKINLDVIR
+NGQRKSLSMAVGSLPDDDEEIASMGAPGAERSSNRLGVTVADLTAEQRKSLDIQGGVVIKEVQDGPAAVI
+GLRPGDVITHLDNKAVTSTKVFADVAKALPKNRSVSMRVLRQGRASFITFKLAE
+```
+- In the graph, red lines peaks indicate the presences of alpha-helix in the query protein sequence while blue line peaks indicate the presences of beta-sheets in the query protein sequence. 
+- GOR-IV predicts loops along with alpha-helix and beta-sheets. In the graph, the regions without any blue or red peaks indicate the presences of loops. 
+
+<img src="./assgn8_gor4_1.png" height="200">
+
+<img src="./assgn8_gor4_2.png" height="150">
+
 ### 73. Algorithm for Secondary Structure Prediction of Transmembrane Proteins
+- Transmembrane protein
+  - Helical transmembrane proteins
+  - Beta-Barrels proteins
+- Approximately 30% of cellular proteins are transmembrane
+- Structure determination is very hard
+- Prediction is only reliable option
+
 ### 74. Practical-16: Prediction of Transmembrane Helix Secondary Structure
+- https://services.healthtech.dtu.dk/services/TMHMM-2.0/
+  - Helical Markov based model
+
 ### Assignment 9: Assignment 9
+```
+MEILCEDNTSLSSIPNSLMQVDGDSGLYRNDFNSRDANSSDASNWTIDGENRTNLSFEGYLPPTCLSILHL
+QEKNWSALLTAVVIILTIAGNILVIMAVSLEKKLQNATNYFLMSLAIADMLLGFLVMPVSMLTILYGYRWP
+LPSKLCAVWIYLDVLFSTASIMHLCAISLDRYVAIQNPIHHSRFNSRTKAFLKIIAVWTISVGVSMPIPVF
+GLQDDSKVFKQGSCLLADDNFVLIGSFVAFFIPLTIMVITYFLTIKSLQKEATLCVSDLSTRAKLASFSFL
+PQSSLSSEKLFQRSIHREPGSYTGRRTMQSISNEQKACKVLGIVFFLFVVMWCPFFITNIMAVICKESCNE
+HVIGALLNVFVWIGYLSSAVNPLVYTLFNKTYRSAFSRYIQCQYKENRKPLQLILVNTIPALAYKSSQLQA
+GQNKDSKEDAEPTDNDCSMVTLGKQQSEETCTDNINTVNEKVSCV
+```
+
+<img src="./assgn9_tmhmm.png" height="200">
+
+- There were total of seven alpha-helix which were predicted in the query protein sequence by TMHMM. 
+- The first loop was toward the outside of the cell. TMHMM used a positive inside rule to make this prediction. 
+- The last loop was toward the inside of the cell and its total length was 91 amino acid residues. e last loop was toward the inside of the cell and its total length was 91 amino acid residues. 
+
 ### 75. 3D Structure Prediction Algorithms
+- Proteins are non-functional until attain 3D shape after folding
+- 3D structure prediction methods
+  - Homology based algorithm
+    - Modeller
+  - Threading based algorithm
+    - I-TASSER
+  - ML based algorithm
+    - Alpha-Fold
+- Critical Assessment of Protein Structure Prediction (CASP)
+  - CASP experiments started in 1994
+  - Last CASP experiments reveal that Alpha-Fold is the most accurate method for protein 3D structure prediction
+
 ### 76. Homology Based Algorithm (Part-1)
+- Also called Homology modelling or comparative modeling
+    1. Template selection from protein databank
+    2. Alignment of query sequence with best template
+    3. Back bone model building
+    4. Side chain refinement
+    5. Loop modeling
+    6. Model optimization
+
 ### 77. Homology Based Algorithm (Part-2)
+- Template selection in homology modeling
+- Protein in BLAST
+- We will build the 3D model of our query protein sequence based on the structural template identified in protein databank
+- Homologous proteins share common structural features
+1. Criteria for selection of template?
+    - There should be at least 30% sequence identity b/w query sequence and template sequence
+    - In case of multiple templates, highest resolution structure should be selected
+    - Structural resolution is depicted in PDB in Anstrom. Lower the value of Anstrom better will be the solution
+2. Sequence Alignment
+    - Once have best template then second step is sequence alignment
+    - Better alignment, better will be model building
+  
 ### 78. Homology Based Algorithm (Part-3)
+3. Backbone modeling
+    - Once the optimum alignment is achieved, backbone modeling is started
+    - The regions identical b/w query sequence and template sequences assumed to have similar structure
+4. Loop modeling    
+    - Regions of high deletions and insertions cannot be modeled directly
+    - These regions are making loops and coils
+    - Spare part algorithm is used for loop modeling
+    - $\phi$ and $\psi$ of loop should be in allowed regions of Ramachandran plot 
+
 ### 79. Homology Based Algorithm (Part-4)
+5. Side chain optimization
+    - Maintain lowest possible interaction energy
+    - Rotamer libraries are also used for side-chain placement
+6. Model optimization
+    - There is need to cure the structural irregularities
+    - Cure of structural irregularities using energy minimization
+    - Extensive energy minimization may make structure unrealistic
+
 ### 80. Model Validation & Draw back of Homology Based Algorithm
+7. Structure assessment
+    - You need to validate the model by building Ramachandran plot
+- Homology based algorithm drawbacks
+  - What if there will be no satisfactory template in the protein databank?
+  - Can we not develop model for our protein?
+    - Threading algorithm may help
+
 ### 81. Practical-17: Prediction of 3D structure Using Homology Modeling (Mdeller)
+- https://salilab.org/modeller/
+- Download binary per OS
+- The registered key is required
+  - Academic use is free
+  - "*.edu" email address is required
+- From BLAST library
+  - Accession number is the PDB id
+    - Ex: 4UUM
+
 ### Assignment 10: Assignment 10
+```
+>AXI68674.1 serine protease [Pseudomonas aeruginosa]
+MHTLKRCMAAMVALLALSLAMTARAELPDFTPLVEQASPAVVNISTRQKLPDRAMARGQLSIPDLEGLPP
+MFRDFLERSIPQVPRNPRGQQREAQSLGSGFIISNDGYILTNNHVVADADEILVRLSDRSEHKAKLIGAD
+PRSDVAVLKIEAKNLPTLKLGDSNKLKVGEWVLAIGSPFGFDHSVTAGIVSAKGRSLPNESYVPFIQTDV
+AINPGNSGGPLLNLQGEVVGINSQIFTRSGGFMGLSFAIPIDVALNVADQLKKAGKVSRGWLGVVIQEVN
+KDLAESFGLDKPSGALVAQLVEDGPAAKGGLQVGDVILSLNGQSINESADLPHLVGNMKPGDKINLDVIR
+NGQRKSLSMAVGSLPDDDEEIASMGAPGAERSSNRLGVTVADLTAEQRKSLDIQGGVVIKEVQDGPAAVI
+GLRPGDVITHLDNKAVTSTKVFADVAKALPKNRSVSMRVLRQGRASFITFKLAE
+```
+
+<img src="./assgn10_blastp.png" height="150">
+
+- The closest ones are 22KG, 8K2Y, 7CO7, ... but the instructor asked to use 3MH7, 1KY9, 3STJ, 3PV2
+
 ### 82. Threading Algorithm for 3D Structure Prediction
+
 ### 83. Practical-18: Prediction of 3D structure Using Threading Technique (I-TASSER)
+
 ### Assignment 11: Assignment 11
+
 ### 84. (Very Important) Practical Learn How to Use Alpha-Fold 2
+<img src="./" height="100">
+<img src="./" height="100">
+
+
 ### 85. Practical Learn How to Use Alpha-Fold3
 ### Assignment 12: Assignment 12
 ### 86. How to Make Publication Quality Images In Pymol? (Very Important)
@@ -736,6 +1069,8 @@ KK
 ### 90. (Optional) Practical 3: ZINC Database for Drug Searching
 ### 91. Update Another GOR-IV Server for Secondary Structure Predictions
 3min
+
+## Section 5: Module 5: Evolutionary Bioinformatics
 
 ### 92. What is Evolution and Phylogenetics
 ### 93. Some Important Terms To Understand Phylogenetic Tree
