@@ -153,11 +153,11 @@
 - https://www.ebi.ac.uk/jdispatcher/
   - https://www.ebi.ac.uk/jdispatcher/seqstats/emboss_dotmatcher
 
-<img src="./part17_menu.png" height=300>
+<img src="./part17_menu.png" height=400>
 
 - Window size can be controlled to remove noises
 
-<img src="./part17_plot.png" height=200>
+<img src="./part17_plot.png" height=300>
 
 ### 18. Practical-3 (Optional): DotMatcher for Qualitative Comparison of Sequence
 - Dotmatcher is a qualitative technique to compare two sequences with one another
@@ -299,24 +299,24 @@ AGTTGGCATTATAAGAAAGCATTGCTTATCAATTTGTTGCAACGAAC
 - Needle algorithm from EMBOSS: https://www.ebi.ac.uk/jdispatcher/psa/emboss_needle
 - Menu:
 
-<img src="./part23_needle_menu.png" height="200">
+<img src="./part23_needle_menu.png" height="300">
 
 - Result:
   - "-" in the sequence is gap
 
-<img src="./part23_needle_result.png" height="200">
+<img src="./part23_needle_result.png" height="300">
 
 ### 24. Practical-5: Pairwise Sequence Alignment Using Protein
 - Select protein option in the menu
 - Menu:
 
-<img src="./part24_menu.png" height="200">
+<img src="./part24_menu.png" height="300">
 
 - Result:
   - ":" for when both matching is similar
   - As there is no insertion or deletion, gaps is 0%
 
-<img src="./part24_result.png" height="200">
+<img src="./part24_result.png" height="300">
 
 ### 25. Practical-6: Local Pairwise Sequence
 - Water method in EMBOSS: https://www.ebi.ac.uk/jdispatcher/psa/emboss_water
@@ -438,16 +438,16 @@ RLMAEYKSTQLKLKQRITKVENKVKNFGSGYLSDGFDSATDTEGGK
 ```
 - Menu:
 
-<img src="./assgn4_menu.png" height="100">
+<img src="./assgn4_menu.png" height="300">
 
 - Result:
 
-<img src="./assgn4_result.png" height="100">
+<img src="./assgn4_result.png" height="300">
 
 - From Aligments menu, manual inspection is available
   - Bit-score provides a normalized measure of alignment quality that is independent of database size
   
-<img src="./assgn4_bitscore.png" height="100">
+<img src="./assgn4_bitscore.png" height="300">
 
 ### 34. Optional: How to Use PSI-BLAST
 - Sensitivity means inclusion of all positive values
@@ -608,7 +608,7 @@ KK
 - The strick (*) signs indicate the identical amino acids.
 - The colon (:) indicates a high level of similarity while dot signs (.) show moderately similar amino acids.
 
-<img src="./assgn5_alignment.png" height="150">
+<img src="./assgn5_alignment.png" height="300">
 
 ### Quiz 2: Quiz 2
 
@@ -848,20 +848,20 @@ H2N - C - COOH
   - Gly and Pro are not present in helix
   - $\phi$ and $\psi$ in right handed alpha-helix is around b/w 60 and 45 degrees
 
-<img src="./part65_alphahelix.png" height="100">
+<img src="./part65_alphahelix.png" height="300">
 
 - Beta-sheet in protein secondary structure
   - Each region is known as beta-strand
   - Hydrogen bonds b/w adjacent strands are stabilizing forces in beta-sheet
   - $\phi$ and $\psi$ are located in the uppoer left region of Ramachandran plot
 
-<img src="./part65_betasheet.png" height="100">
+<img src="./part65_betasheet.png" height="300">
 
 - Coil and loops in protein structure
   - Hot-spot regions: high solvent exposure, structural flexibility
   - Less sensitive to mutations
 
-<img src="./part65_loopcoil.png" height="100">
+<img src="./part65_loopcoil.png" height="300">
 
 ### 66. Practical 13: Visualization of Protein Structure in Pymol
 - https://pymol.org
@@ -927,9 +927,9 @@ GLRPGDVITHLDNKAVTSTKVFADVAKALPKNRSVSMRVLRQGRASFITFKLAE
 - In the graph, red lines peaks indicate the presences of alpha-helix in the query protein sequence while blue line peaks indicate the presences of beta-sheets in the query protein sequence. 
 - GOR-IV predicts loops along with alpha-helix and beta-sheets. In the graph, the regions without any blue or red peaks indicate the presences of loops. 
 
-<img src="./assgn8_gor4_1.png" height="200">
+<img src="./assgn8_gor4_1.png" height="400">
 
-<img src="./assgn8_gor4_2.png" height="150">
+<img src="./assgn8_gor4_2.png" height="300">
 
 ### 73. Algorithm for Secondary Structure Prediction of Transmembrane Proteins
 - Transmembrane protein
@@ -954,7 +954,7 @@ HVIGALLNVFVWIGYLSSAVNPLVYTLFNKTYRSAFSRYIQCQYKENRKPLQLILVNTIPALAYKSSQLQA
 GQNKDSKEDAEPTDNDCSMVTLGKQQSEETCTDNINTVNEKVSCV
 ```
 
-<img src="./assgn9_tmhmm.png" height="200">
+<img src="./assgn9_tmhmm.png" height="400">
 
 - There were total of seven alpha-helix which were predicted in the query protein sequence by TMHMM. 
 - The first loop was toward the outside of the cell. TMHMM used a positive inside rule to make this prediction. 
@@ -1044,57 +1044,230 @@ NGQRKSLSMAVGSLPDDDEEIASMGAPGAERSSNRLGVTVADLTAEQRKSLDIQGGVVIKEVQDGPAAVI
 GLRPGDVITHLDNKAVTSTKVFADVAKALPKNRSVSMRVLRQGRASFITFKLAE
 ```
 
-<img src="./assgn10_blastp.png" height="150">
+<img src="./assgn10_blastp.png" height="300">
 
-- The closest ones are 22KG, 8K2Y, 7CO7, ... but the instructor asked to use 3MH7, 1KY9, 3STJ, 3PV2
+- The closest ones are 22KG, 8K2Y, 7CO7, ... but the instructor asked to use 3MH7, 1KY9, 3STJ, 3PV2. Here, the requested nucleotides are used
+- Copy and Paste the sequence in the BLAST-P query window and search the Protein Data Bank (PDB) to search appropriate structural templates. (How to use BLAST-P to search structural templates in PDB is demonstrated in Practical-17 video tutorials). We have already searched templates for you. You can download them directly from Protein Databank. The PDB ID of templates is 3MH7, 1KY9, 3STJ, 3PV2. We highly recommend you go with these templates on your first attempt. Later on when you will be an expert then use your templates.
+- Please download the 4 best templates from PDB and rename them as tseq1, tseq2, tseq3 and tseq4. (Note: Renaming the templates is not mandatory. If you will use our naming system then there will be no need to edit Script-2.)
+- Run all Scripts as demonstrated in the video tutorials and predict the 3D structure of the protein.
+- Visualize your best-predicted model in Pymol. You may learn how to download and install Pymol by watching the video tutorial Practical-13. 
+- Build the Ramachandran Plot of your best-predicted Model. To build the plot, please click here to access the website. Once you access the website then you will have the following page 
+- Script1.py analyzes the query sequence
+- Script2.py multiple sequence alignments to find a template
+  - Here, tseq1 is the closest
+  - "@3.0" means that the resolution is 3.0
+```
+                                                               .--- tseq1A@3.0  
+  34.0000
+                                                               |
+                                        .-------------------------- tseq3A@2.6  
+  48.0000
+                                        |
+        .---------------------------------------------------------- tseq2A@2.8  
+  67.5000
+        |
+      .------------------------------------------------------------ tseq4A@2.2
+
+      +----+----+----+----+----+----+----+----+----+----+----+----+
+    68.8400   62.8100   56.7800   50.7500   44.7200   38.6900   32.6600
+         65.8250   59.7950   53.7650   47.7350   41.7050   35.6750
+```
+- Script3.py
+  - Update the python script using the closest template
+  - Pair-wise sequence alignment of the query with the template
+- Script4.py
+  - Update the python script using the closest template
+  - Builds 3D model
+    - "qseq1.B99990001.pdb" is the most closest model
+```
+  >> Summary of successfully produced models:
+Filename                          molpdf     DOPE score    GA341 score
+----------------------------------------------------------------------
+qseq1.B99990001.pdb           3257.11841   -40986.34766        1.00000
+qseq1.B99990002.pdb           3528.80347   -40132.31641        1.00000
+qseq1.B99990003.pdb           3298.68970   -42048.91016        1.00000
+qseq1.B99990004.pdb           3282.86401   -41269.66797        1.00000
+qseq1.B99990005.pdb           3634.45288   -40666.27344        1.00000
+```
+- Script5.py
+  - Update the file to load as qseq1.B99990001.pdb as shown above
+```
+  # Energy of each residue is written to: qseq1.profile
+# The profile IS normalized by the number of restraints.
+# The profiles are smoothed over a window of residues:   13
+# The sum of all numbers in the file:     -14.9730
+
+<< end of ENERGY.
+DOPE score               : -40987.085938
+```
+- Questions for this assignment
+  - Can you please let us know on which basis you have selected the templates for the 3D structure prediction in Modeller?
+    - The templates are selected on the basis of the highest identity and high crystallographic resolution. The resolution of protein structure is depicted by angstrom values
+  - Can you please let us know which one was the best-predicted model among the five using the DOPE score?
+    - qseq1.B99990001.pdb with DOPE -40986.34766 
+  - The four templates which we have provided you which was having the highest resolution?
+    - tseq4A@2.2
+  - Please look at the log file of script-2 and let us know which template will be most appropriate for building the 3D structure among the four?
+    - tseq1A@3.0
+  - Please develop the Ramachandran plot for your best-predicted model using Ramachandran plot tool.  Please have a look at the Ramachandran plot and let us know whether our predicted model is accurate or not.
+  - Please see the instructions to get access the server to build Ramachandran plot. 
+- ?
+  - In assignment 10, qseq1.B99990001.pdb is selected as the best-predicted model
+  - But Q4, the best template is tseq4?
 
 ### 82. Threading Algorithm for 3D Structure Prediction
+- Protein structures are more conserved than protein sequences
+- I-TASSER
+  - Pairwise energy based method
+  - Profile based method
 
 ### 83. Practical-18: Prediction of 3D structure Using Threading Technique (I-TASSER)
-
+- https://zhanggroup.org/I-TASSER/
+- For the homology, the modeller is the best
+- For threading, I-TASSER is the best so far
+  - Use the normalized Z score 
+  
 ### Assignment 11: Assignment 11
+- Academic email ID required
 
 ### 84. (Very Important) Practical Learn How to Use Alpha-Fold 2
-<img src="./" height="100">
-<img src="./" height="100">
-
+- https://www.alphafold.ebi.ac.uk
 
 ### 85. Practical Learn How to Use Alpha-Fold3
+- https://alphafoldserver.com/welcome
+- Max 5000 tokens per model
+- Proteins: 1 token per standard amino acid residue
+- DNA, RNA: 1 token per input nucleotide base
+- Ligands: 1 token per atom in the ligand
+- Ions: 1 token per ion
+
 ### Assignment 12: Assignment 12
+
 ### 86. How to Make Publication Quality Images In Pymol? (Very Important)
+
 ### Quiz 4: Quiz 4
+
 ### 87. (Optional) Practical-18.1: Use of InterPro
+- https://www.ebi.ac.uk/interpro/
+
+
 ### 88. (Optional) Practical-20: How to Perform Docking Easily Using Vina
+- CB-DocK: https://cadd.labshare.cn:11080/cb-dock3/php/blinddock_v3.php
+
 ### 89. (Optional) Practical-21: How to Analyze the Docking Data
+- https://www.ebi.ac.uk/thornton-srv/software/LIGPLOT/
+  - Download is not supported
+- https://github.com/RomanLas/LigPlus
+
 ### 90. (Optional) Practical 3: ZINC Database for Drug Searching
+- https://zinc15.docking.org
+
+<img src="./part90_dopamin.png" height="300">
+
 ### 91. Update Another GOR-IV Server for Secondary Structure Predictions
-3min
 
 ## Section 5: Module 5: Evolutionary Bioinformatics
 
 ### 92. What is Evolution and Phylogenetics
+- References
+  - Fossils
+  - Molecular phylogenetics
+
 ### 93. Some Important Terms To Understand Phylogenetic Tree
+
+<img src="./part93_terms.png" height="300">
+
 ### 94. Different Type of Phylogenetic Trees
+
+<img src="./part94_tree.png" height="300">
+
+- Phylogram is better than clado gram
+
 ### 95. Steps To Construct Phylogenetic Tree
+- Five steps to construct molecular phylogentic tree
+    1. Selection of molecular marker/fossils
+    2. Alignment of sequences
+    3. Selection of evolutionary model
+    4. Construction of tree
+    5. Assessment of tree correctness
+
 ### 96. Selection of Molecular Marker for Tree Construction
+- DNA or Protein
+- Proteins tends to evolve slow as compared to nucleotides
+- In case of closely related organisms DNA sequences will be preferred
+- In case of highly divergent organisms protein sequences will be preferred
+
 ### 97. Alignment for Tree Construction
+- Once we have molecular marker, this is time for alignment
+- Better the alignment, better will be tree building
+
 ### 98. Evolutionary Model Selection
+- Rate of substitution is directly proportional to the evolutionary distance
+- Observed number of substitutions may be different then actual number
+- Evolutionary models
+  - Jukes-Cantor model
+  - Kimura model
+- Substitutions
+  - Transitions: purine changes to purine
+  - Transversions  : purine changes to pyrimidine
+- Transitions are more common as compared to transversions during evolution
+- Kimura model acccounts transitions and transversions separately
+
 ### 99. Methods To Construct Tree
+- Distance Based method
+  - UPGMA
+  - NJ Method
+- Character based method
+  - Maximum Parsimony
+  - ML Method
+- Evolution distance matrix for distance based method  
+- Phylogenetic tree for character based method
+
 ### 100. Validation of Tree By Bootstrapping
+
 ### 101. Practical -19: Building Phylogenetic Tree
+- Identification of unknown bacteria
+- BLAST-N to search homologous
+- https://phylogeny.fr
+
 ### Assignment 13: Assignment 12
+- 10 of 16S rRNA sequences vs unknown bacteria
+
+<img src="./assgn13_phylogenetic_tree.png" height="300">
+
+- Please look at the developed phylogenetic tree and let us know that "Unkown bacteria" is closest to which bacteria in the tree? 
+  - Bacteria 1
+- The first tree that is developed by Phylogeny.fr is cladogram or phylogram and what is the difference between cladogram and phylogram?
+  - Phylogram. Cladogram doesn't show the distance
+- Is there any option in Phylogeny.fr to convert the cladogram to phylogram and vice versa?
+  - Yes. Top/right
+How many basic steps are involved in the development of a phylogenetic tree?
+  - There are five basic steps that are involved in building a phylogenetic tree (1) Selection of Molecular Markers (2) Alignment (MSA) (3) Evolutionary Model (4)  Tree Building (NJ or ML methods) (5) Validation of tree (Bootstrapping)
+
 ### 102. Practical-19.1: Building Beautiful Circular Phylogenetic Tree
+- Export phylogentic tree result into newic format:
+
+<img src="./part102_newic_export.png" height="100">
+
+- https://itol.embl.de
+
+<img src="./part102_iTOL.png" height="300">
+
 ### Quiz 5: Quiz 5
 
+## Section 6: Module 6 (Optional)
+
 ### 103. Practical-22: How to install Linux in Windows for Bioinformatics Analysis
+
 ### 104. Practical-24: How to Download Chemsketch
+
 ### 105. Practical-25: Ligand Drawing and Making of Ligand 3D Structure
+- https://avogadro.cc
+
 ### 106. How to Use AI to Do Literature Review Smartly
-11min
+- https://www.semanticscholar.org
 
-
-
-
+------------------------------------------------------------
 
 # Learn Bioinformatics - Beginner to Master Through Projects
 - Instructor: Rafiq Ur Rehman
