@@ -1,5 +1,6 @@
 # Sample CMake projects and templates for CPP/MPI code
-1. sample1_gtest
+
+## 1. sample1_gtest
     - Downloand/install googletest on-the-fly
 ```bash
 $ mkdir build
@@ -33,7 +34,7 @@ The following tests FAILED:
 Errors while running CTest
 ```
 
-2. sample2_mpi
+## 2. sample2_mpi
     - Coupling MPI for CMake
 ```bash
 $ module load openmpi_5.0.10
@@ -92,3 +93,31 @@ parallel_test    =   0.26 sec*proc (3 tests)
 
 Total Test time (real) =   0.27 sec
 ```
+
+## 3. sample3_cyclic_depend
+- Cyclic dependency
+  - lib2x needs the definition of ret_3x() and ret_4x() from lib3x and lib4x
+  - lib3x needs the definition of ret_4x() and ret_2x() from lib4x and lib2x
+  - lib4x needs the definition of ret_2x() and ret_3x() from lib2x and lib3x
+  - At link stage (not compiling), repeat library calls then the linker can handle cyclic dependency: `g++ main.cpp.o -o a.exe  liblib2x.a liblib3x.a liblib4x.a liblib2x.a liblib3x.a liblib4x.a` 
+- For STATIC libraries, cmake will scan twice for cyclic dependency. If more repetitions are required, then use LINK_INTERFACE_MULTIPLICITY such as: `set_target_properties(lib2x PROPERTIES LINK_INTERFACE_MULTIPLICITY 3)`
+- Scenario 1
+  - lib2x contains ret_2x() and comb_A() functions
+  - main.cpp uses ret_2x() only
+  - `g++ main.cpp.o -o a.exe liblib2x.a` fails as comb_A() needs the definition of ret_3x() and ret_4x(), which are from lib3x and lib4x respectively
+    ```bash
+    $ nm src/liblib2x.a
+    func_2x.cpp.o:
+    0000000000000016 T _Z6comb_ARi
+    0000000000000000 T _Z6ret_2xRi  #<-- defined in the lib2x
+                    U _Z6ret_3xRi  #<-- not defined but referred
+                    U _Z6ret_4xRi  #<-- not defined but referred
+    ```  
+  - Solution:
+    - Add lib3x and lib4x into linker. In other words, link all lib2x, lib3x, lib4x, and this could be waste of resource (too much redundancy)
+    - As comb_A() function is not needed in main.cpp, we may ignore such undefined references. In CMakeLists.txt:
+        ```cmake
+        target_link_libraries(a.exe lib2x )
+        target_link_options(a.exe PRIVATE "LINKER:--unresolved-symbols=ignore-all")
+        ```    
+        - In CLI: `/usr/bin/c++ -Wl,--unresolved-symbols=ignore-all CMakeFiles/a.exe.dir/main.cpp.o -o a.exe  liblib2x.a`
