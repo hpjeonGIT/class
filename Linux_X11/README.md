@@ -302,9 +302,162 @@ Addr Line File Flags
     - Overwriting with new will lose those comments in old
     - `patch old < patch_content` will update the differences, keeping the comments made above
 
-## How/when to use a binary editor
-- ImHex
-  - https://github.com/WerWolv/ImHex
+# Linux network
+
+## Netmask in ip setup
+- Netmask 255.255.255.0 vs 255.255.255.192
+- 255.255.255.0 = 11111111.11111111.11111111.00000000 => /24 => 24 of 1 and left-over as zero
+  - one larger netwok with 254 hosts
+- 255.255.255.192 = 11111111.11111111.11111111.11000000 => /26 => 26 of 1 and left-over as zero
+  - four smaller networks, each with 62 hosts
+  - 192.168.1.0/26, 192.168.1.64/26, 192.168.1.128/26, 192.168.1.192/26
+
+## Asymmetric subnetting
+- 192.168.1.101 couldn't reach 192.168.1.201
+  - Found that 101 vs 201 had different netmask => Asymmetric subnetting
+- 192.168.1.101 has /26. When it tries to reach 201, it will send packet to default gateway as it thinks 201 is outside of subnet
+- 192.168.1.201 has /24. Now it tries to respond but it thinks 101 is inside of subnet, and ARPs directly to 101. So handshake fails
+
+# Binary/Hex Editor
+
+## How/when to use a binary editor (from Gemini)
+1. File Header Inspection & Corrupted File Repair
+  - Every file format starts with specific "magic bytes" (signatures) that tell the operating system what the file is.
+  - Identifying unknown files: If a file lacks an extension or won't open, opening it in GHex lets you read the first few bytes (e.g., 89 50 4E 47 for a PNG image or 25 50 44 46 for a PDF) to identify its true format.
+  - Fixing corrupted headers: If a file's header gets damaged during a failed download or disk error, you can manually paste valid header bytes from a working file of the same type to make it readable again.
+2. Reverse Engineering & Binary Patching
+  - Software engineers and security researchers use GHex to examine compiled executables without needing the original source code.
+  - Finding hardcoded strings: You can search the ASCII pane for error messages, URLs, or file paths embedded inside a compiled program.
+  - Patching binaries: Developers sometimes alter specific bytes—such as changing a conditional jump instruction or tweaking a hardcoded limit—to test software behavior or bypass a broken check in legacy software.
+3. Game Save Editing & Modding
+  - In single-player PC gaming (especially older titles or indie games), save files are often stored as uncompressed binary data rather than plain text.
+  - Modifying stats: Players open save files in GHex, search for the hexadecimal equivalent of their current in-game currency, health, or item count, and overwrite those bytes to increase the values.
+  - Unlocking content: Toggling specific 00 bytes to 01 can often unlock hidden levels, characters, or debug menus.
+4. Embedded Systems & Firmware Analysis
+  - Hardware engineers working with microcontrollers, routers, or IoT devices use GHex to inspect raw firmware dumps and memory images.
+  - Verifying memory layouts: Engineers check compiled .bin or .hex firmware files to ensure bootloaders, configuration tables, and application code sit at the exact memory offsets required by the hardware.
+  - Extracting assets: You can locate and carve out embedded images, certificates, or configuration blocks stored inside monolithic firmware images.
+5. Debugging Network Protocols & Custom File Formats
+  - When writing software that communicates over raw TCP/UDP sockets or saves data in a custom binary format, standard logging often hides invisible characters.
+  - Spotting off-by-one errors: GHex's built-in data conversion table (which translates highlighted bytes into signed/unsigned integers, floats, and binary) makes it easy to verify endianness (byte order) and catch misaligned data fields.
+  - Checking control characters: It clearly displays non-printable characters like null terminators (00), carriage returns (0D), and line feeds (0A) that cause silent bugs in parsers.
+
+## xxd
+- CLI hex tool
+- Ref: https://www.binarytranslator.ai/xxd-command/
+```bash
+$ more txt.txt 
+hello world
+
+$ xxd txt.txt 
+00000000: 6865 6c6c 6f20 776f 726c 640a 0a         hello world..
+```
+- In hex, 68 -> h, 65 -> e, ... , 20 -> space, 0a -> line feed
+- JPEG File signature : https://www.dev-toolbox.tech/tools/hex-editor/examples/jpeg-file-signature
+  - JPEG magic bytes: FF D8 FF E0
+  - Doesn't prove that the file is valid or safe though
+```bash
+$ xxd -l 16 AAA.jpg 
+00000000: ffd8 ffe0 0010 4a46 4946 0001 0101 0048  ......JFIF.....H
+$ xxd -l 16 XXX.jpg 
+00000000: ffd8 ffe0 0010 4a46 4946 0001 0102 0076  ......JFIF.....v
+--------->^^^^ ^^^^<-----------
+```
+- ELF (Executable and Linkable Format) magic bytes: 7F 45 4C 46
+  - https://filesignature.org/elf
+```bash
+$ xxd -l 16 ./bin_write.o # object file from *.c
+00000000: 7f45 4c46 0201 0100 0000 0000 0000 0000  .ELF............
+$ xxd -l 16 ./a.out  # executable made from gcc
+00000000: 7f45 4c46 0201 0100 0000 0000 0000 0000  .ELF............
+--------->^^^^ ^^^^ <-------
+```  
+
+## hexdump
+- Ref: https://opensource.com/article/19/8/dig-binary-files-hexdump
+```bash
+$ convert -size 1x1 canvas:black pixel.png
+$ file pixel.png 
+pixel.png: PNG image data, 1 x 1, 1-bit grayscale, non-interlaced
+$ xxd pixel.png 
+00000000: 8950 4e47 0d0a 1a0a 0000 000d 4948 4452  .PNG........IHDR
+00000010: 0000 0001 0000 0001 0100 0000 0037 6ef9  .............7n.
+00000020: 2400 0000 2063 4852 4d00 007a 2600 0080  $... cHRM..z&...
+00000030: 8400 00fa 0000 0080 e800 0075 3000 00ea  ...........u0...
+00000040: 6000 003a 9800 0017 709c ba51 3c00 0000  `..:....p..Q<...
+00000050: 0262 4b47 4400 01dd 8a13 a400 0000 0774  .bKGD..........t
+00000060: 494d 4507 ea0b 1b00 3205 16d9 d335 0000  IME.....2....5..
+00000070: 000a 4944 4154 08d7 6360 0000 0002 0001  ..IDAT..c`......
+00000080: e221 bc33 0000 0000 4945 4e44 ae42 6082  .!.3....IEND.B`.
+$ hexdump --canonical pixel.png 
+00000000  89 50 4e 47 0d 0a 1a 0a  00 00 00 0d 49 48 44 52  |.PNG........IHDR|
+00000010  00 00 00 01 00 00 00 01  01 00 00 00 00 37 6e f9  |.............7n.|
+00000020  24 00 00 00 20 63 48 52  4d 00 00 7a 26 00 00 80  |$... cHRM..z&...|
+00000030  84 00 00 fa 00 00 00 80  e8 00 00 75 30 00 00 ea  |...........u0...|
+00000040  60 00 00 3a 98 00 00 17  70 9c ba 51 3c 00 00 00  |`..:....p..Q<...|
+00000050  02 62 4b 47 44 00 01 dd  8a 13 a4 00 00 00 07 74  |.bKGD..........t|
+00000060  49 4d 45 07 ea 0b 1b 00  32 05 16 d9 d3 35 00 00  |IME.....2....5..|
+00000070  00 0a 49 44 41 54 08 d7  63 60 00 00 00 02 00 01  |..IDAT..c`......|
+00000080  e2 21 bc 33 00 00 00 00  49 45 4e 44 ae 42 60 82  |.!.3....IEND.B`.|
+```
+- PNG magic bytes: https://filesignature.org/png
+  - 89 50 4E 47 0D 0A 1A 0A
+
+## ghex
+- writer.c
+```c
+#include <stdio.h>
+
+int main(void) {
+    int values[] = {10, 20, 30};
+    int result[3];
+
+    FILE *file = fopen("data.bin", "wb");
+    if (file == NULL) return 1;
+    fwrite(values, sizeof values[0], 3, file);
+    fclose(file);
+    return 0;
+}
+```
+- reader.c
+```c
+#include <stdio.h>
+int main(void) {
+    int values[] = {10, 20, 30};
+    int result[3];
+    FILE *file = fopen("data.bin", "rb");
+    if (file == NULL) return 1;
+    size_t count = fread(result, sizeof result[0], 3, file);
+    fclose(file);
+    printf(" %d %d %d \n", result[0], result[1], result[2]);
+    return 0;
+}
+```
+- Demo:
+```bash
+$ ./writer.exe 
+$ ./reader.exe 
+ 10 20 30 
+$ hexdump --canonical data.bin
+00000000  0a 00 00 00 14 00 00 00  1e 00 00 00              |............|
+```
+- Dex to Hex: 10-> 0xA, 20 -> 0x14, 30 -> 0x1E
+- Now let's edit with ghex:
+  -  Dex to Hex: 99 -> 0x63, 111 -> 0x6F, 12345 -> 0x3039
+
+<img src="./ghex.png" height="50">
+
+- Demo:
+```bash
+$ hexdump --canonical data.bin
+00000000  63 00 00 00 6f 00 00 00  39 30 00 00              |c...o...90..|
+0000000c
+$ ./reader.exe 
+ 99 111 12345 
+```
+
+## ImHex
+- https://github.com/WerWolv/ImHex
 - Let's write a C code producing a binary file:
 ```c
 #include <stdio.h>
@@ -330,18 +483,3 @@ int main() {
 - 09 is found at address 04
 - 0A (which is 10 in decimal) at address 08
 - As 4 int values (5,9,10,11) consume the first 64bit addresses, 'hello' is stored in the next address 00000010
-
-
-## Netmask in ip setup
-- Netmask 255.255.255.0 vs 255.255.255.192
-- 255.255.255.0 = 11111111.11111111.11111111.00000000 => /24 => 24 of 1 and left-over as zero
-  - one larger netwok with 254 hosts
-- 255.255.255.192 = 11111111.11111111.11111111.11000000 => /26 => 26 of 1 and left-over as zero
-  - four smaller networks, each with 62 hosts
-  - 192.168.1.0/26, 192.168.1.64/26, 192.168.1.128/26, 192.168.1.192/26
-
-## Asymmetric subnetting
-- 192.168.1.101 couldn't reach 192.168.1.201
-  - Found that 101 vs 201 had different netmask => Asymmetric subnetting
-- 192.168.1.101 has /26. When it tries to reach 201, it will send packet to default gateway as it thinks 201 is outside of subnet
-- 192.168.1.201 has /24. Now it tries to respond but it thinks 101 is inside of subnet, and ARPs directly to 101. So handshake fails
